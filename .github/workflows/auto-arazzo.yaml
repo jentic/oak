@@ -1,0 +1,139 @@
+name: Generate Arazzo Spec from OpenAPI URL in Issue
+
+on:
+  issues:
+    types: [ opened ]
+
+jobs:
+  generate-arazzo:
+    if: contains(github.event.issue.body, 'openapi_url:')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Extract OpenAPI URL and Details from issue body
+        id: extract_info
+        run: |
+          echo "Parsing OpenAPI URL and details from issue..."
+          BODY="${{ github.event.issue.body }}"
+          URL=$(echo "$BODY" | grep -oP '(?<=openapi_url:).*' | head -n 1 | xargs)
+          # Attempt to extract vendor and api_name from URL structure
+          # Example: .../apis/openapi/vendor.com/api_name/version/openapi.json
+          VENDOR_NAME=$(echo "$URL" | grep -oP '(?<=apis/openapi/)[^/]+' | head -n 1)
+          API_NAME=$(echo "$URL" | grep -oP '(?<=apis/openapi/'"$VENDOR_NAME"'/)[^/]+' | head -n 1)
+          # Extract version from the part right before openapi.json
+          API_VERSION=$(echo "$URL" | grep -oP '[^/]+(?=/openapi\.json)' | head -n 1)
+
+          if [ -z "$URL" ]; then
+            echo "::error::Could not extract openapi_url from issue body."
+            exit 1
+          fi
+          if [ -z "$VENDOR_NAME" ]; then
+            echo "::warning::Could not automatically determine VENDOR_NAME from URL: $URL. Defaulting path."
+            VENDOR_NAME="unknown-vendor-${{ github.event.issue.number }}"
+          fi
+          if [ -z "$API_NAME" ]; then
+            # Assume 'main' if api_name part is missing or different structure
+            echo "::warning::Could not automatically determine API_NAME from URL: $URL. Assuming 'main'."
+            API_NAME="main"
+          fi
+          if [ -z "$API_VERSION" ]; then
+            # Assume 'latest' if version part is missing or different structure
+            echo "::warning::Could not automatically determine API_VERSION from URL: $URL. Assuming 'latest'."
+            API_VERSION="latest"
+          fi
+
+          echo "Extracted URL: $URL"
+          echo "Determined Vendor: $VENDOR_NAME"
+          echo "Determined API Name: $API_NAME"
+          echo "Determined API Version: $API_VERSION"
+
+          echo "openapi_url=$URL" >> $GITHUB_OUTPUT
+          echo "vendor_name=$VENDOR_NAME" >> $GITHUB_OUTPUT
+          echo "api_name=$API_NAME" >> $GITHUB_OUTPUT
+          echo "api_version=$API_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Call Arazzo Generator API and Create File
+        id: call_api_and_create_file
+        run: |
+          echo "Calling Arazzo Generator API with OpenAPI URL: ${{ steps.extract_info.outputs.openapi_url }}"
+          RESPONSE=$(curl -s -f -X POST https://jentic-arazzo-generator.qa1.eu-west-1.jenticdev.net/generate \
+            -H "Content-Type: application/json" \
+            -d '{
+              "url": "${{ steps.extract_info.outputs.openapi_url }}",
+              "format": "json",
+              "validate": true,
+              "enable_llm": true,
+              "enable_rules": false,
+              "direct_llm": false,
+              "llm_provider": "gemini"
+            }')
+
+          # Determine output directory structure based on vendor/api name
+          VENDOR="${{ steps.extract_info.outputs.vendor_name }}"
+          API="${{ steps.extract_info.outputs.api_name }}"
+          if [ "$API" == "main" ] || [ -z "$API" ]; then
+            TARGET_SUBDIR="$VENDOR"
+          else
+            TARGET_SUBDIR="${VENDOR}~${API}"
+          fi
+
+          # Define the target file path within the current repository
+          TARGET_DIR="workflows/$TARGET_SUBDIR"
+          SPEC_FILE="$TARGET_DIR/workflows.arazzo.json"
+          echo "Target spec file: $SPEC_FILE"
+
+          # Ensure the target directory exists
+          mkdir -p "$TARGET_DIR"
+
+          # Attempt to parse and save the spec file
+          if ! echo "$RESPONSE" | jq -e '.arazzo_spec' > "$SPEC_FILE"; then
+             echo "::error::API call failed or API response did not contain expected '.arazzo_spec' field."
+             echo "Response was:"
+             echo "$RESPONSE"
+             exit 1
+          fi
+          echo "API call successful, $SPEC_FILE created in workspace."
+
+          # --- Debugging: Verify file --- (Run within the context of the workspace)
+          echo "--- Debug: Checking created file ---"
+          ls -la "$TARGET_DIR"
+          echo "Content of $SPEC_FILE (first 5 lines):"
+          head -n 5 "$SPEC_FILE" || echo "WARN: Could not read head of $SPEC_FILE"
+          echo "--- End Debugging ---"
+
+      # Optional: Check git status within the repository
+      - name: Check Git Status Before PR Action
+        run: |
+          echo "--- Debug: Git Status ---"
+          git status
+          echo "--- End Debug Status ---"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.PAT_AUTO_OPENAPI }}
+          # No 'path' needed, operates on the whole repo
+          commit-message: "feat: Add Arazzo spec for ${{ steps.extract_info.outputs.vendor_name }}/${{ steps.extract_info.outputs.api_name }}/${{ steps.extract_info.outputs.api_version }} (Issue #${{ github.event.issue.number }})"
+          title: "feat: Add Arazzo spec for ${{ steps.extract_info.outputs.vendor_name }}/${{ steps.extract_info.outputs.api_name }}/${{ steps.extract_info.outputs.api_version }} (Issue #${{ github.event.issue.number }})"
+          body: |
+            This PR adds the Arazzo spec generated for the OpenAPI URL provided in Issue #${{ github.event.issue.number }} to Jentic OAK.
+
+            **Vendor:** ${{ steps.extract_info.outputs.vendor_name }}
+            **API Name:** ${{ steps.extract_info.outputs.api_name }}
+            **API Version:** ${{ steps.extract_info.outputs.api_version }}
+            **Source URL:** ${{ steps.extract_info.outputs.openapi_url }}
+
+            Arazzo spec was automatically generated by the hosted API.
+
+            Closes #${{ github.event.issue.number }}
+          branch: feat/arazzo-${{ steps.extract_info.outputs.vendor_name }}-${{ steps.extract_info.outputs.api_name }}-${{ steps.extract_info.outputs.api_version }}-${{ github.event.issue.number }}
+          base: main # Or your target branch in jentic-arazzo-generator
+          # Optional: Add labels, assignees etc.
+          # labels: automated-pr, arazzo-spec
