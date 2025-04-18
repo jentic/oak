@@ -4,6 +4,18 @@ The OAK Runner is a workflow execution engine that processes and executes API wo
 
 ## Usage
 
+### Execute a Workflow
+```python
+from oak_runner import OAKRunner
+
+# Create a runner instance
+runner = OAKRunner.from_arazzo_path("../../workflows/discord.com/workflows.arazzo.json")
+
+# Execute a workflow with inputs
+result = runner.execute_workflow("workflowId", {"param1": "value1"})
+```
+
+### Display Authentication Options
 ```python
 from oak_runner import OAKRunner
 
@@ -12,11 +24,9 @@ runner = OAKRunner.from_arazzo_path("../../workflows/discord.com/workflows.arazz
 
 # Display authentication options for the API
 print(runner.get_env_mappings())
-
-# Execute a workflow with inputs
-result = runner.execute_workflow("workflowId", {"param1": "value1"})
 ```
 
+### Execute a Single OpenAPI Operation
 ```python
 from oak_runner import OAKRunner
 # Execute a single OpenAPI operation with an operationId
