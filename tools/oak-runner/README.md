@@ -10,15 +10,16 @@ from oak_runner import OAKRunner
 # Create a runner instance
 runner = OAKRunner.from_arazzo_path("../../workflows/discord.com/workflows.arazzo.json")
 
-# Access authentication options for the API
-env_mappings = runner.get_env_mappings()
+# Display authentication options for the API
+print(runner.get_env_mappings())
 
 # Execute a workflow with inputs
 result = runner.execute_workflow("workflowId", {"param1": "value1"})
-
+```
+```python
 # Create a runner instance with a custom base path for resolving OpenAPI file paths
 runner_with_base_path = OAKRunner.from_arazzo_path(
-    "./tests/fixtures/my/arazzo.yaml", 
+    "./my/arazzo.yaml", 
     base_path="./my/source/description/base"
 )
 ```
@@ -29,14 +30,14 @@ Credentials are resolved from environment variables defined by the OAK Runner ba
 
 The OAK Runner supports various authentication methods defined in OpenAPI specifications:
 
-- **API Key**: Header, query, or cookie-based API keys
-- **OAuth2**: Some OAuth2 flows (client credentials, password)
-- **HTTP**: Basic and Bearer authentication
+- **API Key**: Header, Query, or Cookie API keys
+- **OAuth2**: Some OAuth2 Flows (Client Credentials, Password)
+- **HTTP**: Basic and Bearer Authentication
 
 ### Auth Methods Not Yet Supported
-- **OAuth2**: Authorization code, implicit
-- **OpenID**: OpenID Connect authentication
-- **Custom**: Custom authentication schemes
+- **OAuth2**: Authorization Code, Implicit
+- **OpenID**: OpenID Connect
+- **Custom**: Custom Authentication Schemes
 
 
 ## Command Line Usage
