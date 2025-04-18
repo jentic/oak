@@ -1,0 +1,141 @@
+# Test configuration for pet-coupons workflows
+
+# Base URLs
+base_urls:
+  pet-coupons: https://petstore3.swagger.io
+  pet-coupons.openapi: https://petstore3.swagger.io
+
+# Custom mocks for specific operations
+custom_mocks:
+  pet-coupons:
+    # Mocking operations with relative paths (without base URL) to match actual requests
+    
+    # Mock for findPetsByTags operation with correct tags parameter
+    - path: "/pet/findByTags"
+      method: get
+      query_params:
+        tags: ["golden", "friendly"]
+      status_code: 200
+      response:
+        - id: 123
+          name: "Golden Retriever"
+          category:
+            id: 1
+            name: "Dogs"
+          photoUrls:
+            - "https://example.com/photos/golden1.jpg"
+          price: 699.99
+          tags:
+            - id: 1
+              name: "golden"
+            - id: 2
+              name: "friendly"
+          status: "available"
+    
+    # Mock for findPetsByStatus
+    - path: /pet/findByStatus
+      method: get
+      status_code: 200
+      response:
+        - id: 456
+          name: "Siamese Cat"
+          category:
+            id: 2
+            name: "Cats"
+          photoUrls:
+            - "https://example.com/photos/siamese1.jpg"
+          price: 499.99
+          tags:
+            - id: 3
+              name: "siamese"
+            - id: 4
+              name: "indoor"
+          status: "available"
+    
+    # Mock for getPetCoupons - exact format for JSON pointer extraction
+    - path: /pet/123/coupons
+      method: get
+      status_code: 200
+      response:
+        couponCode: "DOG20"
+        id: 10
+        description: "Summer Sale - 20% off Dogs!"
+        
+    # Mock for getPetCoupons with path parameter
+    - path: /pet/{petId}/coupons
+      method: get
+      status_code: 200
+      response:
+        couponCode: "DOG20"
+        id: 10
+        description: "Summer Sale - 20% off Dogs!"
+    
+    # Mock for placeOrder with coupon
+    - path: /store/order
+      method: post
+      status_code: 200
+      response:
+        id: 1001
+        petId: 123
+        quantity: 1
+        status: "placed"
+        complete: false
+        couponCode: "DOG20"
+    
+    # Mock for coupon not found
+    - path: /pet/999/coupons
+      method: get
+      status_code: 404
+      response:
+        code: 404
+        type: "error"
+        message: "Coupon not found"
+
+# Test workflows with specific inputs and expected outputs
+workflows:
+  # Test apply-coupon workflow (happy path)
+  - id: apply-coupon
+    inputs:
+      my_pet_tags: ["golden", "friendly"]
+      store_id: "pets.example.com"
+    expect_success: true
+    expected_outputs:
+      apply_coupon_pet_order_id: 1001
+      "find-pet.my_pet_id": 123 
+      "find-coupons.my_coupon_code": "DOG20"
+      "place-order.my_order_id": 1001
+    expected_api_calls: 3
+  
+  # Test buy-available-pet workflow
+  - id: buy-available-pet
+    inputs:
+      store_id: "pets.example.com"
+    expect_success: true
+    expected_outputs:
+      buy_pet_order_id: 1001
+      "find-pet.my_pet_id": 456
+      "place-order.my_order_id": 1001
+    expected_api_calls: 2
+  
+  # Test place-order workflow directly
+  - id: place-order
+    inputs:
+      pet_id: 123
+      quantity: 1
+      coupon_code: "DOG20"
+    expect_success: true
+    expected_outputs:
+      workflow_order_id: 1001
+      "place-order.step_order_id": 1001
+    expected_api_calls: 1
+  
+  # Test place-order without coupon code
+  - id: place-order
+    inputs:
+      pet_id: 456
+      quantity: 2
+    expect_success: true
+    expected_outputs:
+      workflow_order_id: 1001
+      "place-order.step_order_id": 1001
+    expected_api_calls: 1

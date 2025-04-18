@@ -1,0 +1,156 @@
+arazzo: 1.0.0
+info:
+  title: Spotify API Workflows
+  description: Common workflows for interacting with the Spotify API
+  version: 1.0.0
+
+sourceDescriptions:
+  - name: spotifyApi
+    url: ./spotify.openapi.yaml
+    type: openapi
+  - name: spotifyAuth
+    url: ./spotify.auth.openapi.yaml
+    type: openapi
+
+workflows:
+  - workflowId: getSpotifyToken
+    summary: Get Spotify API token using client credentials
+    description: Obtain an access token for the Spotify API using client credentials flow
+    inputs:
+      type: object
+      properties:
+        client_id:
+          type: string
+          description: The Spotify API client ID
+        client_secret:
+          type: string
+          description: The Spotify API client secret
+      required:
+        - client_id
+        - client_secret
+    steps:
+      - stepId: tokenRequest
+        description: Request a token from Spotify Auth server
+        operationId: get-spotify-token
+        requestBody:
+          contentType: application/x-www-form-urlencoded
+          payload:
+            grant_type: client_credentials
+            client_id: $inputs.client_id
+            client_secret: $inputs.client_secret
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          access_token: $response.body.access_token
+          token_type: $response.body.token_type
+          expires_in: $response.body.expires_in
+    outputs:
+      access_token: $steps.tokenRequest.access_token
+      token_type: $steps.tokenRequest.token_type
+      expires_in: $steps.tokenRequest.expires_in
+
+  - workflowId: searchTracks
+    summary: Search for tracks in Spotify
+    description: Search for tracks matching a query in the Spotify catalog
+    dependsOn: ["getSpotifyToken"]
+    inputs:
+      type: object
+      properties:
+        query:
+          type: string
+          description: The search query string
+        limit:
+          type: integer
+          description: Maximum number of results to return (1-50)
+          default: 10
+        client_id:
+          type: string
+          description: The Spotify API client ID
+        client_secret:
+          type: string
+          description: The Spotify API client secret
+      required:
+        - query
+        - client_id
+        - client_secret
+    steps:
+      - stepId: searchSpotify
+        description: Search the Spotify catalog for tracks matching the query
+        operationId: search
+        parameters:
+          - name: q
+            in: query
+            value: $inputs.query
+          - name: type
+            in: query
+            value: "track"
+          - name: limit
+            in: query
+            value: $inputs.limit
+          - name: Authorization
+            in: header
+            value: "Bearer $dependencies.getSpotifyToken.access_token"
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          items: $response.body.tracks.items
+          total: $response.body.tracks.total
+          limit: $response.body.tracks.limit
+          offset: $response.body.tracks.offset
+    outputs:
+      tracks: $steps.searchSpotify.items
+      total: $steps.searchSpotify.total
+      limit: $steps.searchSpotify.limit
+      offset: $steps.searchSpotify.offset
+      
+  - workflowId: getTrackDetails
+    summary: Get details for a specific track
+    description: Retrieve comprehensive information about a specific track by its ID
+    dependsOn: ["getSpotifyToken"]
+    inputs:
+      type: object
+      properties:
+        trackId:
+          type: string
+          description: The Spotify ID of the track
+        client_id:
+          type: string
+          description: The Spotify API client ID
+        client_secret:
+          type: string
+          description: The Spotify API client secret
+      required:
+        - trackId
+        - client_id
+        - client_secret
+    steps:
+      - stepId: getTrack
+        description: Get the track details from Spotify
+        operationId: get-track
+        parameters:
+          - name: id
+            in: path
+            value: $inputs.trackId
+          - name: Authorization
+            in: header
+            value: "Bearer $dependencies.getSpotifyToken.access_token"
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          id: $response.body.id
+          name: $response.body.name
+          artists: $response.body.artists
+          album: $response.body.album
+          duration_ms: $response.body.duration_ms
+          popularity: $response.body.popularity
+          preview_url: $response.body.preview_url
+          external_urls: $response.body.external_urls
+    outputs:
+      trackId: $steps.getTrack.id
+      name: $steps.getTrack.name
+      artists: $steps.getTrack.artists
+      album: $steps.getTrack.album
+      duration_ms: $steps.getTrack.duration_ms
+      popularity: $steps.getTrack.popularity
+      preview_url: $steps.getTrack.preview_url
+      external_urls: $steps.getTrack.external_urls
