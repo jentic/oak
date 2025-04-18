@@ -124,17 +124,6 @@ class AuthProcessor:
             except Exception as e:
                 logger.warning(f"Error extracting auth requirements from spec with ID {source_id}: {str(e)}")
         
-        # Process additional auth from Arazzo workflows if provided
-        if arazzo_specs:
-            for arazzo_spec in arazzo_specs:
-                workflow_auth = extract_auth_from_arazzo(arazzo_spec)
-                logger.debug(f"Found {len(workflow_auth)} auth requirements in Arazzo workflow")
-                # Merge auth requirements, avoiding duplicates
-                existing_names = {req.name.lower() for req in auth_requirements}
-                for req in workflow_auth:
-                    if req.name.lower() not in existing_names:
-                        auth_requirements.append(req)
-        
         # Generate environment variable mappings
         env_mappings = self.generate_env_mappings(auth_requirements)
         
