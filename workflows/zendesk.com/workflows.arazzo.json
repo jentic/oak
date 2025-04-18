@@ -1,0 +1,1261 @@
+{
+  "arazzo": "1.0.1",
+  "info": {
+    "title": "Jentic Generated Arazzo Specification",
+    "version": "1.0.0",
+    "description": "Automatically generated Arazzo specification from OpenAPI"
+  },
+  "sourceDescriptions": [
+    {
+      "name": "openapi_source",
+      "url": "./apis/openapi/zendesk.com/main/2.0.0/openapi.json",
+      "type": "openapi"
+    }
+  ],
+  "workflows": [
+    {
+      "workflowId": "define-and-populate-a-custom-object-type",
+      "summary": "Creates a new custom object type, adds fields to it, and then creates a record for that custom object type.",
+      "description": "Creates a new custom object type, adds fields to it, and then creates a record for that custom object type.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "create-custom-object-type_body": {
+            "type": "object"
+          },
+          "custom_object_key": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "create-custom-object-type",
+          "description": "Defines a new custom object type.",
+          "operationId": "CreateCustomObject",
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": "$inputs.create-custom-object-type_body"
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "key": "$response.body#/key",
+            "url": "$response.body#/url"
+          }
+        },
+        {
+          "stepId": "add-field-to-custom-object",
+          "description": "Adds a new field definition to the created custom object type.",
+          "operationId": "CreateCustomObjectField",
+          "parameters": [
+            {
+              "name": "custom_object_key",
+              "in": "path",
+              "value": "$steps.create-custom-object-type.outputs.key"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "custom_object_key": "$steps.create-custom-object-type.outputs.key"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "key": "$response.body#/key",
+            "id": "$response.body#/id"
+          }
+        },
+        {
+          "stepId": "create-custom-object-record",
+          "description": "Creates a new record instance for the custom object type, populating its fields.",
+          "operationId": "CreateCustomObjectRecord",
+          "parameters": [
+            {
+              "name": "custom_object_key",
+              "in": "path",
+              "value": "$steps.create-custom-object-type.outputs.key"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "custom_object_key": "$steps.create-custom-object-type.outputs.key"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "url": "$response.body#/url"
+          }
+        }
+      ],
+      "outputs": {
+        "key": "$steps.add-field-to-custom-object.outputs.key",
+        "url": "$steps.create-custom-object-record.outputs.url",
+        "id": "$steps.create-custom-object-record.outputs.id"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "merge-duplicate-end-users",
+      "summary": "Identifies potential duplicate end users based on search criteria (like email) and merges one into another, consolidating user data and tickets.",
+      "description": "Identifies potential duplicate end users based on search criteria (like email) and merges one into another, consolidating user data and tickets.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "search-user-by-email",
+          "description": "Search for users based on email address to identify potential duplicates.",
+          "operationId": "SearchUsers",
+          "parameters": [
+            {
+              "name": "query",
+              "in": "query",
+              "value": "$inputs.query"
+            },
+            {
+              "name": "external_id",
+              "in": "query",
+              "value": "$inputs.external_id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "users": "$response.body#/users",
+            "count": "$response.body#/count"
+          }
+        },
+        {
+          "stepId": "merge-users",
+          "description": "Merges the 'losing' user (specified in the path) into the 'winning' user (specified in the body). Requires user IDs identified from search or other means.",
+          "operationId": "MergeEndUsers",
+          "parameters": [
+            {
+              "name": "user_id",
+              "in": "path",
+              "value": "$steps.search-user-by-email.outputs.users.id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "user_id": "$steps.search-user-by-email.outputs.users[0].id",
+              "user.id": "$steps.search-user-by-email.outputs.users[1].id"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "user": "$response.body#/user"
+          }
+        }
+      ],
+      "outputs": {
+        "users": "$steps.search-user-by-email.outputs.users",
+        "count": "$steps.search-user-by-email.outputs.count",
+        "user": "$steps.merge-users.outputs.user"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "permanently-delete-user-gdpr-compliance",
+      "summary": "First soft-deletes a user, then permanently deletes them for compliance purposes.",
+      "description": "First soft-deletes a user, then permanently deletes them for compliance purposes.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "deleted_user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "soft-delete-user",
+          "description": "Soft deletes a user, marking them as inactive.",
+          "operationId": "DeleteUser",
+          "parameters": [
+            {
+              "name": "user_id",
+              "in": "path",
+              "value": "$inputs.user_id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "user": "$response.body#/user"
+          }
+        },
+        {
+          "stepId": "permanently-delete-user",
+          "description": "Permanently deletes the user data associated with the soft-deleted user.",
+          "operationId": "PermanentlyDeleteUser",
+          "parameters": [
+            {
+              "name": "deleted_user_id",
+              "in": "path",
+              "value": "$steps.soft-delete-user.outputs.user.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "deleted_user": "$response.body#/deleted_user"
+          }
+        }
+      ],
+      "outputs": {
+        "user": "$steps.soft-delete-user.outputs.user",
+        "deleted_user": "$steps.permanently-delete-user.outputs.deleted_user"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "find-related-tickets-using-lookup-relationship",
+      "summary": "Finds all tickets (sources) related to a specific user (target) through a defined lookup relationship field.",
+      "description": "Finds all tickets (sources) related to a specific user (target) through a defined lookup relationship field.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "target_type": {
+            "type": "string"
+          },
+          "target_id": {
+            "type": "string"
+          },
+          "field_id": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "get-target-user",
+          "description": "Retrieve the target user object to confirm its ID.",
+          "operationId": "ShowUser",
+          "parameters": [
+            {
+              "name": "user_id",
+              "in": "path",
+              "value": "$inputs.user_id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "user": "$response.body#/user"
+          }
+        },
+        {
+          "stepId": "find-tickets-by-user-lookup",
+          "description": "Finds all tickets where the specified user ID is populated in the given lookup relationship field.",
+          "operationId": "GetSourcesByTarget",
+          "parameters": [
+            {
+              "name": "target_type",
+              "in": "path",
+              "value": "$inputs.target_type"
+            },
+            {
+              "name": "target_id",
+              "in": "path",
+              "value": "$steps.get-target-user.outputs.user.id"
+            },
+            {
+              "name": "field_id",
+              "in": "path",
+              "value": "$inputs.field_id"
+            },
+            {
+              "name": "source_type",
+              "in": "path",
+              "value": "$inputs.source_type"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "sources": "$response.body#/sources"
+          }
+        }
+      ],
+      "outputs": {
+        "user": "$steps.get-target-user.outputs.user",
+        "sources": "$steps.find-tickets-by-user-lookup.outputs.sources"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "manage-ticket-satisfaction-rating",
+      "summary": "Allows an end user (requester) to submit a satisfaction rating for their solved ticket.",
+      "description": "Allows an end user (requester) to submit a satisfaction rating for their solved ticket.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "ticket_id": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "get-solved-ticket",
+          "description": "End user retrieves their request (ticket) details to confirm it's solved.",
+          "operationId": "ShowRequest",
+          "parameters": [
+            {
+              "name": "request_id",
+              "in": "path",
+              "value": "$inputs.request_id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "request": "$response.body#/request"
+          }
+        },
+        {
+          "stepId": "submit-satisfaction-rating",
+          "description": "Submits a satisfaction rating (good/bad) and optional comment for the ticket.",
+          "operationId": "CreateTicketSatisfactionRating",
+          "parameters": [
+            {
+              "name": "ticket_id",
+              "in": "path",
+              "value": "$steps.get-solved-ticket.outputs.request.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "satisfaction_rating": "$response.body#/satisfaction_rating"
+          }
+        }
+      ],
+      "outputs": {
+        "request": "$steps.get-solved-ticket.outputs.request",
+        "satisfaction_rating": "$steps.submit-satisfaction-rating.outputs.satisfaction_rating"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "add-collaborators-to-a-ticket",
+      "summary": "Adds CCs (Collaborators) to an existing ticket to keep relevant parties informed.",
+      "description": "Adds CCs (Collaborators) to an existing ticket to keep relevant parties informed.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "get-ticket-details",
+          "description": "Retrieve the current details of a ticket, including existing collaborators.",
+          "operationId": "ShowTicket",
+          "parameters": [
+            {
+              "name": "ticket_id",
+              "in": "path",
+              "value": "$inputs.ticket_id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "ticket": "$response.body#/ticket"
+          }
+        },
+        {
+          "stepId": "update-ticket-collaborators",
+          "description": "Updates the ticket by adding new collaborators.",
+          "operationId": "UpdateTicket",
+          "parameters": [
+            {
+              "name": "ticket_id",
+              "in": "path",
+              "value": "$steps.get-ticket-details.outputs.ticket.id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "ticket_id": "$steps.get-ticket-details.outputs.ticket.id"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "ticket": "$response.body#/ticket",
+            "audit": "$response.body#/audit"
+          }
+        }
+      ],
+      "outputs": {
+        "ticket": "$steps.update-ticket-collaborators.outputs.ticket",
+        "audit": "$steps.update-ticket-collaborators.outputs.audit"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "recover-suspended-ticket",
+      "summary": "Identifies a suspended ticket and recovers it, making it a normal ticket in the system.",
+      "description": "Identifies a suspended ticket and recovers it, making it a normal ticket in the system.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "sort_by": {
+            "type": "string"
+          },
+          "sort_order": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "list-suspended-tickets",
+          "description": "Lists currently suspended tickets.",
+          "operationId": "ListSuspendedTickets",
+          "parameters": [
+            {
+              "name": "sort_by",
+              "in": "query",
+              "value": "$inputs.sort_by"
+            },
+            {
+              "name": "sort_order",
+              "in": "query",
+              "value": "$inputs.sort_order"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "suspended_tickets": "$response.body#/suspended_tickets"
+          }
+        },
+        {
+          "stepId": "recover-suspended-ticket",
+          "description": "Recovers a specific suspended ticket using its ID.",
+          "operationId": "RecoverSuspendedTicket",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.list-suspended-tickets.outputs.suspended_tickets.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "ticket": "$response.body#/ticket"
+          }
+        }
+      ],
+      "outputs": {
+        "suspended_tickets": "$steps.list-suspended-tickets.outputs.suspended_tickets",
+        "ticket": "$steps.recover-suspended-ticket.outputs.ticket"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "manage-user-email-identity-verification",
+      "summary": "Adds a new email identity to a user, requests verification, and allows checking the verification status.",
+      "description": "Adds a new email identity to a user, requests verification, and allows checking the verification status.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "type[]": {
+            "type": "string"
+          },
+          "user_identity_id": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "create-user-email-identity",
+          "description": "Adds a new email identity to a specified user's profile.",
+          "operationId": "CreateUserIdentity",
+          "parameters": [
+            {
+              "name": "user_id",
+              "in": "path",
+              "value": "$inputs.user_id"
+            },
+            {
+              "name": "type[]",
+              "in": "query",
+              "value": "$inputs.type[]"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "identity": "$response.body#/identity"
+          }
+        },
+        {
+          "stepId": "request-identity-verification",
+          "description": "Sends a verification email to the newly added email address.",
+          "operationId": "RequestUserVerfication",
+          "parameters": [
+            {
+              "name": "user_id",
+              "in": "path",
+              "value": "$steps.create-user-email-identity.outputs.identity.user_id"
+            },
+            {
+              "name": "user_identity_id",
+              "in": "path",
+              "value": "$steps.create-user-email-identity.outputs.identity.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "verification_data": "$response.body"
+          }
+        },
+        {
+          "stepId": "check-identity-verification-status",
+          "description": "Checks the status of the email identity, specifically if it has been verified (after the user clicks the link in the email).",
+          "operationId": "ShowUserIdentity",
+          "parameters": [
+            {
+              "name": "user_id",
+              "in": "path",
+              "value": "$steps.create-user-email-identity.outputs.identity.user_id"
+            },
+            {
+              "name": "user_identity_id",
+              "in": "path",
+              "value": "$steps.create-user-email-identity.outputs.identity.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "identity": "$response.body#/identity"
+          }
+        }
+      ],
+      "outputs": {
+        "identity": "$steps.check-identity-verification-status.outputs.identity",
+        "verification_data": "$steps.request-identity-verification.outputs.verification_data"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "redact-sensitive-information-from-ticket-comment",
+      "summary": "Identifies a specific comment on a ticket and redacts sensitive text within it.",
+      "description": "Identifies a specific comment on a ticket and redacts sensitive text within it.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string"
+          },
+          "include_inline_images": {
+            "type": "string"
+          },
+          "include": {
+            "type": "string"
+          },
+          "ticket_comment_id": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "get-ticket-comments",
+          "description": "List comments for a ticket to identify the comment ID and its content.",
+          "operationId": "ListTicketComments",
+          "parameters": [
+            {
+              "name": "ticket_id",
+              "in": "path",
+              "value": "$inputs.ticket_id"
+            },
+            {
+              "name": "include_inline_images",
+              "in": "query",
+              "value": "$inputs.include_inline_images"
+            },
+            {
+              "name": "include",
+              "in": "query",
+              "value": "$inputs.include"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "comments": "$response.body#/comments"
+          }
+        },
+        {
+          "stepId": "redact-comment-text",
+          "description": "Redacts a specific string within the identified comment.",
+          "operationId": "RedactStringInComment",
+          "parameters": [
+            {
+              "name": "ticket_id",
+              "in": "path",
+              "value": "$steps.get-ticket-comments.outputs.comments.ticket_id"
+            },
+            {
+              "name": "ticket_comment_id",
+              "in": "path",
+              "value": "$steps.get-ticket-comments.outputs.comments.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "comment": "$response.body#/comment"
+          }
+        }
+      ],
+      "outputs": {
+        "comments": "$steps.get-ticket-comments.outputs.comments",
+        "comment": "$steps.redact-comment-text.outputs.comment"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "manage-group-memberships",
+      "summary": "Assigns a user to a group and optionally sets it as their default group.",
+      "description": "Assigns a user to a group and optionally sets it as their default group.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "group_membership_id": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "create-group-membership",
+          "description": "Assigns a user to a specific group.",
+          "operationId": "CreateGroupMembership",
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "group_membership": "$response.body#/group_membership"
+          }
+        },
+        {
+          "stepId": "set-membership-as-default",
+          "description": "Sets the newly created group membership as the default for the user.",
+          "operationId": "GroupMembershipSetDefault",
+          "parameters": [
+            {
+              "name": "user_id",
+              "in": "path",
+              "value": "$steps.create-group-membership.outputs.group_membership.user_id"
+            },
+            {
+              "name": "group_membership_id",
+              "in": "path",
+              "value": "$steps.create-group-membership.outputs.group_membership.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "group_memberships": "$response.body#/group_memberships"
+          }
+        }
+      ],
+      "outputs": {
+        "group_membership": "$steps.create-group-membership.outputs.group_membership",
+        "group_memberships": "$steps.set-membership-as-default.outputs.group_memberships"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "export-audit-logs",
+      "summary": "Initiates an asynchronous job to export audit logs based on specified filters.",
+      "description": "Initiates an asynchronous job to export audit logs based on specified filters.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "filter[source_type]": {
+            "type": "string"
+          },
+          "filter[source_id]": {
+            "type": "string"
+          },
+          "filter[actor_id]": {
+            "type": "string"
+          },
+          "filter[ip_address]": {
+            "type": "string"
+          },
+          "filter[created_at]": {
+            "type": "string"
+          },
+          "filter[action]": {
+            "type": "string"
+          },
+          "job_status_id": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "export-audit-logs-job",
+          "description": "Starts a job to export audit logs, optionally filtered by criteria like source_type, actor_id, etc.",
+          "operationId": "ExportAuditLogs",
+          "parameters": [
+            {
+              "name": "filter[source_type]",
+              "in": "query",
+              "value": "$inputs.filter[source_type]"
+            },
+            {
+              "name": "filter[source_id]",
+              "in": "query",
+              "value": "$inputs.filter[source_id]"
+            },
+            {
+              "name": "filter[actor_id]",
+              "in": "query",
+              "value": "$inputs.filter[actor_id]"
+            },
+            {
+              "name": "filter[ip_address]",
+              "in": "query",
+              "value": "$inputs.filter[ip_address]"
+            },
+            {
+              "name": "filter[created_at]",
+              "in": "query",
+              "value": "$inputs.filter[created_at]"
+            },
+            {
+              "name": "filter[action]",
+              "in": "query",
+              "value": "$inputs.filter[action]"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "job_data": "$response.body"
+          }
+        },
+        {
+          "stepId": "check-export-job-status",
+          "description": "Checks the status of the export job. (Note: The job ID is not directly returned by the export endpoint; it needs to be obtained through listing job statuses or other means).",
+          "operationId": "ShowJobStatus",
+          "parameters": [
+            {
+              "name": "job_status_id",
+              "in": "path",
+              "value": "$inputs.job_status_id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "job_status": "$response.body#/job_status"
+          }
+        }
+      ],
+      "outputs": {
+        "job_data": "$steps.export-audit-logs-job.outputs.job_data",
+        "job_status": "$steps.check-export-job-status.outputs.job_status"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "create-reseller-trial-account",
+      "summary": "Checks if a subdomain is available and then creates a new trial account for a reseller.",
+      "description": "Checks if a subdomain is available and then creates a new trial account for a reseller.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "check-subdomain-availability",
+          "description": "Verifies if the desired subdomain for the trial account is available.",
+          "operationId": "VerifySubdomainAvailability",
+          "parameters": [
+            {
+              "name": "subdomain",
+              "in": "query",
+              "value": "$inputs.subdomain"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "success": "$response.body#/success"
+          }
+        },
+        {
+          "stepId": "create-trial-account",
+          "description": "Creates a new trial account using the available subdomain.",
+          "operationId": "CreateTrialAccount",
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "account": "$response.body#/account"
+          }
+        }
+      ],
+      "outputs": {
+        "success": "$steps.check-subdomain-availability.outputs.success",
+        "account": "$steps.create-trial-account.outputs.account"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "configure-account-settings",
+      "summary": "Retrieves current account settings and updates specific configurations.",
+      "description": "Retrieves current account settings and updates specific configurations.",
+      "steps": [
+        {
+          "stepId": "get-account-settings",
+          "description": "Retrieves the current settings for the account.",
+          "operationId": "ShowAccountSettings",
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "settings": "$response.body#/settings"
+          }
+        },
+        {
+          "stepId": "update-account-settings",
+          "description": "Updates specific settings for the account.",
+          "operationId": "UpdateAccountSettings",
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "settings": "$response.body#/settings"
+          }
+        }
+      ],
+      "outputs": {
+        "settings": "$steps.update-account-settings.outputs.settings"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "create-ticket-from-tweet",
+      "summary": "Identifies a monitored X (formerly Twitter) handle and creates a support ticket from a specific tweet.",
+      "description": "Identifies a monitored X (formerly Twitter) handle and creates a support ticket from a specific tweet.",
+      "steps": [
+        {
+          "stepId": "list-monitored-handles",
+          "description": "Lists the monitored X handles configured for the account.",
+          "operationId": "ListMonitoredTwitterHandles",
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "monitored_twitter_handles": "$response.body#/monitored_twitter_handles"
+          }
+        },
+        {
+          "stepId": "create-ticket-from-tweet",
+          "description": "Creates a ticket using the ID of a monitored handle and the ID of the tweet.",
+          "operationId": "CreateTicketFromTweet",
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "tweet_data": "$response.body"
+          }
+        }
+      ],
+      "outputs": {
+        "monitored_twitter_handles": "$steps.list-monitored-handles.outputs.monitored_twitter_handles",
+        "tweet_data": "$steps.create-ticket-from-tweet.outputs.tweet_data"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    }
+  ],
+  "components": {
+    "successActions": {
+      "default_success": {
+        "name": "default_success",
+        "type": "end"
+      }
+    },
+    "failureActions": {
+      "auth_failure": {
+        "name": "auth_failure",
+        "type": "end",
+        "criteria": [
+          {
+            "condition": "$statusCode == 401"
+          }
+        ]
+      },
+      "permission_denied": {
+        "name": "permission_denied",
+        "type": "end",
+        "criteria": [
+          {
+            "condition": "$statusCode == 403"
+          }
+        ]
+      },
+      "not_found": {
+        "name": "not_found",
+        "type": "end",
+        "criteria": [
+          {
+            "condition": "$statusCode == 404"
+          }
+        ]
+      },
+      "server_error": {
+        "name": "server_error",
+        "type": "retry",
+        "retryAfter": 2,
+        "retryLimit": 3,
+        "criteria": [
+          {
+            "condition": "$statusCode >= 500"
+          }
+        ]
+      },
+      "default_retry": {
+        "name": "default_retry",
+        "type": "retry",
+        "retryAfter": 1,
+        "retryLimit": 3
+      },
+      "default_failure": {
+        "name": "default_failure",
+        "type": "end"
+      }
+    }
+  }
+}
