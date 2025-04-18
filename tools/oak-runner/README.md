@@ -8,10 +8,8 @@ The OAK Runner is a workflow execution engine that processes and executes API wo
 ```python
 from oak_runner import OAKRunner
 
-# Create a runner instance
 runner = OAKRunner.from_arazzo_path("../../workflows/discord.com/workflows.arazzo.json")
 
-# Execute a workflow with inputs
 result = runner.execute_workflow("workflowId", {"param1": "value1"})
 ```
 
@@ -19,10 +17,8 @@ result = runner.execute_workflow("workflowId", {"param1": "value1"})
 ```python
 from oak_runner import OAKRunner
 
-# Create a runner instance
 runner = OAKRunner.from_arazzo_path("../../workflows/discord.com/workflows.arazzo.json")
 
-# Display authentication options for the API
 print(runner.get_env_mappings())
 ```
 
@@ -36,6 +32,7 @@ result = runner.execute_operation("operationId", {"param1": "value1"})
 result = runner.execute_operation("GET /users/@me/guilds", {"param1": "value1"})
 ```
 
+### Create a Runner with a Custom Base Path
 ```python
 # Create a runner instance with a custom base path for resolving OpenAPI file paths
 runner_with_base_path = OAKRunner.from_arazzo_path(
