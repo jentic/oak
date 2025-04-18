@@ -230,27 +230,37 @@ class StepExecutor:
         Returns:
             List of SecurityOption objects (empty list if none found)
         """
-        
-        # Check for operation-level security requirements
         operation = operation_info.get("operation", {})
+        source_name = operation_info.get("source")
+        path = operation_info.get("path")
+
+        # 1. Check for operation-level security requirements
         if "security" in operation:
             logger.debug(f"Found operation-level security requirements for {operation.get('operationId')}")
             raw_options = operation.get("security", [])
             return self._convert_to_security_options(raw_options)
-            
-        # Check for global security requirements in the source description
-        source_name = operation_info.get("source")
+
+        # 2. Check for path-level security requirements (OpenAPI 3.x)
+        if source_name in self.source_descriptions and path:
+            paths_obj = self.source_descriptions[source_name].get("paths", {})
+            path_obj = paths_obj.get(path, {})
+            if isinstance(path_obj, dict) and "security" in path_obj:
+                logger.debug(f"Found path-level security requirements for path {path} in API {source_name}")
+                raw_options = path_obj.get("security", [])
+                return self._convert_to_security_options(raw_options)
+
+        # 3. Check for global security requirements in the source description
         if source_name in self.source_descriptions:
             source_desc = self.source_descriptions.get(source_name, {})
             if "security" in source_desc:
                 logger.debug(f"Found global security requirements for API {source_name}")
                 raw_options = source_desc.get("security", [])
                 return self._convert_to_security_options(raw_options)
-            
-        # No security requirements found
+
+        # 4. No security requirements found
         logger.debug("No security requirements found")
         return []
-        
+
     def _convert_to_security_options(self, raw_options: list) -> list:
         """
         Convert raw security options from OpenAPI spec to SecurityOption model instances
