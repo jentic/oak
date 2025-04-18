@@ -36,9 +36,6 @@ result = runner.execute_operation("operationId", {"param1": "value1"})
 result = runner.execute_operation("GET /users/@me/guilds", {"param1": "value1"})
 ```
 
-
-
-
 ```python
 # Create a runner instance with a custom base path for resolving OpenAPI file paths
 runner_with_base_path = OAKRunner.from_arazzo_path(
