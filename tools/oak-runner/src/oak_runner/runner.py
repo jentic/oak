@@ -18,6 +18,7 @@ from .http import HTTPExecutor
 from .models import ActionType, ArazzoDoc, ExecutionState, OpenAPIDoc, StepStatus
 from .utils import dump_state, load_arazzo_doc, load_source_descriptions, load_openapi_file
 from .auth.default_credential_provider import DefaultCredentialProvider
+import json
 
 logger = logging.getLogger("arazzo-runner")
 
@@ -215,8 +216,8 @@ class OAKRunner:
 
         # Add dependency outputs to execution state
         state.dependency_outputs = dependency_outputs
-        logger.info(f"Setting dependency_outputs for {workflow_id} to: {dependency_outputs}")
-        logger.info(f"State dependency_outputs after setting: {state.dependency_outputs}")
+        logger.debug(f"Setting dependency_outputs for {workflow_id} to: {dependency_outputs}")
+        logger.debug(f"State dependency_outputs after setting: {state.dependency_outputs}")
 
         # Set all steps to pending
         for step in workflow.get("steps", []):
@@ -233,6 +234,46 @@ class OAKRunner:
         )
 
         return execution_id
+
+    def execute_workflow(self, workflow_id: str, inputs: dict[str, Any] = None) -> dict[str, any]:
+        """
+        Start and execute a workflow until completion, returning the outputs.
+
+        Args:
+            workflow_id: ID of the workflow to execute
+            inputs: Input parameters for the workflow
+
+        Returns:
+            outputs: The outputs of the completed workflow
+        """
+        def on_workflow_start(execution_id, workflow_id, inputs):
+            logger.debug(f"\n=== Starting workflow: {workflow_id} ===")
+            logger.debug(f"Inputs: {json.dumps(inputs, indent=2)}")
+
+        def on_step_start(execution_id, workflow_id, step_id):
+            logger.debug(f"\n--- Starting step: {step_id} ---")
+
+        def on_step_complete(execution_id, workflow_id, step_id, success, outputs=None, error=None):
+            logger.debug(f"--- Completed step: {step_id} (Success: {success}) ---")
+            if outputs:
+                logger.debug(f"Outputs: {json.dumps(outputs, indent=2)}")
+            if error:
+                logger.debug(f"Error: {error}")
+
+        def on_workflow_complete(execution_id, workflow_id, outputs):
+            logger.debug(f"\n=== Completed workflow: {workflow_id} ===")
+            logger.debug(f"Outputs: {json.dumps(outputs, indent=2)}")
+
+        self.register_callback("workflow_start", on_workflow_start)
+        self.register_callback("step_start", on_step_start)
+        self.register_callback("step_complete", on_step_complete)
+        self.register_callback("workflow_complete", on_workflow_complete)
+
+        execution_id = self.start_workflow(workflow_id, inputs)
+        while True:
+            result = self.execute_next_step(execution_id)
+            if result.get("status") in ["workflow_complete", "workflow_error"]:
+                return result.get("outputs")
 
     def execute_next_step(self, execution_id: str) -> dict[str, Any]:
         """
@@ -543,7 +584,7 @@ class OAKRunner:
             raise ValueError("Provide either operation_id or operation_path, not both.")
 
         log_identifier = f"ID='{operation_id}'" if operation_id else f"Path='{operation_path}'"
-        logger.info(f"OAKRunner: Received request to execute operation directly: {log_identifier}")
+        logger.debug(f"OAKRunner: Received request to execute operation directly: {log_identifier}")
 
         try:
             # Delegate to StepExecutor's implementation

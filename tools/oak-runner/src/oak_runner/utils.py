@@ -121,16 +121,15 @@ def dump_state(state, label: str = "Current Execution State"):
         state: Execution state to dump
         label: Optional label for the state dump
     """
-    logger.info(f"=== {label} ===")
-    logger.info(f"Workflow ID: {state.workflow_id}")
-    logger.info(f"Current Step ID: {state.current_step_id}")
-    logger.info(f"Inputs: {state.inputs}")
-    logger.info("Step Outputs:")
+    logger.debug(f"=== {label} ===")
+    logger.debug(f"Workflow ID: {state.workflow_id}")
+    logger.debug(f"Current Step ID: {state.current_step_id}")
+    logger.debug(f"Inputs: {state.inputs}")
+    logger.debug("Step Outputs:")
     for step_id, outputs in state.step_outputs.items():
-        logger.info(f"  {step_id}: {outputs}")
-    logger.info(f"Workflow Outputs: {state.workflow_outputs}")
-    logger.info(f"Status: {state.status}")
-    logger.info("=============================")
+        logger.debug(f"  {step_id}: {outputs}")
+    logger.debug(f"Workflow Outputs: {state.workflow_outputs}")
+    logger.debug(f"Status: {state.status}")
 
 
 def evaluate_json_pointer(data: dict, pointer_path: str) -> Any | None:
@@ -211,7 +210,7 @@ def load_openapi_file(openapi_path: str) -> dict[str, Any]:
         ValueError: If the file cannot be parsed.
         FileNotFoundError: If the local file does not exist.
     """
-    logger.info(f"Loading OpenAPI specification from local path: {openapi_path}")
+    logger.debug(f"Loading OpenAPI specification from local path: {openapi_path}")
 
     try:
         if not os.path.isfile(openapi_path):

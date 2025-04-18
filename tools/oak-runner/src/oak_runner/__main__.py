@@ -36,7 +36,7 @@ async def main():
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Set the logging level (default: INFO)",
+        help="Set the logging level (default: WARNING)",
     )
 
     subparsers = parser.add_subparsers(dest="operation", required=True, help='Operation to perform')
@@ -197,57 +197,27 @@ async def handle_execute_workflow(runner: OAKRunner | None, args: argparse.Names
         logger.error("--workflow-id is required for execute-workflow.")
         sys.exit(1)
 
-    # Register callbacks for events
-    def on_workflow_start(execution_id, workflow_id, inputs):
-        print(f"\n=== Starting workflow: {workflow_id} ===")
-        print(f"Inputs: {json.dumps(inputs, indent=2)}")
-
-    def on_step_start(execution_id, workflow_id, step_id):
-        print(f"\n--- Starting step: {step_id} ---")
-
-    def on_step_complete(execution_id, workflow_id, step_id, success, outputs=None, error=None):
-        print(f"--- Completed step: {step_id} (Success: {success}) ---")
-        if outputs:
-            print(f"Outputs: {json.dumps(outputs, indent=2)}")
-        if error:
-            print(f"Error: {error}")
-
-    def on_workflow_complete(execution_id, workflow_id, outputs):
-        print(f"\n=== Completed workflow: {workflow_id} ===")
-        print(f"Outputs: {json.dumps(outputs, indent=2)}")
-
-    # Register the callbacks
-    runner.register_callback("workflow_start", on_workflow_start)
-    runner.register_callback("step_start", on_step_start)
-    runner.register_callback("step_complete", on_step_complete)
-    runner.register_callback("workflow_complete", on_workflow_complete)
-
-    # Start the workflow
+    # Start and execute the workflow using the new API
     try:
-        execution_id = runner.start_workflow(args.workflow_id, inputs)
+        outputs = runner.execute_workflow(args.workflow_id, inputs)
     except Exception as e:
-        logger.error(f"Failed to start workflow: {e}", exc_info=True)
+        logger.error(f"Failed to execute workflow: {e}", exc_info=True)
         sys.exit(1)
 
-    # Execute steps until completion
-    try:
-        while True:
-            result = runner.execute_next_step(execution_id)
-            logger.debug(f"Step result: {json.dumps(result, indent=2)}")
+    # Print outputs and determine success/failure
+    print(f"\n=== Completed workflow: {args.workflow_id} ===")
+    print(f"Outputs: {json.dumps(outputs, indent=2)}")
 
-            if result.get("status") in ["workflow_complete", "workflow_error"]:
+    # Check for failure in outputs (if possible)
+    try:
+        state = None
+        for exec_id, st in runner.execution_states.items():
+            if st.workflow_id == args.workflow_id:
+                state = st
                 break
-    except Exception as e:
-        logger.error(f"Error executing workflow: {e}", exc_info=True)
-        sys.exit(1)
-
-    # Return success or failure
-    try:
-        state = runner.execution_states.get(execution_id)
         if not state:
-            logger.error(f"Could not retrieve final execution state for {execution_id}")
+            logger.error(f"Could not retrieve final execution state for {args.workflow_id}")
             sys.exit(1)
-        # Check if the last step in the state has a status value indicating failure
         last_step_id = list(state.status.keys())[-1] if state.status else None
         all_success = not (last_step_id and state.status.get(last_step_id) == StepStatus.FAILURE)
     except Exception as e:
@@ -297,6 +267,10 @@ async def handle_execute_operation(runner: OAKRunner | None, args: argparse.Name
             operation_path=args.operation_path, # Pass directly
             inputs=inputs
         )
+        # Remove 'headers' from result if present
+        if isinstance(result, dict) and 'headers' in result:
+            result = dict(result)  # Make a shallow copy to avoid mutating originals
+            result.pop('headers')
         logger.info(f"Operation Result: {json.dumps(result, indent=2)}")
         # Determine exit code based on HTTP status (e.g., 2xx is success)
         status_code = result.get("status_code", 500)

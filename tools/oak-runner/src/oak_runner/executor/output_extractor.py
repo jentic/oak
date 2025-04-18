@@ -44,7 +44,7 @@ class OutputExtractor:
 
         # Detailed logging of response structure for troubleshooting
         logger.info(f"Response status code: {response.get('status_code')}")
-        logger.info(f"Response headers: {response.get('headers')}")
+        logger.debug(f"Response headers: {response.get('headers')}")
         logger.debug(f"Response body: {response.get('body')}")
 
         # Cache direct ID values from response for potential future use

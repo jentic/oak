@@ -16,9 +16,6 @@ env_mappings = runner.get_env_mappings()
 # Execute a workflow with inputs
 result = runner.execute_workflow("workflowId", {"param1": "value1"})
 
-# Access workflow outputs
-outputs = result.outputs
-
 # Create a runner instance with a custom base path for resolving OpenAPI file paths
 runner_with_base_path = OAKRunner.from_arazzo_path(
     "./tests/fixtures/my/arazzo.yaml", 
@@ -48,9 +45,6 @@ Usage:
 ```sh
 pdm run python -m oak_runner <command> [command-specific arguments] [global options]
 ```
-
-**Global Options:**
-- `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`: Set the logging level (default: INFO).
 
 **Commands:**
 
@@ -101,6 +95,11 @@ pdm run python -m oak_runner <command> [command-specific arguments] [global opti
     ```
     -   `arazzo_path`: *Required*. Path to the Arazzo YAML file containing the workflow.
     -   `--workflow-id WORKFLOW_ID`: *Required*. ID of the workflow to generate an example for.
+
+
+**Global Options:**
+- `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`: Set the logging level (default: INFO).
+
 
 **Examples:**
 

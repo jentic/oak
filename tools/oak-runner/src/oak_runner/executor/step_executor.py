@@ -132,7 +132,7 @@ class StepExecutor:
             operation_path = ExpressionEvaluator.evaluate_expression(
                 operation_path[1:-1], state, self.source_descriptions
             )
-            logger.info(f"Evaluated operationPath expression to: {operation_path}")
+            logger.debug(f"Evaluated operationPath expression to: {operation_path}")
 
         # Parse the operation path to find the source and JSON pointer
         match = re.match(r"([^#]+)#(.+)", operation_path)
@@ -142,20 +142,20 @@ class StepExecutor:
             raise ValueError(error_msg)
 
         source_url, json_pointer = match.groups()
-        logger.info(f"Parsed operationPath - source: {source_url}, pointer: {json_pointer}")
+        logger.debug(f"Parsed operationPath - source: {source_url}, pointer: {json_pointer}")
 
         # Print the raw JSON pointer for debugging
-        logger.info(f"Raw JSON pointer in operationPath: {json_pointer}")
+        logger.debug(f"Raw JSON pointer in operationPath: {json_pointer}")
 
         # Try to decode it manually to see what's happening
         decoded = json_pointer.replace("~1", "/").replace("~0", "~")
-        logger.info(f"Manually decoded pointer: {decoded}")
+        logger.debug(f"Manually decoded pointer: {decoded}")
 
         # Find the operation in the source descriptions
         operation_info = self.operation_finder.find_by_path(source_url, json_pointer)
 
         if operation_info:
-            logger.info(
+            logger.debug(
                 f"Found operation: {operation_info.get('method')} {operation_info.get('url')}"
             )
         else:
@@ -163,13 +163,13 @@ class StepExecutor:
             # Log detailed information about the source descriptions
             for name, desc in self.source_descriptions.items():
                 paths = desc.get("paths", {})
-                logger.info(f"Source '{name}' has {len(paths)} paths: {list(paths.keys())}")
+                logger.debug(f"Source '{name}' has {len(paths)} paths: {list(paths.keys())}")
                 # Log all operations
                 for path, methods in paths.items():
                     for method, op in methods.items():
                         if method.lower() in ["get", "post", "put", "delete", "patch"]:
                             op_id = op.get("operationId", "[No operationId]")
-                            logger.info(f"  - {method.upper()} {path} (operationId: {op_id})")
+                            logger.debug(f"  - {method.upper()} {path} (operationId: {op_id})")
 
         if not operation_info:
             raise ValueError(f"Operation not found at path {operation_path}")
@@ -306,7 +306,7 @@ class StepExecutor:
             raise ValueError("Provide either operation_id or operation_path, not both.")
 
         log_identifier = f"ID='{operation_id}'" if operation_id else f"Path='{operation_path}'"
-        logger.info(f"Attempting to execute operation directly: {log_identifier}")
+        logger.debug(f"Attempting to execute operation directly: {log_identifier}")
 
         # Find the operation definition
         try:
@@ -346,7 +346,7 @@ class StepExecutor:
                 operation_details=operation_details,
                 inputs=inputs
             )
-            logger.info(f"Prepared parameters for direct execution: {prepared_params}")
+            logger.debug(f"Prepared parameters for direct execution: {prepared_params}")
         except ValueError as e:
             logger.error(f"Error preparing parameters for {log_identifier}: {e}")
             # Reraise as ValueError, potentially add more context if needed
@@ -354,7 +354,7 @@ class StepExecutor:
 
         # Handle Authentication
         security_options = self._extract_security_requirements(operation_details)
-        logger.info(f"Resolved security options for {log_identifier}: {security_options}")
+        logger.debug(f"Resolved security options for {log_identifier}: {security_options}")
 
         # Execute Request
         method = operation_details.get("method")
@@ -366,7 +366,7 @@ class StepExecutor:
             raise ValueError("Operation details are incomplete (missing method or url).")
 
         try:
-            logger.info(f"Executing direct API call: {method} {url}")
+            logger.debug(f"Executing direct API call: {method} {url}")
             response_data = self.http_client.execute_request(
                 method=method,
                 url=url,
@@ -374,7 +374,7 @@ class StepExecutor:
                 request_body=request_body_payload,
                 security_options=security_options
             )
-            logger.info(f"Direct operation execution completed ({log_identifier}) - Status: {response_data.get('status_code')}")
+            logger.debug(f"Direct operation execution completed ({log_identifier}) - Status: {response_data.get('status_code')}")
             return response_data
         except Exception as e:
             # Catch potential exceptions during HTTP execution (e.g., network errors, auth failures handled by HTTPExecutor)

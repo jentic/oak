@@ -80,7 +80,7 @@ class OperationFinder:
                     operation = path_item[target_method]
                     # Found the operation
                     base_url = source_desc.get("servers", [{}])[0].get("url", "")
-                    logger.info(f"Found operation in '{source_name}' for {target_method.upper()} {http_path}")
+                    logger.debug(f"Found operation in '{source_name}' for {target_method.upper()} {http_path}")
                     return {
                         "source": source_name,
                         "path": http_path,
@@ -98,7 +98,7 @@ class OperationFinder:
                           if target_method in path_item:
                                 operation = path_item[target_method]
                                 base_url = source_desc.get("servers", [{}])[0].get("url", "")
-                                logger.info(f"Found operation (template match) in '{source_name}' for {target_method.upper()} {path_key} matching {http_path}")
+                                logger.debug(f"Found operation (template match) in '{source_name}' for {target_method.upper()} {path_key} matching {http_path}")
                                 return {
                                     "source": source_name,
                                     "path": path_key, # Return the template path

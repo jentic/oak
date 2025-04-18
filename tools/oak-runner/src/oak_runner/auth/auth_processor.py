@@ -42,12 +42,12 @@ class AuthProcessor:
             if "components" not in processed_spec and "securityDefinitions" in processed_spec:
                 # OpenAPI v2 format uses securityDefinitions
                 # Convert to OpenAPI v3 format expected by our parser
-                logger.info("Converting OpenAPI v2 security definitions to v3 format")
+                logger.debug("Converting OpenAPI v2 security definitions to v3 format")
                 processed_spec["components"] = {"securitySchemes": processed_spec["securityDefinitions"]}
                 
             elif "components" not in processed_spec and "securitySchemes" in processed_spec:
                 # Some specs have securitySchemes at root level
-                logger.info("Moving root level securitySchemes to components")
+                logger.debug("Moving root level securitySchemes to components")
                 processed_spec["components"] = {"securitySchemes": processed_spec["securitySchemes"]}
         
         return processed_spec
@@ -95,7 +95,7 @@ class AuthProcessor:
                 "auth_workflows": []
             }
             
-        logger.info(f"Processing auth for {len(openapi_specs)} OpenAPI specs")
+        logger.debug(f"Processing auth for {len(openapi_specs)} OpenAPI specs")
         
         # Fix OpenAPI spec structure if needed for each spec
         processed_specs = {}
@@ -128,7 +128,7 @@ class AuthProcessor:
         if arazzo_specs:
             for arazzo_spec in arazzo_specs:
                 workflow_auth = extract_auth_from_arazzo(arazzo_spec)
-                logger.info(f"Found {len(workflow_auth)} auth requirements in Arazzo workflow")
+                logger.debug(f"Found {len(workflow_auth)} auth requirements in Arazzo workflow")
                 # Merge auth requirements, avoiding duplicates
                 existing_names = {req.name.lower() for req in auth_requirements}
                 for req in workflow_auth:

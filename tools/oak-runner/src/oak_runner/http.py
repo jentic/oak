@@ -62,9 +62,9 @@ class HTTPExecutor:
 
         # Log security options
         if security_options:
-            logger.info(f"Security options: {security_options}")
+            logger.debug(f"Security options: {security_options}")
             for i, option in enumerate(security_options):
-                logger.info(f"Option {i} requirements: {option}")
+                logger.debug(f"Option {i} requirements: {option}")
 
         # Apply authentication headers from auth_provider if available
         self._apply_auth_to_request(url, headers, query_params, cookies, security_options, source_name)

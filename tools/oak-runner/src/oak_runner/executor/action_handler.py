@@ -43,7 +43,7 @@ class ActionHandler:
             Dictionary with action type and parameters
         """
         step_id = step.get("stepId", "unknown")
-        logger.info(f"Determining next action for step {step_id}, success={success}")
+        logger.debug(f"Determining next action for step {step_id}, success={success}")
 
         if success:
             # Check onSuccess actions
@@ -88,7 +88,7 @@ class ActionHandler:
         else:
             # Check onFailure actions
             actions = step.get("onFailure", [])
-            logger.info(f"Step {step_id} has {len(actions)} onFailure actions")
+            logger.debug(f"Step {step_id} has {len(actions)} onFailure actions")
 
             for i, action in enumerate(actions):
                 action_name = action.get("name", f"failure_action_{i}")
