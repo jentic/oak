@@ -57,6 +57,14 @@ The OAK Repository organizes API specifications and workflows using a standardiz
 
 For detailed information on the directory structure, please refer to [STRUCTURE.md](STRUCTURE.md).
 
+## OAK Runner
+
+The **OAK Runner** is the reference tool for executing agentic workflows and API operations described in this repository. It provides a robust engine for running OpenAPI and Arazzo-based workflows, handling authentication, security requirements, and step orchestration for agents and developers alike.
+
+- **Location:** The OAK Runner tool and its source code can be found in [`tools/oak-runner/`](tools/oak-runner/).
+
+For setup and usage instructions, see the [`tools/oak-runner/README.md`](tools/oak-runner/README.md).
+
 ## Acknowledgments
 
 The OAK Repository would like to express our sincere gratitude to [APIs.guru](https://apis.guru/) for providing the initial collection of OpenAPI specifications that helped bootstrap this repository. Their dedication to cataloging public APIs has been instrumental in our mission to create an open knowledge layer for AI agents.
