@@ -329,8 +329,8 @@ class AuthProcessor:
         
         return auth_workflows
 
+    @staticmethod
     def get_security_requirements_for_workflow(
-        self, 
         workflow_id: str, 
         arazzo_spec: ArazzoDoc, 
         source_descriptions: dict[str, OpenAPIDoc]
@@ -378,8 +378,8 @@ class AuthProcessor:
                     seen.add(key)
         return by_source
 
+    @staticmethod
     def get_security_requirements_for_openapi_operation(
-        self,
         openapi_spec: OpenAPIDoc,
         http_method: str,
         path: str
@@ -387,7 +387,7 @@ class AuthProcessor:
         """
         Extract SecurityOption objects for a single operation in an OpenAPI spec.
         Args:
-            openapi_spec: The OpenAPI spec
+            openapi_spec: The OpenAPI spec (already parsed as dict)
             http_method: HTTP verb (e.g., 'get', 'post')
             path: The path string (e.g., '/users')
         Returns:
