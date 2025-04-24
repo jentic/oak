@@ -378,7 +378,7 @@ class AuthProcessor:
                     seen.add(key)
         return by_source
 
-    def get_security_requirements_for_openapi_spec(
+    def get_security_requirements_for_openapi_operation(
         self,
         openapi_spec: OpenAPIDoc,
         http_method: str,
