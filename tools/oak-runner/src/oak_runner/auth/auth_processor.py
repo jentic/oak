@@ -16,8 +16,11 @@ from .auth_parser import (
 )
 from .models import (
     AuthType,
-    EnvVarKeys
+    EnvVarKeys,
+    SecurityOption
 )
+from oak_runner.auth.models import SecurityOption
+from oak_runner.executor.operation_finder import OperationFinder
 
 logger = logging.getLogger(__name__)
 
@@ -323,6 +326,55 @@ class AuthProcessor:
                     })
         
         return auth_workflows
+
+    def get_security_requirements_for_workflow(
+        self, 
+        workflow_id: str, 
+        arazzo_spec: dict, 
+        source_descriptions: dict
+    ) -> Dict[str, List[SecurityOption]]:
+        """
+        For a given workflow_id in an Arazzo spec (already parsed as dict),
+        extract all unique SecurityOption objects for all operations in the workflow,
+        grouped and deduplicated by source description.
+        Args:
+            workflow_id: The workflowId to extract security for
+            arazzo_spec: The parsed Arazzo spec dict
+            source_descriptions: Dict of OpenAPI source descriptions
+        Returns:
+            Dict mapping source_name to list of unique SecurityOption objects (deduplicated per source)
+        """
+        workflows = arazzo_spec.get("workflows", [])
+        workflow = None
+        for wf in workflows:
+            if wf.get("workflowId") == workflow_id:
+                workflow = wf
+                break
+        if not workflow:
+            raise ValueError(f"Workflow with id '{workflow_id}' not found in Arazzo spec")
+
+        op_finder = OperationFinder(source_descriptions)
+        operations = op_finder.get_operations_for_workflow(workflow)
+
+        # Group and deduplicate by source
+        by_source = {}
+        for op_info in operations:
+            source = op_info.get("source")
+            options = op_finder.extract_security_requirements(op_info)
+            if not options:
+                continue
+            if source not in by_source:
+                by_source[source] = []
+            # Deduplicate within this source
+            def option_key(option):
+                return tuple(sorted((req.scheme_name, tuple(sorted(req.scopes))) for req in option.requirements))
+            seen = set(option_key(opt) for opt in by_source[source])
+            for option in options:
+                key = option_key(option)
+                if key not in seen:
+                    by_source[source].append(option)
+                    seen.add(key)
+        return by_source
 
     def _convert_to_env_var(self, value: str) -> str:
         """

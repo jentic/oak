@@ -10,6 +10,7 @@ import re
 from typing import Any
 
 import jsonpointer
+from oak_runner.auth.models import SecurityOption, SecurityRequirement
 
 # Configure logging
 logger = logging.getLogger("arazzo-runner.executor")
@@ -548,3 +549,84 @@ class OperationFinder:
         except Exception as e:
             logger.error(f"Error handling special cases: {e}")
             return None
+
+    def extract_security_requirements(self, operation_info: dict) -> list[SecurityOption]:
+        """
+        Extract security requirements from operation info and source descriptions.
+        Args:
+            operation_info: Operation information from operation finder
+        Returns:
+            List of SecurityOption objects (empty list if none found)
+        """
+        operation = operation_info.get("operation", {})
+        source_name = operation_info.get("source")
+        path = operation_info.get("path")
+
+        # 1. Check for operation-level security requirements
+        if "security" in operation:
+            logger.debug(f"Found operation-level security requirements for {operation.get('operationId')}")
+            raw_options = operation.get("security", [])
+            return self._convert_to_security_options(raw_options)
+
+        # 2. Check for path-level security requirements (OpenAPI 3.x)
+        if source_name in self.source_descriptions and path:
+            paths_obj = self.source_descriptions[source_name].get("paths", {})
+            path_obj = paths_obj.get(path, {})
+            if isinstance(path_obj, dict) and "security" in path_obj:
+                logger.debug(f"Found path-level security requirements for path {path} in API {source_name}")
+                raw_options = path_obj.get("security", [])
+                return self._convert_to_security_options(raw_options)
+
+        # 3. Check for global security requirements in the source description
+        if source_name in self.source_descriptions:
+            source_desc = self.source_descriptions.get(source_name, {})
+            if "security" in source_desc:
+                logger.debug(f"Found global security requirements for API {source_name}")
+                raw_options = source_desc.get("security", [])
+                return self._convert_to_security_options(raw_options)
+
+        # 4. No security requirements found
+        logger.debug("No security requirements found")
+        return []
+
+    def _convert_to_security_options(self, raw_options: list) -> list[SecurityOption]:
+        """
+        Convert raw security options from OpenAPI spec to SecurityOption model instances
+        Args:
+            raw_options: List of raw security option objects from OpenAPI spec
+        Returns:
+            List of SecurityOption objects
+        """
+        security_options = []
+        for raw_option in raw_options:
+            option = SecurityOption()
+            for scheme_name, scopes in raw_option.items():
+                requirement = SecurityRequirement(
+                    scheme_name=scheme_name,
+                    scopes=scopes
+                )
+                option.requirements.append(requirement)
+            security_options.append(option)
+        return security_options
+
+    def get_operations_for_workflow(self, workflow: dict) -> list[dict]:
+        """
+        Find all operation references in a workflow dict (Arazzo format).
+        Returns a list of operation_info dicts as returned by find_by_id/find_by_path.
+        """
+        operations = []
+        steps = workflow.get("steps", [])
+        for step in steps:
+            if "operationId" in step:
+                op_info = self.find_by_id(step["operationId"])
+                if op_info:
+                    operations.append(op_info)
+            elif "operationPath" in step:
+                # operationPath format: <source>#<json_pointer>
+                match = re.match(r"([^#]+)#(.+)", step["operationPath"])
+                if match:
+                    source_url, json_pointer = match.groups()
+                    op_info = self.find_by_path(source_url, json_pointer)
+                    if op_info:
+                        operations.append(op_info)
+        return operations

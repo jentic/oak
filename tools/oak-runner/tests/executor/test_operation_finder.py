@@ -1,5 +1,8 @@
 import unittest
 from oak_runner.executor.operation_finder import OperationFinder
+from oak_runner.auth.models import SecurityOption, SecurityRequirement
+import pytest
+from oak_runner.auth.auth_processor import AuthProcessor
 
 # Mock OpenAPI source descriptions
 MOCK_SOURCE_DESC = {
@@ -41,6 +44,121 @@ MOCK_SOURCE_DESC = {
     }
 }
 
+def make_finder_with_sources(source_descriptions):
+    return OperationFinder(source_descriptions)
+
+def test_extract_security_requirements_path_level_override():
+    source_descriptions = {
+        "api": {
+            "security": [
+                {"apiKey": []}
+            ],
+            "paths": {
+                "/public/resource": {
+                    "security": [],
+                    "get": {
+                        "responses": {
+                            "200": {"description": "ok"}
+                        }
+                    }
+                },
+                "/private/resource": {
+                    "get": {
+                        "responses": {"200": {"description": "ok"}}
+                    }
+                }
+            },
+            "components": {
+                "securitySchemes": {
+                    "apiKey": {"type": "apiKey", "in": "header", "name": "X-API-KEY"}
+                }
+            }
+        }
+    }
+    finder = make_finder_with_sources(source_descriptions)
+
+    operation_info = {
+        "operation": source_descriptions["api"]["paths"]["/public/resource"]["get"],
+        "source": "api",
+        "path": "/public/resource"
+    }
+    result = finder.extract_security_requirements(operation_info)
+    assert result == [], "Path-level security override (empty array) should disable security requirements"
+
+    operation_info_private = {
+        "operation": source_descriptions["api"]["paths"]["/private/resource"]["get"],
+        "source": "api",
+        "path": "/private/resource"
+    }
+    result_private = finder.extract_security_requirements(operation_info_private)
+    assert result_private == [SecurityOption(requirements=[SecurityRequirement(scheme_name="apiKey", scopes=[])])], "Should inherit global security when no path-level override is present"
+
+def test_extract_security_requirements_operation_level():
+    source_descriptions = {
+        "api": {
+            "security": [
+                {"apiKey": []}
+            ],
+            "paths": {
+                "/resource": {
+                    "get": {
+                        "security": [
+                            {"oauth2": ["read"]}
+                        ],
+                        "responses": {"200": {"description": "ok"}}
+                    },
+                    "post": {
+                        "responses": {"200": {"description": "ok"}}
+                    }
+                }
+            },
+            "components": {
+                "securitySchemes": {
+                    "apiKey": {"type": "apiKey", "in": "header", "name": "X-API-KEY"},
+                    "oauth2": {"type": "oauth2", "flows": {"implicit": {"authorizationUrl": "https://example.com", "scopes": {"read": "Read access"}}}}
+                }
+            }
+        }
+    }
+    finder = make_finder_with_sources(source_descriptions)
+
+    operation_info_op = {
+        "operation": source_descriptions["api"]["paths"]["/resource"]["get"],
+        "source": "api",
+        "path": "/resource"
+    }
+    result_op = finder.extract_security_requirements(operation_info_op)
+    assert result_op == [SecurityOption(requirements=[SecurityRequirement(scheme_name="oauth2", scopes=["read"])])], "Operation-level security should take precedence and match oauth2 scheme"
+
+def test_extract_security_requirements_global_level():
+    source_descriptions = {
+        "api": {
+            "security": [
+                {"apiKey": []}
+            ],
+            "paths": {
+                "/resource": {
+                    "post": {
+                        "responses": {"200": {"description": "ok"}}
+                    }
+                }
+            },
+            "components": {
+                "securitySchemes": {
+                    "apiKey": {"type": "apiKey", "in": "header", "name": "X-API-KEY"}
+                }
+            }
+        }
+    }
+    finder = make_finder_with_sources(source_descriptions)
+
+    operation_info_global = {
+        "operation": source_descriptions["api"]["paths"]["/resource"]["post"],
+        "source": "api",
+        "path": "/resource"
+    }
+    result_global = finder.extract_security_requirements(operation_info_global)
+    assert result_global == [SecurityOption(requirements=[SecurityRequirement(scheme_name="apiKey", scopes=[])])], "Global security should apply and match apiKey scheme"
 
 class TestOperationFinderHttpPath(unittest.TestCase):
 
@@ -95,6 +213,165 @@ class TestOperationFinderHttpPath(unittest.TestCase):
         self.assertEqual(result["method"], "get")
         self.assertEqual(result["operationId"], "listItems")
         self.assertEqual(result["url"], "http://localhost:8080/items")
+
+def test_get_security_requirements_for_workflow_basic():
+    arazzo_spec = {
+        "workflows": [
+            {
+                "workflowId": "wf1",
+                "steps": [
+                    {"operationId": "op1"}
+                ]
+            }
+        ]
+    }
+    source_descriptions = {
+        "src": {
+            "paths": {
+                "/foo": {
+                    "get": {
+                        "operationId": "op1",
+                        "security": [{"apiKey": []}]
+                    }
+                }
+            },
+            "security": [{"apiKey": []}],
+            "components": {"securitySchemes": {"apiKey": {"type": "apiKey"}}}
+        }
+    }
+    processor = AuthProcessor()
+    result = processor.get_security_requirements_for_workflow("wf1", arazzo_spec, source_descriptions)
+    assert list(result.keys()) == ["src"]
+    assert result["src"] == [SecurityOption(requirements=[SecurityRequirement(scheme_name="apiKey", scopes=[])])]
+
+def test_get_security_requirements_for_workflow_multiple_sources():
+    arazzo_spec = {
+        "workflows": [
+            {
+                "workflowId": "wf2",
+                "steps": [
+                    {"operationId": "op1"},
+                    {"operationId": "op2"}
+                ]
+            }
+        ]
+    }
+    source_descriptions = {
+        "src1": {
+            "paths": {
+                "/foo": {
+                    "get": {
+                        "operationId": "op1",
+                        "security": [{"apiKey": []}]
+                    }
+                }
+            },
+            "security": [{"apiKey": []}],
+            "components": {"securitySchemes": {"apiKey": {"type": "apiKey"}}}
+        },
+        "src2": {
+            "paths": {
+                "/bar": {
+                    "post": {
+                        "operationId": "op2",
+                        "security": [{"oauth2": ["read"]}]
+                    }
+                }
+            },
+            "security": [{"oauth2": ["read"]}],
+            "components": {"securitySchemes": {"oauth2": {"type": "oauth2"}}}
+        }
+    }
+    processor = AuthProcessor()
+    result = processor.get_security_requirements_for_workflow("wf2", arazzo_spec, source_descriptions)
+    assert set(result.keys()) == {"src1", "src2"}
+    assert SecurityOption(requirements=[SecurityRequirement(scheme_name="apiKey", scopes=[])]) in result["src1"]
+    assert SecurityOption(requirements=[SecurityRequirement(scheme_name="oauth2", scopes=["read"])]) in result["src2"]
+    assert len(result["src1"]) == 1
+    assert len(result["src2"]) == 1
+
+def test_get_security_requirements_for_workflow_deduplication():
+    arazzo_spec = {
+        "workflows": [
+            {
+                "workflowId": "wf3",
+                "steps": [
+                    {"operationId": "op1"},
+                    {"operationId": "op2"}
+                ]
+            }
+        ]
+    }
+    source_descriptions = {
+        "src": {
+            "paths": {
+                "/foo": {
+                    "get": {
+                        "operationId": "op1",
+                        "security": [{"apiKey": []}]
+                    }
+                },
+                "/bar": {
+                    "post": {
+                        "operationId": "op2",
+                        "security": [{"apiKey": []}]
+                    }
+                }
+            },
+            "security": [{"apiKey": []}],
+            "components": {"securitySchemes": {"apiKey": {"type": "apiKey"}}}
+        }
+    }
+    processor = AuthProcessor()
+    result = processor.get_security_requirements_for_workflow("wf3", arazzo_spec, source_descriptions)
+    assert list(result.keys()) == ["src"]
+    assert result["src"] == [SecurityOption(requirements=[SecurityRequirement(scheme_name="apiKey", scopes=[])])]
+
+def test_get_security_requirements_for_workflow_duplicate_names_different_sources():
+    arazzo_spec = {
+        "workflows": [
+            {
+                "workflowId": "wf4",
+                "steps": [
+                    {"operationId": "op1"},
+                    {"operationId": "op2"}
+                ]
+            }
+        ]
+    }
+    source_descriptions = {
+        "src1": {
+            "paths": {
+                "/foo": {
+                    "get": {
+                        "operationId": "op1",
+                        "security": [{"apiKey": []}]
+                    }
+                }
+            },
+            "security": [{"apiKey": []}],
+            "components": {"securitySchemes": {"apiKey": {"type": "apiKey", "x-issuer": "src1"}}}
+        },
+        "src2": {
+            "paths": {
+                "/bar": {
+                    "post": {
+                        "operationId": "op2",
+                        "security": [{"apiKey": []}]
+                    }
+                }
+            },
+            "security": [{"apiKey": []}],
+            "components": {"securitySchemes": {"apiKey": {"type": "apiKey", "x-issuer": "src2"}}}
+        }
+    }
+    processor = AuthProcessor()
+    result = processor.get_security_requirements_for_workflow("wf4", arazzo_spec, source_descriptions)
+    assert set(result.keys()) == {"src1", "src2"}
+    assert SecurityOption(requirements=[SecurityRequirement(scheme_name="apiKey", scopes=[])]) in result["src1"]
+    assert SecurityOption(requirements=[SecurityRequirement(scheme_name="apiKey", scopes=[])]) in result["src2"]
+    assert len(result["src1"]) == 1
+    assert len(result["src2"]) == 1
 
 if __name__ == '__main__':
     unittest.main()
