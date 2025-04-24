@@ -26,9 +26,6 @@ from .models import (
     OpenIDScheme,
     SecurityRequirement,
     SecurityOption,
-    OperationSecurityRequirements,
-    GlobalSecurityRequirements,
-    ApiSecurityRequirements,
     auth_requirement_to_schema,
 )
 
@@ -536,81 +533,3 @@ def summarize_auth_requirements(auth_requirements: list[AuthRequirement]) -> str
         return f"Authentication required: {summary_parts[0]}"
     else:
         return f"Authentication required: {', '.join(summary_parts[:-1])} and {summary_parts[-1]}"
-
-
-def extract_security_requirements(openapi_spec: dict[str, Any]) -> ApiSecurityRequirements:
-    """
-    Extract security requirements from an OpenAPI specification.
-    
-    This function extracts both global security requirements and operation-level
-    security requirements from an OpenAPI specification.
-    
-    Args:
-        openapi_spec: Parsed OpenAPI specification
-        
-    Returns:
-        ApiSecurityRequirements object containing all security requirements
-    """
-    api_security = ApiSecurityRequirements()
-    
-    # Extract global security requirements
-    global_security = openapi_spec.get("security", [])
-    if global_security:
-        global_options = []
-        for security_item in global_security:
-            # Each security_item is an alternative option (OR relationship)
-            option = SecurityOption()
-            for scheme_name, scopes in security_item.items():
-                # Within each option, multiple schemes represent combined requirements (AND)
-                option.requirements.append(
-                    SecurityRequirement(
-                        scheme_name=scheme_name,
-                        scopes=scopes
-                    )
-                )
-            global_options.append(option)
-            
-        api_security.global_requirements = GlobalSecurityRequirements(
-            options=global_options
-        )
-    
-    # Extract operation-level security requirements
-    paths = openapi_spec.get("paths", {})
-    for path, path_item in paths.items():
-        for method, operation in path_item.items():
-            # Skip non-operation fields
-            if method in ["parameters", "summary", "description", "servers", "$ref"]:
-                continue
-                
-            operation_security = operation.get("security", [])
-            if not operation_security:
-                continue
-                
-            operation_id = operation.get("operationId", f"{method}_{path}")
-            
-            # Process operation security requirements
-            operation_options = []
-            for security_item in operation_security:
-                # Each security_item is an alternative option (OR relationship)
-                option = SecurityOption()
-                for scheme_name, scopes in security_item.items():
-                    # Within each option, multiple schemes represent combined requirements (AND)
-                    option.requirements.append(
-                        SecurityRequirement(
-                            scheme_name=scheme_name,
-                            scopes=scopes
-                        )
-                    )
-                operation_options.append(option)
-            
-            if operation_options:
-                api_security.operation_requirements.append(
-                    OperationSecurityRequirements(
-                        operation_id=operation_id,
-                        path=path,
-                        method=method,
-                        options=operation_options
-                    )
-                )
-    
-    return api_security

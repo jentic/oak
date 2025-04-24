@@ -307,44 +307,6 @@ class SecurityOption(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class OperationSecurityRequirements(BaseModel):
-    """
-    Represents security requirements for a specific operation.
-    
-    In OpenAPI, the security field is an array of requirement objects,
-    where each object represents an alternative security requirement.
-    If multiple objects are provided, only one needs to be satisfied.
-    """
-    operation_id: str
-    path: str
-    method: str
-    options: List[SecurityOption] = Field(default_factory=list)
-    
-    model_config = ConfigDict(extra="forbid")
-
-
-class GlobalSecurityRequirements(BaseModel):
-    """
-    Represents global security requirements for an API.
-    
-    In OpenAPI, the top-level security field defines the default security
-    requirements for all operations. These can be overridden at the operation level.
-    """
-    options: List[SecurityOption] = Field(default_factory=list)
-    
-    model_config = ConfigDict(extra="forbid")
-
-
-class ApiSecurityRequirements(BaseModel):
-    """
-    Represents all security requirements for an API, both global and operation-specific.
-    """
-    global_requirements: GlobalSecurityRequirements = Field(default_factory=GlobalSecurityRequirements)
-    operation_requirements: List[OperationSecurityRequirements] = Field(default_factory=list)
-    
-    model_config = ConfigDict(extra="forbid")
-
-
 # Conversion functions
 def auth_requirement_to_schema(req: 'AuthRequirement') -> SecuritySchemeUnion:
     """

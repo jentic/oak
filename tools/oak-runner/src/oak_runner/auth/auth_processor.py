@@ -13,8 +13,7 @@ from oak_runner.models import ArazzoDoc, OpenAPIDoc
 from .auth_parser import (
     AuthRequirement,
     extract_auth_from_openapi,
-    extract_auth_from_arazzo,
-    extract_security_requirements,
+    extract_auth_from_arazzo
 )
 from .models import (
     AuthType,
@@ -109,7 +108,6 @@ class AuthProcessor:
         
         # Extract auth requirements from OpenAPI specs
         auth_requirements = []
-        security_requirements = None
         
         for source_id, spec in processed_specs.items():
             try:
@@ -123,9 +121,6 @@ class AuthProcessor:
                 if spec_requirements:
                     auth_requirements.extend(spec_requirements)
                 
-                # Extract security requirements (global and operation-level)
-                if not security_requirements and isinstance(spec, dict):
-                    security_requirements = extract_security_requirements(spec)
             except Exception as e:
                 logger.warning(f"Error extracting auth requirements from spec with ID {source_id}: {str(e)}")
         
@@ -147,10 +142,6 @@ class AuthProcessor:
             "auth_workflows": auth_workflows,
         }
         
-        # Add security requirements if available
-        if security_requirements:
-            result["security_requirements"] = security_requirements.model_dump()
-            
         return result
     
     def generate_env_mappings(
@@ -387,7 +378,7 @@ class AuthProcessor:
         """
         Extract SecurityOption objects for a single operation in an OpenAPI spec.
         Args:
-            openapi_spec: The OpenAPI spec (already parsed as dict)
+            openapi_spec: The OpenAPI spec
             http_method: HTTP verb (e.g., 'get', 'post')
             path: The path string (e.g., '/users')
         Returns:

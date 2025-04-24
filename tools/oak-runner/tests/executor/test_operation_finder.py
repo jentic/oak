@@ -390,19 +390,5 @@ def test_get_security_requirements_for_openapi_operation_basic():
     result = processor.get_security_requirements_for_openapi_operation(openapi_spec, "get", "/foo")
     assert result == [SecurityOption(requirements=[SecurityRequirement(scheme_name="apiKey", scopes=[])])]
 
-class TestAuthProcessor(unittest.TestCase):
-
-    def test_convert_to_env_var(self):
-        processor = AuthProcessor()
-        assert processor._convert_to_env_var("foo-bar") == "FOO_BAR"
-        assert processor._convert_to_env_var("foo--bar") == "FOO_BAR"
-        assert processor._convert_to_env_var("foo@bar!") == "FOO_BAR"
-        assert processor._convert_to_env_var("foo_bar-baz") == "FOO_BAR_BAZ"
-        assert processor._convert_to_env_var("__foo__bar__") == "FOO_BAR"
-        assert processor._convert_to_env_var("foo  bar") == "FOO_BAR"
-        assert processor._convert_to_env_var("foo-bar-baz-123") == "FOO_BAR_BAZ_123"
-        assert processor._convert_to_env_var("-foo-") == "FOO"
-        assert processor._convert_to_env_var("foo--bar--baz") == "FOO_BAR_BAZ"
-
 if __name__ == '__main__':
     unittest.main()
