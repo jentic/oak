@@ -373,5 +373,22 @@ def test_get_security_requirements_for_workflow_duplicate_names_different_source
     assert len(result["src1"]) == 1
     assert len(result["src2"]) == 1
 
+def test_get_security_requirements_for_openapi_spec_basic():
+    openapi_spec = {
+        "paths": {
+            "/foo": {
+                "get": {
+                    "operationId": "op1",
+                    "security": [{"apiKey": []}]
+                }
+            }
+        },
+        "security": [{"apiKey": []}],
+        "components": {"securitySchemes": {"apiKey": {"type": "apiKey"}}}
+    }
+    processor = AuthProcessor()
+    result = processor.get_security_requirements_for_openapi_spec(openapi_spec, "get", "/foo")
+    assert result == [SecurityOption(requirements=[SecurityRequirement(scheme_name="apiKey", scopes=[])])]
+
 if __name__ == '__main__':
     unittest.main()

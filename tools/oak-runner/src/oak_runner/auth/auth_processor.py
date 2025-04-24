@@ -8,6 +8,8 @@ import logging
 import re
 from typing import Dict, List, Optional, Any
 
+from oak_runner.models import ArazzoDoc, OpenAPIDoc
+
 from .auth_parser import (
     AuthRequirement,
     extract_auth_from_openapi,
@@ -330,8 +332,8 @@ class AuthProcessor:
     def get_security_requirements_for_workflow(
         self, 
         workflow_id: str, 
-        arazzo_spec: dict, 
-        source_descriptions: dict
+        arazzo_spec: ArazzoDoc, 
+        source_descriptions: dict[str, OpenAPIDoc]
     ) -> Dict[str, List[SecurityOption]]:
         """
         For a given workflow_id in an Arazzo spec (already parsed as dict),
@@ -375,6 +377,27 @@ class AuthProcessor:
                     by_source[source].append(option)
                     seen.add(key)
         return by_source
+
+    def get_security_requirements_for_openapi_spec(
+        self,
+        openapi_spec: OpenAPIDoc,
+        http_method: str,
+        path: str
+    ) -> list[SecurityOption]:
+        """
+        Extract SecurityOption objects for a single operation in an OpenAPI spec.
+        Args:
+            openapi_spec: The OpenAPI spec
+            http_method: HTTP verb (e.g., 'get', 'post')
+            path: The path string (e.g., '/users')
+        Returns:
+            List of SecurityOption objects for the operation
+        """
+        op_finder = OperationFinder({"default": openapi_spec})
+        op_info = op_finder.find_by_http_path_and_method(path, http_method)
+        if not op_info:
+            raise ValueError(f"Operation {http_method.upper()} {path} not found in OpenAPI spec")
+        return op_finder.extract_security_requirements(op_info)
 
     def _convert_to_env_var(self, value: str) -> str:
         """
