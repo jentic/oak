@@ -20,7 +20,7 @@ from .models import (
     EnvVarKeys,
     SecurityOption
 )
-from oak_runner.auth.models import SecurityOption
+from oak_runner.auth.models import SecurityOption, SecurityRequirement
 from oak_runner.executor.operation_finder import OperationFinder
 
 logger = logging.getLogger(__name__)
@@ -349,8 +349,9 @@ class AuthProcessor:
         op_finder = OperationFinder(source_descriptions)
         operations = op_finder.get_operations_for_workflow(workflow)
 
-        # Group and deduplicate by source
+        # Group and merge options by source, merging options where scheme name is the same (merge scopes)
         by_source = {}
+        import copy
         for op_info in operations:
             source = op_info.get("source")
             options = op_finder.extract_security_requirements(op_info)
@@ -358,15 +359,20 @@ class AuthProcessor:
                 continue
             if source not in by_source:
                 by_source[source] = []
-            # Deduplicate within this source
-            def option_key(option):
-                return tuple(sorted((req.scheme_name, tuple(sorted(req.scopes))) for req in option.requirements))
-            seen = set(option_key(opt) for opt in by_source[source])
+            by_source[source].extend(copy.deepcopy(opt) for opt in options)
+        # Merge SecurityOptions by scheme name (union all scopes per scheme)
+        for source, options in by_source.items():
+            scheme_to_scopes = {}
             for option in options:
-                key = option_key(option)
-                if key not in seen:
-                    by_source[source].append(option)
-                    seen.add(key)
+                for req in option.requirements:
+                    if req.scheme_name not in scheme_to_scopes:
+                        scheme_to_scopes[req.scheme_name] = set()
+                    scheme_to_scopes[req.scheme_name].update(req.scopes)
+            merged_requirements = [
+                SecurityRequirement(scheme_name=scheme, scopes=sorted(scopes))
+                for scheme, scopes in scheme_to_scopes.items()
+            ]
+            by_source[source] = [SecurityOption(requirements=merged_requirements)] if merged_requirements else []
         return by_source
 
     @staticmethod

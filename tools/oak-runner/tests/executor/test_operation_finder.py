@@ -373,6 +373,53 @@ def test_get_security_requirements_for_workflow_duplicate_names_different_source
     assert len(result["src1"]) == 1
     assert len(result["src2"]) == 1
 
+def test_get_security_requirements_for_workflow_scope_merging():
+    """
+    If two operations in the same workflow have SecurityOptions with the same scheme name but different scopes,
+    the merged SecurityOption should contain all unique scopes for that scheme.
+    """
+    arazzo_spec = {
+        "workflows": [
+            {
+                "workflowId": "wf_scope_merge",
+                "steps": [
+                    {"operationId": "op1"},
+                    {"operationId": "op2"}
+                ]
+            }
+        ]
+    }
+    source_descriptions = {
+        "src": {
+            "paths": {
+                "/foo": {
+                    "get": {
+                        "operationId": "op1",
+                        "security": [{"oauth2": ["read"]}]
+                    }
+                },
+                "/bar": {
+                    "post": {
+                        "operationId": "op2",
+                        "security": [{"oauth2": ["write"]}]
+                    }
+                }
+            },
+            "security": [{"oauth2": ["read", "write"]}],
+            "components": {"securitySchemes": {"oauth2": {"type": "oauth2"}}}
+        }
+    }
+    processor = AuthProcessor()
+    result = processor.get_security_requirements_for_workflow("wf_scope_merge", arazzo_spec, source_descriptions)
+    assert list(result.keys()) == ["src"]
+    # The merged SecurityOption should have both scopes for oauth2
+    merged_option = SecurityOption(requirements=[SecurityRequirement(scheme_name="oauth2", scopes=["read", "write"])])
+    # Allow for scopes to be in any order
+    assert len(result["src"]) == 1
+    req = result["src"][0].requirements[0]
+    assert req.scheme_name == "oauth2"
+    assert set(req.scopes) == {"read", "write"}
+
 def test_get_security_requirements_for_openapi_operation_basic():
     openapi_spec = {
         "paths": {
