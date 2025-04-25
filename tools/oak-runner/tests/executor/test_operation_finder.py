@@ -7,7 +7,7 @@ from oak_runner.auth.auth_processor import AuthProcessor
 # Mock OpenAPI source descriptions
 MOCK_SOURCE_DESC = {
     "api_one": {
-        "servers": [{"url": "https://api.example.com/v1"}],
+        "servers": [{"url": "http://localhost"}],
         "paths": {
             "/users": {
                 "get": {
@@ -174,7 +174,7 @@ class TestOperationFinderHttpPath(unittest.TestCase):
         self.assertEqual(result["path"], "/users")
         self.assertEqual(result["method"], "get")
         self.assertEqual(result["operationId"], "listUsers")
-        self.assertEqual(result["url"], "https://api.example.com/v1/users")
+        self.assertEqual(result["url"], "http://localhost/users")
 
     def test_find_template_path_and_method_success(self):
         """Test finding an operation with a template path and method match."""
@@ -185,7 +185,7 @@ class TestOperationFinderHttpPath(unittest.TestCase):
         self.assertEqual(result["path"], "/users/{userId}") # Should return template path
         self.assertEqual(result["method"], "delete")
         self.assertEqual(result["operationId"], "deleteUser")
-        self.assertEqual(result["url"], "https://api.example.com/v1/users/{userId}")
+        self.assertEqual(result["url"], "http://localhost/users/{userId}")
 
     def test_find_case_insensitive_method_success(self):
         """Test finding an operation with a case-insensitive method match."""
@@ -227,6 +227,7 @@ def test_get_security_requirements_for_workflow_basic():
     }
     source_descriptions = {
         "src": {
+            "servers": [{"url": "http://dummy.com"}],
             "paths": {
                 "/foo": {
                     "get": {
@@ -258,6 +259,7 @@ def test_get_security_requirements_for_workflow_multiple_sources():
     }
     source_descriptions = {
         "src1": {
+            "servers": [{"url": "http://dummy1.com"}],
             "paths": {
                 "/foo": {
                     "get": {
@@ -270,6 +272,7 @@ def test_get_security_requirements_for_workflow_multiple_sources():
             "components": {"securitySchemes": {"apiKey": {"type": "apiKey"}}}
         },
         "src2": {
+            "servers": [{"url": "http://dummy2.com"}],
             "paths": {
                 "/bar": {
                     "post": {
@@ -304,6 +307,7 @@ def test_get_security_requirements_for_workflow_deduplication():
     }
     source_descriptions = {
         "src": {
+            "servers": [{"url": "http://dummy.com"}],
             "paths": {
                 "/foo": {
                     "get": {
@@ -341,6 +345,7 @@ def test_get_security_requirements_for_workflow_duplicate_names_different_source
     }
     source_descriptions = {
         "src1": {
+            "servers": [{"url": "http://dummy1.com"}],
             "paths": {
                 "/foo": {
                     "get": {
@@ -353,11 +358,12 @@ def test_get_security_requirements_for_workflow_duplicate_names_different_source
             "components": {"securitySchemes": {"apiKey": {"type": "apiKey", "x-issuer": "src1"}}}
         },
         "src2": {
+            "servers": [{"url": "http://dummy2.com"}],
             "paths": {
                 "/bar": {
                     "post": {
                         "operationId": "op2",
-                        "security": [{"apiKey": []}]
+                        "security": [{"apiKey": []}] # Same scheme name, different source
                     }
                 }
             },
@@ -391,6 +397,7 @@ def test_get_security_requirements_for_workflow_scope_merging():
     }
     source_descriptions = {
         "src": {
+            "servers": [{"url": "http://dummy.com"}],
             "paths": {
                 "/foo": {
                     "get": {
@@ -401,7 +408,7 @@ def test_get_security_requirements_for_workflow_scope_merging():
                 "/bar": {
                     "post": {
                         "operationId": "op2",
-                        "security": [{"oauth2": ["write"]}]
+                        "security": [{"oauth2": ["write"]}] 
                     }
                 }
             },
@@ -422,6 +429,7 @@ def test_get_security_requirements_for_workflow_scope_merging():
 
 def test_get_security_requirements_for_openapi_operation_basic():
     openapi_spec = {
+        "servers": [{"url": "http://dummy.com"}],
         "paths": {
             "/foo": {
                 "get": {

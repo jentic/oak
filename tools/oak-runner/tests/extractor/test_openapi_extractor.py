@@ -23,6 +23,7 @@ if not extractor_logger.hasHandlers():
 TEST_SPEC = {
     "openapi": "3.0.0",
     "info": {"title": "Test API", "version": "1.0.0"},
+    "servers": [{"url": "http://test.com/api"}],
     "paths": {
         "/orders": {
             "post": {
