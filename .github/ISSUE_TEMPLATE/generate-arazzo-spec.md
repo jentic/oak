@@ -31,7 +31,7 @@ If you would like to request specific workflows, please add them as bullet point
 - Submit an order and retrieve order status
 
 Note:
-If workflows requested the generator will attempt to only create the requested workflows.
+If workflows are requested the generator will attempt to only create the requested workflows.
 If no workflows are specified, the generator will attempt to discover workflows automatically.
 The system will not generate single step/operation workflows even if requested
 -->
