@@ -14,19 +14,153 @@
   ],
   "workflows": [
     {
-      "workflowId": "run-assistant-with-file-search",
-      "summary": "Creates a new Assistant configured with the File Search tool, uploads a file, associates it with the Assistant via a Vector Store, creates a Thread, adds a user message, runs the Assistant on the Thread, and retrieves the response. This demonstrates a common RAG (Retrieval-Augmented Generation) pattern.",
-      "description": "Creates a new Assistant configured with the File Search tool, uploads a file, associates it with the Assistant via a Vector Store, creates a Thread, adds a user message, runs the Assistant on the Thread, and retrieves the response. This demonstrates a common RAG (Retrieval-Augmented Generation) pattern.",
+      "workflowId": "convert-text-file-to-speech",
+      "summary": "Uploads a text file, retrieves its content, and then converts that text content into synthesized speech audio using a specified voice and model.",
+      "description": "Uploads a text file, retrieves its content, and then converts that text content into synthesized speech audio using a specified voice and model.",
       "inputs": {
         "type": "object",
         "properties": {
           "file": {
             "type": "string"
           },
+          "purpose": {
+            "type": "string"
+          },
+          "file_id": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "voice": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "upload-text-file",
+          "description": "Upload the text file to be converted. Purpose can be 'assistants' or 'user_data'.",
+          "operationId": "createFile",
+          "requestBody": {
+            "contentType": "multipart/form-data",
+            "payload": {
+              "file": "$inputs.file",
+              "purpose": "$inputs.purpose"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "bytes": "$response.body#/bytes",
+            "created_at": "$response.body#/created_at",
+            "filename": "$response.body#/filename",
+            "object": "$response.body#/object",
+            "purpose": "$response.body#/purpose",
+            "status": "$response.body#/status"
+          }
+        },
+        {
+          "stepId": "get-file-content",
+          "description": "Retrieve the text content of the uploaded file.",
+          "operationId": "downloadFile",
+          "parameters": [
+            {
+              "name": "file_id",
+              "in": "path",
+              "value": "$steps.upload-text-file.outputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "file_content": "$response.body#/file_content"
+          }
+        },
+        {
+          "stepId": "generate-speech",
+          "description": "Generate audio from the retrieved text content.",
+          "operationId": "createSpeech",
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "input": "$steps.get-file-content.outputs.file_content",
+              "model": "$inputs.model",
+              "voice": "$inputs.voice"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "audio_content": "$response.body#/audio_content"
+          }
+        }
+      ],
+      "outputs": {
+        "id": "$steps.upload-text-file.outputs.id",
+        "bytes": "$steps.upload-text-file.outputs.bytes",
+        "created_at": "$steps.upload-text-file.outputs.created_at",
+        "filename": "$steps.upload-text-file.outputs.filename",
+        "object": "$steps.upload-text-file.outputs.object",
+        "purpose": "$steps.upload-text-file.outputs.purpose",
+        "status": "$steps.upload-text-file.outputs.status",
+        "file_content": "$steps.get-file-content.outputs.file_content",
+        "audio_content": "$steps.generate-speech.outputs.audio_content"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "run-assistant-with-file-search-on-uploaded-files",
+      "summary": "Uploads files, creates a vector store, adds files to it, creates an assistant configured for file search using the vector store, creates a thread, adds a user message, runs the assistant on the thread, and retrieves the assistant's response which utilizes the uploaded files.",
+      "description": "Uploads files, creates a vector store, adds files to it, creates an assistant configured for file search using the vector store, creates a thread, adds a user message, runs the assistant on the thread, and retrieves the assistant's response which utilizes the uploaded files.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },
+          "expires_after": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "string"
+          },
           "vector_store_id": {
+            "type": "string"
+          },
+          "file_ids": {
+            "type": "string"
+          },
+          "batch_id": {
             "type": "string"
           },
           "model": {
@@ -38,16 +172,16 @@
           "tool_resources": {
             "type": "string"
           },
-          "metadata": {
+          "thread_id": {
             "type": "string"
           },
-          "thread_id": {
+          "role": {
             "type": "string"
           },
           "content": {
             "type": "string"
           },
-          "include": {
+          "include[]": {
             "type": "string"
           },
           "run_id": {
@@ -69,13 +203,14 @@
       },
       "steps": [
         {
-          "stepId": "upload-assistant-file",
-          "description": "Upload a file to be used by the Assistant's File Search tool.",
+          "stepId": "upload-knowledge-file-1",
+          "description": "Upload the first knowledge file for the assistant.",
           "operationId": "createFile",
           "requestBody": {
             "contentType": "multipart/form-data",
             "payload": {
-              "file": "$inputs.file"
+              "file": "$inputs.file",
+              "purpose": "$inputs.purpose"
             }
           },
           "successCriteria": [
@@ -84,23 +219,39 @@
             }
           ],
           "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "bytes": "$response.body",
-            "created_at": "$response.body",
-            "filename": "$response.body",
-            "purpose": "$response.body"
+            "id": "$response.body#/id"
+          }
+        },
+        {
+          "stepId": "upload-knowledge-file-2",
+          "description": "Upload the second knowledge file for the assistant.",
+          "operationId": "createFile",
+          "requestBody": {
+            "contentType": "multipart/form-data",
+            "payload": {
+              "file": "$inputs.file",
+              "purpose": "$inputs.purpose"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id"
           }
         },
         {
           "stepId": "create-vector-store",
-          "description": "Create a Vector Store to hold the file for the Assistant.",
+          "description": "Create a new vector store to hold the file knowledge.",
           "operationId": "createVectorStore",
           "requestBody": {
             "contentType": "application/json",
             "payload": {
-              "file_ids": "$steps.upload-assistant-file.outputs.id",
-              "name": "$inputs.name"
+              "name": "$inputs.name",
+              "expires_after": "$inputs.expires_after",
+              "metadata": "$inputs.metadata"
             }
           },
           "successCriteria": [
@@ -109,19 +260,14 @@
             }
           ],
           "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "created_at": "$response.body",
-            "name": "$response.body",
-            "usage_bytes": "$response.body",
-            "file_counts": "$response.body",
-            "status": "$response.body"
+            "id": "$response.body#/id",
+            "status": "$response.body#/status"
           }
         },
         {
-          "stepId": "poll-vector-store-status",
-          "description": "Poll the Vector Store status until it's 'completed' (indicating files are processed). Note: This might require repeated calls until status is 'completed'.",
-          "operationId": "getVectorStore",
+          "stepId": "add-files-to-vector-store",
+          "description": "Add the uploaded files to the vector store in a batch.",
+          "operationId": "createVectorStoreFileBatch",
           "parameters": [
             {
               "name": "vector_store_id",
@@ -129,20 +275,54 @@
               "value": "$steps.create-vector-store.outputs.id"
             }
           ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "vector_store_id": "$steps.create-vector-store.outputs.id",
+              "file_ids": "$inputs.file_ids"
+            }
+          },
           "successCriteria": [
             {
               "condition": "$statusCode == 200"
             }
           ],
           "outputs": {
-            "id": "$response.body",
-            "status": "$response.body",
-            "file_counts": "$response.body"
+            "id": "$response.body#/id",
+            "status": "$response.body#/status",
+            "file_counts": "$response.body#/file_counts"
           }
         },
         {
-          "stepId": "create-assistant-with-file-search",
-          "description": "Create an Assistant configured with the File Search tool and linked to the Vector Store.",
+          "stepId": "check-vector-store-file-processing",
+          "description": "Check the status of the file batch processing. Poll until status is 'completed'.",
+          "operationId": "getVectorStoreFileBatch",
+          "parameters": [
+            {
+              "name": "vector_store_id",
+              "in": "path",
+              "value": "$steps.create-vector-store.outputs.id"
+            },
+            {
+              "name": "batch_id",
+              "in": "path",
+              "value": "$steps.add-files-to-vector-store.outputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "status": "$response.body#/status",
+            "file_counts": "$response.body#/file_counts"
+          }
+        },
+        {
+          "stepId": "create-file-search-assistant",
+          "description": "Create an assistant configured with the file search tool pointing to the vector store.",
           "operationId": "createAssistant",
           "requestBody": {
             "contentType": "application/json",
@@ -156,16 +336,11 @@
             }
           ],
           "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "created_at": "$response.body",
-            "model": "$response.body",
-            "tools": "$response.body",
-            "tool_resources": "$response.body"
+            "id": "$response.body#/id"
           }
         },
         {
-          "stepId": "create-thread",
+          "stepId": "create-conversation-thread",
           "description": "Create a new conversation thread.",
           "operationId": "createThread",
           "requestBody": {
@@ -182,28 +357,25 @@
             }
           ],
           "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "created_at": "$response.body",
-            "metadata": "$response.body",
-            "tool_resources": "$response.body"
+            "id": "$response.body#/id"
           }
         },
         {
-          "stepId": "add-message-to-thread",
-          "description": "Add the user's query to the thread.",
+          "stepId": "add-user-query",
+          "description": "Add the user's query to the conversation thread.",
           "operationId": "createMessage",
           "parameters": [
             {
               "name": "thread_id",
               "in": "path",
-              "value": "$steps.create-thread.outputs.id"
+              "value": "$steps.create-conversation-thread.outputs.id"
             }
           ],
           "requestBody": {
             "contentType": "application/json",
             "payload": {
-              "thread_id": "$steps.create-thread.outputs.id",
+              "thread_id": "$steps.create-conversation-thread.outputs.id",
+              "role": "$inputs.role",
               "content": "$inputs.content"
             }
           },
@@ -213,35 +385,32 @@
             }
           ],
           "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "created_at": "$response.body",
-            "thread_id": "$response.body",
-            "role": "$response.body",
-            "content": "$response.body"
+            "id": "$response.body#/id",
+            "role": "$response.body#/role",
+            "content": "$response.body#/content"
           }
         },
         {
-          "stepId": "run-assistant",
-          "description": "Run the Assistant on the thread to process the message using File Search.",
+          "stepId": "run-assistant-on-thread",
+          "description": "Run the file search assistant on the thread.",
           "operationId": "createRun",
           "parameters": [
             {
               "name": "thread_id",
               "in": "path",
-              "value": "$steps.create-thread.outputs.id"
+              "value": "$steps.create-conversation-thread.outputs.id"
             },
             {
-              "name": "include",
+              "name": "include[]",
               "in": "query",
-              "value": "$inputs.include"
+              "value": "$inputs.include[]"
             }
           ],
           "requestBody": {
             "contentType": "application/json",
             "payload": {
-              "thread_id": "$steps.create-thread.outputs.id",
-              "assistant_id": "$steps.create-assistant-with-file-search.outputs.id"
+              "thread_id": "$steps.create-conversation-thread.outputs.id",
+              "assistant_id": "$steps.create-file-search-assistant.outputs.id"
             }
           },
           "successCriteria": [
@@ -250,28 +419,24 @@
             }
           ],
           "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "created_at": "$response.body",
-            "thread_id": "$response.body",
-            "assistant_id": "$response.body",
-            "status": "$response.body"
+            "id": "$response.body#/id",
+            "status": "$response.body#/status"
           }
         },
         {
-          "stepId": "get-run-status",
-          "description": "Poll the run status until it reaches a terminal state (e.g., 'completed', 'failed'). Note: This might require repeated calls.",
+          "stepId": "check-run-status",
+          "description": "Check the status of the assistant run. Poll until status is 'completed'.",
           "operationId": "getRun",
           "parameters": [
             {
               "name": "thread_id",
               "in": "path",
-              "value": "$steps.create-thread.outputs.id"
+              "value": "$steps.create-conversation-thread.outputs.id"
             },
             {
               "name": "run_id",
               "in": "path",
-              "value": "$steps.run-assistant.outputs.id"
+              "value": "$steps.run-assistant-on-thread.outputs.id"
             }
           ],
           "successCriteria": [
@@ -280,22 +445,20 @@
             }
           ],
           "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "status": "$response.body",
-            "last_error": "$response.body",
-            "usage": "$response.body"
+            "id": "$response.body#/id",
+            "status": "$response.body#/status",
+            "usage": "$response.body#/usage"
           }
         },
         {
-          "stepId": "list-thread-messages",
-          "description": "Retrieve the messages from the thread, including the Assistant's response.",
+          "stepId": "retrieve-assistant-response",
+          "description": "Retrieve the messages from the thread, including the assistant's response.",
           "operationId": "listMessages",
           "parameters": [
             {
               "name": "thread_id",
               "in": "path",
-              "value": "$steps.create-thread.outputs.id"
+              "value": "$steps.create-conversation-thread.outputs.id"
             },
             {
               "name": "limit",
@@ -329,1483 +492,24 @@
             }
           ],
           "outputs": {
-            "object": "$response.body",
-            "data": "$response.body",
-            "first_id": "$response.body",
-            "last_id": "$response.body",
-            "has_more": "$response.body"
+            "data": "$response.body#/data",
+            "first_id": "$response.body#/first_id",
+            "last_id": "$response.body#/last_id",
+            "has_more": "$response.body#/has_more"
           }
         }
       ],
       "outputs": {
-        "id": "$steps.get-run-status.outputs.id",
-        "object": "$steps.list-thread-messages.outputs.object",
-        "bytes": "$steps.upload-assistant-file.outputs.bytes",
-        "created_at": "$steps.run-assistant.outputs.created_at",
-        "filename": "$steps.upload-assistant-file.outputs.filename",
-        "purpose": "$steps.upload-assistant-file.outputs.purpose",
-        "name": "$steps.create-vector-store.outputs.name",
-        "usage_bytes": "$steps.create-vector-store.outputs.usage_bytes",
-        "file_counts": "$steps.poll-vector-store-status.outputs.file_counts",
-        "status": "$steps.get-run-status.outputs.status",
-        "model": "$steps.create-assistant-with-file-search.outputs.model",
-        "tools": "$steps.create-assistant-with-file-search.outputs.tools",
-        "tool_resources": "$steps.create-thread.outputs.tool_resources",
-        "metadata": "$steps.create-thread.outputs.metadata",
-        "thread_id": "$steps.run-assistant.outputs.thread_id",
-        "role": "$steps.add-message-to-thread.outputs.role",
-        "content": "$steps.add-message-to-thread.outputs.content",
-        "assistant_id": "$steps.run-assistant.outputs.assistant_id",
-        "last_error": "$steps.get-run-status.outputs.last_error",
-        "usage": "$steps.get-run-status.outputs.usage",
-        "data": "$steps.list-thread-messages.outputs.data",
-        "first_id": "$steps.list-thread-messages.outputs.first_id",
-        "last_id": "$steps.list-thread-messages.outputs.last_id",
-        "has_more": "$steps.list-thread-messages.outputs.has_more"
-      },
-      "failureActions": [
-        {
-          "reference": "$components.failureActions.auth_failure"
-        },
-        {
-          "reference": "$components.failureActions.permission_denied"
-        },
-        {
-          "reference": "$components.failureActions.not_found"
-        },
-        {
-          "reference": "$components.failureActions.server_error"
-        }
-      ]
-    },
-    {
-      "workflowId": "fine-tune-a-model-and-use-it",
-      "summary": "Upload training data, create a fine-tuning job, monitor its progress, and then use the resulting fine-tuned model in a chat completion request.",
-      "description": "Upload training data, create a fine-tuning job, monitor its progress, and then use the resulting fine-tuned model in a chat completion request.",
-      "inputs": {
-        "type": "object",
-        "properties": {
-          "file": {
-            "type": "string"
-          },
-          "model": {
-            "type": "string"
-          },
-          "fine_tuning_job_id": {
-            "type": "string"
-          },
-          "after": {
-            "type": "string"
-          },
-          "limit": {
-            "type": "string"
-          }
-        }
-      },
-      "steps": [
-        {
-          "stepId": "upload-training-file",
-          "description": "Upload the JSONL training file.",
-          "operationId": "createFile",
-          "requestBody": {
-            "contentType": "multipart/form-data",
-            "payload": {
-              "file": "$inputs.file"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "bytes": "$response.body",
-            "created_at": "$response.body",
-            "filename": "$response.body",
-            "purpose": "$response.body"
-          }
-        },
-        {
-          "stepId": "upload-validation-file",
-          "description": "Upload the JSONL validation file (optional).",
-          "operationId": "createFile",
-          "requestBody": {
-            "contentType": "multipart/form-data",
-            "payload": {
-              "file": "$inputs.file"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "bytes": "$response.body",
-            "created_at": "$response.body",
-            "filename": "$response.body",
-            "purpose": "$response.body"
-          }
-        },
-        {
-          "stepId": "create-fine-tuning-job",
-          "description": "Start the fine-tuning job using the uploaded file(s).",
-          "operationId": "createFineTuningJob",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "training_file": "$steps.upload-training-file.outputs.id",
-              "validation_file": "$steps.upload-validation-file.outputs.id",
-              "model": "$inputs.model"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "created_at": "$response.body",
-            "model": "$response.body",
-            "status": "$response.body",
-            "training_file": "$response.body",
-            "validation_file": "$response.body"
-          }
-        },
-        {
-          "stepId": "monitor-fine-tuning-job",
-          "description": "Periodically check the status of the fine-tuning job until it succeeds or fails.",
-          "operationId": "retrieveFineTuningJob",
-          "parameters": [
-            {
-              "name": "fine_tuning_job_id",
-              "in": "path",
-              "value": "$steps.create-fine-tuning-job.outputs.id"
-            }
-          ],
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "status": "$response.body",
-            "fine_tuned_model": "$response.body",
-            "error": "$response.body",
-            "result_files": "$response.body"
-          }
-        },
-        {
-          "stepId": "list-fine-tuning-events",
-          "description": "Retrieve events related to the fine-tuning job for detailed progress or error analysis (optional).",
-          "operationId": "listFineTuningEvents",
-          "parameters": [
-            {
-              "name": "fine_tuning_job_id",
-              "in": "path",
-              "value": "$steps.create-fine-tuning-job.outputs.id"
-            },
-            {
-              "name": "after",
-              "in": "query",
-              "value": "$inputs.after"
-            },
-            {
-              "name": "limit",
-              "in": "query",
-              "value": "$inputs.limit"
-            }
-          ],
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "object": "$response.body",
-            "data": "$response.body",
-            "has_more": "$response.body"
-          }
-        },
-        {
-          "stepId": "use-fine-tuned-model",
-          "description": "Use the newly fine-tuned model to generate a chat completion.",
-          "operationId": "createChatCompletion",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "model": "$steps.monitor-fine-tuning-job.outputs.fine_tuned_model"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "created": "$response.body",
-            "model": "$response.body",
-            "choices": "$response.body",
-            "usage": "$response.body"
-          }
-        }
-      ],
-      "outputs": {
-        "id": "$steps.use-fine-tuned-model.outputs.id",
-        "object": "$steps.use-fine-tuned-model.outputs.object",
-        "bytes": "$steps.upload-validation-file.outputs.bytes",
-        "created_at": "$steps.create-fine-tuning-job.outputs.created_at",
-        "filename": "$steps.upload-validation-file.outputs.filename",
-        "purpose": "$steps.upload-validation-file.outputs.purpose",
-        "model": "$steps.use-fine-tuned-model.outputs.model",
-        "status": "$steps.monitor-fine-tuning-job.outputs.status",
-        "training_file": "$steps.create-fine-tuning-job.outputs.training_file",
-        "validation_file": "$steps.create-fine-tuning-job.outputs.validation_file",
-        "fine_tuned_model": "$steps.monitor-fine-tuning-job.outputs.fine_tuned_model",
-        "error": "$steps.monitor-fine-tuning-job.outputs.error",
-        "result_files": "$steps.monitor-fine-tuning-job.outputs.result_files",
-        "data": "$steps.list-fine-tuning-events.outputs.data",
-        "has_more": "$steps.list-fine-tuning-events.outputs.has_more",
-        "created": "$steps.use-fine-tuned-model.outputs.created",
-        "choices": "$steps.use-fine-tuned-model.outputs.choices",
-        "usage": "$steps.use-fine-tuned-model.outputs.usage"
-      },
-      "failureActions": [
-        {
-          "reference": "$components.failureActions.auth_failure"
-        },
-        {
-          "reference": "$components.failureActions.permission_denied"
-        },
-        {
-          "reference": "$components.failureActions.not_found"
-        },
-        {
-          "reference": "$components.failureActions.server_error"
-        }
-      ]
-    },
-    {
-      "workflowId": "process-large-dataset-with-batch-api",
-      "summary": "Upload a file containing multiple API requests (e.g., for embeddings or chat completions), create a batch job to process them asynchronously, monitor the job, and retrieve the results.",
-      "description": "Upload a file containing multiple API requests (e.g., for embeddings or chat completions), create a batch job to process them asynchronously, monitor the job, and retrieve the results.",
-      "inputs": {
-        "type": "object",
-        "properties": {
-          "file": {
-            "type": "string"
-          },
-          "endpoint": {
-            "type": "string"
-          },
-          "completion_window": {
-            "type": "string"
-          },
-          "batch_id": {
-            "type": "string"
-          },
-          "file_id": {
-            "type": "string"
-          }
-        }
-      },
-      "steps": [
-        {
-          "stepId": "upload-batch-input-file",
-          "description": "Upload the JSONL file containing the batch requests.",
-          "operationId": "createFile",
-          "requestBody": {
-            "contentType": "multipart/form-data",
-            "payload": {
-              "file": "$inputs.file"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "bytes": "$response.body",
-            "created_at": "$response.body",
-            "filename": "$response.body",
-            "purpose": "$response.body"
-          }
-        },
-        {
-          "stepId": "create-batch-job",
-          "description": "Create and start the batch processing job.",
-          "operationId": "createBatch",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "input_file_id": "$steps.upload-batch-input-file.outputs.id",
-              "endpoint": "$inputs.endpoint",
-              "completion_window": "$inputs.completion_window"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "endpoint": "$response.body",
-            "status": "$response.body",
-            "input_file_id": "$response.body",
-            "created_at": "$response.body"
-          }
-        },
-        {
-          "stepId": "monitor-batch-job",
-          "description": "Periodically check the status of the batch job until it completes or fails.",
-          "operationId": "retrieveBatch",
-          "parameters": [
-            {
-              "name": "batch_id",
-              "in": "path",
-              "value": "$steps.create-batch-job.outputs.id"
-            }
-          ],
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "status": "$response.body",
-            "output_file_id": "$response.body",
-            "error_file_id": "$response.body",
-            "request_counts": "$response.body",
-            "completed_at": "$response.body",
-            "failed_at": "$response.body"
-          }
-        },
-        {
-          "stepId": "download-batch-output-file",
-          "description": "Download the results file containing the outputs of successfully processed requests.",
-          "operationId": "downloadFile",
-          "parameters": [
-            {
-              "name": "file_id",
-              "in": "path",
-              "value": "$steps.monitor-batch-job.outputs.output_file_id"
-            }
-          ],
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "file_content": "$response.body"
-          }
-        },
-        {
-          "stepId": "download-batch-error-file",
-          "description": "Download the error file containing details about requests that failed (optional).",
-          "operationId": "downloadFile",
-          "parameters": [
-            {
-              "name": "file_id",
-              "in": "path",
-              "value": "$steps.monitor-batch-job.outputs.error_file_id"
-            }
-          ],
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "file_content": "$response.body"
-          }
-        }
-      ],
-      "outputs": {
-        "id": "$steps.monitor-batch-job.outputs.id",
-        "object": "$steps.monitor-batch-job.outputs.object",
-        "bytes": "$steps.upload-batch-input-file.outputs.bytes",
-        "created_at": "$steps.create-batch-job.outputs.created_at",
-        "filename": "$steps.upload-batch-input-file.outputs.filename",
-        "purpose": "$steps.upload-batch-input-file.outputs.purpose",
-        "endpoint": "$steps.create-batch-job.outputs.endpoint",
-        "status": "$steps.monitor-batch-job.outputs.status",
-        "input_file_id": "$steps.create-batch-job.outputs.input_file_id",
-        "output_file_id": "$steps.monitor-batch-job.outputs.output_file_id",
-        "error_file_id": "$steps.monitor-batch-job.outputs.error_file_id",
-        "request_counts": "$steps.monitor-batch-job.outputs.request_counts",
-        "completed_at": "$steps.monitor-batch-job.outputs.completed_at",
-        "failed_at": "$steps.monitor-batch-job.outputs.failed_at",
-        "file_content": "$steps.download-batch-error-file.outputs.file_content"
-      },
-      "failureActions": [
-        {
-          "reference": "$components.failureActions.auth_failure"
-        },
-        {
-          "reference": "$components.failureActions.permission_denied"
-        },
-        {
-          "reference": "$components.failureActions.not_found"
-        },
-        {
-          "reference": "$components.failureActions.server_error"
-        }
-      ]
-    },
-    {
-      "workflowId": "upload-large-file-using-parts-api",
-      "summary": "Upload a large file (> 64MB, up to 8GB) by creating an Upload object, adding file parts, and then completing the upload to create a usable File object.",
-      "description": "Upload a large file (> 64MB, up to 8GB) by creating an Upload object, adding file parts, and then completing the upload to create a usable File object.",
-      "inputs": {
-        "type": "object",
-        "properties": {
-          "filename": {
-            "type": "string"
-          },
-          "purpose": {
-            "type": "string"
-          },
-          "bytes": {
-            "type": "string"
-          },
-          "mime_type": {
-            "type": "string"
-          },
-          "upload_id": {
-            "type": "string"
-          },
-          "data": {
-            "type": "string"
-          },
-          "part_ids": {
-            "type": "string"
-          }
-        }
-      },
-      "steps": [
-        {
-          "stepId": "create-upload-session",
-          "description": "Initiate a large file upload session.",
-          "operationId": "createUpload",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "filename": "$inputs.filename",
-              "purpose": "$inputs.purpose",
-              "bytes": "$inputs.bytes",
-              "mime_type": "$inputs.mime_type"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "created_at": "$response.body",
-            "filename": "$response.body",
-            "bytes": "$response.body",
-            "purpose": "$response.body",
-            "status": "$response.body",
-            "expires_at": "$response.body"
-          }
-        },
-        {
-          "stepId": "add-upload-part-1",
-          "description": "Upload the first part/chunk of the large file.",
-          "operationId": "addUploadPart",
-          "parameters": [
-            {
-              "name": "upload_id",
-              "in": "path",
-              "value": "$steps.create-upload-session.outputs.id"
-            }
-          ],
-          "requestBody": {
-            "contentType": "multipart/form-data",
-            "payload": {
-              "upload_id": "$steps.create-upload-session.outputs.id",
-              "data": "$inputs.data"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "created_at": "$response.body",
-            "upload_id": "$response.body"
-          }
-        },
-        {
-          "stepId": "add-upload-part-2",
-          "description": "Upload the second part/chunk of the large file. (Repeat as needed for all parts).",
-          "operationId": "addUploadPart",
-          "parameters": [
-            {
-              "name": "upload_id",
-              "in": "path",
-              "value": "$steps.create-upload-session.outputs.id"
-            }
-          ],
-          "requestBody": {
-            "contentType": "multipart/form-data",
-            "payload": {
-              "upload_id": "$steps.create-upload-session.outputs.id",
-              "data": "$inputs.data"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "created_at": "$response.body",
-            "upload_id": "$response.body"
-          }
-        },
-        {
-          "stepId": "complete-upload",
-          "description": "Complete the upload process after all parts have been added, creating the final File object.",
-          "operationId": "completeUpload",
-          "parameters": [
-            {
-              "name": "upload_id",
-              "in": "path",
-              "value": "$steps.create-upload-session.outputs.id"
-            }
-          ],
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "upload_id": "$steps.create-upload-session.outputs.id",
-              "part_ids": "$inputs.part_ids"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "status": "$response.body",
-            "file": "$response.body"
-          }
-        }
-      ],
-      "outputs": {
-        "id": "$steps.complete-upload.outputs.id",
-        "created_at": "$steps.add-upload-part-2.outputs.created_at",
-        "filename": "$steps.create-upload-session.outputs.filename",
-        "bytes": "$steps.create-upload-session.outputs.bytes",
-        "purpose": "$steps.create-upload-session.outputs.purpose",
-        "status": "$steps.complete-upload.outputs.status",
-        "expires_at": "$steps.create-upload-session.outputs.expires_at",
-        "upload_id": "$steps.add-upload-part-2.outputs.upload_id",
-        "file": "$steps.complete-upload.outputs.file"
-      },
-      "failureActions": [
-        {
-          "reference": "$components.failureActions.auth_failure"
-        },
-        {
-          "reference": "$components.failureActions.permission_denied"
-        },
-        {
-          "reference": "$components.failureActions.not_found"
-        },
-        {
-          "reference": "$components.failureActions.server_error"
-        }
-      ]
-    },
-    {
-      "workflowId": "search-vector-store",
-      "summary": "Creates a vector store, adds files via batch, waits for completion, and then performs a semantic search on the vector store.",
-      "description": "Creates a vector store, adds files via batch, waits for completion, and then performs a semantic search on the vector store.",
-      "inputs": {
-        "type": "object",
-        "properties": {
-          "file": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "vector_store_id": {
-            "type": "string"
-          },
-          "file_ids": {
-            "type": "string"
-          },
-          "batch_id": {
-            "type": "string"
-          },
-          "query": {
-            "type": "string"
-          }
-        }
-      },
-      "steps": [
-        {
-          "stepId": "upload-search-file-1",
-          "description": "Upload the first file for the vector store.",
-          "operationId": "createFile",
-          "requestBody": {
-            "contentType": "multipart/form-data",
-            "payload": {
-              "file": "$inputs.file"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body"
-          }
-        },
-        {
-          "stepId": "upload-search-file-2",
-          "description": "Upload the second file for the vector store.",
-          "operationId": "createFile",
-          "requestBody": {
-            "contentType": "multipart/form-data",
-            "payload": {
-              "file": "$inputs.file"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body"
-          }
-        },
-        {
-          "stepId": "create-search-vector-store",
-          "description": "Create an empty Vector Store.",
-          "operationId": "createVectorStore",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "name": "$inputs.name"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "status": "$response.body"
-          }
-        },
-        {
-          "stepId": "create-vector-store-file-batch",
-          "description": "Create a batch to add multiple files to the vector store.",
-          "operationId": "createVectorStoreFileBatch",
-          "parameters": [
-            {
-              "name": "vector_store_id",
-              "in": "path",
-              "value": "$steps.create-search-vector-store.outputs.id"
-            }
-          ],
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "vector_store_id": "$steps.create-search-vector-store.outputs.id",
-              "file_ids": "$inputs.file_ids"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "vector_store_id": "$response.body",
-            "status": "$response.body",
-            "file_counts": "$response.body"
-          }
-        },
-        {
-          "stepId": "get-vector-store-file-batch-status",
-          "description": "Poll the status of the file batch until it is completed.",
-          "operationId": "getVectorStoreFileBatch",
-          "parameters": [
-            {
-              "name": "vector_store_id",
-              "in": "path",
-              "value": "$steps.create-vector-store-file-batch.outputs.vector_store_id"
-            },
-            {
-              "name": "batch_id",
-              "in": "path",
-              "value": "$steps.create-vector-store-file-batch.outputs.id"
-            }
-          ],
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "status": "$response.body",
-            "file_counts": "$response.body"
-          }
-        },
-        {
-          "stepId": "search-vector-store",
-          "description": "Perform a semantic search within the populated vector store.",
-          "operationId": "searchVectorStore",
-          "parameters": [
-            {
-              "name": "vector_store_id",
-              "in": "path",
-              "value": "$steps.create-search-vector-store.outputs.id"
-            }
-          ],
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "vector_store_id": "$steps.create-search-vector-store.outputs.id",
-              "query": "$inputs.query"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "object": "$response.body",
-            "search_query": "$response.body",
-            "data": "$response.body",
-            "has_more": "$response.body",
-            "next_page": "$response.body"
-          }
-        }
-      ],
-      "outputs": {
-        "id": "$steps.get-vector-store-file-batch-status.outputs.id",
-        "status": "$steps.get-vector-store-file-batch-status.outputs.status",
-        "vector_store_id": "$steps.create-vector-store-file-batch.outputs.vector_store_id",
-        "file_counts": "$steps.get-vector-store-file-batch-status.outputs.file_counts",
-        "object": "$steps.search-vector-store.outputs.object",
-        "search_query": "$steps.search-vector-store.outputs.search_query",
-        "data": "$steps.search-vector-store.outputs.data",
-        "has_more": "$steps.search-vector-store.outputs.has_more",
-        "next_page": "$steps.search-vector-store.outputs.next_page"
-      },
-      "failureActions": [
-        {
-          "reference": "$components.failureActions.auth_failure"
-        },
-        {
-          "reference": "$components.failureActions.permission_denied"
-        },
-        {
-          "reference": "$components.failureActions.not_found"
-        },
-        {
-          "reference": "$components.failureActions.server_error"
-        }
-      ]
-    },
-    {
-      "workflowId": "transcribe-and-synthesize-audio",
-      "summary": "Transcribe an audio file into text, and then synthesize new audio from that text (or modified text).",
-      "description": "Transcribe an audio file into text, and then synthesize new audio from that text (or modified text).",
-      "inputs": {
-        "type": "object",
-        "properties": {
-          "file": {
-            "type": "string"
-          },
-          "model": {
-            "type": "string"
-          },
-          "voice": {
-            "type": "string"
-          }
-        }
-      },
-      "steps": [
-        {
-          "stepId": "transcribe-audio",
-          "description": "Transcribe an audio file into text.",
-          "operationId": "createTranscription",
-          "requestBody": {
-            "contentType": "multipart/form-data",
-            "payload": {
-              "file": "$inputs.file",
-              "model": "$inputs.model"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "text": "$response.body"
-          }
-        },
-        {
-          "stepId": "synthesize-speech",
-          "description": "Generate audio (speech) from the transcribed text.",
-          "operationId": "createSpeech",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "input": "$steps.transcribe-audio.outputs.text",
-              "model": "$inputs.model",
-              "voice": "$inputs.voice"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "audio_binary": "$response.body"
-          }
-        }
-      ],
-      "outputs": {
-        "text": "$steps.transcribe-audio.outputs.text",
-        "audio_binary": "$steps.synthesize-speech.outputs.audio_binary"
-      },
-      "failureActions": [
-        {
-          "reference": "$components.failureActions.auth_failure"
-        },
-        {
-          "reference": "$components.failureActions.permission_denied"
-        },
-        {
-          "reference": "$components.failureActions.not_found"
-        },
-        {
-          "reference": "$components.failureActions.server_error"
-        }
-      ]
-    },
-    {
-      "workflowId": "moderate-user-input-before-processing",
-      "summary": "Check user-provided text input for harmful content using the Moderations endpoint before sending it to a generation model like Chat Completion.",
-      "description": "Check user-provided text input for harmful content using the Moderations endpoint before sending it to a generation model like Chat Completion.",
-      "inputs": {
-        "type": "object",
-        "properties": {
-          "input": {
-            "type": "string"
-          },
-          "generate-response-if-safe_body": {
-            "type": "object"
-          }
-        }
-      },
-      "steps": [
-        {
-          "stepId": "moderate-input",
-          "description": "Classify input text for potentially harmful content.",
-          "operationId": "createModeration",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "input": "$inputs.input"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "model": "$response.body",
-            "results": "$response.body"
-          }
-        },
-        {
-          "stepId": "generate-response-if-safe",
-          "description": "Generate a chat completion only if the input was not flagged as harmful. (Conditional step based on 'moderate-input' output).",
-          "operationId": "createChatCompletion",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": "$inputs.generate-response-if-safe_body"
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "created": "$response.body",
-            "model": "$response.body",
-            "choices": "$response.body",
-            "usage": "$response.body"
-          }
-        }
-      ],
-      "outputs": {
-        "id": "$steps.generate-response-if-safe.outputs.id",
-        "model": "$steps.generate-response-if-safe.outputs.model",
-        "results": "$steps.moderate-input.outputs.results",
-        "object": "$steps.generate-response-if-safe.outputs.object",
-        "created": "$steps.generate-response-if-safe.outputs.created",
-        "choices": "$steps.generate-response-if-safe.outputs.choices",
-        "usage": "$steps.generate-response-if-safe.outputs.usage"
-      },
-      "failureActions": [
-        {
-          "reference": "$components.failureActions.auth_failure"
-        },
-        {
-          "reference": "$components.failureActions.permission_denied"
-        },
-        {
-          "reference": "$components.failureActions.not_found"
-        },
-        {
-          "reference": "$components.failureActions.server_error"
-        }
-      ]
-    },
-    {
-      "workflowId": "generate-image-and-create-variations",
-      "summary": "Generate an image based on a text prompt, then upload that image (or another) to create variations.",
-      "description": "Generate an image based on a text prompt, then upload that image (or another) to create variations.",
-      "inputs": {
-        "type": "object",
-        "properties": {
-          "prompt": {
-            "type": "string"
-          },
-          "image": {
-            "type": "string"
-          }
-        }
-      },
-      "steps": [
-        {
-          "stepId": "generate-image",
-          "description": "Create an initial image from a text prompt.",
-          "operationId": "createImage",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "prompt": "$inputs.prompt"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "created": "$response.body",
-            "data": "$response.body"
-          }
-        },
-        {
-          "stepId": "create-image-variation",
-          "description": "Create variations of an uploaded image. Note: Requires manually downloading the image from the URL generated in the previous step and uploading it here, or using a different pre-existing image file.",
-          "operationId": "createImageVariation",
-          "requestBody": {
-            "contentType": "multipart/form-data",
-            "payload": {
-              "image": "$inputs.image"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "created": "$response.body",
-            "data": "$response.body"
-          }
-        }
-      ],
-      "outputs": {
-        "created": "$steps.create-image-variation.outputs.created",
-        "data": "$steps.create-image-variation.outputs.data"
-      },
-      "failureActions": [
-        {
-          "reference": "$components.failureActions.auth_failure"
-        },
-        {
-          "reference": "$components.failureActions.permission_denied"
-        },
-        {
-          "reference": "$components.failureActions.not_found"
-        },
-        {
-          "reference": "$components.failureActions.server_error"
-        }
-      ]
-    },
-    {
-      "workflowId": "manage-project-access-and-api-keys",
-      "summary": "Create a new project, invite a user to the organization, add the user to the project, and create a service account with an API key scoped to that project.",
-      "description": "Create a new project, invite a user to the organization, add the user to the project, and create a service account with an API key scoped to that project.",
-      "inputs": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string"
-          },
-          "project_id": {
-            "type": "string"
-          },
-          "user_id": {
-            "type": "string"
-          }
-        }
-      },
-      "steps": [
-        {
-          "stepId": "create-project",
-          "description": "Create a new project within the organization.",
-          "operationId": "create-project",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "name": "$inputs.name"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "name": "$response.body",
-            "created_at": "$response.body",
-            "status": "$response.body"
-          }
-        },
-        {
-          "stepId": "invite-user-to-org",
-          "description": "Invite a new user to the organization.",
-          "operationId": "inviteUser",
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "email": "$inputs.email",
-              "role": "$inputs.role"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "email": "$response.body",
-            "role": "$response.body",
-            "status": "$response.body"
-          }
-        },
-        {
-          "stepId": "add-user-to-project",
-          "description": "Add an existing organization user to the newly created project.",
-          "operationId": "create-project-user",
-          "parameters": [
-            {
-              "name": "project_id",
-              "in": "path",
-              "value": "$steps.create-project.outputs.id"
-            }
-          ],
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "project_id": "$steps.create-project.outputs.id",
-              "user_id": "$inputs.user_id",
-              "role": "$inputs.role"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "name": "$response.body",
-            "email": "$response.body",
-            "role": "$response.body",
-            "added_at": "$response.body"
-          }
-        },
-        {
-          "stepId": "create-project-service-account",
-          "description": "Create a service account within the project and retrieve its API key.",
-          "operationId": "create-project-service-account",
-          "parameters": [
-            {
-              "name": "project_id",
-              "in": "path",
-              "value": "$steps.create-project.outputs.id"
-            }
-          ],
-          "requestBody": {
-            "contentType": "application/json",
-            "payload": {
-              "project_id": "$steps.create-project.outputs.id",
-              "name": "$inputs.name"
-            }
-          },
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "id": "$response.body",
-            "object": "$response.body",
-            "name": "$response.body",
-            "role": "$response.body",
-            "created_at": "$response.body",
-            "api_key": "$response.body"
-          }
-        }
-      ],
-      "outputs": {
-        "id": "$steps.create-project-service-account.outputs.id",
-        "object": "$steps.create-project-service-account.outputs.object",
-        "name": "$steps.create-project-service-account.outputs.name",
-        "created_at": "$steps.create-project-service-account.outputs.created_at",
-        "status": "$steps.invite-user-to-org.outputs.status",
-        "email": "$steps.add-user-to-project.outputs.email",
-        "role": "$steps.create-project-service-account.outputs.role",
-        "added_at": "$steps.add-user-to-project.outputs.added_at",
-        "api_key": "$steps.create-project-service-account.outputs.api_key"
-      },
-      "failureActions": [
-        {
-          "reference": "$components.failureActions.auth_failure"
-        },
-        {
-          "reference": "$components.failureActions.permission_denied"
-        },
-        {
-          "reference": "$components.failureActions.not_found"
-        },
-        {
-          "reference": "$components.failureActions.server_error"
-        }
-      ]
-    },
-    {
-      "workflowId": "monitor-organization-costs-and-usage",
-      "summary": "Retrieve detailed cost and usage information for the organization over a specified time period, potentially grouped by project or service.",
-      "description": "Retrieve detailed cost and usage information for the organization over a specified time period, potentially grouped by project or service.",
-      "inputs": {
-        "type": "object",
-        "properties": {
-          "start_time": {
-            "type": "string"
-          },
-          "end_time": {
-            "type": "string"
-          },
-          "bucket_width": {
-            "type": "string"
-          },
-          "project_ids": {
-            "type": "string"
-          },
-          "group_by": {
-            "type": "string"
-          },
-          "limit": {
-            "type": "string"
-          },
-          "page": {
-            "type": "string"
-          },
-          "user_ids": {
-            "type": "string"
-          },
-          "api_key_ids": {
-            "type": "string"
-          },
-          "models": {
-            "type": "string"
-          },
-          "batch": {
-            "type": "string"
-          },
-          "sources": {
-            "type": "string"
-          },
-          "sizes": {
-            "type": "string"
-          }
-        }
-      },
-      "steps": [
-        {
-          "stepId": "get-organization-costs",
-          "description": "Retrieve aggregated cost data for the organization.",
-          "operationId": "usage-costs",
-          "parameters": [
-            {
-              "name": "start_time",
-              "in": "query",
-              "value": "$inputs.start_time"
-            },
-            {
-              "name": "end_time",
-              "in": "query",
-              "value": "$inputs.end_time"
-            },
-            {
-              "name": "bucket_width",
-              "in": "query",
-              "value": "$inputs.bucket_width"
-            },
-            {
-              "name": "project_ids",
-              "in": "query",
-              "value": "$inputs.project_ids"
-            },
-            {
-              "name": "group_by",
-              "in": "query",
-              "value": "$inputs.group_by"
-            },
-            {
-              "name": "limit",
-              "in": "query",
-              "value": "$inputs.limit"
-            },
-            {
-              "name": "page",
-              "in": "query",
-              "value": "$inputs.page"
-            }
-          ],
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "object": "$response.body",
-            "data": "$response.body",
-            "has_more": "$response.body",
-            "next_page": "$response.body"
-          }
-        },
-        {
-          "stepId": "get-completions-usage",
-          "description": "Retrieve detailed usage data specifically for completions (Chat, Text).",
-          "operationId": "usage-completions",
-          "parameters": [
-            {
-              "name": "start_time",
-              "in": "query",
-              "value": "$inputs.start_time"
-            },
-            {
-              "name": "end_time",
-              "in": "query",
-              "value": "$inputs.end_time"
-            },
-            {
-              "name": "bucket_width",
-              "in": "query",
-              "value": "$inputs.bucket_width"
-            },
-            {
-              "name": "project_ids",
-              "in": "query",
-              "value": "$inputs.project_ids"
-            },
-            {
-              "name": "user_ids",
-              "in": "query",
-              "value": "$inputs.user_ids"
-            },
-            {
-              "name": "api_key_ids",
-              "in": "query",
-              "value": "$inputs.api_key_ids"
-            },
-            {
-              "name": "models",
-              "in": "query",
-              "value": "$inputs.models"
-            },
-            {
-              "name": "batch",
-              "in": "query",
-              "value": "$inputs.batch"
-            },
-            {
-              "name": "group_by",
-              "in": "query",
-              "value": "$inputs.group_by"
-            },
-            {
-              "name": "limit",
-              "in": "query",
-              "value": "$inputs.limit"
-            },
-            {
-              "name": "page",
-              "in": "query",
-              "value": "$inputs.page"
-            }
-          ],
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "object": "$response.body",
-            "data": "$response.body",
-            "has_more": "$response.body",
-            "next_page": "$response.body"
-          }
-        },
-        {
-          "stepId": "get-images-usage",
-          "description": "Retrieve detailed usage data specifically for image generation/editing.",
-          "operationId": "usage-images",
-          "parameters": [
-            {
-              "name": "start_time",
-              "in": "query",
-              "value": "$inputs.start_time"
-            },
-            {
-              "name": "end_time",
-              "in": "query",
-              "value": "$inputs.end_time"
-            },
-            {
-              "name": "bucket_width",
-              "in": "query",
-              "value": "$inputs.bucket_width"
-            },
-            {
-              "name": "sources",
-              "in": "query",
-              "value": "$inputs.sources"
-            },
-            {
-              "name": "sizes",
-              "in": "query",
-              "value": "$inputs.sizes"
-            },
-            {
-              "name": "project_ids",
-              "in": "query",
-              "value": "$inputs.project_ids"
-            },
-            {
-              "name": "user_ids",
-              "in": "query",
-              "value": "$inputs.user_ids"
-            },
-            {
-              "name": "api_key_ids",
-              "in": "query",
-              "value": "$inputs.api_key_ids"
-            },
-            {
-              "name": "models",
-              "in": "query",
-              "value": "$inputs.models"
-            },
-            {
-              "name": "group_by",
-              "in": "query",
-              "value": "$inputs.group_by"
-            },
-            {
-              "name": "limit",
-              "in": "query",
-              "value": "$inputs.limit"
-            },
-            {
-              "name": "page",
-              "in": "query",
-              "value": "$inputs.page"
-            }
-          ],
-          "successCriteria": [
-            {
-              "condition": "$statusCode == 200"
-            }
-          ],
-          "outputs": {
-            "object": "$response.body",
-            "data": "$response.body",
-            "has_more": "$response.body",
-            "next_page": "$response.body"
-          }
-        }
-      ],
-      "outputs": {
-        "object": "$steps.get-images-usage.outputs.object",
-        "data": "$steps.get-images-usage.outputs.data",
-        "has_more": "$steps.get-images-usage.outputs.has_more",
-        "next_page": "$steps.get-images-usage.outputs.next_page"
+        "id": "$steps.check-run-status.outputs.id",
+        "status": "$steps.check-run-status.outputs.status",
+        "file_counts": "$steps.check-vector-store-file-processing.outputs.file_counts",
+        "role": "$steps.add-user-query.outputs.role",
+        "content": "$steps.add-user-query.outputs.content",
+        "usage": "$steps.check-run-status.outputs.usage",
+        "data": "$steps.retrieve-assistant-response.outputs.data",
+        "first_id": "$steps.retrieve-assistant-response.outputs.first_id",
+        "last_id": "$steps.retrieve-assistant-response.outputs.last_id",
+        "has_more": "$steps.retrieve-assistant-response.outputs.has_more"
       },
       "failureActions": [
         {
