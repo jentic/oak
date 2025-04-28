@@ -21,20 +21,15 @@ openapi_url:
 ## Additional Information
 <!-- Optional: Add any additional context about this API that might be helpful -->
 
-## Workflow Descriptions (Optional)
+## Request Workflow Descriptions
 <!--
 If you would like to request specific workflows, please add them as bullet points below under this section. Each bullet should describe a workflow you want generated from the OpenAPI specification. For example:
 
-### Workflow Descriptions
 - Create a new user and assign them a role
 - Authenticate a user and fetch their profile
 - Submit an order and retrieve order status
 
-Note:
-If workflows are requested the generator will attempt to only create the requested workflows.
 If no workflows are specified, the generator will attempt to discover workflows automatically.
-The system will not generate single step/operation workflows even if requested
 -->
-
-### Workflow Descriptions
+### Workflow Descriptions (Optional)
 -

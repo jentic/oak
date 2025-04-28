@@ -30,6 +30,10 @@ jobs:
           # Extract version from the part right before openapi.json
           API_VERSION=$(echo "$URL" | grep -oP '[^/]+(?=/openapi\.json)' | head -n 1)
 
+          # Extract Workflow Descriptions section as a JSON array
+          # Looks for the specific heading from the issue template
+          WORKFLOW_DESCRIPTIONS=$(echo "$BODY" | awk '/^### Workflow Descriptions \(Optional\)/{flag=1;next}/^## |^### /{if(flag)flag=0}flag' | grep -E '^[-*] ' | sed -E 's/^[-*] *//' | jq -R . | jq -sc .)
+
           if [ -z "$URL" ]; then
             echo "::error::Could not extract openapi_url from issue body."
             exit 1
@@ -53,27 +57,35 @@ jobs:
           echo "Determined Vendor: $VENDOR_NAME"
           echo "Determined API Name: $API_NAME"
           echo "Determined API Version: $API_VERSION"
+          echo "Extracted Workflow Descriptions: $WORKFLOW_DESCRIPTIONS"
 
           echo "openapi_url=$URL" >> $GITHUB_OUTPUT
           echo "vendor_name=$VENDOR_NAME" >> $GITHUB_OUTPUT
           echo "api_name=$API_NAME" >> $GITHUB_OUTPUT
           echo "api_version=$API_VERSION" >> $GITHUB_OUTPUT
+          echo "workflow_descriptions=$WORKFLOW_DESCRIPTIONS" >> $GITHUB_OUTPUT
 
       - name: Call Arazzo Generator API and Create File
         id: call_api_and_create_file
         run: |
           echo "Calling Arazzo Generator API with OpenAPI URL: ${{ steps.extract_info.outputs.openapi_url }}"
-          RESPONSE=$(curl -s -f -X POST https://jentic-arazzo-generator.qa1.eu-west-1.jenticdev.net/generate \
-            -H "Content-Type: application/json" \
-            -d '{
-              "url": "${{ steps.extract_info.outputs.openapi_url }}",
-              "format": "json",
-              "validate": true,
-              "enable_llm": true,
-              "enable_rules": false,
-              "direct_llm": false,
-              "llm_provider": "gemini"
-            }')
+          # Prepare workflow_descriptions JSON for curl
+          WF_DESCRIPTIONS='${{ steps.extract_info.outputs.workflow_descriptions }}'
+          if [ "$WF_DESCRIPTIONS" = "" ] || [ "$WF_DESCRIPTIONS" = "null" ] || [ "$WF_DESCRIPTIONS" = "[]" ]; then
+            WF_DESCRIPTIONS=null
+          fi
+          RESPONSE=$(jq -n --arg url "${{ steps.extract_info.outputs.openapi_url }}" \
+                        --arg format "json" \
+                        --argjson validate true \
+                        --argjson enable_llm true \
+                        --argjson enable_rules false \
+                        --argjson direct_llm false \
+                        --arg llm_provider "gemini" \
+                        --rawfile wf_desc <(echo "$WF_DESCRIPTIONS") \
+                        '{url: $url, format: $format, validate: $validate, enable_llm: $enable_llm, enable_rules: $enable_rules, direct_llm: $direct_llm, llm_provider: $llm_provider, workflow_descriptions: ($wf_desc | fromjson? // null)}' | \
+            curl -s -f -X POST https://jentic-arazzo-generator.qa1.eu-west-1.jenticdev.net/generate \
+              -H "Content-Type: application/json" \
+              -d @-)
 
           # Determine output directory structure based on vendor/api name
           VENDOR="${{ steps.extract_info.outputs.vendor_name }}"
