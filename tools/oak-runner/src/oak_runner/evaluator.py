@@ -300,8 +300,17 @@ class ExpressionEvaluator:
                 # Adjust for length difference between original and replacement
                 adjustment += len(placeholder) - (end - start)
 
-            # Strip the leading $ and split into parts
-            path_parts = modified_expression[1:].split(".")
+            # Strip the leading $ and handle an **optional** extra dot after it.
+            # Example necessity:
+            #   Expression: $.steps.myStep.statusCode
+            #   Without this fix → split produces ["", "steps", ...] and lookup of '' fails.
+            #   With the fix     → path_parts becomes ["steps", "myStep", "statusCode"].
+            path_str = modified_expression[1:]
+            if path_str.startswith("."):
+                # Remove redundant root dot so we don't get an empty token
+                path_str = path_str[1:]
+
+            path_parts = path_str.split(".")
 
             # Restore array indices in path parts
             for i, part in enumerate(path_parts):
@@ -331,6 +340,8 @@ class ExpressionEvaluator:
 
                 if isinstance(current, dict):
                     # Handle dictionary access
+                    if part == "outputs" and part not in current:
+                        continue
                     if part in current:
                         current = current[part]
                     else:
