@@ -1,8 +1,8 @@
 # The Open Agentic Knowledge (OAK) repository
 
-[![Discord](https://img.shields.io/badge/JOIN%20OUR%20DISCORD-COMMUNITY-7289DA?style=plastic&logo=discord&logoColor=white)](https://discord.gg/J22TNGqe)
+[![Discord](https://img.shields.io/badge/JOIN%20OUR%20DISCORD-COMMUNITY-7289DA?style=plastic&logo=discord&logoColor=white)](https://discord.gg/4BFEPssR5F)
 
-> **Join our community!** Connect with contributors and users on [Discord](https://discord.gg/J22TNGqe) to discuss ideas, ask questions, and collaborate on the OAK repository.
+> **Join our community!** Connect with contributors and users on [Discord](https://discord.gg/4BFEPssR5F) to discuss ideas, ask questions, and collaborate on the OAK repository.
 
 ## Overview
 
@@ -54,6 +54,7 @@ The OAK Repository organizes API specifications and workflows using a standardiz
 - API specifications are organized by vendor and version
 - Workflows are organized to clearly show which APIs they reference
 - Multi-API workflows demonstrate how different services can be orchestrated together
+- The `tools` directory contains supporting utilities like the [Jentic MCP Plugin](tools/jentic-mcp/README.md), the [Jentic SDK](tools/jentic-sdk/README.md), and the [OAK Runner](tools/oak-runner/README.md). See the [tools README](tools/README.md) for more details.
 
 For detailed information on the directory structure, please refer to [STRUCTURE.md](STRUCTURE.md).
 

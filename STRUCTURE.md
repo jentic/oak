@@ -37,6 +37,10 @@ __data__/
       └── vendor1.com+vendor2.com~api3/ # Multi-API workflows (alphabetical ordering)
           ├── workflows.arrazo.json    # Default workflows for these APIs
           └── integration-flows.arrazo.json # Specific integration workflows
+tools/
+  ├── jentic-mcp/
+  ├── jentic-sdk/
+  └── oak-runner/
 ```
 
 ## API Structure Details
@@ -109,3 +113,13 @@ Each workflow directory can contain multiple `.arrazo.json` files:
   - `auth-flows.arrazo.json`
   - `integration-flows.arrazo.json`
   - etc.
+
+## Tools Directory
+
+The `tools/` directory contains supporting utilities and libraries developed as part of the OAK initiative:
+
+- **`jentic-mcp/`**: Contains the Jentic MCP Plugin, which allows IDEs and agents to interact with the Jentic platform for API discovery and workflow generation via the Model Context Protocol.
+- **`jentic-sdk/`**: Provides the Jentic SDK, a Python library for generating LLM-compatible tools and executing OAK workflows and API operations within agentic applications.
+- **`oak-runner/`**: Houses the OAK Runner, a reference execution engine for Arazzo workflows and OpenAPI operations defined in the repository.
+
+Each tool subdirectory contains its own `README.md` with specific usage and development instructions. A summary can also be found in [`tools/README.md`](../tools/README.md).
