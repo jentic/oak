@@ -305,6 +305,7 @@ class StepExecutor:
         method = operation_details.get("method")
         url = operation_details.get("url") # Base URL, path params handled by http_client
         request_body_payload = prepared_params.get('body') # Extract body from prepared params
+        logger.debug(f"Request body payload: {request_body_payload}")
 
         if not method or not url:
             logger.error(f"Missing method or url in operation details for {log_identifier}")

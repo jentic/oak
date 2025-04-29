@@ -80,17 +80,23 @@ class HTTPExecutor:
             if content_type:
                 headers["Content-Type"] = content_type
 
-            if content_type and "json" in content_type:
+            if content_type and "json" in content_type.lower():
                 json_data = payload
-            elif content_type and "form" in content_type:
+            elif content_type and ("form" in content_type.lower() or "x-www-form-urlencoded" in content_type.lower()):
                 # Handle form data
                 if isinstance(payload, dict):
                     data = payload
                 else:
+                    logger.warning(f"Form content type specified, but payload is not a dictionary: {type(payload)}. Sending as raw data.")
                     data = payload
-            else:
-                # Raw data
-                data = payload
+            elif payload is not None:
+                # Raw data - ensure it's bytes or string for the 'data' parameter
+                if isinstance(payload, (str, bytes)):
+                    data = payload
+                else:
+                    # Attempt to serialize other types? Or raise error? Let's log and convert to string for now.
+                    logger.warning(f"Payload type {type(payload)} not directly supported for raw data. Converting to string.")
+                    data = str(payload)
 
         # Log request details for debugging
         logger.debug(f"Making {method} request to {url}")
