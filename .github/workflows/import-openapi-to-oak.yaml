@@ -1,0 +1,182 @@
+name: Import OpenAPI Spec to OAK
+
+on:
+  issues:
+    types: [ opened ]
+
+jobs:
+  generate-repo-structure:
+    # Only run if the issue body contains the trigger string
+    if: contains(github.event.issue.body, 'import_oas_url:')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # To push the new branch and commit files
+      pull-requests: write   # To create the pull request
+      issues: read           # To read the issue body
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Extract Info from Issue
+        id: extract_info
+        run: |
+          set -x # Enable debugging output
+
+          echo "Parsing REQUIRED OpenAPI URL and Vendor Name from issue..."
+          BODY="${{ github.event.issue.body }}"
+          BODY=$(echo "$BODY" | tr -d '\r')
+          echo "Sanitized Body:"
+          echo "$BODY"
+
+          # Extract URL (Required)
+          URL=$(echo "$BODY" | grep -oP '(?<=import_oas_url:).*' | head -n 1 | xargs)
+          echo "URL after grep/xargs: $URL"
+          if [ -z "$URL" ]; then
+            echo "::error::Could not extract required 'import_oas_url:' field from issue body."
+            exit 1
+          fi
+
+          # Extract Vendor Name (Required)
+          VENDOR_NAME=$(echo "$BODY" | grep -oP '(?<=vendor_name:).*' | head -n 1 | xargs)
+          echo "Vendor Name after grep/xargs: $VENDOR_NAME"
+          if [ -z "$VENDOR_NAME" ]; then
+            echo "::error::Could not extract required 'vendor_name:' field from issue body."
+            exit 1
+          fi
+
+          # Set the Repotools Label (always the vendor name now)
+          REPOTOOLS_LABEL="$VENDOR_NAME"
+          echo "Using provided Vendor Name as Repotools label: $REPOTOOLS_LABEL"
+
+          echo "Extracted URL: $URL"
+          echo "Repotools Label: $REPOTOOLS_LABEL"
+          echo "import_oas_url=$URL" >> $GITHUB_OUTPUT
+          echo "repotools_label=$REPOTOOLS_LABEL" >> $GITHUB_OUTPUT
+
+      - name: Call Repotools Service and Download ZIP
+        id: call_repotools
+        run: |
+          echo "Calling Repotools Service for URL: ${{ steps.extract_info.outputs.import_oas_url }}"
+          echo "Using Repotools Label: ${{ steps.extract_info.outputs.repotools_label }}"
+          API_ENDPOINT="https://jentic-directory-repotools.qa1.eu-west-1.jenticdev.net/spec/download/openapi"
+          OUTPUT_ZIP="repotools_output.zip"
+          REQUEST_BODY=$(cat <<EOF
+          {
+            "url": "${{ steps.extract_info.outputs.import_oas_url }}",
+            "label": "${{ steps.extract_info.outputs.repotools_label }}"
+          }
+          EOF
+          )
+          
+          echo "Request Body:"
+          echo "$REQUEST_BODY"
+          echo "Calling endpoint: $API_ENDPOINT"
+
+          # Use -f to fail on server errors, -s for silent, -L to follow redirects, -o to save output
+          STATUS_CODE=$(curl -s -L -w '%{http_code}' -X POST "$API_ENDPOINT" \
+            -H "Content-Type: application/json" \
+            -d "$REQUEST_BODY" \
+            -o "$OUTPUT_ZIP")
+
+          if [ "$STATUS_CODE" -ne 200 ]; then
+            echo "::error::Repotools API call failed with status code $STATUS_CODE."
+            echo "Response details (if any):"
+            cat "$OUTPUT_ZIP" # Output might contain error details from the API
+            exit 1
+          else
+            echo "API call successful (HTTP $STATUS_CODE). ZIP file downloaded to $OUTPUT_ZIP."
+            # Verify zip file is not empty/tiny (basic check)
+            if [ ! -s "$OUTPUT_ZIP" ] || [ $(stat -c%s "$OUTPUT_ZIP") -lt 100 ]; then # Check if file exists and is > 100 bytes
+              echo "::error::Downloaded ZIP file seems empty or too small."
+              ls -l "$OUTPUT_ZIP"
+              exit 1
+            fi
+            echo "ZIP file size: $(stat -c%s "$OUTPUT_ZIP") bytes."
+          fi
+          echo "zip_file=$OUTPUT_ZIP" >> $GITHUB_OUTPUT
+
+      - name: Unzip Generated Files and Adjust Structure
+        run: |
+          ZIP_FILE="${{ steps.call_repotools.outputs.zip_file }}"
+          EXTRACT_TEMP_DIR="apis/openapi_temp_extract" # Temporary place to unzip
+          FINAL_TARGET_DIR="apis/openapi"             # Final destination
+
+          echo "Ensuring temporary extraction directory $EXTRACT_TEMP_DIR exists and is empty..."
+          rm -rf "$EXTRACT_TEMP_DIR" # Clean up from potential previous runs
+          mkdir -p "$EXTRACT_TEMP_DIR"
+
+          echo "Unzipping $ZIP_FILE into $EXTRACT_TEMP_DIR..."
+          unzip -o "$ZIP_FILE" -d "$EXTRACT_TEMP_DIR"
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to unzip $ZIP_FILE into $EXTRACT_TEMP_DIR."
+            exit 1
+          fi
+          echo "Successfully unzipped files into temporary directory $EXTRACT_TEMP_DIR."
+
+          # Find the single top-level directory created by the unzip (expected to be like 'issue-XX')
+          # Using 'find' is safer for potentially complex names or hidden files.
+          # '-quit' makes find stop after the first match.
+          TOP_LEVEL_DIR_PATH=$(find "$EXTRACT_TEMP_DIR" -mindepth 1 -maxdepth 1 -type d -print -quit)
+
+          if [ -z "$TOP_LEVEL_DIR_PATH" ]; then
+              echo "::error::Could not find the expected single top-level directory inside $EXTRACT_TEMP_DIR after unzipping."
+              ls -lA "$EXTRACT_TEMP_DIR" # Show what's actually there
+              exit 1
+          fi
+          echo "Found top-level directory from zip: $TOP_LEVEL_DIR_PATH"
+
+          # Ensure the final target directory exists
+          echo "Ensuring final target directory $FINAL_TARGET_DIR exists..."
+          mkdir -p "$FINAL_TARGET_DIR"
+
+          echo "Moving directory '$TOP_LEVEL_DIR_PATH' into '$FINAL_TARGET_DIR/'..."
+          # Move the ENTIRE found top-level directory into the final target dir
+          mv "$TOP_LEVEL_DIR_PATH" "$FINAL_TARGET_DIR/"
+
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to move directory '$TOP_LEVEL_DIR_PATH' into '$FINAL_TARGET_DIR'."
+            # Show contents of both dirs for debugging before exiting
+            echo "Contents of source parent ($EXTRACT_TEMP_DIR):"
+            ls -lA "$EXTRACT_TEMP_DIR"
+            echo "Contents of target ($FINAL_TARGET_DIR):"
+            ls -lA "$FINAL_TARGET_DIR"
+            exit 1
+          fi
+
+          # Get the name of the moved directory for logging
+          MOVED_DIR_NAME=$(basename "$TOP_LEVEL_DIR_PATH")
+          echo "Successfully moved directory '$MOVED_DIR_NAME' into $FINAL_TARGET_DIR."
+          echo "Final contents of $FINAL_TARGET_DIR/$MOVED_DIR_NAME:"
+          ls -lA "$FINAL_TARGET_DIR/$MOVED_DIR_NAME"
+
+          echo "Cleaning up temporary extraction directory $EXTRACT_TEMP_DIR..."
+          rm -rf "$EXTRACT_TEMP_DIR"
+          echo "Cleaning up ZIP file..."
+          rm "$ZIP_FILE"
+
+      - name: Check Git Status Before PR Action
+        run: |
+          echo "--- Git Status After Unzip ---"
+          git status
+          echo "--- End Git Status ---"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.PAT_AUTO_OPENAPI }} # Make sure this token has write permissions
+          commit-message: "feat: Import OpenAPI spec from Issue #${{ github.event.issue.number }}"
+          title: "feat: Import OpenAPI spec from Issue #${{ github.event.issue.number }}"
+          body: |
+            This PR adds/updates Jentic OAK with information from the OpenAPI URL provided in Issue #${{ github.event.issue.number }}.
+
+            **Source URL:** ${{ steps.extract_info.outputs.import_oas_url }}
+
+            Files were automatically generated by the Jentic OpenAPI import service.
+
+            Closes #${{ github.event.issue.number }}
+          branch: feat/import-oas-${{ github.event.issue.number }}
+          base: main # Or your target branch in jentic-arazzo-generator
+          delete-branch: true # Optional: delete the branch after merging PR
+          # Optional: Add labels, assignees etc.
+          # labels: automated-pr, repotools-generated

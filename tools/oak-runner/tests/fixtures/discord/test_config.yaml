@@ -1,0 +1,319 @@
+fixture:
+  name: discord
+  description: Discord API test workflows
+  
+real_mode:
+  # Disable for CI/regular tests, enable manually when testing with real credentials
+  enabled: false
+  # Timeout for real mode API calls (in seconds)
+  timeout: 30
+  # Retry settings for real mode
+  retries: 2
+  # Set which test user to run with (user1, user2, etc.)
+  test_user: "user1"
+
+# Base URL for the Discord API
+base_urls:
+  discordApi: https://discord.com/api/v10
+  
+# Authentication values for real mode
+auth_values:
+  # Discord bot token for the Authorization header
+  # To use, replace YOUR_DISCORD_BOT_TOKEN with an actual Discord bot token
+  Authorization: "Bot YOUR_DISCORD_BOT_TOKEN"
+  
+  # Uncomment if using OAuth2 instead of a bot token
+  # oauth2_token: "YOUR_OAUTH2_TOKEN"
+
+# Custom mocks for testing
+custom_mocks:
+  discordApi:
+    # Mock for the current user endpoint
+    - path: /users/@me
+      method: get
+      status_code: 200
+      response:
+        id: "987654321098765432"
+        username: "test_user"
+        avatar: "abcdef123456"
+        discriminator: "1234"
+        public_flags: 0
+        flags: 0
+        banner: null
+        accent_color: null
+        global_name: "Test User"
+        avatar_decoration_data: null
+        banner_color: null
+    
+    # Mock for create DM channel endpoint with specific request body check
+    - path: /users/@me/channels
+      method: post
+      request_body:
+        recipient_id: "123456789012345678"  
+      status_code: 200
+      response:
+        id: "111222333444555666"
+        type: 1
+        last_message_id: "999888777666555444"
+        recipients:
+          - id: "123456789012345678"
+            username: "recipient_user"
+            avatar: "fedcba654321"
+            discriminator: "5678"
+            global_name: "Recipient User"
+    
+    # Fallback for create DM channel endpoint (any request)
+    - path: /users/@me/channels
+      method: post
+      status_code: 200
+      response:
+        id: "111222333444555666"
+        type: 1
+        last_message_id: "999888777666555444"
+        recipients:
+          - id: "123456789012345678"
+            username: "recipient_user"
+            avatar: "fedcba654321"
+            discriminator: "5678"
+            global_name: "Recipient User"
+    
+    # Mock for channels messages endpoint with the specific channel ID path
+    - path: /channels/111222333444555666/messages
+      method: post
+      request_body:
+        content: "Hello from Arazzo test"
+      status_code: 200
+      response:
+        id: "555666777888999000"
+        type: 0
+        content: "Hello from Arazzo test"
+        channel_id: "111222333444555666"
+        author:
+          id: "987654321098765432"
+          username: "test_user"
+          avatar: "abcdef123456"
+          discriminator: "1234"
+        timestamp: "2023-05-01T12:00:00.000Z"
+        edited_timestamp: null
+        tts: false
+        mention_everyone: false
+        mentions: []
+        mention_roles: []
+        attachments: []
+        embeds: []
+    
+    # Fallback for any channel messages (in case the channel ID isn't parsed correctly)
+    - path: /channels/{channel_id}/messages
+      method: post
+      status_code: 200
+      response:
+        id: "555666777888999000"
+        type: 0
+        content: "Hello from Arazzo test"
+        channel_id: "111222333444555666"
+        author:
+          id: "987654321098765432"
+          username: "test_user"
+          avatar: "abcdef123456"
+          discriminator: "1234"
+        timestamp: "2023-05-01T12:00:00.000Z"
+        edited_timestamp: null
+        tts: false
+        mention_everyone: false
+        mentions: []
+        mention_roles: []
+        attachments: []
+        embeds: []
+    
+    # Mock for listing guilds
+    - path: /users/@me/guilds
+      method: get
+      status_code: 200
+      response:
+        - id: "111222333444555666"
+          name: "Test Server 1"
+          icon: "abcdef123456"
+          owner: false
+          permissions: "36953089"
+        - id: "222333444555666777"
+          name: "Test Server 2"
+          icon: "fedcba654321"
+          owner: true
+          permissions: "2199023255551"
+
+# Test workflow configurations with input values
+workflows:
+  - id: getUserInfoAndSendMessage
+    # Default parameters used in mock mode
+    params:
+      recipient_id: "123456789012345678"
+      message_content: "Hello from Arazzo test"
+    # Real mode specific parameters that override the default params when in real mode
+    real_mode:
+      params:
+        # Real Discord user ID to send a message to
+        # You should replace this with a real Discord user ID that your bot has permission to message
+        recipient_id: "REAL_USER_ID_HERE"
+        # Custom message for the real API test
+        message_content: "Hello from Arazzo real test. This is an automated test message sent at $(date)."
+      
+      # Workflow-specific settings
+      settings:
+        # Whether to delete the message after sending (cleanup)
+        delete_after_test: true
+        # Maximum wait time for message to be delivered (seconds)
+        message_timeout: 5
+    expect_success: true
+    expected_outputs:
+      userId: "987654321098765432"
+      username: "test_user"
+      messageId: "555666777888999000"
+      channelId: "111222333444555666"
+    expected_api_calls: 3
+    # For real mode, we don't check the exact output values, just their types
+    real_mode_checks:
+      outputs:
+        userId:
+          type: string
+          min_length: 10
+        username:
+          type: string
+        messageId:
+          type: string
+        channelId:
+          type: string
+    # Add specific mocks for this workflow to ensure output extraction works
+    custom_mocks:
+      - path: /users/@me
+        method: get
+        status_code: 200
+        response:
+          id: "987654321098765432"
+          username: "test_user"
+          avatar: "abcdef123456"
+      - path: /users/@me/channels
+        method: post
+        status_code: 200
+        response:
+          id: "111222333444555666"
+          last_message_id: "999888777666555444"
+      - path: /channels/111222333444555666/messages
+        method: post
+        status_code: 200
+        response:
+          id: "555666777888999000"
+          timestamp: "2023-05-01T12:00:00.000Z"
+      
+      # Additional mock for any channel ID (in case the specific one doesn't match)
+      - path: /channels/{channel_id}/messages
+        method: post
+        status_code: 200
+        response:
+          id: "555666777888999000"
+          timestamp: "2023-05-01T12:00:00.000Z"
+
+  - id: listUserGuilds
+    params:
+      limit: 10
+    # Real mode specific configuration
+    real_mode:
+      # Override params for real mode
+      params:
+        # Limit the number of guilds returned (lower for faster tests)
+        limit: 5
+        # Optional: filter guilds by these conditions
+        # before: "guild_id_to_get_guilds_before"
+        # after: "guild_id_to_get_guilds_after"
+      
+      # Workflow-specific auth values (will override the global ones if needed)
+      auth_values:
+        # Example: If you need to use a different bot token for this workflow
+        # Authorization: "Bot DIFFERENT_TOKEN_FOR_THIS_WORKFLOW"
+      
+      # Workflow-specific settings
+      settings:
+        # Whether to print detailed guild information in logs
+        verbose_logging: true
+        # Whether to include guild members in the results
+        include_members: false
+    expect_success: true
+    expected_outputs:
+      guildCount: 2
+    expected_api_calls: 1
+    # For real mode, check that we get a list of guilds
+    real_mode_checks:
+      outputs:
+        guilds:
+          type: array
+        guildCount:
+          type: number
+          
+  - id: postChannelMessage
+    # Default parameters used in mock mode
+    params:
+      channel_id: "333444555666777888"
+      message_content: "Hello from the Arazzo channel test"
+    # Real mode specific parameters that override the default params when in real mode
+    real_mode:
+      params:
+        # Real Discord channel ID to send a message to
+        # You should replace this with a real Discord channel ID that your bot has permission to post in
+        channel_id: "1349727283304202271"
+        # Custom message for the real API test
+        message_content: "Hello from Arazzo real channel test. This is an automated test message sent at $(date). This messsage was driven from an Arrazo workflow found in the Jentic repository, and nobody ever has to set up this workflow ever again."
+      
+      # Workflow-specific settings
+      settings:
+        # Whether to delete the message after sending (cleanup)
+        delete_after_test: true
+        # Maximum wait time for message to be delivered (seconds)
+        message_timeout: 5
+    expect_success: true
+    expected_outputs:
+      userId: "987654321098765432"
+      username: "test_user"
+      messageId: "777888999000111222"
+      content: "Hello from the Arazzo channel test"
+    expected_api_calls: 2
+    # For real mode, we don't check the exact output values, just their types
+    real_mode_checks:
+      outputs:
+        userId:
+          type: string
+          min_length: 10
+        username:
+          type: string
+        messageId:
+          type: string
+        content:
+          type: string
+    # Add specific mocks for this workflow to ensure output extraction works
+    custom_mocks:
+      - path: /users/@me
+        method: get
+        status_code: 200
+        response:
+          id: "987654321098765432"
+          username: "test_user"
+          avatar: "abcdef123456"
+      - path: /channels/333444555666777888/messages
+        method: post
+        status_code: 200
+        response:
+          id: "777888999000111222"
+          type: 0
+          content: "Hello from the Arazzo channel test"
+          channel_id: "333444555666777888"
+          author:
+            id: "987654321098765432"
+            username: "test_user"
+            avatar: "abcdef123456"
+            discriminator: "1234"
+          timestamp: "2023-05-01T12:00:00.000Z"
+          edited_timestamp: null
+          tts: false
+          mention_everyone: false
+          mentions: []
+          mention_roles: []
+          attachments: []
+          embeds: []

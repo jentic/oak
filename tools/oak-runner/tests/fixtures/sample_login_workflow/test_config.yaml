@@ -1,0 +1,66 @@
+# Test configuration for the login workflow fixture
+
+# Global success rate for API operations (1.0 = 100% success)
+success_rate: 1.0
+
+# Custom base URLs for API specs (optional)
+base_urls:
+  login_api: https://api.example.com/v1
+
+# Custom mocks for specific operations
+custom_mocks:
+  login_api:
+    # Custom response for successful login
+    - path: https://api.example.com/v1/login
+      method: post
+      status_code: 200
+      response:
+        token: test-token-123
+        user_id: user-456
+        expires_at: "2025-12-31T23:59:59Z" # String format for dates
+    
+    # Custom response for user profile
+    - path: https://api.example.com/v1/profile
+      method: get
+      status_code: 200
+      response:
+        user_id: user-456
+        name: Test User
+        email: test@example.com
+        created_at: "2023-01-01T00:00:00Z" # String format for dates
+
+# Test workflows with specific inputs and expected outputs
+workflows:
+  # Test successful login flow
+  - id: loginWorkflow
+    arazzo_spec: login_workflow.yaml
+    inputs:
+      username: testuser
+      password: password123
+    expect_success: true
+    expected_outputs:
+      token: test-token-123
+      userId: user-456
+      name: Test User
+      email: test@example.com
+      # Also include direct step output references
+      "loginStep.token": test-token-123
+      "profileStep.userId": user-456
+      "profileStep.name": Test User
+      "profileStep.email": test@example.com
+    expected_api_calls: 2
+    
+  # Test failed login flow (will use different mocks)
+  - id: failedLoginWorkflow
+    arazzo_spec: login_workflow.yaml
+    inputs:
+      username: invaliduser
+      password: wrongpassword
+    expect_success: false
+    custom_mocks:
+      - path: https://api.example.com/v1/login
+        method: post
+        status_code: 401
+        response:
+          error: Invalid username or password
+    expected_api_calls: 1

@@ -1,0 +1,85 @@
+arazzo: 1.0.0
+info:
+  title: Login Workflow
+  description: Authentication workflow for testing
+  version: 1.0.0
+sourceDescriptions:
+  - name: loginApi
+    url: login_api.yaml
+    type: openapi
+workflows:
+  - workflowId: loginWorkflow
+    summary: User Login and Profile
+    description: A workflow that logs in a user and retrieves their profile
+    inputs:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+    steps:
+      - stepId: loginStep
+        description: Login with credentials
+        operationId: loginUser
+        requestBody:
+          contentType: application/json
+          payload:
+            username: $inputs.username
+            password: $inputs.password
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          token: $response.body.token
+          userId: $response.body.user_id
+          expiresAt: $response.body.expires_at
+      - stepId: profileStep
+        description: Get user profile
+        operationId: getUserProfile
+        parameters:
+          - name: Authorization
+            in: header
+            value: Bearer $steps.loginStep.token
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          name: $response.body.name
+          email: $response.body.email
+          userId: $response.body.user_id
+          createdAt: $response.body.created_at
+    outputs:
+      token: $steps.loginStep.token
+      userId: $steps.profileStep.userId
+      name: $steps.profileStep.name
+      email: $steps.profileStep.email
+  - workflowId: failedLoginWorkflow
+    summary: Failed User Login
+    description: A workflow that simulates a failed login attempt
+    inputs:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+    steps:
+      - stepId: loginStep
+        description: Login with invalid credentials
+        operationId: loginUser
+        requestBody:
+          contentType: application/json
+          payload:
+            username: $inputs.username
+            password: $inputs.password
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          error: $response.body.error
+    outputs:
+      error: $steps.loginStep.outputs.error

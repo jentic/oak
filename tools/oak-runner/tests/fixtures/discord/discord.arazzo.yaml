@@ -1,0 +1,147 @@
+arazzo: 1.0.0
+info:
+  title: Discord API Workflows
+  description: Common workflows for interacting with the Discord API
+  version: 1.0.0
+
+sourceDescriptions:
+  - name: discordApi
+    url: ./discord.openapi.json
+    type: openapi
+
+workflows:
+  - workflowId: getUserInfoAndSendMessage
+    summary: Get user information and send a message
+    description: This workflow retrieves information about the current user, then creates a DM channel, and sends a message
+    inputs:
+      type: object
+      properties:
+        recipient_id:
+          type: string
+          description: The ID of the user to send a message to
+        message_content:
+          type: string
+          description: The content of the message to send
+      required:
+        - recipient_id
+        - message_content
+    steps:
+      - stepId: getCurrentUser
+        description: Retrieve information about the current user
+        operationId: get_my_user
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          userId: $response.body.id
+          username: $response.body.username
+          avatar: $response.body.avatar
+
+      - stepId: createDmChannel
+        description: Create a direct message channel with the recipient
+        operationId: create_dm
+        requestBody:
+          contentType: application/json
+          payload: 
+            recipient_id: $inputs.recipient_id
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          channelId: $response.body.id
+          lastMessageId: $response.body.last_message_id
+
+      - stepId: sendMessage
+        description: Send a message to the created DM channel
+        operationId: create_message
+        parameters:
+          - name: channel_id
+            in: path
+            value: $steps.createDmChannel.channelId
+        requestBody:
+          contentType: application/json
+          payload:
+            content: $inputs.message_content
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          messageId: $response.body.id
+          timestamp: $response.body.timestamp
+    outputs:
+      userId: $steps.getCurrentUser.userId
+      username: $steps.getCurrentUser.username
+      messageId: $steps.sendMessage.messageId
+      channelId: $steps.createDmChannel.channelId
+
+  - workflowId: listUserGuilds
+    summary: List guilds the current user is a member of
+    description: Retrieves a list of partial guild objects for the current user
+    inputs:
+      type: object
+      properties:
+        limit:
+          type: integer
+          description: Max number of guilds to return (1-200)
+      required: []
+    steps:
+      - stepId: getUserGuilds
+        description: Get the guilds the current user is a member of
+        operationId: list_my_guilds
+        parameters:
+          - name: limit
+            in: query
+            value: $inputs.limit
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          guilds: $response.body
+          guildCount: 2
+    outputs:
+      guilds: $steps.getUserGuilds.guilds
+      guildCount: $steps.getUserGuilds.guildCount
+      
+  - workflowId: postChannelMessage
+    summary: Post a message to a Discord channel
+    description: Sends a message to a specific Discord channel
+    inputs:
+      type: object
+      properties:
+        channel_id:
+          type: string
+          description: The ID of the channel to send a message to
+        message_content:
+          type: string
+          description: The content of the message to send
+      required:
+        - channel_id
+        - message_content
+    steps:
+      - stepId: getCurrentUser
+        description: Retrieve information about the current user
+        operationId: get_my_user
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          userId: $response.body.id
+          username: $response.body.username
+          
+      - stepId: sendChannelMessage
+        description: Send a message to the specified channel
+        operationId: create_message
+        parameters:
+          - name: channel_id
+            in: path
+            value: $inputs.channel_id
+        requestBody:
+          contentType: application/json
+          payload:
+            content: $inputs.message_content
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          messageId: $response.body.id
+          timestamp: $response.body.timestamp
+          content: $response.body.content
+    outputs:
+      userId: $steps.getCurrentUser.userId
+      username: $steps.getCurrentUser.username
+      messageId: $steps.sendChannelMessage.messageId
+      content: $steps.sendChannelMessage.content
