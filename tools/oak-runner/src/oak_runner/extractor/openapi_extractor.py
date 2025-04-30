@@ -7,10 +7,11 @@ from an OpenAPI specification for a given API operation.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional, List, Union
 
 import jsonpointer
 import copy
+import re
 
 from oak_runner.models import OpenAPIDoc
 from oak_runner.executor.operation_finder import OperationFinder
@@ -102,7 +103,8 @@ def extract_operation_io(
     spec: Dict[str, Any],
     http_path: str,
     http_method: str,
-    simplify: bool = False
+    input_max_depth: Optional[int] = None,
+    output_max_depth: Optional[int] = None
 ) -> Dict[str, Dict[str, Any]]:
     """
     Finds the specified operation within the spec and extracts input parameters
@@ -113,11 +115,12 @@ def extract_operation_io(
         spec: The full OpenAPI specification dictionary.
         http_path: The HTTP path of the target operation (e.g., '/users/{id}').
         http_method: The HTTP method of the target operation (e.g., 'get', 'post').
-        simplify: If True, simplify the extracted schemas for LLM consumption.
+        input_max_depth: If set, limits the depth of the input structure.
+        output_max_depth: If set, limits the depth of the output structure.
 
     Returns:
-        A dictionary containing 'inputs' and 'outputs'.
-        Returns empty dicts if operation not found or on error.
+        A dictionary containing 'inputs' and 'outputs'. Returns the full, unsimplified
+        dict structure if both max depth arguments are None.
         'inputs' is structured like an OpenAPI schema object:
             {'type': 'object', 'properties': {param_name: {param_schema_or_simple_type}, ...}}
             Non-body params map to {'type': openapi_type_string}.
@@ -159,6 +162,7 @@ def extract_operation_io(
 
     if not operation_info:
         logger.warning(f"Operation {http_method.upper()} {http_path} not found in the spec.")
+        # Return early if operation not found
         return {"inputs": {}, "outputs": {}}
 
     # Initialize with new structure for inputs
@@ -211,6 +215,21 @@ def extract_operation_io(
                     seen_params.add(param_key)
             except (jsonpointer.JsonPointerException, ValueError, KeyError) as e:
                 logger.warning(f"Skipping operation-level parameter due to resolution/format error: {e}")
+
+    # --- Ensure all URL path parameters are present and required ---
+    # Find all {param} in the http_path
+    url_param_names = re.findall(r'{([^}/]+)}', http_path)
+    for url_param in url_param_names:
+        param_key = (url_param, 'path')
+        if param_key not in seen_params:
+            all_parameters.append({
+                'name': url_param,
+                'in': 'path',
+                'required': True,
+                'schema': {'type': 'string'}
+            })
+            seen_params.add(param_key)
+    # --- End ensure URL params ---
 
     # Process collected parameters into simplified inputs
     for param in all_parameters:
@@ -302,98 +321,39 @@ def extract_operation_io(
         else:
             logger.debug("No '200' or '201' response found for this operation.")
 
-    # --- Simplify final schemas (conditionally) ---
-    if simplify:
-        if isinstance(extracted_details.get("inputs"), dict):
-            extracted_details["inputs"] = _simplify_schema(extracted_details["inputs"])
-        if isinstance(extracted_details.get("outputs"), dict):
-            extracted_details["outputs"] = _simplify_schema(extracted_details["outputs"])
-            # Post-process Simplified Outputs: remove top-level 'required' if present (USER preference)
-            if "required" in extracted_details["outputs"]:
-                del extracted_details["outputs"]["required"]
+    # --- Limit output depth (conditionally) ---
+    if input_max_depth is not None:
+        if isinstance(extracted_details.get("inputs"), (dict, list)):
+            extracted_details["inputs"] = _limit_dict_depth(extracted_details["inputs"], input_max_depth)
+    if output_max_depth is not None:
+        if isinstance(extracted_details.get("outputs"), (dict, list)):
+            extracted_details["outputs"] = _limit_dict_depth(extracted_details["outputs"], output_max_depth)
 
+    # If both max depths are None, return the full, unsimplified details
     return extracted_details
 
 
-# Helper function to check if a schema part might need resolving
-
-def _simplify_schema(schema: Any) -> Any:
-    """Recursively simplify a schema fragment for LLM consumption."""
-    if isinstance(schema, list):
-        return [_simplify_schema(item) for item in schema]
-
-    if not isinstance(schema, dict):
-        return schema
-
-    simplified = {}
-    for key, value in schema.items():
-        if key in {'description', 'title', 'pattern', 'example', 'examples',
-                   'maxLength', 'minLength', 'maximum', 'minimum',
-                   'maxItems', 'minItems', 'uniqueItems',
-                   'maxProperties', 'minProperties',
-                   'contentEncoding', 'contentMediaType',
-                   'deprecated', 'externalDocs', 'xml', 'format'}:
-            continue
-
-        if key == 'oneOf':
-            # Check for nullable pattern: [{type: null}, {schema}] or [{schema}, {type: null}]
-            if len(value) == 2 and any(item == {'type': 'null'} for item in value):
-                other_schema = value[0] if value[1] == {'type': 'null'} else value[1]
-                simplified_other = _simplify_schema(other_schema)
-                if isinstance(simplified_other, dict):
-                    simplified_other['nullable'] = True # Add nullable marker
-                    # Merge the simplified nullable schema into the current level
-                    # Avoids creating a nested structure just for nullability
-                    for k, v in simplified_other.items():
-                        simplified[k] = v
-                    continue # Skip adding the 'oneOf' key itself
-                else:
-                    # Handle case where the non-null part is simple (e.g. just string)
-                    # This case might not happen often with real schemas but good to consider
-                    simplified[key] = value # Keep original if simplification failed
-
-            # Check for enum pattern: [{const: v1}, {const: v2}, ...]
-            elif all(isinstance(item, dict) and 'const' in item for item in value):
-                enum_values = [item['const'] for item in value]
-                simplified['enum'] = enum_values
-                # If type is not already present, try to infer from first const
-                if 'type' not in simplified and enum_values:
-                    const_type = type(enum_values[0])
-                    if const_type is str:
-                        simplified['type'] = 'string'
-                    elif const_type is int:
-                        simplified['type'] = 'integer'
-                    elif const_type is float:
-                        simplified['type'] = 'number'
-                    elif const_type is bool:
-                        simplified['type'] = 'boolean'
-                continue # Skip adding the 'oneOf' key itself
-            else:
-                # Simplify items within oneOf recursively
-                simplified[key] = [_simplify_schema(item) for item in value]
-        elif key == 'allOf':
-             # Simplification: Take the first schema in allOf, ignore others
-             # This is a basic strategy and might lose information
-             if value and isinstance(value, list):
-                 first_schema = _simplify_schema(value[0])
-                 if isinstance(first_schema, dict):
-                      for k, v in first_schema.items():
-                          simplified[k] = v
-                 else:
-                     simplified[key] = [_simplify_schema(v) for v in value] # fallback: simplify all
-             continue # Skip adding 'allOf' key
-        elif key == 'anyOf':
-            simplified[key] = [_simplify_schema(item) for item in value]
-        elif key == 'properties':
-            simplified[key] = {prop_name: _simplify_schema(prop_schema)
-                               for prop_name, prop_schema in value.items()}
-        elif key == 'items':
-            simplified[key] = _simplify_schema(value)
-        elif key == 'additionalProperties':
-            # Can be boolean or schema, simplify if schema
-            simplified[key] = _simplify_schema(value)
+def _limit_dict_depth(data: Union[Dict, List, Any], max_depth: int, current_depth: int = 0) -> Union[Dict, List, Any]:
+    """Recursively limits the depth of a dictionary or list structure."""
+    
+    if isinstance(data, dict):
+        if current_depth >= max_depth:
+            return data.get('type', 'object') # Limit hit for dict
         else:
-            # Keep other keys like 'type', 'required', 'enum' (if not from oneOf)
-            simplified[key] = value # Keep value as is (no deeper simplification needed)
-
-    return simplified
+            # Recurse into dict
+            limited_dict = {}
+            for key, value in data.items():
+                limited_dict[key] = _limit_dict_depth(value, max_depth, current_depth + 1)
+            return limited_dict
+    elif isinstance(data, list):
+        if current_depth >= max_depth:
+            return 'array' # Limit hit for list
+        else:
+            # Recurse into list
+            limited_list = []
+            for item in data:
+                limited_list.append(_limit_dict_depth(item, max_depth, current_depth + 1))
+            return limited_list
+    else:
+        # It's a primitive, return the value itself regardless of depth
+        return data
