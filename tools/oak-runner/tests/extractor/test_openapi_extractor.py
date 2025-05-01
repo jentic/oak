@@ -127,33 +127,39 @@ def test_extract_order_post_details():
 
     # Check non-body parameter (simplified schema within properties)
     assert "X-Request-ID" in input_properties
-    assert input_properties["X-Request-ID"] == {"type": "string", "required": False}
-    
-    # Check body parameter (full resolved schema within properties)
-    assert "body" in input_properties
-    # Manually construct expected resolved OrderInput schema
-    expected_resolved_body_schema = {
-        "type": "object",
-        "properties": {
-            "items": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "string", "format": "uuid"},
-                        "product_id": {"type": "string"},
-                        "quantity": {"type": "integer"}
-                    },
-                    "required": ["product_id", "quantity"]
-                }
+    # Check type only, required status is in the top-level list
+    assert input_properties["X-Request-ID"] == {"type": "string"}
+    # Check that it's NOT required in the top-level list
+    assert "X-Request-ID" not in extracted["inputs"].get("required", [])
+
+    # Check the flattened 'items' property from the body
+    assert "items" in input_properties
+    # Manually construct expected resolved items schema
+    expected_items_schema = {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "format": "uuid"},
+                "product_id": {"type": "string"},
+                "quantity": {"type": "integer"}
             },
-            "customer_notes": {"type": "string"}
-        },
-        "required": [] # UPDATED: Expect empty list because original schema has no required
+            "required": ["product_id", "quantity"]
+        }
     }
-    assert input_properties["body"] == expected_resolved_body_schema
- 
-    # --- Assert Outputs (should be the full resolved 200 response schema) ---
+    assert input_properties["items"] == expected_items_schema
+
+    # Check the flattened 'customer_notes' property from the body
+    assert "customer_notes" in input_properties
+    assert input_properties["customer_notes"] == {"type": "string"}
+
+    # Check required properties from the body are in the top-level required list
+    # 'items' is NOT listed in the requestBody schema's top-level required list in TEST_SPEC
+    assert "items" not in extracted["inputs"].get("required", [])
+    # customer_notes was not required in the body schema
+    assert "customer_notes" not in extracted["inputs"].get("required", [])
+
+    # --- Assert Outputs (Full schema) ---
     assert "outputs" in extracted
     # Manually construct expected resolved Order schema
     expected_resolved_output_schema = {
@@ -238,8 +244,10 @@ def test_extracts_implicit_url_param():
     result = extract_operation_io(spec, "/widgets/{widget_id}", "get")
     props = result["inputs"]["properties"]
     assert "widget_id" in props
-    assert props["widget_id"]["required"] is True
-    assert props["widget_id"]["type"] == "string"
+    # Path params derived from URL are always required
+    assert "widget_id" in result["inputs"].get("required", [])
+    # Check the type (defaults to string if not specified)
+    assert props["widget_id"] == {"type": "string"}
 
 def test_extracts_explicit_url_param():
     """
@@ -269,8 +277,11 @@ def test_extracts_explicit_url_param():
     result = extract_operation_io(spec, "/gadgets/{gadget_id}", "get")
     props = result["inputs"]["properties"]
     assert "gadget_id" in props
-    assert props["gadget_id"]["required"] is True
-    assert props["gadget_id"]["type"] == "integer"
+    # Path params are always required
+    assert "gadget_id" in result["inputs"].get("required", [])
+    # Check the type matches the spec
+    assert props["gadget_id"] == {"type": "integer"}
+
 
 def test_extract_operation_io_depth_limits():
     """
@@ -329,8 +340,49 @@ def test_extract_operation_io_depth_limits():
     result = extract_operation_io(
         spec, "/foo/{bar}", "post", input_max_depth=2, output_max_depth=1
     )
-    # At input_max_depth=2, the entire body is truncated to 'object'
-    body = result["inputs"]["properties"]["body"]
-    assert body == "object"
-    # At output_max_depth=1, the entire outputs["properties"] is truncated to 'object'
-    assert result["outputs"]["properties"] == "object"
+
+    # --- Check Input Depth Limit (input_max_depth=2) ---
+    assert "inputs" in result
+    assert result["inputs"].get("type") == "object"
+    input_props = result["inputs"].get("properties", {})
+
+    # Path parameter 'bar' should exist and its value truncated
+    assert "bar" in input_props
+    # At depth=2, _limit_dict_depth returns the type string for the primitive schema
+    assert input_props["bar"] == "string"
+
+    # Body property 'deep' should be flattened and its value truncated
+    assert "deep" in input_props
+    # At depth=2, _limit_dict_depth returns the type of the nested object
+    assert input_props["deep"] == "object"
+
+    # Check required fields
+    assert result["inputs"].get("required") == ["bar"]
+
+    # --- Check Output Depth Limit (output_max_depth=1) ---
+    assert "outputs" in result
+    output_schema = result["outputs"]
+    assert output_schema.get("type") == "object"
+    # At depth=1, _limit_dict_depth truncates the 'properties' dict to its type
+    assert output_schema.get("properties") == "object"
+
+def test_no_params_or_body():
+    """
+    If an operation has no parameters or body, extract_operation_io should return an empty inputs dict.
+    """
+    spec = {
+        "openapi": "3.0.0",
+        "info": {"title": "Minimal API", "version": "1.0.0"},
+        "servers": [{"url": "http://test.com/api"}],
+        "paths": {
+            "/widgets": {
+                "get": {
+                    "summary": "Get widgets",
+                    "responses": {"200": {"description": "ok"}}
+                }
+            }
+        }
+    }
+    result = extract_operation_io(spec, "/widgets", "get")
+    assert "inputs" in result
+    assert result["inputs"] == {"type": "object", "properties": {}, "required": []}

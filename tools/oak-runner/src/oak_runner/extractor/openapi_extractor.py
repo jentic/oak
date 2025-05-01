@@ -167,7 +167,7 @@ def extract_operation_io(
 
     # Initialize with new structure for inputs
     extracted_details: Dict[str, Dict[str, Any]] = {
-        "inputs": {"type": "object", "properties": {}},
+        "inputs": {"type": "object", "properties": {}, "required": []},
         "outputs": {}
     }
     operation = operation_info.get("operation")
@@ -256,14 +256,19 @@ def extract_operation_io(
                     openapi_type = oapi_type_from_schema
                 # TODO: More nuanced mapping (e.g., number format to float/double?)?
 
-            # Add to properties as { 'type': 'openapi_type_string', 'required': boolean }
+            # Add to properties as { 'type': 'openapi_type_string' }
+            # Required status will be tracked in the top-level 'required' list
             is_required = param.get('required', False) # Default to false if not present
             extracted_details["inputs"]["properties"][param_name] = {
-                "type": openapi_type,
-                "required": is_required
+                "type": openapi_type
+                # Removed "required": is_required from here
             }
+            if is_required:
+                # Add to top-level required list if not already present
+                if param_name not in extracted_details["inputs"]["required"]:
+                    extracted_details["inputs"]["required"].append(param_name)
 
-    # Process Request Body for inputs['body']
+    # Process Request Body for inputs
     if 'requestBody' in operation:
         try:
             request_body = operation['requestBody']
@@ -280,13 +285,30 @@ def extract_operation_io(
 
                 # Recursively resolve nested refs within the body schema
                 fully_resolved_body_schema = _resolve_schema_refs(body_schema, spec)
-                # Add the fully resolved body schema under the 'body' key in properties
-                extracted_details["inputs"]["properties"]['body'] = fully_resolved_body_schema
 
-                # Ensure 'required' key exists for object schemas
-                body_schema_dict = extracted_details["inputs"]["properties"].get('body')
-                if isinstance(body_schema_dict, dict) and body_schema_dict.get("type") == "object" and "required" not in body_schema_dict:
-                    body_schema_dict["required"] = []
+                # --- Flatten body properties into inputs --- 
+                if isinstance(fully_resolved_body_schema, dict) and fully_resolved_body_schema.get("type") == "object":
+                    body_properties = fully_resolved_body_schema.get("properties", {})
+                    for prop_name, prop_schema in body_properties.items():
+                        if prop_name in extracted_details["inputs"]["properties"]:
+                            # Handle potential name collisions (e.g., param 'id' and body field 'id')
+                            # Current approach: Body property overwrites if name collides. Log warning.
+                            logger.warning(f"Body property '{prop_name}' overwrites existing parameter with the same name.")
+                        extracted_details["inputs"]["properties"][prop_name] = prop_schema
+
+                    # Add required body properties to the main 'required' list
+                    body_required = fully_resolved_body_schema.get('required', [])
+                    for req_prop_name in body_required:
+                        if req_prop_name not in extracted_details["inputs"]["required"]:
+                            extracted_details["inputs"]["required"].append(req_prop_name)
+                else:
+                    # If body is not an object (e.g., array, primitive) or has no properties, don't flatten.
+                    # Log a warning as we are not adding it under 'body' key either per the requirement.
+                    logger.warning(f"Request body for {http_method.upper()} {http_path} is not an object with properties. Skipping flattening.")
+                # --- End flatten --- 
+
+                # Removed code that added the schema under 'body'
+                # Removed code that checked 'required' on the nested 'body' object
 
         except (jsonpointer.JsonPointerException, ValueError, KeyError) as e:
             logger.warning(f"Skipping request body processing due to error: {e}")
