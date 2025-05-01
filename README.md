@@ -54,7 +54,6 @@ The OAK Repository organizes API specifications and workflows using a standardiz
 - API specifications are organized by vendor and version
 - Workflows are organized to clearly show which APIs they reference
 - Multi-API workflows demonstrate how different services can be orchestrated together
-- The `tools` directory contains supporting utilities like the [Jentic MCP Plugin](tools/jentic-mcp/README.md), the [Jentic SDK](tools/jentic-sdk/README.md), and the [OAK Runner](tools/oak-runner/README.md). See the [tools README](tools/README.md) for more details.
 
 For detailed information on the directory structure, please refer to [STRUCTURE.md](STRUCTURE.md).
 
