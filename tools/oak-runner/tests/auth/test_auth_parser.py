@@ -120,13 +120,7 @@ class TestAuthParser(unittest.TestCase):
         for req in auth_reqs:
             req.source_description_id = "test_oauth2"
 
-        self.assertEqual(len(auth_reqs), 1)
-        self.assertEqual(auth_reqs[0].auth_type, AuthType.OAUTH2)
-        self.assertEqual(auth_reqs[0].name, "oauth2")
-        self.assertEqual(auth_reqs[0].flow_type, "implicit")
-        self.assertIn("read:items", auth_reqs[0].scopes)
-        self.assertIn("write:items", auth_reqs[0].scopes)
-        self.assertTrue(auth_reqs[0].required)
+        self.assertEqual(len(auth_reqs), 0)
 
     def test_extract_auth_from_openapi_bearer(self):
         """Test extracting bearer token authentication from OpenAPI spec."""
@@ -175,54 +169,37 @@ class TestAuthParser(unittest.TestCase):
 
         auth_reqs = extract_auth_from_openapi(openapi_spec)
 
-        # Verify we found the API key and OAuth2 auth
-        self.assertEqual(len(auth_reqs), 2)
+        self.assertEqual(len(auth_reqs), 1)
 
-        # Check auth types
         auth_types = [req.auth_type for req in auth_reqs]
         self.assertIn(AuthType.API_KEY, auth_types)
-        self.assertIn(AuthType.OAUTH2, auth_types)
+        self.assertNotIn(AuthType.OAUTH2, auth_types)
 
-        # Find the API key auth
         api_key_auth = next(req for req in auth_reqs if req.auth_type == AuthType.API_KEY)
         self.assertEqual(api_key_auth.name, "api_key")
         self.assertEqual(api_key_auth.location, AuthLocation.HEADER)
 
-        # Find the OAuth2 auth
-        oauth2_auth = next(req for req in auth_reqs if req.auth_type == AuthType.OAUTH2)
-        self.assertEqual(oauth2_auth.name, "petstore_auth")
-        self.assertEqual(oauth2_auth.flow_type, "implicit")
-        self.assertIn("write:pets", oauth2_auth.scopes)
-        self.assertIn("read:pets", oauth2_auth.scopes)
-
     def test_extract_auth_from_openapi_with_source_description(self):
         """Test extracting authentication with a custom source description."""
-        # Test with a custom source description
         custom_source = "custom-api-source"
         auth_reqs = extract_auth_from_openapi(self.openapi_spec_api_key)
-        # Set source_description_id after extraction
         for req in auth_reqs:
             req.source_description_id = custom_source
 
         self.assertEqual(len(auth_reqs), 1)
         self.assertEqual(auth_reqs[0].auth_type, AuthType.API_KEY)
         self.assertEqual(auth_reqs[0].source_description_id, custom_source)
-        
-        # Verify that api_title is still set correctly
         api_title = self.openapi_spec_api_key.get("info", {}).get("title", "")
         self.assertEqual(auth_reqs[0].api_title, api_title)
-        
-        # Test with a different source description
+
         different_source = "different-api-source"
         auth_reqs = extract_auth_from_openapi(self.openapi_spec_api_key)
-        # Set source_description_id after extraction
         for req in auth_reqs:
             req.source_description_id = different_source
         self.assertEqual(auth_reqs[0].source_description_id, different_source)
 
     def test_auth_requirements_to_dict(self):
         """Test converting auth requirements to dictionaries."""
-        # Create sample auth requirements
         api_key_auth = AuthRequirement(
             auth_type=AuthType.API_KEY,
             name="api_key",
@@ -241,24 +218,131 @@ class TestAuthParser(unittest.TestCase):
             required=True,
         )
 
-        # Convert to dictionaries
         auth_dicts = auth_requirements_to_dict([api_key_auth, oauth2_auth])
 
-        # Verify the conversion
         self.assertEqual(len(auth_dicts), 2)
 
-        # Check API key dict
         api_key_dict = next(d for d in auth_dicts if d["name"] == "api_key")
         self.assertEqual(api_key_dict["type"], "apiKey")
         self.assertEqual(api_key_dict["location"], "header")
         self.assertTrue(api_key_dict["required"])
 
-        # Check OAuth2 dict
         oauth2_dict = next(d for d in auth_dicts if d["name"] == "oauth2")
         self.assertEqual(oauth2_dict["type"], "oauth2")
         self.assertEqual(oauth2_dict["flow_type"], "implicit")
         self.assertEqual(oauth2_dict["scopes"], ["read", "write"])
         self.assertEqual(oauth2_dict["auth_urls"], {"authorization": "https://example.com/auth"})
+
+    def test_extract_auth_from_openapi_oauth2_authcode_only(self):
+        """Test that OAuth2 authorizationCode flow is skipped."""
+        spec = {
+            "openapi": "3.0.0",
+            "info": {"title": "Test AuthCode", "version": "1.0.0"},
+            "components": {
+                "securitySchemes": {
+                    "oauth2AuthCode": {
+                        "type": "oauth2",
+                        "flows": {
+                            "authorizationCode": {
+                                "authorizationUrl": "https://example.com/auth",
+                                "tokenUrl": "https://example.com/token",
+                                "scopes": {"read": "Read access"}
+                            }
+                        }
+                    }
+                }
+            },
+            "security": [{"oauth2AuthCode": ["read"]}]
+        }
+        auth_reqs = extract_auth_from_openapi(spec)
+        self.assertEqual(len(auth_reqs), 0, "AuthorizationCode flow should be skipped")
+
+    def test_extract_auth_from_openapi_openid_only(self):
+        """Test that OpenID Connect is skipped."""
+        spec = {
+            "openapi": "3.0.0",
+            "info": {"title": "Test OpenID", "version": "1.0.0"},
+            "components": {
+                "securitySchemes": {
+                    "openId": {
+                        "type": "openIdConnect",
+                        "openIdConnectUrl": "https://example.com/.well-known/openid-configuration"
+                    }
+                }
+            },
+            "security": [{"openId": []}]
+        }
+        auth_reqs = extract_auth_from_openapi(spec)
+        self.assertEqual(len(auth_reqs), 0, "OpenID Connect should be skipped")
+
+    def test_extract_auth_from_openapi_oauth2_mixed_flows(self):
+        """Test handling of mixed supported/unsupported OAuth2 flows."""
+        spec = {
+            "openapi": "3.0.0",
+            "info": {"title": "Test Mixed OAuth Flows", "version": "1.0.0"},
+            "components": {
+                "securitySchemes": {
+                    "mixedOAuth": {
+                        "type": "oauth2",
+                        "flows": {
+                            "implicit": { # Unsupported
+                                "authorizationUrl": "https://example.com/auth_implicit",
+                                "scopes": {"read": "Read access"}
+                            },
+                            "clientCredentials": { # Supported
+                                "tokenUrl": "https://example.com/token_cc",
+                                "scopes": {"internal": "Internal access"}
+                            }
+                        }
+                    }
+                }
+            },
+            "security": [{"mixedOAuth": ["internal"]}]
+        }
+        auth_reqs = extract_auth_from_openapi(spec)
+        self.assertEqual(len(auth_reqs), 1, "Only supported flows should be extracted")
+        self.assertEqual(auth_reqs[0].auth_type, AuthType.OAUTH2)
+        self.assertEqual(auth_reqs[0].flow_type, "clientCredentials")
+        self.assertEqual(auth_reqs[0].scopes, ["internal"])
+
+    def test_extract_auth_from_openapi_mixed_schemes(self):
+        """Test handling of mixed supported/unsupported security schemes."""
+        spec = {
+            "openapi": "3.0.0",
+            "info": {"title": "Test Mixed Schemes", "version": "1.0.0"},
+            "components": {
+                "securitySchemes": {
+                    "apiKeyAuth": { # Supported
+                        "type": "apiKey", "name": "X-API-Key", "in": "header"
+                    },
+                    "bearerAuth": { # Supported
+                        "type": "http", "scheme": "bearer"
+                    },
+                    "oauthImplicit": { # Unsupported
+                        "type": "oauth2",
+                        "flows": {"implicit": {"authorizationUrl": "https://e.com/auth", "scopes": {"r": "r"}}}
+                    },
+                    "openIdAuth": { # Unsupported
+                        "type": "openIdConnect",
+                        "openIdConnectUrl": "https://e.com/.well-known"
+                    }
+                }
+            },
+            # Security field might reference a mix, but extraction should only yield supported ones
+            "security": [
+                {"apiKeyAuth": []},
+                {"bearerAuth": []},
+                {"oauthImplicit": ["r"]}, 
+                {"openIdAuth": []}
+            ]
+        }
+        auth_reqs = extract_auth_from_openapi(spec)
+        self.assertEqual(len(auth_reqs), 2, "Only supported schemes should be extracted")
+        extracted_types = {req.auth_type for req in auth_reqs}
+        self.assertIn(AuthType.API_KEY, extracted_types)
+        self.assertIn(AuthType.HTTP, extracted_types)
+        self.assertNotIn(AuthType.OAUTH2, extracted_types)
+        self.assertNotIn(AuthType.OPENID, extracted_types)
 
 
 if __name__ == "__main__":

@@ -205,6 +205,12 @@ def extract_auth_from_openapi(openapi_spec: dict[str, Any]) -> list[AuthRequirem
             flows = scheme_data.get("flows", {})
 
             for flow_type, flow_data in flows.items():
+                # --- OAK RUNNER CHANGE: Skip unsupported OAuth flows ---
+                if flow_type in ["implicit", "authorizationCode"]:
+                    logger.debug(f"Skipping unsupported OAuth2 flow '{flow_type}' for scheme '{scheme_name}'.")
+                    continue  # Skip this flow
+                # --- END OAK RUNNER CHANGE ---
+
                 scopes = list(flow_data.get("scopes", {}).keys())
 
                 auth_urls = {}
@@ -230,18 +236,11 @@ def extract_auth_from_openapi(openapi_spec: dict[str, Any]) -> list[AuthRequirem
 
         elif auth_type == AuthType.OPENID:
             # OpenID Connect authentication
-            openid_url = scheme_data.get("openIdConnectUrl", "")
-            
-            auth_requirements.append(
-                AuthRequirement(
-                    auth_type=auth_type,
-                    name=scheme_name,
-                    description=description,
-                    auth_urls={"openIdConnectUrl": openid_url},
-                    security_scheme_name=scheme_name,
-                    api_title=api_title,
-                )
-            )
+            # --- OAK RUNNER CHANGE: Skip unsupported OpenID Connect ---
+            logger.debug(f"Skipping unsupported OpenID Connect scheme: {scheme_name}")
+            continue  # Skip OpenID Connect entirely
+            # --- END OAK RUNNER CHANGE ---
+            # Original code for adding OpenID if supported would go here
             
         else:
             # Custom or unknown authentication type
