@@ -7,6 +7,7 @@ instead of using mocks.
 """
 
 import argparse
+import importlib
 import logging
 import os
 import sys
@@ -44,7 +45,7 @@ def main():
         logging.getLogger("arazzo-test").setLevel(logging.DEBUG)
         logging.getLogger("arazzo-runner").setLevel(logging.DEBUG)
 
-    # Import the test discovery module - use relative import since we're in the same package
+    # Import the test discovery module via relative import
     from .test_fixture_discovery import fixtures
 
     # Find ALL fixtures with their workflows - we'll run them in real mode
@@ -96,10 +97,18 @@ def main():
         if "ARAZZO_TEST_WORKFLOW" in os.environ:
             del os.environ["ARAZZO_TEST_WORKFLOW"]
 
-    # Create test suite with real mode tests
-    test_suite = unittest.defaultTestLoader.loadTestsFromName(
-        f"tests.oak_runner.test_fixture_discovery.{pattern}"
-    )
+    # Dynamically load real-mode tests from test_fixture_discovery
+    mod = importlib.import_module("tests.test_fixture_discovery")
+    loader = unittest.defaultTestLoader
+    if "*" in pattern:
+        test_suite = unittest.TestSuite()
+        for name in dir(mod):
+            if name.startswith("Test_") and name.endswith("_Real"):
+                test_suite.addTests(
+                    loader.loadTestsFromName(f"tests.test_fixture_discovery.{name}")
+                )
+    else:
+        test_suite = loader.loadTestsFromName(f"tests.test_fixture_discovery.{pattern}")
 
     # Set environment variable to tell test classes they should run in real mode
     os.environ["ARAZZO_RUN_REAL_TESTS"] = "1"

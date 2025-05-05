@@ -297,18 +297,16 @@ def create_test_class(fixture: dict[str, Any], mode: str = "mock") -> type:
             self.success_rate = fixture["config"].get("success_rate", 1.0)
             self.mode = mode
 
-            # Skip real mode tests when running in default test mode
-            # Real tests should only run when explicitly requested through run_real_tests.py
-            if mode == "real" and "ARAZZO_RUN_REAL_TESTS" not in os.environ:
-                self.skipTest(
-                    "Real mode tests are only run when explicitly requested with pdm run test-real"
-                )
-                return
-
             # Initialize HTTP client based on mode
             if mode == "real":
+                # Skip real mode tests unless explicitly enabled
+                if os.getenv("ARAZZO_RUN_REAL_TESTS") != "1":
+                    self.skipTest(
+                        "Real mode tests are only run when explicitly requested with "
+                        "`pdm run test-real` or by setting ARAZZO_RUN_REAL_TESTS=1"
+                    )
+
                 # Get real mode settings
-                timeout = fixture["config"].get("real_mode", {}).get("timeout", 30)
                 base_urls = fixture["config"].get("base_urls", {})
 
                 # Get auth values from config
@@ -387,15 +385,22 @@ def create_test_class(fixture: dict[str, Any], mode: str = "mock") -> type:
                     # Apply custom mocks from config with the given HTTP client
                     self._apply_custom_mocks(name, http_client)
                 else:
-                    # In real mode, just store the spec name and configure base URLs
-                    self.api_specs[name] = name
+                    # In real mode: load and store the OpenAPI spec dict under its sourceDescription name
+                    source_description_name = source_descriptions_name_map.get(name, name)
+                    self.api_specs[source_description_name] = self._load_test_openapi_spec(
+                        spec_path, source_description_name
+                    )
 
                     # Set base URL for real client
                     if isinstance(http_client, RealHTTPExecutor):
-                        base_url = self.fixture["config"].get("base_urls", {}).get(name)
+                        base_url = self.fixture["config"].get("base_urls", {}).get(
+                            source_description_name
+                        )
                         if base_url:
-                            http_client.base_urls[name] = base_url
-                            logger.info(f"Real mode: Set base URL for {name} to {base_url}")
+                            http_client.base_urls[source_description_name] = base_url
+                            logger.info(
+                                f"Real mode: Set base URL for {source_description_name} to {base_url}"
+                            )
 
         def _load_test_openapi_spec(self, file_path: str, name: str | None) -> str:
             """
