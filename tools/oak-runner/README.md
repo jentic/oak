@@ -61,14 +61,14 @@ The OAK Runner supports various authentication methods defined in OpenAPI specif
 
 Usage:
 ```sh
-pdm run python -m oak_runner <command> [command-specific arguments] [global options]
+uvx oak-runner <command> [command-specific arguments] [global options]
 ```
 
 **Commands:**
 
 1.  **`show-env-mappings`**: Show environment variable mappings for authentication based on an Arazzo or OpenAPI file.
     ```sh
-    pdm run python -m oak_runner show-env-mappings [arazzo_path | --openapi-path PATH]
+    uvx oak-runner show-env-mappings [arazzo_path | --openapi-path PATH]
     ```
     -   `arazzo_path`: Path to the Arazzo YAML file (use this OR --openapi-path).
     -   `--openapi-path PATH`: Path to the OpenAPI spec file (use this OR arazzo_path).
@@ -76,7 +76,7 @@ pdm run python -m oak_runner <command> [command-specific arguments] [global opti
 
 2.  **`execute-workflow`**: Execute a workflow defined in an Arazzo file.
     ```sh
-    pdm run python -m oak_runner execute-workflow <arazzo_path> --workflow-id <workflow_id> [--inputs <json_string>]
+    uvx oak-runner execute-workflow <arazzo_path> --workflow-id <workflow_id> [--inputs <json_string>]
     ```
     -   `arazzo_path`: *Required*. Path to the Arazzo YAML file containing the workflow.
     -   `--workflow-id WORKFLOW_ID`: *Required*. ID of the workflow to execute.
@@ -84,7 +84,7 @@ pdm run python -m oak_runner <command> [command-specific arguments] [global opti
 
 3.  **`execute-operation`**: Execute a single API operation directly from an OpenAPI specification (or an Arazzo file for context).
     ```sh
-    pdm run python -m oak_runner execute-operation [--arazzo-path PATH | --openapi-path PATH] [--operation-id ID | --operation-path PATH_METHOD] [--inputs <json_string>]
+    uvx oak-runner execute-operation [--arazzo-path PATH | --openapi-path PATH] [--operation-id ID | --operation-path PATH_METHOD] [--inputs <json_string>]
     ```
     -   `--arazzo-path PATH`: Path to an Arazzo file (provides context, use this OR --openapi-path).
     -   `--openapi-path PATH`: Path to the OpenAPI spec file (use this OR --arazzo-path).
@@ -96,20 +96,20 @@ pdm run python -m oak_runner <command> [command-specific arguments] [global opti
 
 4.  **`list-workflows`**: List all available workflows defined in an Arazzo file.
     ```sh
-    pdm run python -m oak_runner list-workflows <arazzo_path>
+    uvx oak-runner list-workflows <arazzo_path>
     ```
     -   `arazzo_path`: *Required*. Path to the Arazzo YAML file.
 
 5.  **`describe-workflow`**: Show details of a specific workflow, including its summary, inputs, steps, and outputs.
     ```sh
-    pdm run python -m oak_runner describe-workflow <arazzo_path> --workflow-id <workflow_id>
+    uvx oak-runner describe-workflow <arazzo_path> --workflow-id <workflow_id>
     ```
     -   `arazzo_path`: *Required*. Path to the Arazzo YAML file containing the workflow.
     -   `--workflow-id WORKFLOW_ID`: *Required*. ID of the workflow to describe.
 
 6.  **`generate-example`**: Generate an example CLI command to execute a specified workflow, including placeholder inputs.
     ```sh
-    pdm run python -m oak_runner generate-example <arazzo_path> --workflow-id <workflow_id>
+    uvx oak-runner generate-example <arazzo_path> --workflow-id <workflow_id>
     ```
     -   `arazzo_path`: *Required*. Path to the Arazzo YAML file containing the workflow.
     -   `--workflow-id WORKFLOW_ID`: *Required*. ID of the workflow to generate an example for.
@@ -123,37 +123,37 @@ pdm run python -m oak_runner <command> [command-specific arguments] [global opti
 
 ```sh
 # Show environment variable mappings using an Arazzo file
-pdm run python -m oak_runner show-env-mappings ./tests/fixtures/discord/discord.arazzo.yaml
+uvx oak-runner show-env-mappings ./tests/fixtures/discord/discord.arazzo.yaml
 
 # Show environment variable mappings using an OpenAPI file
-pdm run python -m oak_runner show-env-mappings --openapi-path ./tests/fixtures/discord/discord.openapi.json
+uvx oak-runner show-env-mappings --openapi-path ./tests/fixtures/discord/discord.openapi.json
 
 # Execute a workflow
-pdm run python -m oak_runner execute-workflow ./tests/fixtures/discord/discord.arazzo.yaml --workflow-id getUserInfoAndSendMessage --inputs '{\"recipient_id\": \"1234567890\", \"message_content\": \"Hello!\"}'
+uvx oak-runner execute-workflow ./tests/fixtures/discord/discord.arazzo.yaml --workflow-id getUserInfoAndSendMessage --inputs '{\"recipient_id\": \"1234567890\", \"message_content\": \"Hello!\"}'
 
 # Execute a specific operation using its operationId and an OpenAPI file
-pdm run python -m oak_runner execute-operation --openapi-path ./tests/fixtures/discord/discord.openapi.json --operation-id list_my_guilds --inputs '{}'
+uvx oak-runner execute-operation --openapi-path ./tests/fixtures/discord/discord.openapi.json --operation-id list_my_guilds --inputs '{}'
 
 # Execute a specific operation using its path/method and an Arazzo file (for context)
-pdm run python -m oak_runner execute-operation --arazzo-path ./tests/fixtures/discord/discord.arazzo.yaml --operation-path 'GET /users/@me/guilds' --inputs '{}' --log-level DEBUG
+uvx oak-runner execute-operation --arazzo-path ./tests/fixtures/discord/discord.arazzo.yaml --operation-path 'GET /users/@me/guilds' --inputs '{}' --log-level DEBUG
 
 # List all available workflows
-pdm run python -m oak_runner list-workflows ./tests/fixtures/discord/discord.arazzo.yaml
+uvx oak-runner list-workflows ./tests/fixtures/discord/discord.arazzo.yaml
 
 # Describe a specific workflow
-pdm run python -m oak_runner describe-workflow ./tests/fixtures/discord/discord.arazzo.yaml --workflow-id getUserInfoAndSendMessage
+uvx oak-runner describe-workflow ./tests/fixtures/discord/discord.arazzo.yaml --workflow-id getUserInfoAndSendMessage
 
 # Generate an example CLI command to execute a workflow
-pdm run python -m oak_runner generate-example ./tests/fixtures/discord/discord.arazzo.yaml --workflow-id getUserInfoAndSendMessage
+uvx oak-runner generate-example ./tests/fixtures/discord/discord.arazzo.yaml --workflow-id getUserInfoAndSendMessage
 ```
 
 **Help:**
 ```sh
 # General help
-pdm run python -m oak_runner --help
+uvx oak-runner --help
 
 # Help for a specific command (e.g., execute-operation)
-pdm run python -m oak_runner execute-operation --help
+uvx oak-runner execute-operation --help
 ```
 
 

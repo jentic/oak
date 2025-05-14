@@ -10,7 +10,7 @@ import sys
 from typing import Any
 
 from .runner import OAKRunner
-from .models import StepStatus 
+from .models import StepStatus
 from .utils import set_log_level
 
 logger = logging.getLogger("oak-runner-cli")
@@ -259,7 +259,7 @@ async def handle_execute_operation(runner: OAKRunner | None, args: argparse.Name
         if not runner:
             logger.error("Runner was not initialized correctly.")
             sys.exit(1)
-            
+
         # Correctly pass operation_id and operation_path based on args
         # REMOVED await as execute_operation is synchronous
         result = runner.execute_operation(
@@ -456,5 +456,10 @@ async def handle_generate_example(runner: OAKRunner | None, args: argparse.Names
         sys.exit(1)
 
 
-if __name__ == "__main__":
+def run_main():
+    """Provide a blocking main entry point for use in scripts"""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run_main()
