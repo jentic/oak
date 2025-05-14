@@ -206,7 +206,7 @@ async def handle_execute_workflow(runner: OAKRunner | None, args: argparse.Names
 
     # Print outputs and determine success/failure
     print(f"\n=== Completed workflow: {args.workflow_id} ===")
-    print(f"Outputs: {json.dumps(result.outputs, indent=2)}")
+    print(f"Outputs: {result}")
 
     # Check for failure in outputs (if possible)
     try:

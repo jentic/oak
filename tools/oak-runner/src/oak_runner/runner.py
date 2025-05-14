@@ -271,14 +271,20 @@ class OAKRunner:
         self.register_callback("workflow_complete", on_workflow_complete)
 
         execution_id = self.start_workflow(workflow_id, inputs)
+        
         while True:
             result = self.execute_next_step(execution_id)
+            
             if result.get("status") in [WorkflowExecutionStatus.WORKFLOW_COMPLETE, WorkflowExecutionStatus.ERROR]:
+                # Get the execution state to access step outputs
+                state = self.execution_states[execution_id]
+                
                 # Convert the dictionary result to a WorkflowExecutionResult object
                 execution_result = WorkflowExecutionResult(
                     status=result["status"],
                     workflow_id=result.get("workflow_id", workflow_id),
                     outputs=result.get("outputs", {}),
+                    step_outputs=state.step_outputs,
                     error=result.get("error")
                 )
                 return execution_result

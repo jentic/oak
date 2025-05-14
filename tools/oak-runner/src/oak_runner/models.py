@@ -60,11 +60,13 @@ class WorkflowExecutionResult:
         status: The status of the workflow execution (e.g., WORKFLOW_COMPLETE, ERROR)
         workflow_id: The ID of the executed workflow
         outputs: The outputs produced by the workflow
+        step_outputs: The outputs from each step in the workflow
         error: Optional error message if the workflow execution failed
     """
     status: WorkflowExecutionStatus
     workflow_id: str
     outputs: dict[str, Any] = field(default_factory=dict)
+    step_outputs: dict[str, dict[str, Any]] = field(default_factory=dict)
     error: Optional[str] = None
 
 

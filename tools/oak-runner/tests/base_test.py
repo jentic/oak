@@ -310,8 +310,7 @@ class ArazzoTestCase(unittest.TestCase):
             status=status,
             workflow_id=workflow_id,
             outputs=workflow_outputs,  # Use our manually constructed workflow outputs
-            # Store additional metadata in the outputs dictionary
-            # This preserves backward compatibility with existing tests
+            step_outputs=state.step_outputs,  # Include step outputs
             error=None if status == WorkflowExecutionStatus.WORKFLOW_COMPLETE else "Workflow execution failed"
         )
 
