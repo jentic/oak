@@ -9,13 +9,14 @@ executes OpenAPI operations sequentially, handling success/failure conditions an
 
 import logging
 from collections.abc import Callable
+import re
 from typing import Any, Optional
 import requests
 from .auth.auth_processor import AuthProcessor
 from .evaluator import ExpressionEvaluator
 from .executor import StepExecutor
 from .http import HTTPExecutor
-from .models import ActionType, ArazzoDoc, ExecutionState, OpenAPIDoc, StepStatus
+from .models import ActionType, ArazzoDoc, ExecutionState, OpenAPIDoc, StepStatus, WorkflowExecutionStatus, WorkflowExecutionResult
 from .utils import dump_state, load_arazzo_doc, load_source_descriptions, load_openapi_file
 from .auth.default_credential_provider import DefaultCredentialProvider
 import json
@@ -186,7 +187,7 @@ class OAKRunner:
                 # Run the dependency workflow until completion
                 while True:
                     result = self.execute_next_step(dep_execution_id)
-                    if result.get("status") in ["workflow_complete", "workflow_error"]:
+                    if result.get("status") in [WorkflowExecutionStatus.WORKFLOW_COMPLETE, WorkflowExecutionStatus.ERROR]:
                         break
 
                 # Get the dependency workflow outputs
@@ -207,7 +208,7 @@ class OAKRunner:
                 )
 
                 # Check if dependency succeeded
-                if result.get("status") == "workflow_error":
+                if result.get("status") == WorkflowExecutionStatus.ERROR:
                     logger.error(f"Dependency workflow {dep_workflow_id} failed")
                     raise ValueError(f"Dependency workflow {dep_workflow_id} failed")
 
@@ -235,7 +236,7 @@ class OAKRunner:
 
         return execution_id
 
-    def execute_workflow(self, workflow_id: str, inputs: dict[str, Any] = None) -> dict[str, any]:
+    def execute_workflow(self, workflow_id: str, inputs: dict[str, Any] = None) -> WorkflowExecutionResult:
         """
         Start and execute a workflow until completion, returning the outputs.
 
@@ -244,7 +245,7 @@ class OAKRunner:
             inputs: Input parameters for the workflow
 
         Returns:
-            outputs: The outputs of the completed workflow
+            A WorkflowExecutionResult object containing the status, workflow_id, outputs, and any error
         """
         def on_workflow_start(execution_id, workflow_id, inputs):
             logger.debug(f"\n=== Starting workflow: {workflow_id} ===")
@@ -272,8 +273,15 @@ class OAKRunner:
         execution_id = self.start_workflow(workflow_id, inputs)
         while True:
             result = self.execute_next_step(execution_id)
-            if result.get("status") in ["workflow_complete", "workflow_error"]:
-                return result.get("outputs")
+            if result.get("status") in [WorkflowExecutionStatus.WORKFLOW_COMPLETE, WorkflowExecutionStatus.ERROR]:
+                # Convert the dictionary result to a WorkflowExecutionResult object
+                execution_result = WorkflowExecutionResult(
+                    status=result["status"],
+                    workflow_id=result.get("workflow_id", workflow_id),
+                    outputs=result.get("outputs", {}),
+                    error=result.get("error")
+                )
+                return execution_result
 
     def execute_next_step(self, execution_id: str) -> dict[str, Any]:
         """
@@ -331,7 +339,7 @@ class OAKRunner:
                 outputs=state.workflow_outputs,
             )
             return {
-                "status": "workflow_complete",
+                "status": WorkflowExecutionStatus.WORKFLOW_COMPLETE,
                 "workflow_id": workflow_id,
                 "outputs": state.workflow_outputs,
             }
@@ -404,7 +412,7 @@ class OAKRunner:
                         outputs=state.workflow_outputs,
                     )
                     return {
-                        "status": "error",
+                        "status": WorkflowExecutionStatus.ERROR,
                         "workflow_id": workflow_id,
                         "step_id": step_id,
                         "error": "Step failed success criteria",
@@ -419,7 +427,7 @@ class OAKRunner:
                         outputs=state.workflow_outputs,
                     )
                     return {
-                        "status": "workflow_complete",
+                        "status": WorkflowExecutionStatus.WORKFLOW_COMPLETE,
                         "workflow_id": workflow_id,
                         "outputs": state.workflow_outputs,
                     }
@@ -431,7 +439,7 @@ class OAKRunner:
                         next_action["workflow_id"], next_action.get("inputs", {})
                     )
                     return {
-                        "status": "goto_workflow",
+                        "status": WorkflowExecutionStatus.GOTO_WORKFLOW,
                         "workflow_id": next_action["workflow_id"],
                         "execution_id": new_execution_id,
                     }
@@ -445,7 +453,7 @@ class OAKRunner:
 
                     # Update current step
                     state.current_step_id = steps[next_step_idx].get("stepId")
-                    return {"status": "goto_step", "step_id": state.current_step_id}
+                    return {"status": WorkflowExecutionStatus.GOTO_STEP, "step_id": state.current_step_id}
             elif next_action["type"] == ActionType.RETRY:
                 # Retry the current step
                 # We don't change the step_id so it will retry on next execution
@@ -453,11 +461,11 @@ class OAKRunner:
 
                 # If there's a delay, we should return that information
                 retry_delay = next_action.get("retry_after", 0)
-                return {"status": "retry", "step_id": step_id, "retry_after": retry_delay}
+                return {"status": WorkflowExecutionStatus.RETRY, "step_id": step_id, "retry_after": retry_delay}
 
             # Default: continue to next step
             return {
-                "status": "step_complete",
+                "status": WorkflowExecutionStatus.STEP_COMPLETE,
                 "step_id": step_id,
                 "success": success,
                 "outputs": step_result.get("outputs", {}),
@@ -477,7 +485,7 @@ class OAKRunner:
                 error=str(e),
             )
 
-            return {"status": "step_error", "step_id": step_id, "error": str(e)}
+            return {"status": WorkflowExecutionStatus.STEP_ERROR, "step_id": step_id, "error": str(e)}
 
     def _execute_nested_workflow(self, step: dict, state: ExecutionState) -> dict:
         """Execute a nested workflow"""
@@ -530,7 +538,7 @@ class OAKRunner:
         # Execute the nested workflow until completion
         while True:
             result = self.execute_next_step(execution_id)
-            if result.get("status") in ["workflow_complete", "workflow_error"]:
+            if result.get("status") in [WorkflowExecutionStatus.WORKFLOW_COMPLETE, WorkflowExecutionStatus.ERROR]:
                 break
 
         # Get the nested workflow outputs

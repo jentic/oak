@@ -199,14 +199,14 @@ async def handle_execute_workflow(runner: OAKRunner | None, args: argparse.Names
 
     # Start and execute the workflow using the new API
     try:
-        outputs = runner.execute_workflow(args.workflow_id, inputs)
+        result = runner.execute_workflow(args.workflow_id, inputs)
     except Exception as e:
         logger.error(f"Failed to execute workflow: {e}", exc_info=True)
         sys.exit(1)
 
     # Print outputs and determine success/failure
     print(f"\n=== Completed workflow: {args.workflow_id} ===")
-    print(f"Outputs: {json.dumps(outputs, indent=2)}")
+    print(f"Outputs: {json.dumps(result.outputs, indent=2)}")
 
     # Check for failure in outputs (if possible)
     try:

@@ -5,9 +5,9 @@ OAK Runner Data Models
 This module defines the data models and enums used by the OAK Runner.
 """
 
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Dict
+from dataclasses import dataclass, field
+from enum import Enum, StrEnum
+from typing import Any, Dict, Optional
 
 OpenAPIDoc = Dict[str, Any]
 ArazzoDoc = Dict[str, Any]
@@ -30,6 +30,42 @@ class ActionType(Enum):
     END = "end"  # End workflow
     GOTO = "goto"  # Go to another step or workflow
     RETRY = "retry"  # Retry the current step
+
+
+class WorkflowExecutionStatus(StrEnum):
+    """Represents the status strings returned by OAK Runner execution logic."""
+
+    WORKFLOW_COMPLETE = "workflow_complete"
+    ERROR = "error"
+    GOTO_WORKFLOW = "goto_workflow"
+    GOTO_STEP = "goto_step"
+    RETRY = "retry"
+    STEP_COMPLETE = "step_complete"
+    STEP_ERROR = "step_error"
+
+    def __repr__(self) -> str:
+        return self.value
+
+    def __str__(self) -> str:
+        return self.value
+
+
+@dataclass
+class WorkflowExecutionResult:
+    """Represents the result of a workflow execution
+    
+    This class models the structure of the result returned by the execute_workflow method.
+    
+    Attributes:
+        status: The status of the workflow execution (e.g., WORKFLOW_COMPLETE, ERROR)
+        workflow_id: The ID of the executed workflow
+        outputs: The outputs produced by the workflow
+        error: Optional error message if the workflow execution failed
+    """
+    status: WorkflowExecutionStatus
+    workflow_id: str
+    outputs: dict[str, Any] = field(default_factory=dict)
+    error: Optional[str] = None
 
 
 @dataclass

@@ -14,7 +14,7 @@ import unittest
 import yaml
 
 # Use the new namespace for imports
-from oak_runner import OAKRunner, ExecutionState, StepStatus
+from oak_runner import OAKRunner, ExecutionState, StepStatus, WorkflowExecutionStatus
 
 
 class MockHTTPExecutor:
@@ -234,7 +234,7 @@ class TestOAKRunner(unittest.TestCase):
 
         # Execute first step
         result1 = self.runner.execute_next_step(execution_id)
-        self.assertEqual(result1["status"], "step_complete")
+        self.assertEqual(result1["status"], WorkflowExecutionStatus.STEP_COMPLETE)
         self.assertEqual(result1["step_id"], "loginStep")
         self.assertTrue(result1["success"])
 
@@ -252,7 +252,7 @@ class TestOAKRunner(unittest.TestCase):
 
         # Execute second step
         result2 = self.runner.execute_next_step(execution_id)
-        self.assertEqual(result2["status"], "step_complete")
+        self.assertEqual(result2["status"], WorkflowExecutionStatus.STEP_COMPLETE)
         self.assertEqual(result2["step_id"], "getDataStep")
         self.assertTrue(result2["success"])
 
@@ -275,7 +275,7 @@ class TestOAKRunner(unittest.TestCase):
 
         # Execute final step (should complete the workflow)
         result3 = self.runner.execute_next_step(execution_id)
-        self.assertEqual(result3["status"], "workflow_complete")
+        self.assertEqual(result3["status"], WorkflowExecutionStatus.WORKFLOW_COMPLETE)
         self.assertEqual(result3["workflow_id"], "testWorkflow")
 
         # Check workflow outputs exist
@@ -322,7 +322,7 @@ class TestOAKRunner(unittest.TestCase):
         # Execute steps until completion
         while True:
             result = self.runner.execute_next_step(execution_id)
-            if result["status"] == "workflow_complete":
+            if result["status"] == WorkflowExecutionStatus.WORKFLOW_COMPLETE:
                 break
 
         # Check that all events were triggered in the right order
@@ -442,11 +442,11 @@ class TestOAKRunner(unittest.TestCase):
         # Execute all steps
         while True:
             result = dependency_runner.execute_next_step(execution_id)
-            if result["status"] in ["workflow_complete", "complete"]:
+            if result["status"] == WorkflowExecutionStatus.WORKFLOW_COMPLETE:
                 break
 
         # Verify workflow completed successfully
-        self.assertEqual(result["status"], "workflow_complete")
+        self.assertEqual(result["status"], WorkflowExecutionStatus.WORKFLOW_COMPLETE)
 
 
 class TestExecutionState(unittest.TestCase):

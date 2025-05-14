@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 import yaml
 
-from oak_runner import OAKRunner, StepStatus
+from oak_runner import OAKRunner, StepStatus, WorkflowExecutionStatus, WorkflowExecutionResult
 
 from .mocks import MockHTTPExecutor, OpenAPIMocker
 from .mocks.real_http_client import RealHTTPExecutor
@@ -211,7 +211,7 @@ class ArazzoTestCase(unittest.TestCase):
         inputs: dict[str, Any],
         expect_success: bool = True,
         max_steps: int = 100,
-    ) -> dict[str, Any]:
+    ) -> WorkflowExecutionResult:
         """
         Execute a workflow from start to finish
 
@@ -243,25 +243,25 @@ class ArazzoTestCase(unittest.TestCase):
             logger.debug(f"Step execution result: {result}")
 
             # Record step execution
-            if result["status"] == "step_complete":
+            if result["status"] == WorkflowExecutionStatus.STEP_COMPLETE:
                 step_success = result.get("success", False)
                 executed_steps.append({"step_id": result["step_id"], "success": step_success})
                 logger.debug(f"Completed step: {result['step_id']}, success: {step_success}")
 
             # Check for workflow completion
-            if result["status"] == "workflow_complete":
+            if result["status"] == WorkflowExecutionStatus.WORKFLOW_COMPLETE:
                 final_result = result
                 logger.debug(f"Workflow complete. Final result: {result}")
                 break
 
             # Check for error
-            if result["status"] == "step_error":
+            if result["status"] == WorkflowExecutionStatus.STEP_ERROR:
                 logger.debug(f"Step error: {result.get('error')}")
                 if expect_success:
                     self.fail(f"Workflow execution failed: {result.get('error')}")
 
                 return {
-                    "status": "error",
+                    "status": WorkflowExecutionStatus.ERROR,
                     "error": result.get("error", "A step failed"),
                     "executed_steps": executed_steps,
                 }
@@ -304,12 +304,16 @@ class ArazzoTestCase(unittest.TestCase):
                     for key, value in outputs.items():
                         workflow_outputs[f"{step_id}.{key}"] = value
 
-        return {
-            "status": "success" if not any_step_failed else "error",
-            "outputs": workflow_outputs,  # Use our manually constructed workflow outputs
-            "executed_steps": executed_steps,
-            "step_statuses": {k: str(v) for k, v in state.status.items()},
-        }
+        # Create and return a WorkflowExecutionResult object
+        status = WorkflowExecutionStatus.WORKFLOW_COMPLETE if not any_step_failed else WorkflowExecutionStatus.ERROR
+        return WorkflowExecutionResult(
+            status=status,
+            workflow_id=workflow_id,
+            outputs=workflow_outputs,  # Use our manually constructed workflow outputs
+            # Store additional metadata in the outputs dictionary
+            # This preserves backward compatibility with existing tests
+            error=None if status == WorkflowExecutionStatus.WORKFLOW_COMPLETE else "Workflow execution failed"
+        )
 
     def _load_arazzo_spec(self, spec_path: str) -> dict[str, Any]:
         """

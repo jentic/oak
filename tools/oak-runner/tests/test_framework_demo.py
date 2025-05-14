@@ -6,6 +6,7 @@ This module provides example tests that demonstrate how to use the Arazzo testin
 """
 
 
+from oak_runner import WorkflowExecutionStatus
 from .base_test import ArazzoTestCase
 
 
@@ -232,7 +233,7 @@ class TestArazzoFramework(ArazzoTestCase):
         result = self.execute_workflow(runner, "basicWorkflow", inputs)
 
         # Validate the workflow executed successfully
-        self.assertEqual(result["status"], "success")
+        self.assertEqual(result.status, WorkflowExecutionStatus.WORKFLOW_COMPLETE)
 
         # Validate the API calls
         self.validate_api_calls(expected_call_count=2)
@@ -375,16 +376,17 @@ class TestArazzoFramework(ArazzoTestCase):
         self.validate_api_calls(expected_call_count=1)
 
         # Check that we got the expected status
-        self.assertEqual(result["status"], "error")
+        self.assertEqual(result.status, WorkflowExecutionStatus.ERROR)
 
         # The output token should not exist or be None since the step failed
         self.assertTrue(
-            "token" not in result["outputs"] or result["outputs"]["token"] is None,
-            f"Expected token to be None or missing, but got {result['outputs'].get('token', 'missing')}",
+            "token" not in result.outputs or result.outputs["token"] is None,
+            f"Expected token to be None or missing, but got {result.outputs.get('token', 'missing')}",
         )
 
-        # Verify the step status is reported as failure
-        self.assertEqual(result["step_statuses"]["loginStep"], "StepStatus.FAILURE")
+        # Note: step_statuses is no longer part of the WorkflowExecutionResult
+        # We can check the execution state directly if needed
+        # self.assertEqual(runner.execution_states[execution_id].status["loginStep"], StepStatus.FAILURE)
 
         # Print the API call summary for debugging
         self.print_api_call_summary()

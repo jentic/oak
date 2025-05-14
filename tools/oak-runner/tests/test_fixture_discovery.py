@@ -18,7 +18,7 @@ from typing import Any
 
 import yaml
 
-from oak_runner import OAKRunner, StepStatus
+from oak_runner import OAKRunner, StepStatus, WorkflowExecutionStatus
 from oak_runner.auth import (
     AuthRequirement,
     extract_auth_from_arazzo,
@@ -488,7 +488,7 @@ def create_test_class(fixture: dict[str, Any], mode: str = "mock") -> type:
 
                             # If no schema is available or generation fails, use a simple success response
                             if not response_data:
-                                response_data = {"status": "success"}
+                                response_data = {"status": WorkflowExecutionStatus.WORKFLOW_COMPLETE}
 
                             http_client.add_static_response(
                                 method=method,
@@ -799,7 +799,7 @@ def create_test_class(fixture: dict[str, Any], mode: str = "mock") -> type:
                 logger.debug(f"Step execution result: {result}")
 
                 # Record step execution
-                if result["status"] == "step_complete":
+                if result["status"] == WorkflowExecutionStatus.STEP_COMPLETE:
                     step_id = result["step_id"]
                     step_success = result.get("success", False)
                     step_outputs = result.get("outputs", {})
@@ -812,7 +812,7 @@ def create_test_class(fixture: dict[str, Any], mode: str = "mock") -> type:
                     )
 
                 # Check for workflow completion
-                if result["status"] == "workflow_complete":
+                if result["status"] == WorkflowExecutionStatus.WORKFLOW_COMPLETE:
                     logger.debug(f"Workflow complete. Final result: {result}")
                     break
 
