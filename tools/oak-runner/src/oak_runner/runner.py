@@ -284,7 +284,8 @@ class OAKRunner:
                     status=result["status"],
                     workflow_id=result.get("workflow_id", workflow_id),
                     outputs=result.get("outputs", {}),
-                    step_outputs=state.step_outputs,
+                    step_outputs=state.step_outputs if state.step_outputs else None,
+                    inputs=inputs,
                     error=result.get("error")
                 )
                 return execution_result

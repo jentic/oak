@@ -26,7 +26,8 @@ class TestWorkflowExecutionResult(unittest.TestCase):
         self.assertEqual(result.status, WorkflowExecutionStatus.WORKFLOW_COMPLETE)
         self.assertEqual(result.workflow_id, "test_workflow")
         self.assertEqual(result.outputs, {})
-        self.assertEqual(result.step_outputs, {})
+        self.assertIsNone(result.step_outputs)
+        self.assertIsNone(result.inputs)
         self.assertIsNone(result.error)
 
         # Full initialization with all fields
@@ -34,17 +35,20 @@ class TestWorkflowExecutionResult(unittest.TestCase):
             "step1": {"output1": "value1"},
             "step2": {"output2": "value2"}
         }
+        inputs = {"param1": "value1", "param2": 123}
         result = WorkflowExecutionResult(
             status=WorkflowExecutionStatus.ERROR,
             workflow_id="test_workflow",
             outputs={"result": "test_output"},
             step_outputs=step_outputs,
+            inputs=inputs,
             error="Test error message"
         )
         self.assertEqual(result.status, WorkflowExecutionStatus.ERROR)
         self.assertEqual(result.workflow_id, "test_workflow")
         self.assertEqual(result.outputs, {"result": "test_output"})
         self.assertEqual(result.step_outputs, step_outputs)
+        self.assertEqual(result.inputs, {"param1": "value1", "param2": 123})
         self.assertEqual(result.error, "Test error message")
 
 
@@ -108,6 +112,26 @@ class TestErrorContext(unittest.TestCase):
         outputs = extractor.extract_outputs(step, response, {})
         
         self.assertNotIn("oak_error_context", outputs)
+        
+    def test_explicit_none_values(self):
+        """Test that explicitly setting optional fields to None works correctly"""
+        # Create a result with explicit None values
+        result = WorkflowExecutionResult(
+            status=WorkflowExecutionStatus.WORKFLOW_COMPLETE,
+            workflow_id="test_workflow",
+            outputs={"result": "test_output"},
+            step_outputs=None,
+            inputs=None,
+            error=None
+        )
+        
+        # Verify the fields are correctly set
+        self.assertEqual(result.status, WorkflowExecutionStatus.WORKFLOW_COMPLETE)
+        self.assertEqual(result.workflow_id, "test_workflow")
+        self.assertEqual(result.outputs, {"result": "test_output"})
+        self.assertIsNone(result.step_outputs)
+        self.assertIsNone(result.inputs)
+        self.assertIsNone(result.error)
 
 
 class TestIntegration(unittest.TestCase):
@@ -128,11 +152,13 @@ class TestIntegration(unittest.TestCase):
     
     def test_error_context_in_workflow_result(self):
         """Test that error context is properly included in workflow execution result"""
+        inputs = {"user_id": "12345", "message": "Hello world"}
         result = WorkflowExecutionResult(
             status=WorkflowExecutionStatus.ERROR,
             workflow_id="test_workflow",
             outputs={"result": "test_output"},
             step_outputs=self.step_outputs,
+            inputs=inputs,
             error="Step failed success criteria"
         )
         

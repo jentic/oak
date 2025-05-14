@@ -310,7 +310,8 @@ class ArazzoTestCase(unittest.TestCase):
             status=status,
             workflow_id=workflow_id,
             outputs=workflow_outputs,  # Use our manually constructed workflow outputs
-            step_outputs=state.step_outputs,  # Include step outputs
+            step_outputs=state.step_outputs if state.step_outputs else None,  # Include step outputs if available
+            inputs=inputs if inputs else None,  # Include original inputs if available
             error=None if status == WorkflowExecutionStatus.WORKFLOW_COMPLETE else "Workflow execution failed"
         )
 
