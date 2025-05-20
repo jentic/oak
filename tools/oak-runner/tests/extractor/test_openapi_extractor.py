@@ -50,7 +50,12 @@ TEST_SPEC = {
                     "400": {
                         "description": "Invalid input"
                     }
-                }
+                },
+                "security": [
+                    {"apiKeyAuth": []}, 
+                    {"oauth2_def": ["write:orders"]}, 
+                    {"basicAuth": [], "petstore_auth": ["read:pets", "write:pets"]} 
+                ]
             }
         }
     },
@@ -102,6 +107,41 @@ TEST_SPEC = {
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/Order"
+                        }
+                    }
+                }
+            }
+        },
+        "securitySchemes": {
+            "oauth2_def": {
+                "type": "oauth2",
+                "flows": {
+                    "clientCredentials": {
+                        "tokenUrl": "http://test.com/oauth/token",
+                        "scopes": {
+                            "write:orders": "modify orders in your account",
+                            "read:orders": "read your orders"
+                        }
+                    }
+                }
+            },
+            "apiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-KEY"
+            },
+            "basicAuth": {
+                "type": "http",
+                "scheme": "basic"
+            },
+            "petstore_auth": {
+                "type": "oauth2",
+                "flows": {
+                    "implicit": {
+                        "authorizationUrl": "http://example.org/api/oauth/dialog",
+                        "scopes": {
+                            "write:pets": "modify pets in your account",
+                            "read:pets": "read your pets"
                         }
                     }
                 }
@@ -184,8 +224,17 @@ def test_extract_order_post_details():
     }
     assert extracted["outputs"] == expected_resolved_output_schema
  
+    # --- Assert Security Requirements ---
+    assert "security_requirements" in extracted
+    expected_security_req = [
+        {"apiKeyAuth": []},
+        {"oauth2_def": ["write:orders"]},
+        {"basicAuth": [], "petstore_auth": ["read:pets", "write:pets"]}
+    ]
+    assert extracted["security_requirements"] == expected_security_req
+
     # --- Assert No Other Top-Level Keys (like old 'parameters', 'request_body', 'responses') ---
-    assert all(key in ["inputs", "outputs"] for key in extracted.keys())
+    assert all(key in ["inputs", "outputs", "security_requirements"] for key in extracted.keys())
 
 
 @pytest.mark.parametrize(

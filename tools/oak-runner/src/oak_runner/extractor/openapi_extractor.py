@@ -15,9 +15,53 @@ import re
 
 from oak_runner.models import OpenAPIDoc
 from oak_runner.executor.operation_finder import OperationFinder
+from oak_runner.auth.models import SecurityOption, SecurityRequirement
 
 # Configure logging (using the same logger as operation_finder for consistency)
 logger = logging.getLogger("oak_runner.extractor")
+
+
+def _format_security_options_to_dict_list(
+    security_options_list: List[SecurityOption],
+    operation_info: Dict[str, Any] # For logging context
+) -> List[Dict[str, List[str]]]:
+    """
+    Converts a list of SecurityOption objects into a list of dictionaries
+    representing OpenAPI security requirements.
+
+    Args:
+        security_options_list: The list of SecurityOption objects.
+        operation_info: The operation details dictionary for logging context.
+
+    Returns:
+        A list of dictionaries, where each dictionary represents an OR security option,
+        and its key-value pairs represent ANDed security schemes.
+    """
+    formatted_requirements = []
+    if not security_options_list:
+        return formatted_requirements
+
+    for sec_opt in security_options_list:
+        current_option_dict = {}
+        if sec_opt.requirements:  # Check if the list is not None and not empty
+            for sec_req in sec_opt.requirements:
+                try:
+                    current_option_dict[sec_req.scheme_name] = sec_req.scopes
+                except AttributeError as e:
+                    op_path = operation_info.get('path', 'unknown_path')
+                    op_method = operation_info.get('http_method', 'unknown_method').upper()
+                    logger.warning(
+                        f"Missing attributes on SecurityRequirement object for operation {op_method} {op_path}. Error: {e}"
+                    )
+        
+        # Handle OpenAPI's concept of an empty security requirement object {},
+        # (optional authentication), represented by an empty list of requirements.
+        if sec_opt.requirements == []: # Explicitly check for an empty list
+            formatted_requirements.append({})
+        elif current_option_dict: # Add if populated from non-empty requirements
+            formatted_requirements.append(current_option_dict)
+
+    return formatted_requirements
 
 
 def _resolve_ref(spec: Dict[str, Any], ref: str) -> Dict[str, Any]:
@@ -119,13 +163,14 @@ def extract_operation_io(
         output_max_depth: If set, limits the depth of the output structure.
 
     Returns:
-        A dictionary containing 'inputs' and 'outputs'. Returns the full, unsimplified
-        dict structure if both max depth arguments are None.
+        A dictionary containing 'inputs', 'outputs', and 'security_requirements'. 
+        Returns the full, unsimplified dict structure if both max depth arguments are None.
         'inputs' is structured like an OpenAPI schema object:
             {'type': 'object', 'properties': {param_name: {param_schema_or_simple_type}, ...}}
             Non-body params map to {'type': openapi_type_string}.
             The JSON request body schema is included under the 'body' key if present.
         'outputs' contains the full resolved schema for the 200 JSON response.
+        'security_requirements' contains the security requirements for the operation.
 
         Example:
         {
@@ -150,7 +195,10 @@ def extract_operation_io(
                       "id": {"type": "string", "format": "uuid"},
                       "status": {"type": "string", "enum": ["pending", "shipped"]}
                  }
-            }
+            },
+            "security_requirements": [
+                # List of SecurityOption objects
+            ]
         }
     """
     # Find the operation first using OperationFinder
@@ -163,17 +211,25 @@ def extract_operation_io(
     if not operation_info:
         logger.warning(f"Operation {http_method.upper()} {http_path} not found in the spec.")
         # Return early if operation not found
-        return {"inputs": {}, "outputs": {}}
+        return {"inputs": {}, "outputs": {}, "security_requirements": []}
 
     # Initialize with new structure for inputs
-    extracted_details: Dict[str, Dict[str, Any]] = {
+    extracted_details: Dict[str, Any] = {
         "inputs": {"type": "object", "properties": {}, "required": []},
-        "outputs": {}
+        "outputs": {},
+        "security_requirements": []
     }
     operation = operation_info.get("operation")
     if not operation or not isinstance(operation, dict):
         logger.warning("Operation object missing or invalid in operation_info.")
         return extracted_details
+
+    # Extract security requirements using OperationFinder
+    security_options_list: List[SecurityOption] = finder.extract_security_requirements(operation_info)
+    
+    extracted_details["security_requirements"] = _format_security_options_to_dict_list(
+        security_options_list, operation_info
+    )
 
     all_parameters = []
     seen_params = set()
