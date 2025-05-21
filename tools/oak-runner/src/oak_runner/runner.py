@@ -10,7 +10,7 @@ executes OpenAPI operations sequentially, handling success/failure conditions an
 import logging
 from collections.abc import Callable
 import re
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 import requests
 from .auth.auth_processor import AuthProcessor
 from .evaluator import ExpressionEvaluator
@@ -150,13 +150,14 @@ class OAKRunner:
             except Exception as e:
                 logger.error(f"Error in {event_type} callback: {e}")
 
-    def start_workflow(self, workflow_id: str, inputs: dict[str, Any] = None) -> str:
+    def start_workflow(self, workflow_id: str, inputs: Optional[Dict[str, Any]] = None, runtime_server_params: Optional[Dict[str, str]] = None) -> str:
         """
         Start a new workflow execution
 
         Args:
             workflow_id: ID of the workflow to execute
             inputs: Input parameters for the workflow
+            runtime_server_params: Optional runtime parameters for server URL variables.
 
         Returns:
             execution_id: Unique ID for this workflow execution
@@ -182,10 +183,12 @@ class OAKRunner:
             for dep_workflow_id in depends_on:
                 logger.info(f"Executing dependency workflow: {dep_workflow_id}")
                 # Execute the dependency workflow and wait for completion
-                dep_execution_id = self.start_workflow(dep_workflow_id, inputs)
+                # Pass runtime_server_params to the dependent workflow execution
+                dep_execution_id = self.start_workflow(dep_workflow_id, inputs, runtime_server_params)
 
                 # Run the dependency workflow until completion
                 while True:
+                    # execute_next_step will now retrieve runtime_server_params from the state
                     result = self.execute_next_step(dep_execution_id)
                     if result.get("status") in [WorkflowExecutionStatus.WORKFLOW_COMPLETE, WorkflowExecutionStatus.ERROR]:
                         break
@@ -213,18 +216,12 @@ class OAKRunner:
                     raise ValueError(f"Dependency workflow {dep_workflow_id} failed")
 
         # Initialize execution state
-        state = ExecutionState(workflow_id=workflow_id, inputs=inputs or {})
-
-        # Add dependency outputs to execution state
-        state.dependency_outputs = dependency_outputs
-        logger.debug(f"Setting dependency_outputs for {workflow_id} to: {dependency_outputs}")
-        logger.debug(f"State dependency_outputs after setting: {state.dependency_outputs}")
-
-        # Set all steps to pending
-        for step in workflow.get("steps", []):
-            step_id = step.get("stepId")
-            if step_id:
-                state.status[step_id] = StepStatus.PENDING
+        state = ExecutionState(
+            workflow_id=workflow_id,
+            inputs=inputs or {},
+            dependency_outputs=dependency_outputs, # Store dependency outputs
+            runtime_server_params=runtime_server_params # Store runtime server params in ExecutionState
+        )
 
         # Store the execution state
         self.execution_states[execution_id] = state
@@ -290,15 +287,15 @@ class OAKRunner:
                 )
                 return execution_result
 
-    def execute_next_step(self, execution_id: str) -> dict[str, Any]:
+    def execute_next_step(self, execution_id: str) -> dict:
         """
         Execute the next step in the workflow
 
         Args:
-            execution_id: Unique ID for this workflow execution
+            execution_id: ID of the workflow execution
 
         Returns:
-            result: Dictionary with step execution results
+            WorkflowExecutionResult: Result of the step execution
         """
         if execution_id not in self.execution_states:
             raise ValueError(f"Execution {execution_id} not found")
@@ -570,6 +567,7 @@ class OAKRunner:
         inputs: dict[str, Any],
         operation_id: Optional[str] = None,
         operation_path: Optional[str] = None,
+        server_runtime_params: Optional[Dict[str, str]] = None,
     ) -> dict:
         """
         Execute a single API operation directly, outside of a workflow context.
@@ -581,6 +579,7 @@ class OAKRunner:
             operation_id: The operationId of the operation to execute.
             operation_path: The path and method (e.g., 'GET /users/{userId}') of the operation.
                           Provide either operation_id or operation_path, not both.
+            server_runtime_params: Optional runtime parameters for server variable resolution.
 
         Returns:
             A dictionary containing the response status_code, headers, and body.
@@ -607,6 +606,7 @@ class OAKRunner:
                 inputs=inputs,
                 operation_id=operation_id,
                 operation_path=operation_path,
+                server_runtime_params=server_runtime_params,
             )
             logger.info(f"OAKRunner: Direct operation execution finished for {log_identifier}")
             return result

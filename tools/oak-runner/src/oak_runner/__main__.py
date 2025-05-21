@@ -84,6 +84,11 @@ async def main():
     exec_group.add_argument("--operation-id", help="ID of the operation to execute")
     exec_group.add_argument("--operation-path", help="HTTP method and path (e.g., 'GET /users/{id}')")
     parser_exec_op.add_argument("--inputs", default="{}", help="Inputs for the operation as a JSON string")
+    parser_exec_op.add_argument(
+        "--server-runtime-params",
+        default="{}",
+        help="Runtime parameters for server variable resolution as a JSON string (e.g., '{\"your-server\": \"your-instance\"}')"
+    )
     parser_exec_op.set_defaults(func=handle_execute_operation)
 
     # Subparser for 'list-workflows'
@@ -249,9 +254,15 @@ async def handle_execute_operation(runner: OAKRunner | None, args: argparse.Name
             logger.error("Runner initialization failed.")
             sys.exit(1)
 
-        inputs = json.loads(args.inputs)
+        inputs_dict = json.loads(args.inputs)
     except json.JSONDecodeError:
         logger.error(f"Invalid JSON in inputs: {args.inputs}")
+        sys.exit(1)
+
+    try:
+        server_params_dict = json.loads(args.server_runtime_params)
+    except json.JSONDecodeError:
+        logger.error(f"Invalid JSON in server_runtime_params: {args.server_runtime_params}")
         sys.exit(1)
 
     try:
@@ -265,7 +276,8 @@ async def handle_execute_operation(runner: OAKRunner | None, args: argparse.Name
         result = runner.execute_operation(
             operation_id=args.operation_id,  # Pass directly
             operation_path=args.operation_path, # Pass directly
-            inputs=inputs
+            inputs=inputs_dict,
+            server_runtime_params=server_params_dict
         )
         # Remove 'headers' from result if present
         if isinstance(result, dict) and 'headers' in result:

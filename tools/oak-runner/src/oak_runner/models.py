@@ -7,7 +7,10 @@ This module defines the data models and enums used by the OAK Runner.
 
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+
+from pydantic import BaseModel, Field, validator, ConfigDict
+
 
 OpenAPIDoc = Dict[str, Any]
 ArazzoDoc = Dict[str, Any]
@@ -83,6 +86,7 @@ class ExecutionState:
     workflow_outputs: dict[str, Any] = None
     dependency_outputs: dict[str, dict[str, Any]] = None
     status: dict[str, StepStatus] = None
+    runtime_server_params: Optional[dict[str, str]] = None
 
     def __post_init__(self):
         """Initialize default values"""
@@ -96,3 +100,24 @@ class ExecutionState:
             self.dependency_outputs = {}
         if self.status is None:
             self.status = {}
+
+
+class ServerVariable(BaseModel):
+    """Represents a variable for server URL template substitution."""
+
+    description: Optional[str] = None
+    default_value: Optional[str] = Field(default=None, alias="default")
+    enum_values: Optional[List[str]] = Field(default=None, alias="enum")
+
+    model_config = ConfigDict(validate_by_name=True, extra='forbid')
+
+
+class ServerConfiguration(BaseModel):
+    """Represents an API server configuration with a templated URL and variables."""
+
+    url_template: str = Field(alias="url")
+    description: Optional[str] = None
+    variables: Dict[str, ServerVariable] = Field(default_factory=dict)
+    api_title_prefix: Optional[str] = None # Derived from spec's info.title
+
+    model_config = ConfigDict(validate_by_name=True, extra='forbid')
