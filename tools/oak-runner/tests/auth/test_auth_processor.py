@@ -200,7 +200,7 @@ class TestAuthProcessor(unittest.TestCase):
 
             # Extract expected prefix from api_title
             expected_prefix = sanitize_for_env_var(api_title.split()[0])
-            expected_env_var = create_env_var_name("ApiKey", api_title_prefix=expected_prefix)
+            expected_env_var = create_env_var_name("ApiKey", prefix=expected_prefix)
 
             # Check that the generated env var has been properly sanitized
             self.assertEqual(

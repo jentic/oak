@@ -288,8 +288,10 @@ def sanitize_for_env_var(text: str) -> str:
 def extract_api_title_prefix(title: str) -> Optional[str]:
     """
     Derives an API title prefix from the OpenAPI spec's info.title.
-    The prefix is the first word of the title, uppercased, with non-alphanumeric
+    The prefix is the first non-skip word of the title, uppercased, with non-alphanumeric
     characters (excluding underscore) replaced by underscores.
+
+    Skip words: 'the', 'a', 'an', 'openapi', 'api', 'swagger'
 
     Args:
         title: The info.title string from the OpenAPI spec.
@@ -301,34 +303,29 @@ def extract_api_title_prefix(title: str) -> Optional[str]:
         logger.debug("API title is empty or not provided, no prefix will be generated.")
         return None
         
-    first_word = title.strip().split()[0]
-    if not first_word:
-        logger.debug("Could not extract a first word from the title, no prefix generated.")
-        return None
-        
-    prefix = sanitize_for_env_var(first_word)
+    # List of words to skip if they appear as the first word
+    SKIP_WORDS = {'the', 'a', 'an', 'openapi', 'api', 'swagger'}
     
-    if not prefix:
-        logger.debug(f"Sanitized first word '{first_word}' resulted in empty prefix, no prefix generated.")
-        return None
+    # Split the title into words and remove any empty strings
+    words = [word for word in title.strip().split() if word]
         
-    logger.debug(f"Generated API title prefix: {prefix}")
-    return prefix
+    for word in words:
+        if word.lower() not in SKIP_WORDS:
+            return sanitize_for_env_var(word)
+
+    return words[0]
 
 
 def create_env_var_name(
     var_name: str, 
-    api_title_prefix: Optional[str] = None,
-    category_prefix: Optional[str] = None
+    prefix: Optional[str] = None
 ) -> str:
     """
-    Create a standardized environment variable name with optional API title prefix
-    and category prefix.
+    Create a standardized environment variable name with an optional prefix.
     
     Args:
         var_name: The base variable name
-        api_title_prefix: Optional API title prefix (e.g., "SPOTIFY" for Spotify API)
-        category_prefix: Optional category prefix (e.g., "OAK_SERVER" for server variables)
+        prefix: Optional prefix (e.g., "MY_API_")
         
     Returns:
         A properly formatted environment variable name
@@ -339,13 +336,9 @@ def create_env_var_name(
     # Construct parts of the environment variable name
     parts = []
     
-    # Add API title prefix if provided
-    if api_title_prefix:
-        parts.append(api_title_prefix)
-    
-    # Add category prefix if provided
-    if category_prefix:
-        parts.append(category_prefix)
+    # Add prefix if provided
+    if prefix:
+        parts.append(prefix)
     
     # Add the sanitized variable name
     parts.append(sanitized_var_name)

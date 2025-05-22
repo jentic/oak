@@ -59,10 +59,10 @@ class ServerProcessor:
             resolved_value: Optional[str] = None
 
             # Construct the environment variable name using the utility function
+            prefix = f"{server_config.api_title_prefix}_OAK_SERVER" if server_config.api_title_prefix else "OAK_SERVER"
             env_var_name = create_env_var_name(
                 var_name=var_name,
-                api_title_prefix=server_config.api_title_prefix,
-                category_prefix="OAK_SERVER"
+                prefix=prefix
             )
 
             # 1. Try to use value from runtime_params (keyed by env_var_name)
@@ -177,10 +177,10 @@ class ServerProcessor:
                 if var_details.description:
                     details.append(f"      Description: {var_details.description}")
                 
+                prefix = f"{config.api_title_prefix}_OAK_SERVER" if config.api_title_prefix else "OAK_SERVER"
                 env_var_name = create_env_var_name(
                     var_name=var_name,
-                    api_title_prefix=config.api_title_prefix,
-                    category_prefix="OAK_SERVER"
+                    prefix=prefix
                 )
                 details.append(f"      Set via ENV: {env_var_name}")
 
@@ -205,6 +205,68 @@ class ServerProcessor:
             if re.search(r"\{[^}]+\}", parsed_url.netloc):
                 return True
         return False
+
+    def get_env_mappings(self) -> Dict[str, Dict[str, Dict[str, str]]]:
+        """
+        Extract environment variable mappings for all server variables across all source descriptions.
+        
+        Returns:
+            A nested dictionary structure mapping source names to server URLs to variable mappings.
+            Format:
+            {
+                "source_name": {
+                    "server_url": {
+                        "variable_name": "ENV_VAR_NAME"
+                    }
+                }
+            }
+        """
+        env_mappings = {}
+        
+        # Process each source description
+        for source_name, spec_dict in self.source_descriptions.items():
+            # Extract server configurations for this source
+            server_configs = self.extract_server_configurations(spec_dict)
+            
+            if not server_configs:
+                continue
+                
+            # Initialize the mapping for this source
+            source_mappings = {}
+            
+            # Process each server configuration
+            for i, server_config in enumerate(server_configs):
+                # Use URL template as the key for this server
+                server_url = server_config.url_template
+                
+                # Skip servers without variables
+                if not server_config.variables:
+                    continue
+                
+                # Initialize the mapping for this server
+                server_mappings = {}
+                
+                # Process each variable in this server configuration
+                for var_name, var_details in server_config.variables.items():
+                    # Create the environment variable name
+                    prefix = f"{server_config.api_title_prefix}_OAK_SERVER" if server_config.api_title_prefix else "OAK_SERVER"
+                    env_var_name = create_env_var_name(
+                        var_name=var_name,
+                        prefix=prefix
+                    )
+                    
+                    # Store the mapping
+                    server_mappings[var_name] = env_var_name
+                
+                # Only add this server if it has variables
+                if server_mappings:
+                    source_mappings[server_url] = server_mappings
+            
+            # Only add this source if it has servers with variables
+            if source_mappings:
+                env_mappings[source_name] = source_mappings
+        
+        return env_mappings
 
     def resolve_final_url(
         self,

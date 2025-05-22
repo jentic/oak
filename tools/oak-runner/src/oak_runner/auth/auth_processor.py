@@ -193,7 +193,7 @@ class AuthProcessor:
             # Create the environment variable prefix using the scheme name and API title
             env_var_prefix = create_env_var_name(
                 var_name=security_scheme_name,
-                api_title_prefix=api_title_prefix
+                prefix=api_title_prefix
             )
             
             # For OAuth2, add the flow type as a suffix to distinguish different flows

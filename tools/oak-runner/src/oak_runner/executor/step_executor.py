@@ -108,7 +108,7 @@ class StepExecutor:
         final_url_template = self.server_processor.resolve_final_url(
             source_name=source_name,
             operation_url_template=base_server_url, # Pass it as operation_url_template
-            server_runtime_params=state.runtime_server_params
+            server_runtime_params=state.server_runtime_params
         )
 
         if not final_url_template:
@@ -206,7 +206,7 @@ class StepExecutor:
         final_url_template = self.server_processor.resolve_final_url(
             source_name=source_name,
             operation_url_template=relative_operation_path_template, # Pass it as operation_url_template
-            server_runtime_params=state.runtime_server_params
+            server_runtime_params=state.server_runtime_params
         )
 
         if not final_url_template:

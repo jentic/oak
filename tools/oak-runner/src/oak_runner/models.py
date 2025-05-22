@@ -86,7 +86,7 @@ class ExecutionState:
     workflow_outputs: dict[str, Any] = None
     dependency_outputs: dict[str, dict[str, Any]] = None
     status: dict[str, StepStatus] = None
-    runtime_server_params: Optional[dict[str, str]] = None
+    server_runtime_params: Optional[dict[str, str]] = None
 
     def __post_init__(self):
         """Initialize default values"""

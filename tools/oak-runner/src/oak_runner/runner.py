@@ -150,14 +150,14 @@ class OAKRunner:
             except Exception as e:
                 logger.error(f"Error in {event_type} callback: {e}")
 
-    def start_workflow(self, workflow_id: str, inputs: Optional[Dict[str, Any]] = None, runtime_server_params: Optional[Dict[str, str]] = None) -> str:
+    def start_workflow(self, workflow_id: str, inputs: Optional[Dict[str, Any]] = None, server_runtime_params: Optional[Dict[str, str]] = None) -> str:
         """
         Start a new workflow execution
 
         Args:
             workflow_id: ID of the workflow to execute
             inputs: Input parameters for the workflow
-            runtime_server_params: Optional runtime parameters for server URL variables.
+            server_runtime_params: Optional runtime parameters for server URL variables.
 
         Returns:
             execution_id: Unique ID for this workflow execution
@@ -183,12 +183,12 @@ class OAKRunner:
             for dep_workflow_id in depends_on:
                 logger.info(f"Executing dependency workflow: {dep_workflow_id}")
                 # Execute the dependency workflow and wait for completion
-                # Pass runtime_server_params to the dependent workflow execution
-                dep_execution_id = self.start_workflow(dep_workflow_id, inputs, runtime_server_params)
+                # Pass server_runtime_params to the dependent workflow execution
+                dep_execution_id = self.start_workflow(dep_workflow_id, inputs, server_runtime_params)
 
                 # Run the dependency workflow until completion
                 while True:
-                    # execute_next_step will now retrieve runtime_server_params from the state
+                    # execute_next_step will now retrieve server_runtime_params from the state
                     result = self.execute_next_step(dep_execution_id)
                     if result.get("status") in [WorkflowExecutionStatus.WORKFLOW_COMPLETE, WorkflowExecutionStatus.ERROR]:
                         break
@@ -220,7 +220,7 @@ class OAKRunner:
             workflow_id=workflow_id,
             inputs=inputs or {},
             dependency_outputs=dependency_outputs, # Store dependency outputs
-            runtime_server_params=runtime_server_params # Store runtime server params in ExecutionState
+            server_runtime_params=server_runtime_params # Store runtime server params in ExecutionState
         )
 
         # Initialize step statuses
@@ -240,13 +240,19 @@ class OAKRunner:
 
         return execution_id
 
-    def execute_workflow(self, workflow_id: str, inputs: dict[str, Any] = None) -> WorkflowExecutionResult:
+    def execute_workflow(
+        self,
+        workflow_id: str,
+        inputs: dict[str, Any] = None,
+        server_runtime_params: Optional[dict[str, str]] = None
+    ) -> WorkflowExecutionResult:
         """
         Start and execute a workflow until completion, returning the outputs.
 
         Args:
             workflow_id: ID of the workflow to execute
             inputs: Input parameters for the workflow
+            server_runtime_params: Runtime parameters for server variable resolution
 
         Returns:
             A WorkflowExecutionResult object containing the status, workflow_id, outputs, and any error
@@ -274,7 +280,7 @@ class OAKRunner:
         self.register_callback("step_complete", on_step_complete)
         self.register_callback("workflow_complete", on_workflow_complete)
 
-        execution_id = self.start_workflow(workflow_id, inputs)
+        execution_id = self.start_workflow(workflow_id, inputs, server_runtime_params)
         
         while True:
             result = self.execute_next_step(execution_id)
@@ -627,11 +633,26 @@ class OAKRunner:
             # Wrap or re-raise depending on desired error handling strategy
             raise RuntimeError(f"Unexpected error during operation execution: {e}") from e
 
-    def get_env_mappings(self) -> dict[str, str]:
+    def get_env_mappings(self) -> dict[str, Any]:
         """
-        Returns the environment variable mappings for authentication.
+        Returns the environment variable mappings for both authentication and server variables.
         
         Returns:
-            Dictionary of environment variable mappings
+            Dictionary containing:
+            - 'auth': Environment variable mappings for authentication
+            - 'servers': Environment variable mappings for server URLs (only included if server variables exist)
         """
-        return self.auth_provider.env_mappings
+        # Get authentication environment mappings
+        auth_mappings = self.auth_provider.env_mappings
+        
+        # Get server variable environment mappings
+        server_mappings = self.step_executor.server_processor.get_env_mappings()
+        
+        # Start with auth mappings
+        result = {"auth": auth_mappings}
+        
+        # Only include server mappings if they exist
+        if server_mappings:
+            result["servers"] = server_mappings
+            
+        return result
