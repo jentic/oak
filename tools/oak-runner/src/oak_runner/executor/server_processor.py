@@ -10,33 +10,7 @@ import logging
 
 logger = logging.getLogger("oak_runner.server_processor")
 
-def _sanitize_and_get_api_title_prefix(title: Optional[str]) -> Optional[str]:
-    """
-    Derives an API title prefix from the OpenAPI spec's info.title.
-    The prefix is the first word of the title, uppercased, with non-alphanumeric
-    characters (excluding underscore) replaced by underscores.
-
-    Args:
-        title: The info.title string from the OpenAPI spec.
-
-    Returns:
-        The sanitized API title prefix, or None if title is empty or not suitable.
-    """
-    if not title or not title.strip():
-        logger.debug("API title is empty or not provided, no prefix will be generated.")
-        return None
-    first_word = title.strip().split()[0]
-    if not first_word:
-        logger.debug("Could not extract a first word from the title, no prefix generated.")
-        return None
-    prefix = first_word.upper()
-    prefix = re.sub(r'[^A-Z0-9_]+', '_', prefix)
-    prefix = prefix.strip('_')
-    if not prefix:
-        logger.debug(f"Sanitized first word '{first_word}' resulted in empty prefix, no prefix generated.")
-        return None
-    logger.debug(f"Generated API title prefix: {prefix}")
-    return prefix
+from ..utils import extract_api_title_prefix, create_env_var_name
 
 
 class ServerProcessor:
@@ -84,15 +58,12 @@ class ServerProcessor:
 
             resolved_value: Optional[str] = None
 
-            # Construct the environment variable name (used as key for runtime_params and os.getenv)
-            env_var_prefix = f"OAK_SERVER_{var_name.upper()}"
-            env_var_name = (
-                f"{server_config.api_title_prefix}_{env_var_prefix}"
-                if server_config.api_title_prefix
-                else env_var_prefix
+            # Construct the environment variable name using the utility function
+            env_var_name = create_env_var_name(
+                var_name=var_name,
+                api_title_prefix=server_config.api_title_prefix,
+                category_prefix="OAK_SERVER"
             )
-            # Sanitize the constructed environment variable name to ensure it's valid
-            env_var_name = re.sub(r'[^A-Z0-9_]+', '_', env_var_name)
 
             # 1. Try to use value from runtime_params (keyed by env_var_name)
             if runtime_params is not None and env_var_name in runtime_params:
@@ -146,7 +117,7 @@ class ServerProcessor:
         logger.debug('extracting server confs...')    
         server_configs: list[ServerConfiguration] = []
         api_title = spec_dict.get('info', {}).get('title')
-        api_title_prefix = _sanitize_and_get_api_title_prefix(api_title)
+        api_title_prefix = extract_api_title_prefix(api_title) if api_title else None
         raw_server_list = spec_dict.get('servers', [])
         if not isinstance(raw_server_list, list):
             logger.warning("'servers' field in OpenAPI spec is not a list. Skipping server configuration parsing.")
@@ -206,11 +177,10 @@ class ServerProcessor:
                 if var_details.description:
                     details.append(f"      Description: {var_details.description}")
                 
-                env_var_name_base = f"OAK_SERVER_{var_name.upper()}"
-                env_var_name = (
-                    f"{config.api_title_prefix}_{env_var_name_base}"
-                    if config.api_title_prefix
-                    else env_var_name_base
+                env_var_name = create_env_var_name(
+                    var_name=var_name,
+                    api_title_prefix=config.api_title_prefix,
+                    category_prefix="OAK_SERVER"
                 )
                 details.append(f"      Set via ENV: {env_var_name}")
 
