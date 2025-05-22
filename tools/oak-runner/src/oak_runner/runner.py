@@ -223,6 +223,13 @@ class OAKRunner:
             runtime_server_params=runtime_server_params # Store runtime server params in ExecutionState
         )
 
+        # Initialize step statuses
+        if workflow and "steps" in workflow:
+            for step in workflow.get("steps", []):
+                step_id = step.get("stepId")
+                if step_id:
+                    state.status[step_id] = StepStatus.PENDING
+
         # Store the execution state
         self.execution_states[execution_id] = state
 

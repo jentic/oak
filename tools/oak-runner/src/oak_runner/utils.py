@@ -257,136 +257,104 @@ def set_log_level(level: str):
     logging.getLogger("arazzo-runner.http").setLevel(numeric_level)
 
 
-def resolve_server_base_url(server_config: ServerConfiguration, runtime_params: Optional[Dict[str, str]] = None) -> str:
+def sanitize_for_env_var(text: str) -> str:
     """
-    Resolves the templated server URL using provided parameters, environment variables,
-    or default values for a given ServerConfiguration.
+    Sanitize a string for use in environment variable names.
+    
+    Args:
+        text: The text to sanitize
+        
+    Returns:
+        Sanitized text suitable for environment variables
+    """
+    # Convert to uppercase
+    sanitized = text.upper()
+    
+    # Replace hyphens with underscores
+    sanitized = sanitized.replace('-', '_')
+    
+    # Replace other non-alphanumeric characters with underscores
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', sanitized)
+    
+    # Replace multiple consecutive underscores with a single underscore
+    sanitized = re.sub(r'_+', '_', sanitized)
+    
+    # Remove leading and trailing underscores
+    sanitized = sanitized.strip('_')
+    
+    return sanitized
+
+
+def extract_api_title_prefix(title: str) -> Optional[str]:
+    """
+    Derives an API title prefix from the OpenAPI spec's info.title.
+    The prefix is the first word of the title, uppercased, with non-alphanumeric
+    characters (excluding underscore) replaced by underscores.
 
     Args:
-        server_config: The ServerConfiguration object.
-        runtime_params: A dictionary of runtime parameters to substitute.
+        title: The info.title string from the OpenAPI spec.
 
     Returns:
-        The resolved server base URL as a string.
-
-    Raises:
-        ValueError: If a required variable in the template cannot be resolved.
+        The sanitized API title prefix, or None if title is empty or not suitable.
     """
-    resolved_url = server_config.url_template
-    if runtime_params is None:
-        runtime_params = {}
-
-    # Find all variable placeholders like {var_name} in the URL template
-    template_vars_in_url = set(re.findall(r"{(.*?)}", server_config.url_template))
-
-    for var_name in template_vars_in_url:
-        server_var_details = server_config.variables.get(var_name)
-
-        if not server_var_details:
-            # This implies a mismatch: a variable placeholder in the URL template
-            # does not have a corresponding definition in the 'variables' section.
-            # OpenAPI spec dictates that all variables in the URL template MUST be defined.
-            raise ValueError(
-                f"Variable '{var_name}' in URL template '{server_config.url_template}' has no corresponding "
-                f"definition in server variables. This may indicate an invalid OpenAPI document."
-            )
-
-        resolved_value: Optional[str] = None
-
-        if resolved_value is None:
-            env_var_name_base = f"OAK_SERVER_{var_name.upper()}"
-            env_var_name = (
-                f"{server_config.api_title_prefix}_{env_var_name_base}"
-                if server_config.api_title_prefix
-                else env_var_name_base
-            )
-            env_var_name = re.sub(r'[^A-Z0-9_]+', '_', env_var_name)
-            
-             # 1. Use value from runtime_params if provided
-            env_value = runtime_params.get(env_var_name)
-
-            # 2. Else, try to use value from environment variable
-            if not env_value:
-                env_value = os.getenv(env_var_name)
-                
-            if env_value is not None:
-                resolved_value = env_value
-                logger.debug(f"Server variable '{var_name}': resolved from env var '{env_var_name}'.")
-
-        # 3. Else, use ServerVariable.default_value
-        if resolved_value is None and server_var_details.default_value is not None:
-            resolved_value = server_var_details.default_value
-            logger.debug(f"Server variable '{var_name}': resolved from default_value.")
-
-        # 4. If still unresolved, this variable is mandatory and no value was found
-        if resolved_value is None:
-            raise ValueError(
-                f"Required server variable '{var_name}' could not be resolved for URL template "
-                f"'{server_config.url_template}'. No runtime parameter, environment variable (tried: '{env_var_name}'), "
-                f"or default value found."
-            )
-
-        # 5. If ServerVariable.enum_values is set, log a warning if the resolved value is not in the enum
-        if server_var_details.enum_values and resolved_value not in server_var_details.enum_values:
-            logger.warning(
-                f"Value '{resolved_value}' for server variable '{var_name}' is not in its defined "
-                f"enum values: {server_var_details.enum_values}. URL: '{server_config.url_template}'"
-            )
-
-        # Substitute the resolved value into the URL string
-        resolved_url = resolved_url.replace(f"{{{var_name}}}", resolved_value)
-
-    return resolved_url
+    if not title or not title.strip():
+        logger.debug("API title is empty or not provided, no prefix will be generated.")
+        return None
+        
+    first_word = title.strip().split()[0]
+    if not first_word:
+        logger.debug("Could not extract a first word from the title, no prefix generated.")
+        return None
+        
+    prefix = sanitize_for_env_var(first_word)
+    
+    if not prefix:
+        logger.debug(f"Sanitized first word '{first_word}' resulted in empty prefix, no prefix generated.")
+        return None
+        
+    logger.debug(f"Generated API title prefix: {prefix}")
+    return prefix
 
 
-def format_server_config_details(config: ServerConfiguration) -> str:
+def create_env_var_name(
+    var_name: str, 
+    api_title_prefix: Optional[str] = None,
+    category_prefix: Optional[str] = None
+) -> str:
     """
-    Formats the details of a ServerConfiguration for user-friendly display.
-
-    This includes the URL template, its description, and for each variable:
-    its name, description, default value, possible enum values, and the
-    exact environment variable name that can be used to set it.
-
+    Create a standardized environment variable name with optional API title prefix
+    and category prefix.
+    
     Args:
-        config: The ServerConfiguration object to format.
-
+        var_name: The base variable name
+        api_title_prefix: Optional API title prefix (e.g., "SPOTIFY" for Spotify API)
+        category_prefix: Optional category prefix (e.g., "OAK_SERVER" for server variables)
+        
     Returns:
-        A string containing the formatted details.
+        A properly formatted environment variable name
     """
-    details = []
-
-    details.append(f"Server URL Template: {config.url_template}")
-    if config.description:
-        details.append(f"  Description: {config.description}")
+    # Sanitize the base variable name
+    sanitized_var_name = sanitize_for_env_var(var_name)
     
-    if config.api_title_prefix:
-        details.append(f"  (Associated API Title Prefix for ENV VARS: {config.api_title_prefix})")
-
-    if not config.variables:
-        details.append("  This server URL has no dynamic variables.")
-    else:
-        details.append("  Variables:")
-        for var_name, var_details in config.variables.items():
-            details.append(f"    - Variable: '{var_name}'")
-            if var_details.description:
-                details.append(f"      Description: {var_details.description}")
-            
-            env_var_name_base = f"OAK_SERVER_{var_name.upper()}"
-            env_var_name = (
-                f"{config.api_title_prefix}_{env_var_name_base}"
-                if config.api_title_prefix
-                else env_var_name_base
-            )
-            details.append(f"      Set via ENV: {env_var_name}")
-
-            if var_details.default_value is not None:
-                details.append(f"      Default: '{var_details.default_value}'")
-            else:
-                details.append(f"      Default: (none)")
-
-            if var_details.enum_values:
-                details.append(f"      Possible Values: {', '.join(var_details.enum_values)}")
-            else:
-                details.append(f"      Possible Values: (any)")
+    # Construct parts of the environment variable name
+    parts = []
     
-    return "\n".join(details)
+    # Add API title prefix if provided
+    if api_title_prefix:
+        parts.append(api_title_prefix)
+    
+    # Add category prefix if provided
+    if category_prefix:
+        parts.append(category_prefix)
+    
+    # Add the sanitized variable name
+    parts.append(sanitized_var_name)
+    
+    # Join all parts with underscores
+    env_var_name = "_".join(parts)
+    
+    return env_var_name
+
+
+
+

@@ -106,10 +106,10 @@ class ServerVariable(BaseModel):
     """Represents a variable for server URL template substitution."""
 
     description: Optional[str] = None
-    default_value: Optional[str] = Field(default=None, alias="default")
-    enum_values: Optional[List[str]] = Field(default=None, alias="enum")
+    default_value: Optional[str] = Field(None, alias="default")
+    enum_values: Optional[List[str]] = Field(None, alias="enum")
 
-    model_config = ConfigDict(validate_by_name=True, extra='forbid')
+    model_config = ConfigDict(populate_by_name=True, extra='allow')
 
 
 class ServerConfiguration(BaseModel):
@@ -120,4 +120,4 @@ class ServerConfiguration(BaseModel):
     variables: Dict[str, ServerVariable] = Field(default_factory=dict)
     api_title_prefix: Optional[str] = None # Derived from spec's info.title
 
-    model_config = ConfigDict(validate_by_name=True, extra='forbid')
+    model_config = ConfigDict(populate_by_name=True, extra='allow')

@@ -7,24 +7,17 @@ This module provides the main StepExecutor class that orchestrates the execution
 
 import logging
 import re
-from typing import Any, Optional, Dict, List
-from urllib.parse import urljoin, urlparse
+from typing import Any, Optional, Dict
 from oak_runner.models import ExecutionState
-from oak_runner.models import OpenAPIDoc
-from oak_runner.models import ServerConfiguration
-from oak_runner.extractor.openapi_extractor import extract_server_configurations
-from oak_runner.utils import resolve_server_base_url
-from ..models import ExecutionState, OpenAPIDoc, ServerConfiguration
-from ..extractor.openapi_extractor import extract_server_configurations
+from ..models import ExecutionState
 from ..evaluator import ExpressionEvaluator
 from ..http import HTTPExecutor
-from ..utils import resolve_server_base_url
 from .action_handler import ActionHandler
 from .operation_finder import OperationFinder
 from .output_extractor import OutputExtractor
 from .parameter_processor import ParameterProcessor
 from .success_criteria import SuccessCriteriaChecker
-
+from .server_processor import ServerProcessor
 
 # Configure logging
 logger = logging.getLogger("arazzo-runner.executor")
@@ -57,86 +50,8 @@ class StepExecutor:
         self.output_extractor = OutputExtractor(source_descriptions)
         self.success_checker = SuccessCriteriaChecker(source_descriptions)
         self.action_handler = ActionHandler(source_descriptions)
+        self.server_processor = ServerProcessor(source_descriptions)
 
-    def _url_contains_template_vars_in_host(self, url_string: Optional[str]) -> bool:
-        if not url_string:
-            return False
-        parsed_url = urlparse(url_string)
-        if parsed_url.netloc:  # Check hostname part
-            if re.search(r"\{[^}]+\}", parsed_url.netloc):
-                return True
-        return False
-
-    def _resolve_final_url_template(
-        self,
-        operation_url_template: Optional[str],
-        server_runtime_params: Optional[Dict[str, str]],
-        source_name: Optional[str] = 'default',
-    ) -> str:
-        logger.debug(f"_resolve_final_url_template: START. operation_url_template='{operation_url_template}', server_runtime_params='{server_runtime_params}', source_name='{source_name}'")
-
-        if not operation_url_template:
-            logger.error("_resolve_final_url_template: operation_url_template is None or empty.")
-            raise ValueError("Operation URL template cannot be None or empty.")
-
-        is_absolute_url = operation_url_template.startswith("http://") or operation_url_template.startswith("https://")
-        has_vars_in_host = self._url_contains_template_vars_in_host(operation_url_template)
-
-        # Case 1: operation_url_template is a full URL and has NO server variables in its host. Use as is.
-        if is_absolute_url and not has_vars_in_host:
-            logger.debug(f"_resolve_final_url_template: Case 1: Absolute URL without host variables. Returning: '{operation_url_template}'")
-            return operation_url_template
-
-        # Case 2: We need to use server configurations from the spec.
-        logger.debug(f"_resolve_final_url_template: Case 2: URL requires server configuration processing.")
-        if not source_name:
-            logger.error(f"_resolve_final_url_template: No source_name provided. Cannot resolve URL '{operation_url_template}' which requires server configuration.")
-            raise ValueError(f"Cannot resolve URL '{operation_url_template}': source_name is required to load server configurations.")
-
-        spec_doc: Optional[OpenAPIDoc] = self.source_descriptions.get(source_name)
-        if not spec_doc:
-            logger.error(f"_resolve_final_url_template: Spec not found for source_name='{source_name}'. Cannot resolve URL '{operation_url_template}'.")
-            raise ValueError(f"Cannot resolve URL '{operation_url_template}': OpenAPI spec for source '{source_name}' not found.")
-
-        server_configs: List[ServerConfiguration] = extract_server_configurations(spec_doc)
-        if not server_configs:
-            logger.error(f"_resolve_final_url_template: No server configurations found in spec for source_name='{source_name}'. Cannot resolve URL '{operation_url_template}'.")
-            raise ValueError(f"Cannot resolve URL '{operation_url_template}': No server configurations found in spec for '{source_name}'.")
-
-        selected_config = server_configs[0]  # Default to the first server config
-        logger.debug(f"_resolve_final_url_template: Using server_config='{selected_config.url_template}' (variables: {selected_config.variables})")
-
-        try:
-            # This resolves variables in the ServerConfiguration's own url_template (e.g., https://{customer}.api.com)
-            # Use the utility function from utils.py
-            resolved_server_base = resolve_server_base_url(server_config=selected_config, runtime_params=server_runtime_params)
-            logger.debug(f"_resolve_final_url_template: resolve_server_base_url() returned: '{resolved_server_base}'")
-        except ValueError as e:
-            logger.error(f"_resolve_final_url_template: Error resolving variables in ServerConfiguration ('{selected_config.url_template}'): {e}")
-            raise ValueError(f"Failed to resolve server variables for server configuration '{selected_config.url_template}': {e}") from e
-
-        # Extract the path, query, and fragment from operation_url_template.
-        # Path parameters here (e.g., /users/{userId}) are NOT resolved at this stage.
-        parsed_operation_url = urlparse(operation_url_template)
-        operation_path_part = parsed_operation_url.path
-        if parsed_operation_url.query:
-            operation_path_part += "?" + parsed_operation_url.query
-        if parsed_operation_url.fragment:
-            operation_path_part += "#" + parsed_operation_url.fragment
-        
-        # Ensure operation_path_part is suitable for urljoin (e.g. starts with / if it's not empty)
-        if operation_path_part and not operation_path_part.startswith("/"):
-             operation_path_part = "/" + operation_path_part
-        elif not operation_path_part: # Handle case where operation_url_template might just be a host or host + scheme
-            operation_path_part = "/" 
-
-        # Combine the resolved server base (from servers object) with the operation's specific path.
-        # urljoin(base, url) - if url is absolute, base is ignored. if url is relative, it's joined.
-        # We want to ensure resolved_server_base is treated as the base, and operation_path_part is appended to it.
-        final_url = urljoin(resolved_server_base.rstrip('/') + '/', operation_path_part.lstrip('/'))
-
-        logger.debug(f"_resolve_final_url_template: Combined resolved_server_base='{resolved_server_base}' with operation_path_part='{operation_path_part}'. Final URL: '{final_url}'")
-        return final_url
 
     def execute_step(self, step: dict, state: ExecutionState) -> dict:
         """
@@ -190,7 +105,7 @@ class StepExecutor:
 
         # Resolve final URL
         base_server_url = operation_info.get("url") # This is the relative path template
-        final_url_template = self._resolve_final_url_template(
+        final_url_template = self.server_processor.resolve_final_url(
             source_name=source_name,
             operation_url_template=base_server_url, # Pass it as operation_url_template
             server_runtime_params=state.runtime_server_params
@@ -253,6 +168,8 @@ class StepExecutor:
         # Find the operation in the source descriptions
         operation_info = self.operation_finder.find_by_path(source_url, json_pointer)
 
+        source_name = operation_info.get("source")
+
         if not operation_info:
             # Enhanced logging moved from original code to here for when operation_info is None
             logger.error(f"Failed to find operation for path: {operation_path_value}")
@@ -283,15 +200,11 @@ class StepExecutor:
         
         # Extract security requirements
         security_options = self.operation_finder.extract_security_requirements(operation_info)
-        # Ensure source_name is correctly identified for server config and auth
-        # operation_info.get("source") should be populated by find_by_path if it uses the source name key
-        # If not, source_name_from_path is the key to self.source_descriptions
-        source_name_for_request = operation_info.get("source", source_name_from_path)
 
         # Resolve final URL
         relative_operation_path_template = operation_info.get("url") 
-        final_url_template = self._resolve_final_url_template(
-            source_name=source_name_for_request,
+        final_url_template = self.server_processor.resolve_final_url(
+            source_name=source_name,
             operation_url_template=relative_operation_path_template, # Pass it as operation_url_template
             server_runtime_params=state.runtime_server_params
         )
@@ -304,12 +217,11 @@ class StepExecutor:
         # Execute the HTTP request
         response = self.http_client.execute_request(
             method=operation_info.get("method"),
-            url=final_url_template, # Pass the resolved URL template
-            parameters=parameters, # parameters now includes 'operation_path' which is the relative path, useful for logging/reference
+            url=final_url_template,
+            parameters=parameters, 
             request_body=request_body,
             security_options=security_options,
-            source_name=source_name_for_request,
-            # selected_server_config and runtime_server_params are no longer passed
+            source_name=source_name,
         )
 
         # Check success criteria
@@ -424,7 +336,7 @@ class StepExecutor:
         source_name = operation_details.get("source", "default") # Get source_name
         base_server_url = operation_details.get("url") # This is the relative path template
 
-        final_url_template = self._resolve_final_url_template(
+        final_url_template = self.server_processor.resolve_final_url(
             source_name=source_name,
             operation_url_template=base_server_url, # Pass it as operation_url_template
             server_runtime_params=server_runtime_params
