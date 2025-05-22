@@ -21,7 +21,7 @@ class ServerProcessor:
         self.source_descriptions = source_descriptions
 
     @staticmethod
-    def resolve_server_base_url(server_config: ServerConfiguration, runtime_params: Optional[Dict[str, str]] = None) -> str:
+    def resolve_server_base_url(server_config: ServerConfiguration, server_runtime_params: Optional[Dict[str, str]] = None) -> str:
         """
         Resolves the templated server URL using provided parameters, environment variables,
         or default values for a given ServerConfiguration.
@@ -38,8 +38,8 @@ class ServerProcessor:
         """
         import os
         resolved_url = server_config.url_template
-        if runtime_params is None:
-            runtime_params = {}
+        if server_runtime_params is None:
+            server_runtime_params = {}
 
         # Find all variable placeholders like {var_name} in the URL template
         template_vars_in_url: set[str] = set(re.findall(r"{(.*?)}", server_config.url_template))
@@ -66,8 +66,8 @@ class ServerProcessor:
             )
 
             # 1. Try to use value from runtime_params (keyed by env_var_name)
-            if runtime_params is not None and env_var_name in runtime_params:
-                resolved_value = runtime_params[env_var_name]
+            if server_runtime_params is not None and env_var_name in server_runtime_params:
+                resolved_value = server_runtime_params[env_var_name]
                 if resolved_value is not None:
                     logger.debug(f"Server variable '{var_name}' (using key '{env_var_name}'): resolved from runtime_params.")
             
@@ -281,7 +281,6 @@ class ServerProcessor:
             logger.error("operation_url_template is None or empty.")
             raise ValueError("Operation URL template cannot be None or empty.")
 
-        is_absolute_url = operation_url_template.startswith("http://") or operation_url_template.startswith("https://")
         has_vars_in_host = self.url_contains_template_vars_in_host(operation_url_template)
 
         # Case 1: operation_url_template is a full URL and has NO server variables in its host. Use as is.
@@ -306,7 +305,7 @@ class ServerProcessor:
         selected_config = server_configs[0]  # Default to the first server config
 
         try:
-            resolved_server_base = self.resolve_server_base_url(server_config=selected_config, runtime_params=server_runtime_params)
+            resolved_server_base = self.resolve_server_base_url(server_config=selected_config, server_runtime_params=server_runtime_params)
         except ValueError as e:
             logger.error(f"Error resolving variables in ServerConfiguration ('{selected_config.url_template}'): {e}")
             raise ValueError(f"Failed to resolve server variables for server configuration '{selected_config.url_template}': {e}") from e

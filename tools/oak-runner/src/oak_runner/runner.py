@@ -16,7 +16,7 @@ from .auth.auth_processor import AuthProcessor
 from .evaluator import ExpressionEvaluator
 from .executor import StepExecutor
 from .http import HTTPExecutor
-from .models import ActionType, ArazzoDoc, ExecutionState, OpenAPIDoc, StepStatus, WorkflowExecutionStatus, WorkflowExecutionResult
+from .models import ActionType, ArazzoDoc, ExecutionState, OpenAPIDoc, StepStatus, WorkflowExecutionStatus, WorkflowExecutionResult, RuntimeParams
 from .utils import dump_state, load_arazzo_doc, load_source_descriptions, load_openapi_file
 from .auth.default_credential_provider import DefaultCredentialProvider
 import json
@@ -150,14 +150,14 @@ class OAKRunner:
             except Exception as e:
                 logger.error(f"Error in {event_type} callback: {e}")
 
-    def start_workflow(self, workflow_id: str, inputs: Optional[Dict[str, Any]] = None, server_runtime_params: Optional[Dict[str, str]] = None) -> str:
+    def start_workflow(self, workflow_id: str, inputs: Optional[Dict[str, Any]] = None, runtime_params: Optional[RuntimeParams] = None) -> str:
         """
         Start a new workflow execution
 
         Args:
             workflow_id: ID of the workflow to execute
             inputs: Input parameters for the workflow
-            server_runtime_params: Optional runtime parameters for server URL variables.
+            runtime_params: Optional runtime parameters for execution (e.g., server variables).
 
         Returns:
             execution_id: Unique ID for this workflow execution
@@ -183,12 +183,12 @@ class OAKRunner:
             for dep_workflow_id in depends_on:
                 logger.info(f"Executing dependency workflow: {dep_workflow_id}")
                 # Execute the dependency workflow and wait for completion
-                # Pass server_runtime_params to the dependent workflow execution
-                dep_execution_id = self.start_workflow(dep_workflow_id, inputs, server_runtime_params)
+                # Pass runtime_params to the dependent workflow execution
+                dep_execution_id = self.start_workflow(dep_workflow_id, inputs, runtime_params)
 
                 # Run the dependency workflow until completion
                 while True:
-                    # execute_next_step will now retrieve server_runtime_params from the state
+                    # execute_next_step will now retrieve runtime_params from the state
                     result = self.execute_next_step(dep_execution_id)
                     if result.get("status") in [WorkflowExecutionStatus.WORKFLOW_COMPLETE, WorkflowExecutionStatus.ERROR]:
                         break
@@ -220,7 +220,7 @@ class OAKRunner:
             workflow_id=workflow_id,
             inputs=inputs or {},
             dependency_outputs=dependency_outputs, # Store dependency outputs
-            server_runtime_params=server_runtime_params # Store runtime server params in ExecutionState
+            runtime_params=runtime_params # Store runtime parameters in ExecutionState
         )
 
         # Initialize step statuses
@@ -244,7 +244,7 @@ class OAKRunner:
         self,
         workflow_id: str,
         inputs: dict[str, Any] = None,
-        server_runtime_params: Optional[dict[str, str]] = None
+        runtime_params: Optional[RuntimeParams] = None
     ) -> WorkflowExecutionResult:
         """
         Start and execute a workflow until completion, returning the outputs.
@@ -252,7 +252,7 @@ class OAKRunner:
         Args:
             workflow_id: ID of the workflow to execute
             inputs: Input parameters for the workflow
-            server_runtime_params: Runtime parameters for server variable resolution
+            runtime_params: Runtime parameters for execution (e.g., server variables)
 
         Returns:
             A WorkflowExecutionResult object containing the status, workflow_id, outputs, and any error
@@ -280,7 +280,7 @@ class OAKRunner:
         self.register_callback("step_complete", on_step_complete)
         self.register_callback("workflow_complete", on_workflow_complete)
 
-        execution_id = self.start_workflow(workflow_id, inputs, server_runtime_params)
+        execution_id = self.start_workflow(workflow_id, inputs, runtime_params)
         
         while True:
             result = self.execute_next_step(execution_id)
@@ -580,7 +580,7 @@ class OAKRunner:
         inputs: dict[str, Any],
         operation_id: Optional[str] = None,
         operation_path: Optional[str] = None,
-        server_runtime_params: Optional[Dict[str, str]] = None,
+        runtime_params: Optional[RuntimeParams] = None,
     ) -> dict:
         """
         Execute a single API operation directly, outside of a workflow context.
@@ -592,7 +592,7 @@ class OAKRunner:
             operation_id: The operationId of the operation to execute.
             operation_path: The path and method (e.g., 'GET /users/{userId}') of the operation.
                           Provide either operation_id or operation_path, not both.
-            server_runtime_params: Optional runtime parameters for server variable resolution.
+            runtime_params: Optional runtime parameters for execution (e.g., server variables).
 
         Returns:
             A dictionary containing the response status_code, headers, and body.
@@ -619,7 +619,7 @@ class OAKRunner:
                 inputs=inputs,
                 operation_id=operation_id,
                 operation_path=operation_path,
-                server_runtime_params=server_runtime_params,
+                runtime_params=runtime_params,
             )
             logger.info(f"OAKRunner: Direct operation execution finished for {log_identifier}")
             return result

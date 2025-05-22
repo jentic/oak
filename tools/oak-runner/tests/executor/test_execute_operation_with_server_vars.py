@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Dict, Any, Optional
 
-from oak_runner.models import ServerConfiguration, ServerVariable
+from oak_runner.models import ServerConfiguration, ServerVariable, RuntimeParams
 from oak_runner.executor.server_processor import ServerProcessor
 from oak_runner.executor.step_executor import StepExecutor
 from oak_runner.http import HTTPExecutor
@@ -175,7 +175,7 @@ def test_execute_operation_with_server_vars_and_path_params(
     response = executor.execute_operation(
         operation_id="getResource",
         inputs={"id": "12345"},
-        server_runtime_params={"MYAPI_OAK_SERVER_INSTANCE": "customerA"}
+        runtime_params=RuntimeParams(servers={"MYAPI_OAK_SERVER_INSTANCE": "customerA"})
     )
     
     # Verify the HTTP client was called with the correct URL
@@ -233,7 +233,7 @@ def test_execute_operation_maintain_path_params(
     response = executor.execute_operation(
         operation_id="getUserByInstance",
         inputs={"instance": "user123"},
-        server_runtime_params={"MYAPI_OAK_SERVER_INSTANCE": "customerA"}
+        runtime_params=RuntimeParams(servers={"MYAPI_OAK_SERVER_INSTANCE": "customerA"})
     )
     
     # Verify that the HTTP client was called

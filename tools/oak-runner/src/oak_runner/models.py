@@ -7,8 +7,7 @@ This module defines the data models and enums used by the OAK Runner.
 
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
-from typing import Any, Dict, Optional, List
-
+from typing import Any, Dict, Optional, List, Union
 from pydantic import BaseModel, Field, validator, ConfigDict
 
 
@@ -86,7 +85,7 @@ class ExecutionState:
     workflow_outputs: dict[str, Any] = None
     dependency_outputs: dict[str, dict[str, Any]] = None
     status: dict[str, StepStatus] = None
-    server_runtime_params: Optional[dict[str, str]] = None
+    runtime_params: Optional['RuntimeParams'] = None
 
     def __post_init__(self):
         """Initialize default values"""
@@ -121,3 +120,13 @@ class ServerConfiguration(BaseModel):
     api_title_prefix: Optional[str] = None # Derived from spec's info.title
 
     model_config = ConfigDict(populate_by_name=True, extra='allow')
+
+
+class RuntimeParams(BaseModel):
+    """
+    Container for all runtime parameters that may influence workflow or operation execution.
+    """
+    servers: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Server variable overrides for server resolution."
+    )

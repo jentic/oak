@@ -7,9 +7,8 @@ This module provides the main StepExecutor class that orchestrates the execution
 
 import logging
 import re
-from typing import Any, Optional, Dict
-from oak_runner.models import ExecutionState
-from ..models import ExecutionState
+from typing import Any, Optional
+from oak_runner.models import ExecutionState, RuntimeParams
 from ..evaluator import ExpressionEvaluator
 from ..http import HTTPExecutor
 from .action_handler import ActionHandler
@@ -108,7 +107,7 @@ class StepExecutor:
         final_url_template = self.server_processor.resolve_final_url(
             source_name=source_name,
             operation_url_template=base_server_url, # Pass it as operation_url_template
-            server_runtime_params=state.server_runtime_params
+            server_runtime_params=state.runtime_params.servers if state.runtime_params else None
         )
 
         if not final_url_template:
@@ -206,7 +205,7 @@ class StepExecutor:
         final_url_template = self.server_processor.resolve_final_url(
             source_name=source_name,
             operation_url_template=relative_operation_path_template, # Pass it as operation_url_template
-            server_runtime_params=state.server_runtime_params
+            server_runtime_params=state.runtime_params.servers if state.runtime_params else None
         )
 
         if not final_url_template:
@@ -256,7 +255,7 @@ class StepExecutor:
         inputs: dict[str, Any],
         operation_id: Optional[str] = None,
         operation_path: Optional[str] = None,
-        server_runtime_params: Optional[Dict[str, str]] = None,
+        runtime_params: Optional[RuntimeParams] = None,
     ) -> dict:
         """
         Execute a single API operation directly, outside of a workflow context.
@@ -266,7 +265,7 @@ class StepExecutor:
             operation_id: The operationId of the operation to execute.
             operation_path: The path and method (e.g., 'GET /users/{userId}') of the operation.
                           Provide either operation_id or operation_path, not both.
-            server_runtime_params: Runtime server parameters for resolving server variables.
+            runtime_params: Runtime parameters for execution (e.g., server variables).
 
         Returns:
             A dictionary containing the response status_code, headers, and body.
@@ -339,7 +338,7 @@ class StepExecutor:
         final_url_template = self.server_processor.resolve_final_url(
             source_name=source_name,
             operation_url_template=base_server_url, # Pass it as operation_url_template
-            server_runtime_params=server_runtime_params
+            server_runtime_params=runtime_params.servers if runtime_params else None
         )
 
         if not final_url_template:
