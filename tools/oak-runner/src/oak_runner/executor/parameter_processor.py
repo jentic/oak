@@ -372,8 +372,6 @@ class ParameterProcessor:
         self, operation_details: dict, inputs: dict[str, Any]
     ) -> dict[str, Any]:
         logger.debug("Preparing operation parameters...")
-        logger.debug(f"Operation details: {operation_details}")
-        logger.debug(f"Inputs: {inputs}")
         """
         Prepare parameters and request body for a direct operation execution.
 

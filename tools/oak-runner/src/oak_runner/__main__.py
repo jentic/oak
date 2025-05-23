@@ -10,7 +10,7 @@ import sys
 from typing import Any
 
 from .runner import OAKRunner
-from .models import StepStatus
+from .models import StepStatus, RuntimeParams
 from .utils import set_log_level
 
 logger = logging.getLogger("oak-runner-cli")
@@ -65,6 +65,11 @@ async def main():
     )
     parser_exec_wf.add_argument("--workflow-id", required=True, help="ID of the workflow to execute")
     parser_exec_wf.add_argument("--inputs", help="JSON string of workflow inputs", default="{}")
+    parser_exec_wf.add_argument(
+        "--server-variables",
+        default="{}",
+        help="Runtime parameters for server variable resolution as a JSON string (e.g., '{\"MY_API_SERVER\": \"your-instance\"}')"
+    )
     parser_exec_wf.set_defaults(func=handle_execute_workflow)
 
     # Subparser for 'execute-operation'
@@ -84,6 +89,11 @@ async def main():
     exec_group.add_argument("--operation-id", help="ID of the operation to execute")
     exec_group.add_argument("--operation-path", help="HTTP method and path (e.g., 'GET /users/{id}')")
     parser_exec_op.add_argument("--inputs", default="{}", help="Inputs for the operation as a JSON string")
+    parser_exec_op.add_argument(
+        "--server-variables",
+        default="{}",
+        help="Runtime parameters for server variable resolution as a JSON string (e.g., '{\"MY_API_SERVER\": \"your-instance\"}')"
+    )
     parser_exec_op.set_defaults(func=handle_execute_operation)
 
     # Subparser for 'list-workflows'
@@ -198,8 +208,21 @@ async def handle_execute_workflow(runner: OAKRunner | None, args: argparse.Names
         sys.exit(1)
 
     # Start and execute the workflow using the new API
+    # Parse server-variables and create RuntimeParams object
     try:
-        result = runner.execute_workflow(args.workflow_id, inputs)
+        server_params_dict = json.loads(args.server_variables)
+        # Create a RuntimeParams object with the server parameters
+        runtime_params = RuntimeParams(servers=server_params_dict)
+    except json.JSONDecodeError:
+        logger.error(f"Invalid JSON in server-variables: {args.server_variables}")
+        sys.exit(1)
+
+    try:
+        result = runner.execute_workflow(
+            args.workflow_id, 
+            inputs, 
+            runtime_params=runtime_params  # Pass the RuntimeParams object
+        )
     except Exception as e:
         logger.error(f"Failed to execute workflow: {e}", exc_info=True)
         sys.exit(1)
@@ -249,9 +272,15 @@ async def handle_execute_operation(runner: OAKRunner | None, args: argparse.Name
             logger.error("Runner initialization failed.")
             sys.exit(1)
 
-        inputs = json.loads(args.inputs)
+        inputs_dict = json.loads(args.inputs)
     except json.JSONDecodeError:
         logger.error(f"Invalid JSON in inputs: {args.inputs}")
+        sys.exit(1)
+
+    try:
+        server_params_dict = json.loads(args.server_variables)
+    except json.JSONDecodeError:
+        logger.error(f"Invalid JSON in server-variables: {args.server_variables}")
         sys.exit(1)
 
     try:
@@ -262,10 +291,14 @@ async def handle_execute_operation(runner: OAKRunner | None, args: argparse.Name
 
         # Correctly pass operation_id and operation_path based on args
         # REMOVED await as execute_operation is synchronous
+        # Create a RuntimeParams object with the server parameters
+        runtime_params = RuntimeParams(servers=server_params_dict)
+        
         result = runner.execute_operation(
             operation_id=args.operation_id,  # Pass directly
             operation_path=args.operation_path, # Pass directly
-            inputs=inputs
+            inputs=inputs_dict,
+            runtime_params=runtime_params  # Pass the RuntimeParams object
         )
         # Remove 'headers' from result if present
         if isinstance(result, dict) and 'headers' in result:

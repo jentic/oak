@@ -13,9 +13,9 @@ import jsonpointer
 import copy
 import re
 
-from oak_runner.models import OpenAPIDoc
 from oak_runner.executor.operation_finder import OperationFinder
-from oak_runner.auth.models import SecurityOption, SecurityRequirement
+from oak_runner.auth.models import SecurityOption
+from ..models import ServerConfiguration, ServerVariable
 
 # Configure logging (using the same logger as operation_finder for consistency)
 logger = logging.getLogger("oak_runner.extractor")

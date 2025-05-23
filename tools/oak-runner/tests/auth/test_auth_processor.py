@@ -5,6 +5,7 @@ import unittest
 from oak_runner.auth.auth_parser import AuthType, AuthLocation, AuthRequirement
 from oak_runner.auth.models import EnvVarKeys
 from oak_runner.auth.auth_processor import AuthProcessor
+from oak_runner.utils import sanitize_for_env_var, create_env_var_name
 
 
 class TestAuthProcessor(unittest.TestCase):
@@ -75,7 +76,7 @@ class TestAuthProcessor(unittest.TestCase):
         ]
 
         for api_id, expected in test_cases:
-            result = self.auth_processor._convert_to_env_var(api_id)
+            result = sanitize_for_env_var(api_id)
             self.assertEqual(result, expected)
 
     def test_generate_env_mappings(self):
@@ -198,8 +199,8 @@ class TestAuthProcessor(unittest.TestCase):
             actual_env_var = mappings["ApiKey"]["apiKey"]
 
             # Extract expected prefix from api_title
-            expected_prefix = self.auth_processor._convert_to_env_var(api_title.split()[0].upper())
-            expected_env_var = f"{expected_prefix}_APIKEY"
+            expected_prefix = sanitize_for_env_var(api_title.split()[0])
+            expected_env_var = create_env_var_name("ApiKey", prefix=expected_prefix)
 
             # Check that the generated env var has been properly sanitized
             self.assertEqual(

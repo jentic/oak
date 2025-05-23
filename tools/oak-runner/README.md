@@ -56,7 +56,6 @@ The OAK Runner supports various authentication methods defined in OpenAPI specif
 - **OpenID**: OpenID Connect
 - **Custom**: Custom Authentication Schemes
 
-
 ## Command Line Usage
 
 Usage:
@@ -154,6 +153,66 @@ uvx oak-runner --help
 
 # Help for a specific command (e.g., execute-operation)
 uvx oak-runner execute-operation --help
+```
+
+## Server URL Configuration
+
+OAK Runner supports dynamic server URLs as defined in the `servers` object of an OpenAPI specification. This allows you to define API server URLs with templated variables (e.g., `https://{instance_id}.api.example.com/v1` or `https://api.example.com/{region}/users`).
+
+### Variable Resolution
+
+When an operation requires a server URL with variables, OAK Runner resolves these variables in the following order of precedence:
+
+1.  **Runtime Parameters**: Values passed explicitly when executing an operation or workflow (e.g., via the `--server-variables` CLI argument or the `runtime_params` parameter in `execute_operation`/`execute_workflow` methods). These parameters should be provided as a dictionary where keys match the expected environment variable names for the server variables (see below).
+2.  **Environment Variables**: If not provided as a runtime parameter, OAK Runner attempts to find an environment variable.
+3.  **Default Values**: If not found in runtime parameters or environment variables, the `default` value specified for the variable in the OpenAPI document's `servers` object is used.
+
+If a variable in the URL template cannot be resolved through any of these means, and it does not have a default value, an error will occur.
+
+### Environment Variable Naming
+
+The environment variables for server URLs follow these naming conventions:
+
+-   If the OpenAPI specification's `info.title` is available and an `API_TITLE_PREFIX` can be derived from it (typically the first word of the title, uppercased and sanitized, e.g., `PETSTORE` from "Petstore API"), the format is:
+    `[API_TITLE_PREFIX_]OAK_SERVER_<VAR_NAME_UPPERCASE>`
+    Example: `PETSTORE_OAK_SERVER_REGION=us-east-1`
+
+-   If an `API_TITLE_PREFIX` cannot be derived (e.g., `info.title` is missing or empty), the format is:
+    `OAK_SERVER_<VAR_NAME_UPPERCASE>`
+    Example: `OAK_SERVER_INSTANCE_ID=my-instance-123`
+
+The `<VAR_NAME_UPPERCASE>` corresponds to the variable name defined in the `servers` object's `variables` map (e.g., `region` or `instance_id`), converted to uppercase.
+
+You can use the `show-env-mappings` CLI command to see the expected environment variable names for server URLs, alongside authentication variables, for a given OpenAPI specification.
+
+### Example
+
+Consider an OpenAPI specification with:
+- `info.title: "My Custom API"`
+- A server definition:
+  ```yaml
+  servers:
+    - url: "https://{instance}.api.example.com/{version}"
+      variables:
+        instance:
+          default: "prod"
+          description: "The API instance name."
+        version:
+          default: "v1"
+          description: "API version."
+  ```
+
+To set the `instance` to "dev" and `version` to "v2" via environment variables, you would set:
+```sh
+export MYCUSTOM_OAK_SERVER_INSTANCE=dev
+export MYCUSTOM_OAK_SERVER_VERSION=v2
+```
+(Assuming "MYCUSTOM" is derived from "My Custom API").
+
+Alternatively, to provide these at runtime via the CLI when executing an operation:
+```sh
+uvx oak-runner execute-operation --openapi-path path/to/spec.yaml --operation-id someOperation \
+  --server-variables '{"MYCUSTOM_OAK_SERVER_INSTANCE": "staging", "MYCUSTOM_OAK_SERVER_VERSION": "v2beta"}'
 ```
 
 

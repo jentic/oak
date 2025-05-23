@@ -9,9 +9,11 @@ import json
 import logging
 import os
 import re
-from typing import Any
+from typing import Any, Dict, Optional, List
 import jsonpointer
 import yaml
+
+from .models import ServerConfiguration, ServerVariable
 
 # Configure logging
 logging.basicConfig(
@@ -253,3 +255,99 @@ def set_log_level(level: str):
     logging.getLogger("arazzo-runner.evaluator").setLevel(numeric_level)
     logging.getLogger("arazzo-runner.executor").setLevel(numeric_level)
     logging.getLogger("arazzo-runner.http").setLevel(numeric_level)
+
+
+def sanitize_for_env_var(text: str) -> str:
+    """
+    Sanitize a string for use in environment variable names.
+    
+    Args:
+        text: The text to sanitize
+        
+    Returns:
+        Sanitized text suitable for environment variables
+    """
+    # Convert to uppercase
+    sanitized = text.upper()
+    
+    # Replace hyphens with underscores
+    sanitized = sanitized.replace('-', '_')
+    
+    # Replace other non-alphanumeric characters with underscores
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', sanitized)
+    
+    # Replace multiple consecutive underscores with a single underscore
+    sanitized = re.sub(r'_+', '_', sanitized)
+    
+    # Remove leading and trailing underscores
+    sanitized = sanitized.strip('_')
+    
+    return sanitized
+
+
+def extract_api_title_prefix(title: str) -> Optional[str]:
+    """
+    Derives an API title prefix from the OpenAPI spec's info.title.
+    The prefix is the first non-skip word of the title, uppercased, with non-alphanumeric
+    characters (excluding underscore) replaced by underscores.
+
+    Skip words: 'the', 'a', 'an', 'openapi', 'api', 'swagger'
+
+    Args:
+        title: The info.title string from the OpenAPI spec.
+
+    Returns:
+        The sanitized API title prefix, or None if title is empty or not suitable.
+    """
+    if not title or not title.strip():
+        logger.debug("API title is empty or not provided, no prefix will be generated.")
+        return None
+        
+    # List of words to skip if they appear as the first word
+    SKIP_WORDS = {'the', 'a', 'an', 'openapi', 'api', 'swagger'}
+    
+    # Split the title into words and remove any empty strings
+    words = [word for word in title.strip().split() if word]
+        
+    for word in words:
+        if word.lower() not in SKIP_WORDS:
+            return sanitize_for_env_var(word)
+
+    return words[0]
+
+
+def create_env_var_name(
+    var_name: str, 
+    prefix: Optional[str] = None
+) -> str:
+    """
+    Create a standardized environment variable name with an optional prefix.
+    
+    Args:
+        var_name: The base variable name
+        prefix: Optional prefix (e.g., "MY_API_")
+        
+    Returns:
+        A properly formatted environment variable name
+    """
+    # Sanitize the base variable name
+    sanitized_var_name = sanitize_for_env_var(var_name)
+    
+    # Construct parts of the environment variable name
+    parts = []
+    
+    # Add prefix if provided
+    if prefix:
+        parts.append(prefix)
+    
+    # Add the sanitized variable name
+    parts.append(sanitized_var_name)
+    
+    # Join all parts with underscores
+    env_var_name = "_".join(parts)
+    
+    return env_var_name
+
+
+
+

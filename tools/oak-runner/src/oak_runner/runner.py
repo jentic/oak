@@ -10,13 +10,13 @@ executes OpenAPI operations sequentially, handling success/failure conditions an
 import logging
 from collections.abc import Callable
 import re
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 import requests
 from .auth.auth_processor import AuthProcessor
 from .evaluator import ExpressionEvaluator
 from .executor import StepExecutor
 from .http import HTTPExecutor
-from .models import ActionType, ArazzoDoc, ExecutionState, OpenAPIDoc, StepStatus, WorkflowExecutionStatus, WorkflowExecutionResult
+from .models import ActionType, ArazzoDoc, ExecutionState, OpenAPIDoc, StepStatus, WorkflowExecutionStatus, WorkflowExecutionResult, RuntimeParams
 from .utils import dump_state, load_arazzo_doc, load_source_descriptions, load_openapi_file
 from .auth.default_credential_provider import DefaultCredentialProvider
 import json
@@ -150,13 +150,14 @@ class OAKRunner:
             except Exception as e:
                 logger.error(f"Error in {event_type} callback: {e}")
 
-    def start_workflow(self, workflow_id: str, inputs: dict[str, Any] = None) -> str:
+    def start_workflow(self, workflow_id: str, inputs: Optional[Dict[str, Any]] = None, runtime_params: Optional[RuntimeParams] = None) -> str:
         """
         Start a new workflow execution
 
         Args:
             workflow_id: ID of the workflow to execute
             inputs: Input parameters for the workflow
+            runtime_params: Optional runtime parameters for execution (e.g., server variables).
 
         Returns:
             execution_id: Unique ID for this workflow execution
@@ -182,10 +183,12 @@ class OAKRunner:
             for dep_workflow_id in depends_on:
                 logger.info(f"Executing dependency workflow: {dep_workflow_id}")
                 # Execute the dependency workflow and wait for completion
-                dep_execution_id = self.start_workflow(dep_workflow_id, inputs)
+                # Pass runtime_params to the dependent workflow execution
+                dep_execution_id = self.start_workflow(dep_workflow_id, inputs, runtime_params)
 
                 # Run the dependency workflow until completion
                 while True:
+                    # execute_next_step will now retrieve runtime_params from the state
                     result = self.execute_next_step(dep_execution_id)
                     if result.get("status") in [WorkflowExecutionStatus.WORKFLOW_COMPLETE, WorkflowExecutionStatus.ERROR]:
                         break
@@ -213,18 +216,19 @@ class OAKRunner:
                     raise ValueError(f"Dependency workflow {dep_workflow_id} failed")
 
         # Initialize execution state
-        state = ExecutionState(workflow_id=workflow_id, inputs=inputs or {})
+        state = ExecutionState(
+            workflow_id=workflow_id,
+            inputs=inputs or {},
+            dependency_outputs=dependency_outputs, # Store dependency outputs
+            runtime_params=runtime_params # Store runtime parameters in ExecutionState
+        )
 
-        # Add dependency outputs to execution state
-        state.dependency_outputs = dependency_outputs
-        logger.debug(f"Setting dependency_outputs for {workflow_id} to: {dependency_outputs}")
-        logger.debug(f"State dependency_outputs after setting: {state.dependency_outputs}")
-
-        # Set all steps to pending
-        for step in workflow.get("steps", []):
-            step_id = step.get("stepId")
-            if step_id:
-                state.status[step_id] = StepStatus.PENDING
+        # Initialize step statuses
+        if workflow and "steps" in workflow:
+            for step in workflow.get("steps", []):
+                step_id = step.get("stepId")
+                if step_id:
+                    state.status[step_id] = StepStatus.PENDING
 
         # Store the execution state
         self.execution_states[execution_id] = state
@@ -236,13 +240,19 @@ class OAKRunner:
 
         return execution_id
 
-    def execute_workflow(self, workflow_id: str, inputs: dict[str, Any] = None) -> WorkflowExecutionResult:
+    def execute_workflow(
+        self,
+        workflow_id: str,
+        inputs: dict[str, Any] = None,
+        runtime_params: Optional[RuntimeParams] = None
+    ) -> WorkflowExecutionResult:
         """
         Start and execute a workflow until completion, returning the outputs.
 
         Args:
             workflow_id: ID of the workflow to execute
             inputs: Input parameters for the workflow
+            runtime_params: Runtime parameters for execution (e.g., server variables)
 
         Returns:
             A WorkflowExecutionResult object containing the status, workflow_id, outputs, and any error
@@ -270,7 +280,7 @@ class OAKRunner:
         self.register_callback("step_complete", on_step_complete)
         self.register_callback("workflow_complete", on_workflow_complete)
 
-        execution_id = self.start_workflow(workflow_id, inputs)
+        execution_id = self.start_workflow(workflow_id, inputs, runtime_params)
         
         while True:
             result = self.execute_next_step(execution_id)
@@ -290,15 +300,15 @@ class OAKRunner:
                 )
                 return execution_result
 
-    def execute_next_step(self, execution_id: str) -> dict[str, Any]:
+    def execute_next_step(self, execution_id: str) -> dict:
         """
         Execute the next step in the workflow
 
         Args:
-            execution_id: Unique ID for this workflow execution
+            execution_id: ID of the workflow execution
 
         Returns:
-            result: Dictionary with step execution results
+            WorkflowExecutionResult: Result of the step execution
         """
         if execution_id not in self.execution_states:
             raise ValueError(f"Execution {execution_id} not found")
@@ -570,6 +580,7 @@ class OAKRunner:
         inputs: dict[str, Any],
         operation_id: Optional[str] = None,
         operation_path: Optional[str] = None,
+        runtime_params: Optional[RuntimeParams] = None,
     ) -> dict:
         """
         Execute a single API operation directly, outside of a workflow context.
@@ -581,6 +592,7 @@ class OAKRunner:
             operation_id: The operationId of the operation to execute.
             operation_path: The path and method (e.g., 'GET /users/{userId}') of the operation.
                           Provide either operation_id or operation_path, not both.
+            runtime_params: Optional runtime parameters for execution (e.g., server variables).
 
         Returns:
             A dictionary containing the response status_code, headers, and body.
@@ -607,6 +619,7 @@ class OAKRunner:
                 inputs=inputs,
                 operation_id=operation_id,
                 operation_path=operation_path,
+                runtime_params=runtime_params,
             )
             logger.info(f"OAKRunner: Direct operation execution finished for {log_identifier}")
             return result
@@ -620,11 +633,26 @@ class OAKRunner:
             # Wrap or re-raise depending on desired error handling strategy
             raise RuntimeError(f"Unexpected error during operation execution: {e}") from e
 
-    def get_env_mappings(self) -> dict[str, str]:
+    def get_env_mappings(self) -> dict[str, Any]:
         """
-        Returns the environment variable mappings for authentication.
+        Returns the environment variable mappings for both authentication and server variables.
         
         Returns:
-            Dictionary of environment variable mappings
+            Dictionary containing:
+            - 'auth': Environment variable mappings for authentication
+            - 'servers': Environment variable mappings for server URLs (only included if server variables exist)
         """
-        return self.auth_provider.env_mappings
+        # Get authentication environment mappings
+        auth_mappings = self.auth_provider.env_mappings
+        
+        # Get server variable environment mappings
+        server_mappings = self.step_executor.server_processor.get_env_mappings()
+        
+        # Start with auth mappings
+        result = {"auth": auth_mappings}
+        
+        # Only include server mappings if they exist
+        if server_mappings:
+            result["servers"] = server_mappings
+            
+        return result

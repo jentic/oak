@@ -5,8 +5,9 @@ and Arazzo workflows to generate appropriate configuration and environment varia
 """
 
 import logging
-import re
 from typing import Dict, List, Optional, Any
+
+from oak_runner.utils import create_env_var_name, extract_api_title_prefix
 
 from oak_runner.models import ArazzoDoc, OpenAPIDoc
 
@@ -180,16 +181,14 @@ class AuthProcessor:
             source_description_id = auth_requirement.source_description_id or "default"
             security_scheme_name = auth_requirement.security_scheme_name
             
-            # Determine the environment variable prefix from API title
-            env_var_prefix_base = None
-            if auth_requirement.api_title:
-                # Extract first word from API title, convert to uppercase for env var naming convention
-                api_title_first_word = auth_requirement.api_title.split()[0].upper().replace('-', '_')
-                env_var_prefix_base = self._convert_to_env_var(api_title_first_word)
-
-            # Create full environment variable prefix
-            sanitized_scheme_name = self._convert_to_env_var(security_scheme_name)
-            env_var_prefix = f"{env_var_prefix_base}_{sanitized_scheme_name}" if env_var_prefix_base else sanitized_scheme_name
+            # Determine API title prefix if available
+            api_title_prefix = extract_api_title_prefix(auth_requirement.api_title)
+            
+            # Create the environment variable prefix using the scheme name and API title
+            env_var_prefix = create_env_var_name(
+                var_name=security_scheme_name,
+                prefix=api_title_prefix
+            )
             
             # For OAuth2, add the flow type as a suffix to distinguish different flows
             scheme_name_suffix = ""
@@ -396,39 +395,4 @@ class AuthProcessor:
             raise ValueError(f"Operation {http_method.upper()} {path} not found in OpenAPI spec")
         return op_finder.extract_security_requirements(op_info)
 
-    def _convert_to_env_var(self, value: str) -> str:
-        """
-        Convert a string to a format suitable for environment variable names.
-        
-        Args:
-            value: String to convert
-            
-        Returns:
-            Converted string suitable for environment variables
-        """
-        # Convert to uppercase and replace hyphens with underscores
-        normalized = value.upper().replace('-', '_')
-        
-        # Use the sanitize method to handle other special characters
-        return self._sanitize_prefix(normalized)
-
-    def _sanitize_prefix(self, prefix: str) -> str:
-        """
-        Sanitize a string for use in environment variable names.
-        
-        Args:
-            prefix: The text to sanitize
-            
-        Returns:
-            Sanitized text suitable for environment variables
-        """
-        # Convert to uppercase and replace hyphens with underscores
-        sanitized = prefix.upper().replace('-', '_')
-        # Replace non-alphanumeric characters with underscores
-        sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', sanitized)
-        # Replace multiple consecutive underscores with a single underscore
-        sanitized = re.sub(r'_+', '_', sanitized)
-        # Remove leading and trailing underscores
-        sanitized = sanitized.strip('_')
-
-        return sanitized
+    # Helper methods for environment variable names have been moved to utils.py

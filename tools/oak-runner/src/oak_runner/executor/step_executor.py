@@ -8,18 +8,15 @@ This module provides the main StepExecutor class that orchestrates the execution
 import logging
 import re
 from typing import Any, Optional
-
-from oak_runner.auth.models import SecurityOption, SecurityRequirement
-
+from oak_runner.models import ExecutionState, RuntimeParams
 from ..evaluator import ExpressionEvaluator
 from ..http import HTTPExecutor
-from ..models import ExecutionState
 from .action_handler import ActionHandler
 from .operation_finder import OperationFinder
 from .output_extractor import OutputExtractor
 from .parameter_processor import ParameterProcessor
 from .success_criteria import SuccessCriteriaChecker
-
+from .server_processor import ServerProcessor
 
 # Configure logging
 logger = logging.getLogger("arazzo-runner.executor")
@@ -52,6 +49,8 @@ class StepExecutor:
         self.output_extractor = OutputExtractor(source_descriptions)
         self.success_checker = SuccessCriteriaChecker(source_descriptions)
         self.action_handler = ActionHandler(source_descriptions)
+        self.server_processor = ServerProcessor(source_descriptions)
+
 
     def execute_step(self, step: dict, state: ExecutionState) -> dict:
         """
@@ -72,6 +71,7 @@ class StepExecutor:
         elif "operationPath" in step:
             return self._execute_operation_by_path(step, state)
         elif "workflowId" in step:
+            # Nested workflows do not directly use HTTPExecutor with server configs at this level
             return self._execute_nested_workflow(step, state)
         else:
             raise ValueError(f"Step {step_id} does not specify an operation or workflow to execute")
@@ -81,6 +81,11 @@ class StepExecutor:
         operation_id = step.get("operationId")
         if not operation_id:
             raise ValueError("Missing operationId in step definition")
+
+        # Find the operation in the source descriptions
+        operation_info = self.operation_finder.find_by_id(operation_id)
+        if not operation_info:
+            raise ValueError(f"Operation {operation_id} not found in source descriptions")
 
         # Prepare parameters
         parameters = self.parameter_processor.prepare_parameters(step, state)
@@ -92,24 +97,31 @@ class StepExecutor:
                 step.get("requestBody"), state
             )
 
-        # Find the operation in the source descriptions
-        operation_info = self.operation_finder.find_by_id(operation_id)
-
-        if not operation_info:
-            raise ValueError(f"Operation {operation_id} not found in source descriptions")
-        
         # Extract security requirements
         security_options = self.operation_finder.extract_security_requirements(operation_info)
-        source_name = operation_info.get("source")
-        
+        source_name = operation_info.get("source", "default")
+
+        # Resolve final URL
+        base_server_url = operation_info.get("url") # This is the relative path template
+        final_url_template = self.server_processor.resolve_server_params(
+            source_name=source_name,
+            operation_url_template=base_server_url, # Pass it as operation_url_template
+            server_runtime_params=state.runtime_params.servers if state.runtime_params else None
+        )
+
+        if not final_url_template:
+            error_msg = f"Could not determine final URL for operationId '{operation_id}'"
+            logger.error(error_msg)
+            return {"success": False, "response": {"error": error_msg, "status_code": 0}, "outputs": {}}
+
         # Execute the HTTP request
         response = self.http_client.execute_request(
-            operation_info.get("method"), 
-            operation_info.get("url"), 
-            parameters, 
-            request_body,
+            method=operation_info.get("method"),
+            url=final_url_template,
+            parameters=parameters, 
+            request_body=request_body,
             security_options=security_options,
-            source_name=source_name
+            source_name=source_name,
         )
 
         # Check success criteria
@@ -122,10 +134,10 @@ class StepExecutor:
 
     def _execute_operation_by_path(self, step: dict, state: ExecutionState) -> dict:
         """Execute an operation by its operationPath"""
-        operation_path = step.get("operationPath")
+        operation_path = step.get("operationPath") # This is the method:path string e.g. GET:/pets
         step_id = step.get("stepId", "unknown")
 
-        logger.debug(f"Processing operationPath: {operation_path} for step {step_id}")
+        logger.debug(f"Processing operationPath value: {operation_path} for step {step_id}")
 
         # Evaluate the operation path if it contains expressions
         if operation_path.startswith("{") and operation_path.endswith("}"):
@@ -141,7 +153,7 @@ class StepExecutor:
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-        source_url, json_pointer = match.groups()
+        source_url, json_pointer = match.groups() # Use source_name_from_path for clarity
         logger.debug(f"Parsed operationPath - source: {source_url}, pointer: {json_pointer}")
 
         # Print the raw JSON pointer for debugging
@@ -154,25 +166,24 @@ class StepExecutor:
         # Find the operation in the source descriptions
         operation_info = self.operation_finder.find_by_path(source_url, json_pointer)
 
-        if operation_info:
-            logger.debug(
-                f"Found operation: {operation_info.get('method')} {operation_info.get('url')}"
-            )
-        else:
+        source_name = operation_info.get("source")
+
+        if not operation_info:
+            # Enhanced logging moved from original code to here for when operation_info is None
             logger.error(f"Failed to find operation for path: {operation_path}")
-            # Log detailed information about the source descriptions
             for name, desc in self.source_descriptions.items():
                 paths = desc.get("paths", {})
                 logger.debug(f"Source '{name}' has {len(paths)} paths: {list(paths.keys())}")
-                # Log all operations
-                for path, methods in paths.items():
-                    for method, op in methods.items():
-                        if method.lower() in ["get", "post", "put", "delete", "patch"]:
-                            op_id = op.get("operationId", "[No operationId]")
-                            logger.debug(f"  - {method.upper()} {path} (operationId: {op_id})")
-
-        if not operation_info:
+                for path_key, methods in paths.items():
+                    for method_key, op_details in methods.items():
+                        if method_key.lower() in ["get", "post", "put", "delete", "patch"]:
+                            op_id_log = op_details.get("operationId", "[No operationId]")
+                            logger.debug(f"  - {method_key.upper()} {path_key} (operationId: {op_id_log})")
             raise ValueError(f"Operation not found at path {operation_path}")
+        
+        logger.debug(
+            f"Found operation: {operation_info.get('method')} {operation_info.get('url')}"
+        )
 
         # Prepare parameters
         parameters = self.parameter_processor.prepare_parameters(step, state)
@@ -186,11 +197,28 @@ class StepExecutor:
         
         # Extract security requirements
         security_options = self.operation_finder.extract_security_requirements(operation_info)
-        
+
+        # Resolve final URL
+        relative_operation_path_template = operation_info.get("url") 
+        final_url_template = self.server_processor.resolve_server_params(
+            source_name=source_name,
+            operation_url_template=relative_operation_path_template, # Pass it as operation_url_template
+            server_runtime_params=state.runtime_params.servers if state.runtime_params else None
+        )
+
+        if not final_url_template:
+            error_msg = f"Could not determine final URL for operationPath '{operation_path}'"
+            logger.error(error_msg)
+            return {"success": False, "response": {"error": error_msg, "status_code": 0}, "outputs": {}}
+
         # Execute the HTTP request
         response = self.http_client.execute_request(
-            operation_info.get("method"), operation_info.get("url"), parameters, request_body,
-            security_options=security_options
+            method=operation_info.get("method"),
+            url=final_url_template,
+            parameters=parameters, 
+            request_body=request_body,
+            security_options=security_options,
+            source_name=source_name,
         )
 
         # Check success criteria
@@ -225,6 +253,7 @@ class StepExecutor:
         inputs: dict[str, Any],
         operation_id: Optional[str] = None,
         operation_path: Optional[str] = None,
+        runtime_params: Optional[RuntimeParams] = None,
     ) -> dict:
         """
         Execute a single API operation directly, outside of a workflow context.
@@ -234,6 +263,7 @@ class StepExecutor:
             operation_id: The operationId of the operation to execute.
             operation_path: The path and method (e.g., 'GET /users/{userId}') of the operation.
                           Provide either operation_id or operation_path, not both.
+            runtime_params: Runtime parameters for execution (e.g., server variables).
 
         Returns:
             A dictionary containing the response status_code, headers, and body.
@@ -274,8 +304,6 @@ class StepExecutor:
             logger.error(f"Operation not found ({log_identifier}): {e}")
             raise ValueError(f"Operation not found: {e}") from e
 
-        logger.debug(f"Found operation details for {log_identifier}: {operation_details}")
-
         # Check if operation was found
         if not operation_details:
             log_identifier = f"ID='{operation_id}'" if operation_id else f"Path='{operation_path}'"
@@ -301,9 +329,24 @@ class StepExecutor:
         security_options = self.operation_finder.extract_security_requirements(operation_details)
         logger.debug(f"Resolved security options for {log_identifier}: {security_options}")
 
+        # Resolve final URL
+        source_name = operation_details.get("source", "default") # Get source_name
+        base_server_url = operation_details.get("url") # This is the relative path template
+
+        final_url_template = self.server_processor.resolve_server_params(
+            source_name=source_name,
+            operation_url_template=base_server_url, # Pass it as operation_url_template
+            server_runtime_params=runtime_params.servers if runtime_params else None
+        )
+
+        if not final_url_template:
+            error_msg = f"Could not determine final URL for operation {log_identifier}. Operation path was '{base_server_url}' and source was '{source_name}'."
+            logger.error(error_msg)
+            return {"success": False, "response": {"error": error_msg, "status_code": 0}, "outputs": {}}
+
         # Execute Request
         method = operation_details.get("method")
-        url = operation_details.get("url") # Base URL, path params handled by http_client
+        url = final_url_template # Base URL, path params handled by http_client
         request_body_payload = prepared_params.get('body') # Extract body from prepared params
         logger.debug(f"Request body payload: {request_body_payload}")
 
