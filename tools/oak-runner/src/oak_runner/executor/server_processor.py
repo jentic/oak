@@ -3,6 +3,7 @@ ServerProcessor: Handles server configuration and URL resolution logic for OAK R
 """
 from typing import Any, Dict, List, Optional
 import re
+import os
 from urllib.parse import urlparse, urljoin
 from ..models import ServerConfiguration
 
@@ -21,7 +22,7 @@ class ServerProcessor:
         self.source_descriptions = source_descriptions
 
     @staticmethod
-    def resolve_server_base_url(server_config: ServerConfiguration, server_runtime_params: Optional[Dict[str, str]] = None) -> str:
+    def resolve_server_base_url(server_config: ServerConfiguration, server_runtime_params: Optional[Dict[str, str]] = {}) -> str:
         """
         Resolves the templated server URL using provided parameters, environment variables,
         or default values for a given ServerConfiguration.
@@ -36,10 +37,7 @@ class ServerProcessor:
         Raises:
             ValueError: If a required variable in the template cannot be resolved.
         """
-        import os
         resolved_url = server_config.url_template
-        if server_runtime_params is None:
-            server_runtime_params = {}
 
         # Find all variable placeholders like {var_name} in the URL template
         template_vars_in_url: set[str] = set(re.findall(r"{(.*?)}", server_config.url_template))
@@ -66,7 +64,7 @@ class ServerProcessor:
             )
 
             # 1. Try to use value from runtime_params (keyed by env_var_name)
-            if server_runtime_params is not None and env_var_name in server_runtime_params:
+            if env_var_name in server_runtime_params:
                 resolved_value = server_runtime_params[env_var_name]
                 if resolved_value is not None:
                     logger.debug(f"Server variable '{var_name}' (using key '{env_var_name}'): resolved from runtime_params.")
