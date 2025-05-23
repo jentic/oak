@@ -163,7 +163,7 @@ OAK Runner supports dynamic server URLs as defined in the `servers` object of an
 
 When an operation requires a server URL with variables, OAK Runner resolves these variables in the following order of precedence:
 
-1.  **Runtime Parameters**: Values passed explicitly when executing an operation or workflow (e.g., via the `--server-runtime-params` CLI argument or the `runtime_params` parameter in `execute_operation`/`execute_workflow` methods). These parameters should be provided as a dictionary where keys match the expected environment variable names for the server variables (see below).
+1.  **Runtime Parameters**: Values passed explicitly when executing an operation or workflow (e.g., via the `--server-variables` CLI argument or the `runtime_params` parameter in `execute_operation`/`execute_workflow` methods). These parameters should be provided as a dictionary where keys match the expected environment variable names for the server variables (see below).
 2.  **Environment Variables**: If not provided as a runtime parameter, OAK Runner attempts to find an environment variable.
 3.  **Default Values**: If not found in runtime parameters or environment variables, the `default` value specified for the variable in the OpenAPI document's `servers` object is used.
 
@@ -212,7 +212,7 @@ export MYCUSTOM_OAK_SERVER_VERSION=v2
 Alternatively, to provide these at runtime via the CLI when executing an operation:
 ```sh
 uvx oak-runner execute-operation --openapi-path path/to/spec.yaml --operation-id someOperation \
-  --server-runtime-params '{"MYCUSTOM_OAK_SERVER_INSTANCE": "staging", "MYCUSTOM_OAK_SERVER_VERSION": "v2beta"}'
+  --server-variables '{"MYCUSTOM_OAK_SERVER_INSTANCE": "staging", "MYCUSTOM_OAK_SERVER_VERSION": "v2beta"}'
 ```
 
 

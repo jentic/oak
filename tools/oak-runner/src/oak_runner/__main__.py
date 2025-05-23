@@ -66,9 +66,9 @@ async def main():
     parser_exec_wf.add_argument("--workflow-id", required=True, help="ID of the workflow to execute")
     parser_exec_wf.add_argument("--inputs", help="JSON string of workflow inputs", default="{}")
     parser_exec_wf.add_argument(
-        "--server-runtime-params",
+        "--server-variables",
         default="{}",
-        help="Runtime parameters for server variable resolution as a JSON string (e.g., '{\"your-server\": \"your-instance\"}')"
+        help="Runtime parameters for server variable resolution as a JSON string (e.g., '{\"MY_API_SERVER\": \"your-instance\"}')"
     )
     parser_exec_wf.set_defaults(func=handle_execute_workflow)
 
@@ -90,9 +90,9 @@ async def main():
     exec_group.add_argument("--operation-path", help="HTTP method and path (e.g., 'GET /users/{id}')")
     parser_exec_op.add_argument("--inputs", default="{}", help="Inputs for the operation as a JSON string")
     parser_exec_op.add_argument(
-        "--server-runtime-params",
+        "--server-variables",
         default="{}",
-        help="Runtime parameters for server variable resolution as a JSON string (e.g., '{\"your-server\": \"your-instance\"}')"
+        help="Runtime parameters for server variable resolution as a JSON string (e.g., '{\"MY_API_SERVER\": \"your-instance\"}')"
     )
     parser_exec_op.set_defaults(func=handle_execute_operation)
 
@@ -208,13 +208,13 @@ async def handle_execute_workflow(runner: OAKRunner | None, args: argparse.Names
         sys.exit(1)
 
     # Start and execute the workflow using the new API
-    # Parse server-runtime-params and create RuntimeParams object
+    # Parse server-variables and create RuntimeParams object
     try:
-        server_params_dict = json.loads(args.server_runtime_params)
+        server_params_dict = json.loads(args.server_variables)
         # Create a RuntimeParams object with the server parameters
         runtime_params = RuntimeParams(servers=server_params_dict)
     except json.JSONDecodeError:
-        logger.error(f"Invalid JSON in server_runtime_params: {args.server_runtime_params}")
+        logger.error(f"Invalid JSON in server-variables: {args.server_variables}")
         sys.exit(1)
 
     try:
@@ -278,9 +278,9 @@ async def handle_execute_operation(runner: OAKRunner | None, args: argparse.Name
         sys.exit(1)
 
     try:
-        server_params_dict = json.loads(args.server_runtime_params)
+        server_params_dict = json.loads(args.server_variables)
     except json.JSONDecodeError:
-        logger.error(f"Invalid JSON in server_runtime_params: {args.server_runtime_params}")
+        logger.error(f"Invalid JSON in server-variables: {args.server_variables}")
         sys.exit(1)
 
     try:
