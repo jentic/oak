@@ -89,7 +89,6 @@ class StepExecutor:
 
         # Prepare parameters
         parameters = self.parameter_processor.prepare_parameters(step, state)
-        parameters['operation_path'] = operation_info.get("url") # Add operation_path
 
         # Prepare request body if present
         request_body = None
@@ -104,7 +103,7 @@ class StepExecutor:
 
         # Resolve final URL
         base_server_url = operation_info.get("url") # This is the relative path template
-        final_url_template = self.server_processor.resolve_final_url(
+        final_url_template = self.server_processor.resolve_server_params(
             source_name=source_name,
             operation_url_template=base_server_url, # Pass it as operation_url_template
             server_runtime_params=state.runtime_params.servers if state.runtime_params else None
@@ -135,22 +134,22 @@ class StepExecutor:
 
     def _execute_operation_by_path(self, step: dict, state: ExecutionState) -> dict:
         """Execute an operation by its operationPath"""
-        operation_path_value = step.get("operationPath") # This is the method:path string e.g. GET:/pets
+        operation_path = step.get("operationPath") # This is the method:path string e.g. GET:/pets
         step_id = step.get("stepId", "unknown")
 
-        logger.debug(f"Processing operationPath value: {operation_path_value} for step {step_id}")
+        logger.debug(f"Processing operationPath value: {operation_path} for step {step_id}")
 
         # Evaluate the operation path if it contains expressions
-        if operation_path_value.startswith("{") and operation_path_value.endswith("}"):
-            operation_path_value = ExpressionEvaluator.evaluate_expression(
-                operation_path_value[1:-1], state, self.source_descriptions
+        if operation_path.startswith("{") and operation_path.endswith("}"):
+            operation_path = ExpressionEvaluator.evaluate_expression(
+                operation_path[1:-1], state, self.source_descriptions
             )
-            logger.debug(f"Evaluated operationPath expression to: {operation_path_value}")
+            logger.debug(f"Evaluated operationPath expression to: {operation_path}")
 
         # Parse the operation path to find the source and JSON pointer
-        match = re.match(r"([^#]+)#(.+)", operation_path_value)
+        match = re.match(r"([^#]+)#(.+)", operation_path)
         if not match:
-            error_msg = f"Invalid operation path: {operation_path_value}"
+            error_msg = f"Invalid operation path: {operation_path}"
             logger.error(error_msg)
             raise ValueError(error_msg)
 
@@ -171,7 +170,7 @@ class StepExecutor:
 
         if not operation_info:
             # Enhanced logging moved from original code to here for when operation_info is None
-            logger.error(f"Failed to find operation for path: {operation_path_value}")
+            logger.error(f"Failed to find operation for path: {operation_path}")
             for name, desc in self.source_descriptions.items():
                 paths = desc.get("paths", {})
                 logger.debug(f"Source '{name}' has {len(paths)} paths: {list(paths.keys())}")
@@ -180,7 +179,7 @@ class StepExecutor:
                         if method_key.lower() in ["get", "post", "put", "delete", "patch"]:
                             op_id_log = op_details.get("operationId", "[No operationId]")
                             logger.debug(f"  - {method_key.upper()} {path_key} (operationId: {op_id_log})")
-            raise ValueError(f"Operation not found at path {operation_path_value}")
+            raise ValueError(f"Operation not found at path {operation_path}")
         
         logger.debug(
             f"Found operation: {operation_info.get('method')} {operation_info.get('url')}"
@@ -188,7 +187,6 @@ class StepExecutor:
 
         # Prepare parameters
         parameters = self.parameter_processor.prepare_parameters(step, state)
-        parameters['operation_path'] = operation_info.get("url") # Add operation_path
 
         # Prepare request body if present
         request_body = None
@@ -202,14 +200,14 @@ class StepExecutor:
 
         # Resolve final URL
         relative_operation_path_template = operation_info.get("url") 
-        final_url_template = self.server_processor.resolve_final_url(
+        final_url_template = self.server_processor.resolve_server_params(
             source_name=source_name,
             operation_url_template=relative_operation_path_template, # Pass it as operation_url_template
             server_runtime_params=state.runtime_params.servers if state.runtime_params else None
         )
 
         if not final_url_template:
-            error_msg = f"Could not determine final URL for operationPath '{operation_path_value}'"
+            error_msg = f"Could not determine final URL for operationPath '{operation_path}'"
             logger.error(error_msg)
             return {"success": False, "response": {"error": error_msg, "status_code": 0}, "outputs": {}}
 
@@ -335,7 +333,7 @@ class StepExecutor:
         source_name = operation_details.get("source", "default") # Get source_name
         base_server_url = operation_details.get("url") # This is the relative path template
 
-        final_url_template = self.server_processor.resolve_final_url(
+        final_url_template = self.server_processor.resolve_server_params(
             source_name=source_name,
             operation_url_template=base_server_url, # Pass it as operation_url_template
             server_runtime_params=runtime_params.servers if runtime_params else None

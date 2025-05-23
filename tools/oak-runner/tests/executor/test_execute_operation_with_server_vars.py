@@ -242,12 +242,6 @@ def test_execute_operation_maintain_path_params(
     # Get the arguments passed to the HTTP client
     call_args = mock_http_client.execute_request.call_args[1]
     
-    # In a working implementation, the URL should look like:
-    # https://api.customerA.com/users/{instance} (with the path parameter not replaced)
-    # But with the current implementation, it will be:
-    # https://api.customerA.com/users/user123
-    
-    # Regardless, verify the path parameters were passed correctly
     assert call_args["parameters"]["path"]["instance"] == "user123"
 
 
@@ -272,8 +266,6 @@ def test_server_processor_direct_with_path_params(mock_env):
     # Now the server config has both 'instance' and 'path' variables
     resolved_url = ServerProcessor.resolve_server_base_url(config)
     
-    # With the current implementation, both variables will be resolved
-    # In an ideal fix, path variables would be handled differently
     assert resolved_url == "https://api.customerA.com/default_path"
     
     # Test same name variable
@@ -284,7 +276,5 @@ def test_server_processor_direct_with_path_params(mock_env):
         api_title_prefix="MYAPI"
     )
     
-    # The current implementation replaces all instances of {instance}
-    # An ideal fix would only replace the server part
     resolved_url = ServerProcessor.resolve_server_base_url(config)
     assert resolved_url == "https://api.customerA.com/customerA"

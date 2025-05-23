@@ -435,39 +435,3 @@ def _limit_dict_depth(data: Union[Dict, List, Any], max_depth: int, current_dept
     else:
         # It's a primitive, return the value itself regardless of depth
         return data
-
-
-def _sanitize_and_get_api_title_prefix(title: Optional[str]) -> Optional[str]:
-    """
-    Derives an API title prefix from the OpenAPI spec's info.title.
-    The prefix is the first word of the title, uppercased, with non-alphanumeric
-    characters (excluding underscore) replaced by underscores.
-
-    Args:
-        title: The info.title string from the OpenAPI spec.
-
-    Returns:
-        The sanitized API title prefix, or None if title is empty or not suitable.
-    """
-    if not title or not title.strip():
-        logger.debug("API title is empty or not provided, no prefix will be generated.")
-        return None
-
-    first_word = title.strip().split()[0]
-    if not first_word:
-        logger.debug("Could not extract a first word from the title, no prefix generated.")
-        return None
-
-    # Convert to uppercase
-    prefix = first_word.upper()
-    # Replace non-alphanumeric characters (excluding underscore) with underscore
-    prefix = re.sub(r'[^A-Z0-9_]+', '_', prefix)
-    # Remove leading/trailing underscores that might result from sanitization
-    prefix = prefix.strip('_')
-
-    if not prefix:
-        logger.debug(f"Sanitized first word '{first_word}' resulted in empty prefix, no prefix generated.")
-        return None
-    
-    logger.debug(f"Generated API title prefix: {prefix}")
-    return prefix

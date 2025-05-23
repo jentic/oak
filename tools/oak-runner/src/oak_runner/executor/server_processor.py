@@ -268,14 +268,20 @@ class ServerProcessor:
         
         return env_mappings
 
-    def resolve_final_url(
+    def resolve_server_params(
         self,
         operation_url_template: Optional[str],
         server_runtime_params: Optional[Dict[str, str]],
-        source_name: Optional[str] = 'default',
+        source_name: str,
     ) -> str:
-        """
-        Resolve the final URL for an operation, including server variable resolution.
+        """Resolve the final URL for an operation, including server variable resolution.
+
+        Example:
+            Given an OpenAPI spec for `source_name` "MY_API" with a server:
+            `operation_url_template: "https://{env}.api.com/v1/users/{userId}"`
+            And an operation with `operation_url_template="/users/{userId}"`.
+
+            Result: "https://dev.api.com/v1/users/{userId}"
         """
         if not operation_url_template:
             logger.error("operation_url_template is None or empty.")
