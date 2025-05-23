@@ -5,10 +5,9 @@ and Arazzo workflows to generate appropriate configuration and environment varia
 """
 
 import logging
-import re
 from typing import Dict, List, Optional, Any
 
-from oak_runner.utils import sanitize_for_env_var, create_env_var_name
+from oak_runner.utils import create_env_var_name, extract_api_title_prefix
 
 from oak_runner.models import ArazzoDoc, OpenAPIDoc
 
@@ -183,12 +182,7 @@ class AuthProcessor:
             security_scheme_name = auth_requirement.security_scheme_name
             
             # Determine API title prefix if available
-            api_title_prefix = None
-            if auth_requirement.api_title:
-                # Extract first word from API title
-                api_title_parts = auth_requirement.api_title.split()
-                if api_title_parts:
-                    api_title_prefix = sanitize_for_env_var(api_title_parts[0])
+            api_title_prefix = extract_api_title_prefix(auth_requirement.api_title)
             
             # Create the environment variable prefix using the scheme name and API title
             env_var_prefix = create_env_var_name(
