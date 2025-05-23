@@ -43,6 +43,7 @@ The repository focuses on:
 
 * [**MANIFESTO.md**](MANIFESTO.md) - The principles and vision behind The OAK Repository
 * [**STRUCTURE.md**](STRUCTURE.md) - Detailed documentation of our standardized directory structure
+* [**FEEDBACK-FILES.md**](FEEDBACK-FILES.md) - Documentation of feedback.json files that track API specification repairs
 * [**CONTRIBUTING.md**](CONTRIBUTING.md) - Guidelines for contributing to the repository
 * [**CODE_OF_CONDUCT.md**](CODE_OF_CONDUCT.md) - Community standards and expectations
 * [**LICENSE.md**](LICENSE.md) - MIT License for this repository
