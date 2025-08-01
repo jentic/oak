@@ -1,6 +1,6 @@
-# OAK Repository Structure
+# Repository Structure (OAK Standard)
 
-This document describes the standardized directory structure for OpenAPI specifications and workflows in the OAK repository.
+This document describes the standardized directory structure for an Open Agentic Knowledge (OAK) repository. This repository follows this standard to organize its API specifications and workflows.
 
 ## Overview
 

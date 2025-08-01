@@ -2,7 +2,7 @@
 
 [![Discord](https://img.shields.io/badge/JOIN%20OUR%20DISCORD-COMMUNITY-7289DA?style=plastic&logo=discord&logoColor=white)](https://discord.gg/yrxmDZWMqB)
 
-> **Join our community!** Connect with contributors and users on [Discord](https://discord.gg/yrxmDZWMqB) to discuss ideas, ask questions, and collaborate on the OAK repository.
+> **Join our community!** Connect with contributors and users on [Discord](https://discord.gg/yrxmDZWMqB) to discuss ideas, ask questions, and collaborate on the Jentic Public APIs repository.
 
 ## Overview
 
@@ -17,7 +17,7 @@ AI agents depend on APIs. Their capabilities are defined by the APIs they know a
 
 This communal effort requires a stable but extensible representation format that can describe all salient aspects of APIs and associated workflows in full detail. The [OpenAPI specifications](https://www.openapis.org/) provide the de-facto standard for formal API descriptions, are widely adopted, supported by a vast ecosystem of associated tooling, and governed by the Linux Foundation. Importantly, the OpenAPI Initiative's most recent specification, [Arazzo](https://www.openapis.org/arazzo), allows complex multi-API workflows to be described in a declarative format. 
 
-This repository represents API and workflow knowledge in these open-source formats. We will coordinate with the OpenAPI community, and propose an RFC containing various extensions to capture additional knowledge that is especially relevant in the context of AI agents (for example concerning authentication, rate limiting, pricing, governance and safety).
+This repository follows the OAK (Open Agentic Knowledge) standard, which builds upon these open formats to represent API and workflow knowledge. We will coordinate with the OpenAPI community, and propose an RFC containing various extensions to capture additional knowledge that is especially relevant in the context of AI agents (for example concerning authentication, rate limiting, pricing, governance and safety).
 
 ### AI-scale
 
@@ -40,8 +40,8 @@ The repository focuses on:
 
 ## Documentation
 
-* [**MANIFESTO.md**](MANIFESTO.md) - The principles and vision behind The OAK Repository
-* [**STRUCTURE.md**](STRUCTURE.md) - Detailed documentation of our standardized directory structure
+* [**MANIFESTO.md**](MANIFESTO.md) - The principles and vision behind the Open Agentic Knowledge (OAK) movement
+* [**STRUCTURE.md**](STRUCTURE.md) - The OAK (Open Agentic Knowledge) Standard for repository structure
 * [**FEEDBACK-FILES.md**](FEEDBACK-FILES.md) - Documentation of feedback.json files that track API specification repairs
 * [**CONTRIBUTING.md**](CONTRIBUTING.md) - Guidelines for contributing to the repository
 * [**CODE_OF_CONDUCT.md**](CODE_OF_CONDUCT.md) - Community standards and expectations
@@ -49,13 +49,13 @@ The repository focuses on:
 
 ## Repository Structure
 
-The Jentic Public APIs organize API specifications and workflows using a standardized directory structure:
+This repository follows the OAK (Open Agentic Knowledge) Standard, which defines a standardized directory structure for organizing API specifications and workflows.
 
 - API specifications are organized by vendor and version
 - Workflows are organized to clearly show which APIs they reference
 - Multi-API workflows demonstrate how different services can be orchestrated together
 
-For detailed information on the directory structure, please refer to [STRUCTURE.md](STRUCTURE.md).
+For detailed information, please refer to the [OAK Standard documentation](STRUCTURE.md).
 
 
 ## Acknowledgments
