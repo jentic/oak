@@ -7,9 +7,9 @@
 ## Overview
 
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-40c463.svg)](CODE_OF_CONDUCT.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
+[![License: CC0-1.0](https://img.shields.io/badge/License-CC0_1.0-blue)](LICENSE.md)
 
-### The agentic knowedge layer
+### The agentic knowledge layer
 
 AI agents depend on APIs. Their capabilities are defined by the APIs they know about, and their reliability is defined by the quality of that knowledge. Documentation was previously nice-to-have, but for AI it's a *need-to-have*. The goal of this project is to collate all knowledge about all the world's APIs into a communal, detailed, comprehensive, structured documentation catalog designed for use by AI.  This allows AI to accurately generate API integration code, and it allows agents to plan and interact with APIs reliably, without intermediaries.
 
@@ -29,10 +29,10 @@ We welcome all contributions from the community and from partners who want to ac
 
 The repository focuses on:
 1. Standardized OpenAPI specifications for public APIs
-1. Arazzo workflows that define composable operations across one or more APIs
-1. Associated tooling, for example to help import and enrich documentation, or to convert it out into other formats (e.g., AI model provider's tool definition formats).
-1. Evaluations and scorecards to measure API knowledge completeness, accuracy and AI-readiness
-1. RFCs for extensions to open formats used in the repository, and any other proposals.
+2. Arazzo workflows that define composable operations across one or more APIs
+3. Associated tooling, for example to help import and enrich documentation, or to convert it out into other formats (e.g., AI model provider's tool definition formats).
+4. Evaluations and scorecards to measure API knowledge completeness, accuracy and AI-readiness
+5. RFCs for extensions to open formats used in the repository, and any other proposals.
 
 ## Project Stage
 
@@ -45,7 +45,7 @@ The repository focuses on:
 * [**FEEDBACK-FILES.md**](FEEDBACK-FILES.md) - Documentation of feedback.json files that track API specification repairs
 * [**CONTRIBUTING.md**](CONTRIBUTING.md) - Guidelines for contributing to the repository
 * [**CODE_OF_CONDUCT.md**](CODE_OF_CONDUCT.md) - Community standards and expectations
-* [**LICENSE.md**](LICENSE.md) - MIT License for this repository
+* [**LICENSE.md**](LICENSE.md) - CC0 1.0 License for this repository
 
 ## Repository Structure
 
@@ -80,4 +80,6 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) for more information 
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+This project is licensed under the CC0 1.0 License - see the [LICENSE.md](LICENSE.md) file for details.
+
+> **Disclaimer:** API specifications and workflows located in this repository describe publicly documented third-party APIs. All **trademarks** and **service marks** are the property of their respective owners. This repository does **not** grant rights to use the underlying APIs.

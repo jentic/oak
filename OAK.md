@@ -40,7 +40,7 @@ Agents depend on APIs as much as AI. Chatbots chat, but agents act, and they act
 11. **Growing the OAK network**  
     The OAK initiative will benefit from many interconnected OAK repositories, which should actively facilitate automated crawling, scraping and importing. To join the OAK network, your OAK repository should contain these essential files:
       - `OAK.md` - A copy of this manifesto in your repository root, serving as your declaration of participation in the open knowledge movement
-      - `LICENSE.md` - An MIT license (or equally permissive license) ensuring your API knowledge remains freely accessible to all
+      - `LICENSE.md` - A CC0 1.0 license (or equally permissive license) ensuring your API knowledge remains freely accessible to all
       - `oak.csv` - A registry of other OAK repositories you're connected to. Anyone starting a new OAK repository should submit a PR to add their new OAK repository to the `oak.csv` in all other OAK repositories that they know about.
       - a `STRUCTURE.md` that provides clear LLM-interpretable instructions on how the repository is structured and what file naming conventions are followed.
 
