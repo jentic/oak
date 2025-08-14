@@ -82,4 +82,4 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) for more information 
 
 This project is licensed under the CC0 1.0 License - see the [LICENSE.md](LICENSE.md) file for details.
 
-> **Disclaimer:** API specifications and workflows located in this repository describe publicly documented third-party APIs. All **trademarks** and **service marks** are the property of their respective owners. This repository does **not** grant rights to use the underlying APIs.
+> **Disclaimer:** API specifications and workflows in this repository are based on publicly documented third-party APIs, with some modifications such as repairs to OpenAPI specs or creation of new specs from public API documentation. All **trademarks** and **service marks** are the property of their respective owners. This repository does **not** grant rights to use the underlying APIs.
