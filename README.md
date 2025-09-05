@@ -6,7 +6,7 @@
 
 ## Overview
 
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-40c463.svg)](CODE_OF_CONDUCT.md)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-3.0-40c463.svg)](CODE_OF_CONDUCT.md)
 [![License: CC0-1.0](https://img.shields.io/badge/License-CC0_1.0-blue)](LICENSE.md)
 
 ### The agentic knowledge layer
