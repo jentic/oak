@@ -24,6 +24,14 @@ import_oas_url:
 <!-- 
 REQUIRED: Provide the vendor name (e.g., github.com, stripe.com).
 The workflow will place the *contents* of this directory under 'apis/openapi/vendor_name/'.
+
+vendor_name is parsed into `vendor-identifier` and `api-name`.
+
+Examples:
+- hashicorp.com
+//=> vendor-identifier=hashicorp.com; api-name=main
+- hashicorp.com/nomad 
+//=> vendor-identifier=hashicorp.com; api-name=nomad
 -->
 vendor_name: 
 
