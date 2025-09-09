@@ -1,0 +1,1135 @@
+{
+  "arazzo": "1.0.1",
+  "info": {
+    "title": "Jentic Generated Arazzo Specification",
+    "version": "1.0.0",
+    "description": "Automatically generated Arazzo specification from OpenAPI"
+  },
+  "sourceDescriptions": [
+    {
+      "name": "openapi_source",
+      "url": "https://raw.githubusercontent.com/jentic/jentic-public-apis/refs/heads/main/apis/openapi/nofrixion.com/main/1.0/openapi.json",
+      "type": "openapi"
+    }
+  ],
+  "workflows": [
+    {
+      "workflowId": "process-card-payment-with-authorization-and-capture",
+      "summary": "A comprehensive workflow for processing a card payment, covering the creation of a payment request, obtaining a public key for secure card data encryption, submitting the payment for authorization, and subsequently capturing the authorized funds. This is a core payment processing flow.",
+      "description": "A comprehensive workflow for processing a card payment, covering the creation of a payment request, obtaining a public key for secure card data encryption, submitting the payment for authorization, and subsequently capturing the authorized funds. This is a core payment processing flow.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "ExpiryMonth": {
+            "type": "string"
+          },
+          "ExpiryYear": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "create-payment-request",
+          "description": "Creates a new payment request, specifying the amount, currency, and enabling card payment methods. This sets up the transaction for the customer.",
+          "operationId": "CreatePaymentRequest",
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "amount": "$inputs.amount"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "amount": "$response.body#/amount",
+            "currency": "$response.body#/currency",
+            "status": "$response.body#/status",
+            "cardStripePaymentIntentID": "$response.body#/cardStripePaymentIntentID",
+            "cardStripePaymentIntentSecret": "$response.body#/cardStripePaymentIntentSecret"
+          }
+        },
+        {
+          "stepId": "get-public-key-for-card-payment",
+          "description": "Retrieves the public key necessary for encrypting sensitive card details on the client-side before transmitting them to the payment gateway, ensuring security.",
+          "operationId": "GetPublicKeyForCardPayment",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.create-payment-request.outputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "jwt": "$response.body#/jwt"
+          }
+        },
+        {
+          "stepId": "submit-card-payment",
+          "description": "Submits the encrypted card payment details for authorization against the created payment request. This initiates the payment process.",
+          "operationId": "SubmitCardPayment",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.create-payment-request.outputs.id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "multipart/form-data",
+            "payload": {
+              "id": "$steps.create-payment-request.outputs.id",
+              "ExpiryMonth": "$inputs.ExpiryMonth",
+              "ExpiryYear": "$inputs.ExpiryYear"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "responseCode": "$response.body#/responseCode",
+            "status": "$response.body#/status",
+            "requestID": "$response.body#/requestID",
+            "transactionID": "$response.body#/transactionID",
+            "isPayerAuthenticationRequired": "$response.body#/isPayerAuthenticationRequired",
+            "payerAuthenticationUrl": "$response.body#/payerAuthenticationUrl",
+            "paymentRequestID": "$response.body#/paymentRequestID"
+          }
+        },
+        {
+          "stepId": "capture-card-payment",
+          "description": "Captures the funds from a previously authorized card payment. This moves the funds from the customer's account to the merchant's account.",
+          "operationId": "CaptureCardPayment",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.submit-card-payment.outputs.paymentRequestID"
+            }
+          ],
+          "requestBody": {
+            "contentType": "multipart/form-data",
+            "payload": {
+              "id": "$steps.submit-card-payment.outputs.paymentRequestID",
+              "AuthorizationID": "$steps.submit-card-payment.outputs.requestID"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "responseCode": "$response.body#/responseCode",
+            "status": "$response.body#/status",
+            "requestID": "$response.body#/requestID",
+            "transactionID": "$response.body#/transactionID",
+            "paymentRequestID": "$response.body#/paymentRequestID"
+          }
+        },
+        {
+          "stepId": "get-payment-request-result",
+          "description": "Retrieves the final result and detailed payment events for the payment request, allowing the merchant to confirm the transaction status.",
+          "operationId": "GetPaymentRequestResult",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.create-payment-request.outputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "result": "$response.body#/result",
+            "amountReceived": "$response.body#/amountReceived",
+            "amountRefunded": "$response.body#/amountRefunded",
+            "amountPending": "$response.body#/amountPending",
+            "payments": "$response.body#/payments"
+          }
+        }
+      ],
+      "outputs": {
+        "id": "$steps.create-payment-request.outputs.id",
+        "amount": "$steps.create-payment-request.outputs.amount",
+        "currency": "$steps.create-payment-request.outputs.currency",
+        "status": "$steps.capture-card-payment.outputs.status",
+        "cardStripePaymentIntentID": "$steps.create-payment-request.outputs.cardStripePaymentIntentID",
+        "cardStripePaymentIntentSecret": "$steps.create-payment-request.outputs.cardStripePaymentIntentSecret",
+        "jwt": "$steps.get-public-key-for-card-payment.outputs.jwt",
+        "responseCode": "$steps.capture-card-payment.outputs.responseCode",
+        "requestID": "$steps.capture-card-payment.outputs.requestID",
+        "transactionID": "$steps.capture-card-payment.outputs.transactionID",
+        "isPayerAuthenticationRequired": "$steps.submit-card-payment.outputs.isPayerAuthenticationRequired",
+        "payerAuthenticationUrl": "$steps.submit-card-payment.outputs.payerAuthenticationUrl",
+        "paymentRequestID": "$steps.capture-card-payment.outputs.paymentRequestID",
+        "result": "$steps.get-payment-request-result.outputs.result",
+        "amountReceived": "$steps.get-payment-request-result.outputs.amountReceived",
+        "amountRefunded": "$steps.get-payment-request-result.outputs.amountRefunded",
+        "amountPending": "$steps.get-payment-request-result.outputs.amountPending",
+        "payments": "$steps.get-payment-request-result.outputs.payments"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "manage-beneficiaries-and-single-payout",
+      "summary": "This workflow enables a merchant to create a new beneficiary, authorize it for secure transactions, and then create and submit a single payout to that authorized beneficiary. It's fundamental for managing outgoing payments.",
+      "description": "This workflow enables a merchant to create a new beneficiary, authorize it for secure transactions, and then create and submit a single payout to that authorized beneficiary. It's fundamental for managing outgoing payments.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "merchantID": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "accountID": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "create-beneficiary",
+          "description": "Creates a new beneficiary record, defining the recipient's details for future payouts.",
+          "operationId": "CreateBeneficiary",
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "currency": "$inputs.currency",
+              "destination": "$inputs.destination",
+              "merchantID": "$inputs.merchantID",
+              "name": "$inputs.name"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "name": "$response.body#/name",
+            "currency": "$response.body#/currency",
+            "isEnabled": "$response.body#/isEnabled",
+            "authorisersRequiredCount": "$response.body#/authorisersRequiredCount"
+          }
+        },
+        {
+          "stepId": "authorise-beneficiary",
+          "description": "Authorises the newly created beneficiary, which may require strong authentication, making it eligible for payouts.",
+          "operationId": "AuthoriseBeneficiary",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.create-beneficiary.outputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "beneficiary_data": "$response.body"
+          }
+        },
+        {
+          "stepId": "create-payout",
+          "description": "Creates a payout request from a specified account to the authorized beneficiary, including amount and references.",
+          "operationId": "CreatePayout",
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "beneficiaryID": "$steps.create-beneficiary.outputs.id",
+              "accountID": "$inputs.accountID",
+              "currency": "$inputs.currency",
+              "type": "$inputs.type"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "status": "$response.body#/status",
+            "amount": "$response.body#/amount",
+            "currency": "$response.body#/currency",
+            "approvePayoutUrl": "$response.body#/approvePayoutUrl"
+          }
+        },
+        {
+          "stepId": "submit-payout",
+          "description": "Submits the created payout for processing. This action initiates the transfer of funds.",
+          "operationId": "SubmitPayout",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.create-payout.outputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "payout_data": "$response.body"
+          }
+        },
+        {
+          "stepId": "get-payout-status",
+          "description": "Retrieves the current status and detailed information of the submitted payout, allowing for tracking of the transaction.",
+          "operationId": "GetPayout",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$inputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "status": "$response.body#/status",
+            "amount": "$response.body#/amount",
+            "currency": "$response.body#/currency",
+            "sourceAccountName": "$response.body#/sourceAccountName",
+            "destination": "$response.body#/destination"
+          }
+        }
+      ],
+      "outputs": {
+        "id": "$steps.get-payout-status.outputs.id",
+        "name": "$steps.create-beneficiary.outputs.name",
+        "currency": "$steps.get-payout-status.outputs.currency",
+        "isEnabled": "$steps.create-beneficiary.outputs.isEnabled",
+        "authorisersRequiredCount": "$steps.create-beneficiary.outputs.authorisersRequiredCount",
+        "beneficiary_data": "$steps.authorise-beneficiary.outputs.beneficiary_data",
+        "status": "$steps.get-payout-status.outputs.status",
+        "amount": "$steps.get-payout-status.outputs.amount",
+        "approvePayoutUrl": "$steps.create-payout.outputs.approvePayoutUrl",
+        "payout_data": "$steps.submit-payout.outputs.payout_data",
+        "sourceAccountName": "$steps.get-payout-status.outputs.sourceAccountName",
+        "destination": "$steps.get-payout-status.outputs.destination"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "open-banking-account-integration-and-data-retrieval",
+      "summary": "This workflow facilitates connecting to an external bank account via Open Banking, obtaining the necessary consent, and then retrieving detailed account and transaction data from the connected financial institution. It's crucial for aggregated financial views.",
+      "description": "This workflow facilitates connecting to an external bank account via Open Banking, obtaining the necessary consent, and then retrieving detailed account and transaction data from the connected financial institution. It's crucial for aggregated financial views.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "institutionID": {
+            "type": "string"
+          },
+          "merchantID": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "accountID": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "string"
+          },
+          "transactionFrom": {
+            "type": "string"
+          },
+          "transactionTo": {
+            "type": "string"
+          },
+          "sortInsertedAscending": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "create-open-banking-consent",
+          "description": "Initiates the process of creating an Open Banking consent, which is required to access external bank account data.",
+          "operationId": "CreateConsent",
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "institutionID": "$inputs.institutionID",
+              "merchantID": "$inputs.merchantID"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "consentID": "$response.body#/consentID",
+            "authorisationUrl": "$response.body#/authorisationUrl"
+          }
+        },
+        {
+          "stepId": "get-consent-details",
+          "description": "Retrieves the details of the created consent, including the authorization URL that the end-user needs to visit to grant access.",
+          "operationId": "GetConsent",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.create-open-banking-consent.outputs.consentID"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "merchantID": "$response.body#/merchantID",
+            "institutionID": "$response.body#/institutionID",
+            "emailAddress": "$response.body#/emailAddress",
+            "isEnabled": "$response.body#/isEnabled",
+            "expiryDate": "$response.body#/expiryDate"
+          }
+        },
+        {
+          "stepId": "get-connected-accounts",
+          "description": "Fetches a list of connected bank accounts from the financial institution using the authorized consent, providing an overview of the user's external accounts.",
+          "operationId": "GetConnectedAccounts",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.get-consent-details.outputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "accounts": "$response.body#/0/accounts"
+          }
+        },
+        {
+          "stepId": "get-connected-account-transactions",
+          "description": "Retrieves detailed transaction history for a specific connected account, enabling comprehensive financial analysis.",
+          "operationId": "GetConnectedAccountTransactions",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.get-connected-accounts.outputs.accounts.id"
+            },
+            {
+              "name": "accountID",
+              "in": "path",
+              "value": "$steps.get-connected-accounts.outputs.accounts.id"
+            },
+            {
+              "name": "offset",
+              "in": "query",
+              "value": "$inputs.offset"
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "value": "$inputs.limit"
+            },
+            {
+              "name": "transactionFrom",
+              "in": "query",
+              "value": "$inputs.transactionFrom"
+            },
+            {
+              "name": "transactionTo",
+              "in": "query",
+              "value": "$inputs.transactionTo"
+            },
+            {
+              "name": "sortInsertedAscending",
+              "in": "query",
+              "value": "$inputs.sortInsertedAscending"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "transactions": "$response.body#/0/transactions"
+          }
+        }
+      ],
+      "outputs": {
+        "consentID": "$steps.create-open-banking-consent.outputs.consentID",
+        "authorisationUrl": "$steps.create-open-banking-consent.outputs.authorisationUrl",
+        "id": "$steps.get-consent-details.outputs.id",
+        "merchantID": "$steps.get-consent-details.outputs.merchantID",
+        "institutionID": "$steps.get-consent-details.outputs.institutionID",
+        "emailAddress": "$steps.get-consent-details.outputs.emailAddress",
+        "isEnabled": "$steps.get-consent-details.outputs.isEnabled",
+        "expiryDate": "$steps.get-consent-details.outputs.expiryDate",
+        "accounts": "$steps.get-connected-accounts.outputs.accounts",
+        "transactions": "$steps.get-connected-account-transactions.outputs.transactions"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "bulk-payout-management-with-payruns",
+      "summary": "This workflow streamlines the process of managing multiple payouts by grouping them into a 'payrun', allowing for collective authorization and submission. Ideal for payroll or batch payments.",
+      "description": "This workflow streamlines the process of managing multiple payouts by grouping them into a 'payrun', allowing for collective authorization and submission. Ideal for payroll or batch payments.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "merchantID": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "invoices": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "scheduledDate": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "create-payrun",
+          "description": "Creates a new payrun, grouping multiple invoices or payments for efficient bulk processing.",
+          "operationId": "CreatePayrun",
+          "parameters": [
+            {
+              "name": "merchantID",
+              "in": "path",
+              "value": "$inputs.merchantID"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "name": "$inputs.name",
+              "invoices": "$inputs.invoices"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "name": "$response.body#/name",
+            "status": "$response.body#/status",
+            "totalEur": "$response.body#/totalEur",
+            "totalGbp": "$response.body#/totalGbp",
+            "totalUsd": "$response.body#/totalUsd"
+          }
+        },
+        {
+          "stepId": "request-payrun-authorisation",
+          "description": "Requests authorisation from designated approvers for the created payrun, ensuring compliance and security.",
+          "operationId": "RequestPayrunAuthorisation",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.create-payrun.outputs.id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "id": "$steps.create-payrun.outputs.id",
+              "notes": "$inputs.notes",
+              "scheduledDate": "$inputs.scheduledDate"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "authorisation_data": "$response.body"
+          }
+        },
+        {
+          "stepId": "submit-payrun",
+          "description": "Submits the payrun for processing after it has received all necessary authorisations. This initiates the batch payouts.",
+          "operationId": "SubmitPayrun",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$inputs.id"
+            }
+          ],
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "scheduledDate": "$inputs.scheduledDate"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "payrun_data": "$response.body"
+          }
+        },
+        {
+          "stepId": "get-payrun-status",
+          "description": "Retrieves the current status and detailed information of the submitted payrun, including its associated payouts and invoices, for monitoring purposes.",
+          "operationId": "GetPayrun",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$inputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "name": "$response.body#/name",
+            "status": "$response.body#/status",
+            "payouts": "$response.body#/payouts",
+            "invoices": "$response.body#/invoices"
+          }
+        }
+      ],
+      "outputs": {
+        "id": "$steps.get-payrun-status.outputs.id",
+        "name": "$steps.get-payrun-status.outputs.name",
+        "status": "$steps.get-payrun-status.outputs.status",
+        "totalEur": "$steps.create-payrun.outputs.totalEur",
+        "totalGbp": "$steps.create-payrun.outputs.totalGbp",
+        "totalUsd": "$steps.create-payrun.outputs.totalUsd",
+        "authorisation_data": "$steps.request-payrun-authorisation.outputs.authorisation_data",
+        "payrun_data": "$steps.submit-payrun.outputs.payrun_data",
+        "payouts": "$steps.get-payrun-status.outputs.payouts",
+        "invoices": "$steps.get-payrun-status.outputs.invoices"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "merchant-api-token-lifecycle-management",
+      "summary": "This workflow covers the full lifecycle of a merchant API token, from its creation and authorization to retrieving its details and eventually archiving it. Essential for secure and controlled API access.",
+      "description": "This workflow covers the full lifecycle of a merchant API token, from its creation and authorization to retrieving its details and eventually archiving it. Essential for secure and controlled API access.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "merchantID": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "string"
+          },
+          "pageSize": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "create-merchant-token",
+          "description": "Creates a new API token for a specific merchant, defining its permissions and HMAC algorithm for secure communication.",
+          "operationId": "CreateMerchantToken",
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "description": "$inputs.description",
+              "merchantID": "$inputs.merchantID"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "token": "$response.body#/token",
+            "sharedSecretBase64": "$response.body#/sharedSecretBase64",
+            "merchantID": "$response.body#/merchantID"
+          }
+        },
+        {
+          "stepId": "authorise-merchant-token",
+          "description": "Authorises the newly created merchant API token, activating it for use in API requests.",
+          "operationId": "AuthoriseMerchantToken",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.create-merchant-token.outputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "token_data": "$response.body"
+          }
+        },
+        {
+          "stepId": "get-merchant-tokens",
+          "description": "Retrieves a paged list of all API tokens associated with the merchant, allowing administrators to review active tokens.",
+          "operationId": "GetMerchantTokens",
+          "parameters": [
+            {
+              "name": "merchantID",
+              "in": "path",
+              "value": "$steps.create-merchant-token.outputs.merchantID"
+            },
+            {
+              "name": "pageNumber",
+              "in": "query",
+              "value": "$inputs.pageNumber"
+            },
+            {
+              "name": "pageSize",
+              "in": "query",
+              "value": "$inputs.pageSize"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "content": "$response.body#/content",
+            "totalSize": "$response.body#/totalSize"
+          }
+        },
+        {
+          "stepId": "archive-merchant-token",
+          "description": "Archives a specific merchant API token, effectively disabling its use for future API calls.",
+          "operationId": "ArchiveToken",
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "value": "$steps.create-merchant-token.outputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "token_data": "$response.body"
+          }
+        }
+      ],
+      "outputs": {
+        "id": "$steps.create-merchant-token.outputs.id",
+        "token": "$steps.create-merchant-token.outputs.token",
+        "sharedSecretBase64": "$steps.create-merchant-token.outputs.sharedSecretBase64",
+        "merchantID": "$steps.create-merchant-token.outputs.merchantID",
+        "token_data": "$steps.archive-merchant-token.outputs.token_data",
+        "content": "$steps.get-merchant-tokens.outputs.content",
+        "totalSize": "$steps.get-merchant-tokens.outputs.totalSize"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    },
+    {
+      "workflowId": "merchant-account-setup-and-overview",
+      "summary": "Allows a merchant to create a new payment account, view its details, and retrieve its transaction history. This workflow is essential for merchants to establish their financial presence and monitor activity within the NoFrixion platform.",
+      "description": "Allows a merchant to create a new payment account, view its details, and retrieve its transaction history. This workflow is essential for merchants to establish their financial presence and monitor activity within the NoFrixion platform.",
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "merchantID": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "physicalAccountID": {
+            "type": "string"
+          },
+          "isTrustAccount": {
+            "type": "string"
+          },
+          "roleIDs": {
+            "type": "string"
+          },
+          "accountID": {
+            "type": "string"
+          },
+          "fromDate": {
+            "type": "string"
+          },
+          "pageNumber": {
+            "type": "string"
+          },
+          "pageSize": {
+            "type": "string"
+          },
+          "toDate": {
+            "type": "string"
+          },
+          "creditType": {
+            "type": "string"
+          },
+          "search": {
+            "type": "string"
+          },
+          "sort": {
+            "type": "string"
+          },
+          "minAmount": {
+            "type": "string"
+          },
+          "maxAmount": {
+            "type": "string"
+          }
+        }
+      },
+      "steps": [
+        {
+          "stepId": "create-payment-account",
+          "description": "Creates a new merchant payment account with specified currency and name. This is the first step for a merchant to manage funds.",
+          "operationId": "CreateAccount",
+          "requestBody": {
+            "contentType": "application/json",
+            "payload": {
+              "merchantID": "$inputs.merchantID",
+              "currency": "$inputs.currency",
+              "accountName": "$inputs.accountName",
+              "physicalAccountID": "$inputs.physicalAccountID",
+              "isTrustAccount": "$inputs.isTrustAccount",
+              "roleIDs": "$inputs.roleIDs"
+            }
+          },
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "accountName": "$response.body#/accountName",
+            "currency": "$response.body#/currency",
+            "balance": "$response.body#/balance"
+          }
+        },
+        {
+          "stepId": "get-created-account",
+          "description": "Retrieves the detailed information of the newly created payment account, including its current balance and available balance.",
+          "operationId": "GetAccount",
+          "parameters": [
+            {
+              "name": "accountID",
+              "in": "path",
+              "value": "$steps.create-payment-account.outputs.id"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "id": "$response.body#/id",
+            "accountName": "$response.body#/accountName",
+            "currency": "$response.body#/currency",
+            "balance": "$response.body#/balance",
+            "availableBalance": "$response.body#/availableBalance"
+          }
+        },
+        {
+          "stepId": "get-account-transactions",
+          "description": "Retrieves a paged list of transactions associated with the created payment account, allowing for financial monitoring.",
+          "operationId": "GetAccountTransactionsPaged",
+          "parameters": [
+            {
+              "name": "accountID",
+              "in": "path",
+              "value": "$steps.get-created-account.outputs.id"
+            },
+            {
+              "name": "fromDate",
+              "in": "query",
+              "value": "$inputs.fromDate"
+            },
+            {
+              "name": "pageNumber",
+              "in": "query",
+              "value": "$inputs.pageNumber"
+            },
+            {
+              "name": "pageSize",
+              "in": "query",
+              "value": "$inputs.pageSize"
+            },
+            {
+              "name": "toDate",
+              "in": "query",
+              "value": "$inputs.toDate"
+            },
+            {
+              "name": "creditType",
+              "in": "query",
+              "value": "$inputs.creditType"
+            },
+            {
+              "name": "search",
+              "in": "query",
+              "value": "$inputs.search"
+            },
+            {
+              "name": "sort",
+              "in": "query",
+              "value": "$inputs.sort"
+            },
+            {
+              "name": "minAmount",
+              "in": "query",
+              "value": "$inputs.minAmount"
+            },
+            {
+              "name": "maxAmount",
+              "in": "query",
+              "value": "$inputs.maxAmount"
+            }
+          ],
+          "successCriteria": [
+            {
+              "condition": "$statusCode == 200"
+            }
+          ],
+          "outputs": {
+            "content": "$response.body#/content",
+            "totalSize": "$response.body#/totalSize"
+          }
+        }
+      ],
+      "outputs": {
+        "id": "$steps.get-created-account.outputs.id",
+        "accountName": "$steps.get-created-account.outputs.accountName",
+        "currency": "$steps.get-created-account.outputs.currency",
+        "balance": "$steps.get-created-account.outputs.balance",
+        "availableBalance": "$steps.get-created-account.outputs.availableBalance",
+        "content": "$steps.get-account-transactions.outputs.content",
+        "totalSize": "$steps.get-account-transactions.outputs.totalSize"
+      },
+      "failureActions": [
+        {
+          "reference": "$components.failureActions.auth_failure"
+        },
+        {
+          "reference": "$components.failureActions.permission_denied"
+        },
+        {
+          "reference": "$components.failureActions.not_found"
+        },
+        {
+          "reference": "$components.failureActions.server_error"
+        }
+      ]
+    }
+  ],
+  "components": {
+    "successActions": {
+      "default_success": {
+        "name": "default_success",
+        "type": "end"
+      }
+    },
+    "failureActions": {
+      "auth_failure": {
+        "name": "auth_failure",
+        "type": "end",
+        "criteria": [
+          {
+            "condition": "$statusCode == 401"
+          }
+        ]
+      },
+      "permission_denied": {
+        "name": "permission_denied",
+        "type": "end",
+        "criteria": [
+          {
+            "condition": "$statusCode == 403"
+          }
+        ]
+      },
+      "not_found": {
+        "name": "not_found",
+        "type": "end",
+        "criteria": [
+          {
+            "condition": "$statusCode == 404"
+          }
+        ]
+      },
+      "server_error": {
+        "name": "server_error",
+        "type": "retry",
+        "retryAfter": 2,
+        "retryLimit": 3,
+        "criteria": [
+          {
+            "condition": "$statusCode >= 500"
+          }
+        ]
+      },
+      "default_retry": {
+        "name": "default_retry",
+        "type": "retry",
+        "retryAfter": 1,
+        "retryLimit": 3
+      },
+      "default_failure": {
+        "name": "default_failure",
+        "type": "end"
+      }
+    }
+  }
+}

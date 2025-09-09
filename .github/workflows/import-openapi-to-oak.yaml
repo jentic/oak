@@ -12,7 +12,7 @@ jobs:
     permissions:
       contents: write        # To push the new branch and commit files
       pull-requests: write   # To create the pull request
-      issues: read           # To read the issue body
+      issues: write          # To comment on the issue (if needed)
 
     steps:
       - name: Check out the repository
@@ -32,6 +32,8 @@ jobs:
           echo "URL after grep/xargs: $URL"
           if [ -z "$URL" ]; then
             echo "::error::Could not extract required 'import_oas_url:' field from issue body."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=Could not extract required 'import_oas_url:' field from issue body. Please ensure your issue contains a line with 'import_oas_url: <your-url>'." >> $GITHUB_OUTPUT
             exit 1
           fi
 
@@ -40,6 +42,8 @@ jobs:
           echo "Vendor Name after grep/xargs: $VENDOR_NAME"
           if [ -z "$VENDOR_NAME" ]; then
             echo "::error::Could not extract required 'vendor_name:' field from issue body."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=Could not extract required 'vendor_name:' field from issue body. Please ensure your issue contains a line with 'vendor_name: <your-vendor-name>'." >> $GITHUB_OUTPUT
             exit 1
           fi
 
@@ -82,10 +86,15 @@ jobs:
 
           if [ "$STATUS_CODE" -ne 200 ]; then
               echo "::error::Repotools API call failed with status code $STATUS_CODE."
+              echo "api_failed=true" >> $GITHUB_OUTPUT
 
               if [ -s "$OUTPUT_ZIP" ]; then
                   echo "Response details (if any):"
-                  cat "$OUTPUT_ZIP" # Output might contain error details from the API
+                  ERROR_RESPONSE=$(cat "$OUTPUT_ZIP")
+                  echo "$ERROR_RESPONSE"
+                  echo "error_response=$ERROR_RESPONSE" >> $GITHUB_OUTPUT
+              else
+                  echo "error_response=Repotools API call failed with HTTP status code $STATUS_CODE. No additional error details available." >> $GITHUB_OUTPUT
               fi
               exit 1
           else
@@ -99,6 +108,8 @@ jobs:
               if [ ! -s "$OUTPUT_ZIP" ] || [ $(stat -c%s "$OUTPUT_ZIP") -lt 100 ]; then # Check if file exists and is > 100 bytes
                   echo "::error::Downloaded ZIP file seems empty or too small."
                   ls -l "$OUTPUT_ZIP"
+                  echo "api_failed=true" >> $GITHUB_OUTPUT
+                  echo "error_response=Downloaded ZIP file from Repotools API is empty or too small. The OpenAPI URL may be invalid or inaccessible." >> $GITHUB_OUTPUT
                   exit 1
               fi
               echo "ZIP file size: $(stat -c%s "$OUTPUT_ZIP") bytes."
@@ -253,7 +264,7 @@ jobs:
         id: create_pr_step
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.PAT_AUTO_OPENAPI }} # Make sure this token has write permissions
+          token: ${{ secrets.GITHUB_TOKEN }} # Make sure this token has write permissions
           commit-message: "feat: Import OpenAPI spec from Issue #${{ github.event.issue.number }}"
           title: "feat: Import OpenAPI spec from Issue #${{ github.event.issue.number }}"
           body: |
@@ -272,7 +283,7 @@ jobs:
         if: steps.prepare_repair_log.outputs.log_found == 'true' && steps.create_pr_step.outputs.pull-request-number
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.PAT_AUTO_OPENAPI }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             let logContentBase64 = '${{ steps.prepare_repair_log.outputs.log_content_base64 }}';
             let logContent = '';
@@ -309,4 +320,47 @@ jobs:
               repo: context.repo.repo,
               issue_number: ${{ steps.create_pr_step.outputs.pull-request-number }},
               body: commentBody
+            });
+
+      - name: Comment on Issue if Import Failed
+        if: failure() && (steps.extract_info.outputs.extract_failed == 'true' || steps.call_repotools.outputs.api_failed == 'true')
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            let errorMessage = "❌ **Failed to import OpenAPI specification**\n\n";
+            
+            // Check which step failed and provide appropriate error message
+            if ('${{ steps.extract_info.outputs.extract_failed }}' === 'true') {
+              errorMessage += `**Error:** ${{ steps.extract_info.outputs.error_message }}\n\n`;
+              errorMessage += "Please check your issue format and ensure it contains the required fields:\n";
+              errorMessage += "- \`import_oas_url: <your-openapi-url>\`\n";
+              errorMessage += "- \`vendor_name: <your-vendor-name>\`\n\n";
+            } else if ('${{ steps.call_repotools.outputs.api_failed }}' === 'true') {
+              const errorResponse = `${{ steps.call_repotools.outputs.error_response }}`;
+              errorMessage += `**Error:** Import service failed\n\n`;
+              
+              try {
+                const response = JSON.parse(errorResponse);
+                if (response.error) {
+                  errorMessage += `**Details:** ${response.error}\n\n`;
+                }
+                if (response.message) {
+                  errorMessage += `**Message:** ${response.message}\n\n`;
+                }
+              } catch (e) {
+                errorMessage += `**Details:** ${errorResponse}\n\n`;
+              }
+              
+              errorMessage += "Please check that your OpenAPI URL is accessible and contains a valid OpenAPI specification.\n\n";
+            }
+            
+            errorMessage += "If you believe this is a bug with the import service or need additional support, please contact the development team at Jentic Community Discord (https://discord.gg/yrxmDZWMqB).\n\n";
+            errorMessage += "Alternatively create a new issue reporting the bug (https://github.com/jentic/jentic-public-apis/issues/new?template=BLANK_ISSUE).";
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: errorMessage
             });

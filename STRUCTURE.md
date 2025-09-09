@@ -1,6 +1,6 @@
-# OAK Repository Structure
+# Repository Structure (OAK Standard)
 
-This document describes the standardized directory structure for OpenAPI specifications and workflows in the OAK repository.
+This document describes the standardized directory structure for an Open Agentic Knowledge (OAK) repository. This repository follows this standard to organize its API specifications and workflows.
 
 ## Overview
 
@@ -37,8 +37,6 @@ __data__/
       └── vendor1.com+vendor2.com~api3/ # Multi-API workflows (alphabetical ordering)
           ├── workflows.arrazo.json    # Default workflows for these APIs
           └── integration-flows.arrazo.json # Specific integration workflows
-tools/
-  └── oak-runner/
 ```
 
 ## API Structure Details
@@ -112,10 +110,3 @@ Each workflow directory can contain multiple `.arrazo.json` files:
   - `integration-flows.arrazo.json`
   - etc.
 
-## Tools Directory
-
-The `tools/` directory contains supporting utilities and libraries developed as part of the OAK initiative:
-
-- **`oak-runner/`**: Houses the OAK Runner, a reference execution engine for Arazzo workflows and OpenAPI operations defined in the repository.
-
-Each tool subdirectory contains its own `README.md` with specific usage and development instructions.
