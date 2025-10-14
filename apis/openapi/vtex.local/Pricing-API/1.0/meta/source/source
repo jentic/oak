@@ -1,0 +1,2311 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Pricing API",
+    "description": "Check the new [Pricing onboarding guide](https://developers.vtex.com/docs/guides/pricing-overview). We created this guide to improve the onboarding experience for developers at VTEX. It assembles all documentation on our Developer Portal about Pricing and is organized by focusing on the developer's journey.\r\n\r\nPricing is the VTEX module responsible for the SKU's price list. In this module, we have the base price of each SKU, optional fixed prices by trade policy, and rules that can be applied to dynamically generate different final prices according to the purchase context and the trade policy. \r\n\r\nFind more information on how to use this module and its business logic at our [Pricing onboarding guide](https://developers.vtex.com/docs/guides/pricing-overview).\r \n\r\n## Rate limits per route\r\nThe rate limits per route revolve around the following values:\r\n\r\n\r\n| Operation | Rate | Burst credits  |\r\n| - | - | - |\r\n| `GET` | No rate limits | No rate limits |\r\n| `POST` and `PUT` | 2000 per minute<br>33 per second | 500 |\r\n| `DELETE` | 1000 per minute<br>16 per second | 300 |\r\n\r\n### Burst credits\r\nIn case the account exceeds the limit frequency for a Rate Limiter (for instance, when one account makes 34 requests per second in any price insert/update route), we decrease from the Burst Credit count the exceeding (in this example, 1 Credit).\r\n\r\nIn the event of the Burst Credits reaching 0 (zero), the request is blocked with a Status 429 response.\r \n\r\nThe credits fill up over time when the route is not being used, at the same rate as the route's Rate Limiter. In our example, for each second not sending a PUT or POST request, we increase 40 Burst Credits to this Rate Limiter.\r\n\r \n### Response Headers for rate limits\r\nIn the response of any request to the Pricing API, there are headers indicating the current status of the Rate Limiting. This information may be useful to evaluate the ideal frequency to send requests to a route, and when to send a new request in the event of reaching a Rate Limit.\r \n\r\n- `Ratelimit-Limit`: Total Burst Credits offered to a route\r\n- `Ratelimit-Remaining`: How many Burst Credits are still available to use\r\n- `Ratelimit-Reset`: How long (in seconds) it will take for Burst Credits to fill up completely (it will fill up to the *Ratelimit-Limit*)\r\n- `Retry-After`: Indicates how many seconds you will need to wait until the Rate Limiter accepts a new request to this route again. If this header response exists, this means your current request has been rate-limited and has not been processed.\r\n\r\n\r\n### Integrating with Pricing v2 considering rate limits\r\nWhen developing an integration, consider the requests/route/account limits specified in the [Rate Limits per route](#rate-limits-per-route) section, and avoid surpassing this frequency.\r\n\r\nIf you happen to be rate limited, please await the time in seconds specified in `Retry-After` before making another request to the service, and reduce the rate of requests per second that your integration is making.\r\n\r\n## Index\r\n\r\n### Prices and Fixed Prices\r\n- `GET` [Get Price](https://developers.vtex.com/docs/api-reference/pricing-api/#get-/pricing/prices/-itemId-)\r \n- `DELETE` [Delete Price](https://developers.vtex.com/docs/api-reference/pricing-api/#delete-/pricing/prices/-itemId-)\r \n- `PUT` [Create or Update Base Price or Fixed Prices](https://developers.vtex.com/docs/api-reference/pricing-api/#put-/pricing/prices/-itemId-)\r \n- `PATCH` [Create or Update Base Price or Fixed Prices](https://developers.vtex.com/docs/api-reference/pricing-api/#patch-/pricing/prices/-itemId-)\r \n-`GET` [Get Fixed Prices](https://developers.vtex.com/docs/api-reference/pricing-api/#get-/pricing/prices/-itemId-/fixed)\r \n- `POST` [Create or Update Fixed Prices on a price table or trade policy](https://developers.vtex.com/docs/api-reference/pricing-api/#post-/pricing/prices/-itemId-/fixed/-priceTableId-)\r \n- `GET` [Get Fixed Prices on a price table policy](https://developers.vtex.com/docs/api-reference/pricing-api/#get-/pricing/prices/-itemId-/fixed/-priceTableId-)\r \n- `DELETE` [Delete Fixed Prices on a price table or trade policy](https://developers.vtex.com/docs/api-reference/pricing-api/#delete-/pricing/prices/-itemId-/fixed/-priceTableId-)\r \n- `GET` [GET Computed Price by price table or trade policy](https://developers.vtex.com/docs/api-reference/pricing-api/#get-/pricing/prices/-itemId-/computed/-priceTableId-)\r \n\r\n\r\n### Pricing Configuration\r\n- `GET` [Get Pricing Configuration](https://developers.vtex.com/docs/api-reference/pricing-api/#get-/pricing/config)\r \n- `GET` [Get Pricing v2 Status](https://developers.vtex.com/docs/api-reference/pricing-api/#get-/pricing/migration)\r \n\r\n\r\n### Price Tables\r\n- `GET` [Get rules for a price table](https://developers.vtex.com/docs/api-reference/pricing-api/#get-/pricing/pipeline/catalog/-priceTableId-)\r \n- `PUT` [Update rules for a price table](https://developers.vtex.com/docs/api-reference/pricing-api/#put-/pricing/pipeline/catalog/-priceTableId-)\r \n- `GET` [Get all price tables and their rules](https://developers.vtex.com/docs/api-reference/pricing-api/#get-/pricing/pipeline/catalog)\r \n- `GET` [List price tables](https://developers.vtex.com/docs/api-reference/pricing-api/#get-/pricing/tables)\r \n\r\n## Common parameters in the documentation\r\n\r\n| Parameter name | Description |\r\n| - | - |\r\n| `{{accountName}}` | Store account name. |\r\n| `{{environment}}` | The environment that will be called. |\r\n| `{{X-VTEX-API-AppKey}}`   | Located in the headers of the requests, user authentication key. |\r\n| `{{X-VTEX-API-AppToken}}` | Located in the headers of the requests, authentication password. |",
+    "contact": {},
+    "version": "1.0",
+    "x-jentic-source-url": "https://raw.githubusercontent.com/vtex/openapi-schemas/master/VTEX - Pricing API.json"
+  },
+  "servers": [
+    {
+      "url": "https://api.vtex.com/{accountName}",
+      "description": "VTEX server URL.",
+      "variables": {
+        "accountName": {
+          "description": "Name of the VTEX account. Used as part of the URL",
+          "default": "apiexamples"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/pricing/prices/{itemId}": {
+      "get": {
+        "tags": [
+          "Prices and Fixed Prices"
+        ],
+        "summary": "Get price by SKU ID",
+        "description": "Retrieves price data given a specific SKU ID. Within the `fixedPrices` object, there might be a list of prices for specific Trade Policies and Minimium Quantities of the SKU. Fixed Prices may also be scheduled.\r\n\r\n\r\n\r\n ## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Read prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "GetPrice",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "SKU ID.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Getprice"
+                },
+                "example": {
+                  "itemId": "1234512354",
+                  "listPrice": 300,
+                  "costPrice": 10,
+                  "markup": 2400,
+                  "basePrice": 250,
+                  "fixedPrices": [
+                    {
+                      "tradePolicyId": "1",
+                      "value": 666.66,
+                      "listPrice": null,
+                      "minQuantity": 1
+                    },
+                    {
+                      "tradePolicyId": "9",
+                      "value": 4500,
+                      "listPrice": null,
+                      "minQuantity": 1
+                    },
+                    {
+                      "tradePolicyId": "9",
+                      "value": 600,
+                      "listPrice": null,
+                      "minQuantity": 1,
+                      "dateRange": {
+                        "from": "2017-12-07T14:30:00Z",
+                        "to": "2017-12-30T14:30:00Z"
+                      }
+                    },
+                    {
+                      "tradePolicyId": "9",
+                      "value": 5555.55,
+                      "listPrice": null,
+                      "minQuantity": 1,
+                      "dateRange": {
+                        "from": "2017-12-20T14:30:00Z",
+                        "to": "2017-12-22T14:30:00Z"
+                      }
+                    },
+                    {
+                      "tradePolicyId": "9",
+                      "value": 555.55,
+                      "listPrice": null,
+                      "minQuantity": 1,
+                      "dateRange": {
+                        "from": "2017-12-06T15:00:00Z",
+                        "to": "2017-12-14T15:00:00Z"
+                      }
+                    },
+                    {
+                      "tradePolicyId": "10",
+                      "value": 5555.55,
+                      "listPrice": null,
+                      "minQuantity": 1
+                    },
+                    {
+                      "tradePolicyId": "18",
+                      "value": 555.55,
+                      "listPrice": null,
+                      "minQuantity": 1
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "deprecated": false
+      },
+      "delete": {
+        "tags": [
+          "Prices and Fixed Prices"
+        ],
+        "summary": "Delete price all base and fixed prices of an SKU",
+        "description": "Deletes the Base Price and all available Fixed Prices for an SKU in all trade policies.\r\n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Delete all prices from account** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "DeletePrice",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "SKU ID.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "deprecated": false
+      },
+      "put": {
+        "tags": [
+          "Prices and Fixed Prices"
+        ],
+        "summary": "Create or update base price or fixed price",
+        "description": "Creates or updates an SKU base price or fixed price. The **base price** is the basic selling price of a product, it comprises the cost price and the markup wanted in the sale of the product. The **fixed price** is an optional price of the SKU for a specific trade policy with a specific minimum quantity to be activated.\r\n\r\nYou may optionally set a list price. Additionally, you may set either a cost price or a markup value. By defining either one of them, the other will be calculated using the formula `costPrice * (1 + markup) = basePrice`. \r\n\r\n>\u26a0\ufe0f This PUT request overwrites all fixed prices for the specified SKU with the provided data. It does not add new fixed prices individually \u2014 any existing prices not included in the request body will be deleted.\r\n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Modify prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "CreateUpdatePriceOrFixedPrice",
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "SKU unique identifier number.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "markup",
+                  "basePrice",
+                  "listPrice"
+                ],
+                "properties": {
+                  "markup": {
+                    "type": "integer",
+                    "description": "The profit percentage that is to be obtained from the sale of that SKU. If you decide to fill the `markup` item, you must also fill the `costPrice`. The `basePrice` will be automatically generated based on both values.",
+                    "example": 30
+                  },
+                  "listPrice": {
+                    "type": "number",
+                    "description": "SKU's suggested selling price.",
+                    "example": 50.0
+                  },
+                  "basePrice": {
+                    "type": "number",
+                    "description": "SKU selling base price. If you decide to fill only the `basePrice` item, the `markup` and `costPrice` will be automatically generated to adapt to the number inserted in `basePrice`.",
+                    "example": 100.0
+                  },
+                  "costPrice": {
+                    "type": "number",
+                    "description": "SKU selling cost price. If you decide to fill the `costPrice` item, you must also fill the `markup` and `basePrice` will be automatically generated based on both values.",
+                    "example": 35.0
+                  },
+                  "fixedPrices": {
+                    "type": "array",
+                    "description": "Information  about the SKU's fixed prices.",
+                    "items": {
+                      "description": "Array with general information about the SKU's fixed prices.",
+                      "type": "object",
+                      "required": [
+                        "minQuantity",
+                        "value",
+                        "tradePolicyId"
+                      ],
+                      "properties": {
+                        "tradePolicyId": {
+                          "type": "string",
+                          "description": "The name or ID of the trade policy, or the name of the price table where the fixed price will be configured.",
+                          "example": "1"
+                        },
+                        "value": {
+                          "type": "number",
+                          "description": "Fixed price value.",
+                          "example": 50.5
+                        },
+                        "listPrice": {
+                          "type": "number",
+                          "description": "SKU List Fixed Price.",
+                          "example": 50.5
+                        },
+                        "minQuantity": {
+                          "type": "integer",
+                          "description": "Minimum quantity of the SKU for the fixed price to be applied.",
+                          "example": 2
+                        },
+                        "dateRange": {
+                          "type": "object",
+                          "description": "Period of time when the fixed price will be applied to the SKU.",
+                          "required": [
+                            "from",
+                            "to"
+                          ],
+                          "properties": {
+                            "from": {
+                              "type": "string",
+                              "description": "Start date of the price. This date follows the [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format, which includes the time zone.",
+                              "example": "2021-12-30T22:00:00-03:00"
+                            },
+                            "to": {
+                              "type": "string",
+                              "description": "End date of the price. This date follows the [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format, which includes the time zone.",
+                              "example": "2021-12-30T22:00:00-03:00"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "markup": 30,
+                "listPrice": 50.0,
+                "basePrice": 100.0,
+                "costPrice": 35.0,
+                "fixedPrices": [
+                  {
+                    "tradePolicyId": "1",
+                    "value": 50.5,
+                    "listPrice": 50.5,
+                    "minQuantity": 2,
+                    "dateRange": {
+                      "from": "2021-12-30T22:00:00-03:00",
+                      "to": "2021-12-30T22:00:00-03:00"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Prices and Fixed Prices"
+        ],
+        "summary": "Create or update base price or fixed price",
+        "description": "Updates the base price or fixed prices of an SKU. The base price is the basic selling price of a product, it comprises the cost price and the markup wanted in the sale of the product. A fixed price is an optional price defined for a specific trade policy or a price table. It can include a minimum quantity and an effective date range that determines when the price is active.\r \n\r\nThis request does not remove existing prices. Instead, it updates or adds new prices without affecting trade policies or price tables that are not included in the request. If a fixed price or base price already exists for the specified SKU and matches the activation conditions (i.e., dateRange and minQuantity), it will be replaced. Otherwise, a new price will be created.\r \n\r\n\r\n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Modify prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "CreateUpdatePriceOrFixedPriceNoRemove",
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "SKU unique identifier number.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "description": "Information about the SKU's fixed prices.",
+                "items": {
+                  "description": "Array with general information about the SKU's fixed prices.",
+                  "type": "object",
+                  "required": [
+                    "minQuantity",
+                    "value",
+                    "tradePolicyId"
+                  ],
+                  "properties": {
+                    "tradePolicyId": {
+                      "type": "string",
+                      "description": "The name or ID of the trade policy, or the price table name, where the fixed price will be configured.",
+                      "example": "1"
+                    },
+                    "value": {
+                      "type": "number",
+                      "description": "Selling price of the SKU for this fixed price entry.",
+                      "example": 50.5
+                    },
+                    "listPrice": {
+                      "type": "number",
+                      "description": "Original or reference price of the SKU for this fixed price.",
+                      "example": 50.5
+                    },
+                    "minQuantity": {
+                      "type": "integer",
+                      "description": "Minimum quantity required for the fixed price to apply.",
+                      "default": 1,
+                      "example": 2
+                    },
+                    "dateRange": {
+                      "type": "object",
+                      "description": "Period of time when the fixed price will be applied to the SKU. If not provided, the price is not restricted by a date range.",
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "properties": {
+                        "from": {
+                          "type": "string",
+                          "description": "Start date of the price. This date follows the [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format, which includes the time zone.",
+                          "example": "2021-12-30T22:00:00-03:00"
+                        },
+                        "to": {
+                          "type": "string",
+                          "description": "End date of the price. This date follows the [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format, which includes the time zone.",
+                          "example": "2021-12-30T22:00:00-03:00"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "example": [
+                {
+                  "tradePolicyId": "1",
+                  "value": 50.5,
+                  "listPrice": 50.5,
+                  "minQuantity": 2,
+                  "dateRange": {
+                    "from": "2021-12-30T22:00:00-03:00",
+                    "to": "2021-12-30T22:00:00-03:00"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/pricing/prices/{itemId}/fixed": {
+      "get": {
+        "tags": [
+          "Prices and Fixed Prices"
+        ],
+        "summary": "Get fixed prices",
+        "description": "The **fixed price** is an optional price of the SKU for a specific trade policy with a specific minimum quantity to be activated. This method retrieves an array of Fixed Prices for an SKU in a Trade Policy with Minimum Quantities.\r\n\r\nThe default value for a Minimum Quantity is `1`. This means a Fixed Price will be valid for a SKU in a Trade Policy for orders containing the specified number of Minimum Quantity or above, unless a higher Minimum Quantity is specified.\r\n\r\nFixed prices may, optionally, be scheduled. If so, these objects will contain the `dateRange` object with `from` and `to` properties, indicating the start and end time of the scheduled fixed price in the RFC3339 timestamp format (`YYYY-MM-DDT23:59:60Z`).\r\n\r\n Note that the 'Z', at the end, represents the UTC time (GMT+00:00). If it was in GMT-03:00, for example, it would be (`YYYY-MM-DDT23:59:60-03:00`).\r\n\r\n\r\n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Read prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "GetFixedPrices",
+        "parameters": [
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "SKU ID.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FixedPrice"
+                  }
+                },
+                "example": [
+                  {
+                    "tradePolicyId": "6",
+                    "value": 20.9,
+                    "listPrice": 22.9,
+                    "minQuantity": 1,
+                    "dateRange": {
+                      "from": "2021-12-30T22:00:00-03:00",
+                      "to": "2021-12-30T22:00:00-03:00"
+                    }
+                  },
+                  {
+                    "tradePolicyId": "1",
+                    "value": 18.9,
+                    "listPrice": null,
+                    "minQuantity": 1,
+                    "dateRange": {
+                      "from": "2021-12-30T22:00:00-03:00",
+                      "to": "2021-12-30T22:00:00-03:00"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "deprecated": false
+      }
+    },
+    "/pricing/prices/{itemId}/fixed/{priceTableId}": {
+      "post": {
+        "tags": [
+          "Prices and Fixed Prices"
+        ],
+        "summary": "Create or update fixed prices on a price table or trade policy",
+        "description": "Creates or updates the fixed prices of an SKU for a specific price table or trade policy. You can add one or multiple fixed prices per SKU.\r \n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Modify prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n> \u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "createorupdatefixedpricesonpricetableortradepolicy",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "SKU ID.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          },
+          {
+            "name": "priceTableId",
+            "in": "path",
+            "description": "SKU **price table** name or **trade policy** ID.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "priceTableA"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "description": "Information about prices and fixed prices.",
+                  "required": [
+                    "value",
+                    "minQuantity"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number",
+                      "description": "Fixed price value.",
+                      "example": 50.5
+                    },
+                    "listPrice": {
+                      "type": "number",
+                      "description": "SKU List Fixed Price.",
+                      "example": 50.5
+                    },
+                    "minQuantity": {
+                      "type": "integer",
+                      "description": "The minimum SKU quantity for the fixed price to be applied.",
+                      "example": 2
+                    },
+                    "dateRange": {
+                      "type": "object",
+                      "description": "Period of time when the fixed price will be applied to the SKU.",
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "properties": {
+                        "from": {
+                          "type": "string",
+                          "description": "Start date of the price. This date follows the [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format, which includes the time zone.",
+                          "example": "2021-12-30T22:00:00-03:00"
+                        },
+                        "to": {
+                          "type": "string",
+                          "description": "End date of the price. This date follows the [RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format, which includes the time zone.",
+                          "example": "2021-12-30T22:00:00-04:00"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "deprecated": false
+      },
+      "get": {
+        "tags": [
+          "Prices and Fixed Prices"
+        ],
+        "summary": "Get fixed prices on a price table or trade policy",
+        "description": "Retrieves all Fixed Prices on a price table or trade policy. \r \n\r\n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Read prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "GetFixedPricesonapricetable",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "SKU ID.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          },
+          {
+            "name": "priceTableId",
+            "in": "path",
+            "description": "Price Table Name",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "gold"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FixedPrice"
+                  }
+                },
+                "example": [
+                  {
+                    "tradePolicyId": "6",
+                    "value": 20.9,
+                    "listPrice": 22.9,
+                    "minQuantity": 1,
+                    "dateRange": {
+                      "from": "2021-12-30T22:00:00-03:00",
+                      "to": "2021-12-30T22:00:00-04:00"
+                    }
+                  },
+                  {
+                    "tradePolicyId": "1",
+                    "value": 18.9,
+                    "listPrice": null,
+                    "minQuantity": 1
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "deprecated": false
+      },
+      "delete": {
+        "tags": [
+          "Prices and Fixed Prices"
+        ],
+        "summary": "Delete fixed prices on a price table or trade policy",
+        "description": "Deletes all Fixed Prices of an SKU in a specific Price Table or Trade Policy.\r\n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Delete all prices from account** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "Deletefixedpricesonapricetableortradepolicy",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "SKU ID.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          },
+          {
+            "name": "priceTableId",
+            "in": "path",
+            "description": "Price Table or Trade Policy Name.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "gold"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "deprecated": false
+      }
+    },
+    "/pricing/prices/{itemId}/computed/{priceTableId}": {
+      "get": {
+        "tags": [
+          "Prices and Fixed Prices"
+        ],
+        "summary": "Get computed price by price table or trade policy",
+        "description": "Gets the Computed Price, which is the price after all the steps in the Pricing pipeline, for an SKU in a specific price table or trade policy. \r\n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint: \r\n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Read prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "GetComputedPricebypricetable",
+        "parameters": [
+          {
+            "name": "categoryIds",
+            "in": "query",
+            "description": "Category ID.",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          },
+          {
+            "name": "brandId",
+            "in": "query",
+            "description": "Brand ID.",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "integer",
+              "example": 3
+            }
+          },
+          {
+            "name": "quantity",
+            "in": "query",
+            "description": "SKU quantity.",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "integer",
+              "example": 2
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "description": "SKU ID.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          },
+          {
+            "name": "priceTableId",
+            "in": "path",
+            "description": "SKU Price Table Name.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "gold"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/Getcomputedprice"
+                },
+                "example": {
+                  "tradePolicyId": "1",
+                  "listPrice": 30,
+                  "costPrice": 76.92,
+                  "sellingPrice": 18.9,
+                  "priceValidUntil": "2018-12-20T18:12:14Z"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": false,
+        "servers": [
+          {
+            "url": "https://api.vtex.com/{account}/pricing",
+            "variables": {
+              "account": {
+                "default": "DefaultParameterValue"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "/pricing/config": {
+      "get": {
+        "tags": [
+          "Pricing Configuration"
+        ],
+        "summary": "Get pricing configuration",
+        "description": "Retrieves Pricing configuration.\r\n\r\n\r\n## Permissions\r\n \r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Read prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "GetPricingConfig",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Access-Control-Allow-Credentials": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "true"
+                  }
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "*"
+                  }
+                }
+              },
+              "Connection": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "keep-alive"
+                  }
+                }
+              },
+              "Content-Encoding": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "gzip"
+                  }
+                }
+              },
+              "Content-Length": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "118"
+                  }
+                }
+              },
+              "Date": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "Tue, 21 Feb 2017 16:11:39 GMT"
+                  }
+                }
+              },
+              "Server": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "nginx"
+                  }
+                }
+              },
+              "X-CDNIgnore": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "1"
+                  }
+                }
+              },
+              "X-Powered-by-VTEX-Janus-Edge": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "v1.35.3"
+                  }
+                }
+              },
+              "X-Track": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "stable"
+                  }
+                }
+              },
+              "X-VTEX-Janus-Router-Backend-App": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "pricing-v3.21.12"
+                  }
+                }
+              }
+            },
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricingConfiguration"
+                },
+                "example": {
+                  "hasMigrated": true,
+                  "migrationStatus": "Completed",
+                  "defaultMarkup": 100,
+                  "priceVariation": {
+                    "upperLimit": null,
+                    "lowerLimit": null
+                  },
+                  "minimumMarkups": {
+                    "1": 100,
+                    "2": 90
+                  },
+                  "tradePolicyConfigs": [],
+                  "sellersToOverride": [],
+                  "hasPriceInheritance": false,
+                  "priceInheritance": "never",
+                  "hasOptionalBasePrice": false,
+                  "blockAccount": false,
+                  "blockedRoutes": null,
+                  "priceTableSelectionStrategy": "first",
+                  "priceTableLimit": null
+                }
+              }
+            }
+          }
+        },
+        "deprecated": false,
+        "servers": [
+          {
+            "url": "https://api.vtex.com/{account}/pricing",
+            "variables": {
+              "account": {
+                "default": "DefaultParameterValue"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "/pricing/migration": {
+      "get": {
+        "tags": [
+          "Pricing Configuration"
+        ],
+        "summary": "Get pricing v2 status",
+        "description": "Retrieves Pricing v2 status.\r\n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Read prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "GetPricingv2Status",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Access-Control-Allow-Credentials": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "true"
+                  }
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "*"
+                  }
+                }
+              },
+              "Connection": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "keep-alive"
+                  }
+                }
+              },
+              "Content-Encoding": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "gzip"
+                  }
+                }
+              },
+              "Content-Length": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "52"
+                  }
+                }
+              },
+              "Date": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "Tue, 21 Feb 2017 16:13:39 GMT"
+                  }
+                }
+              },
+              "Server": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "nginx"
+                  }
+                }
+              },
+              "X-CDNIgnore": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "1"
+                  }
+                }
+              },
+              "X-Powered-by-VTEX-Janus-Edge": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "v1.35.3"
+                  }
+                }
+              },
+              "X-Track": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "stable"
+                  }
+                }
+              },
+              "X-VTEX-Janus-Router-Backend-App": {
+                "content": {
+                  "text/plain": {
+                    "schema": {
+                      "type": "string"
+                    },
+                    "example": "pricing-v3.21.12"
+                  }
+                }
+              }
+            },
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isActive": {
+                      "type": "boolean",
+                      "description": "Defines if the account is active."
+                    },
+                    "hasMigrated": {
+                      "type": "boolean",
+                      "description": "Defines if the account has migrated to Pricing V2."
+                    }
+                  }
+                },
+                "example": {
+                  "isActive": true,
+                  "hasMigrated": true
+                }
+              }
+            }
+          }
+        },
+        "deprecated": false,
+        "servers": [
+          {
+            "url": "https://api.vtex.com/{account}/pricing",
+            "variables": {
+              "account": {
+                "default": "DefaultParameterValue"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "/pricing/pipeline/catalog/{priceTableId}": {
+      "get": {
+        "tags": [
+          "Price Tables"
+        ],
+        "summary": "Get rules for a price table",
+        "description": "Retrieves the rules of a specific price table.\r\n\r\n\r\n## Permissions\r \n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Read prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "Getrulesforapricetable",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "name": "priceTableId",
+            "in": "path",
+            "description": "Price Table Name.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "b2c"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "example": {
+                  "tradePolicyId": "b2c",
+                  "rules": [
+                    {
+                      "id": 0,
+                      "context": {
+                        "categories": {},
+                        "brands": {
+                          "2000009": "Whiskas"
+                        },
+                        "stockStatuses": null,
+                        "internalCategories": null,
+                        "markupRange": null,
+                        "dateRange": null
+                      },
+                      "percentualModifier": 15
+                    }
+                  ]
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tradePolicyId": {
+                      "type": "string",
+                      "description": "Trade Policy ID (Price Table ID)."
+                    },
+                    "rules": {
+                      "type": "array",
+                      "description": "Array of rules for the price table.",
+                      "items": {
+                        "type": "object",
+                        "description": "Object containing a price table rule.",
+                        "properties": {
+                          "id": {
+                            "type": "number",
+                            "description": "Rule ID."
+                          },
+                          "context": {
+                            "type": "object",
+                            "description": "Rule Context is a group of filters to be checked at an item level when applying the rule. If all those filters check out, the rule will be applied for that item, unless there is a fixed price for that item.",
+                            "properties": {
+                              "categories": {
+                                "type": "object",
+                                "description": "Categories that an item should have to be eligible for the rule. Format: key: `categoryId`, value: `categoryName`.",
+                                "additionalProperties": {
+                                  "type": "string",
+                                  "description": "Category ID.",
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "description": "Category Name."
+                                  }
+                                }
+                              },
+                              "brands": {
+                                "type": "object",
+                                "description": "Brands that an item should have to be eligible for the rule. Format: key: `brandId`, value: `brandName`.",
+                                "additionalProperties": {
+                                  "type": "string",
+                                  "description": "Brand ID.",
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "description": "Brand Name."
+                                  }
+                                }
+                              },
+                              "stockStatuses": {
+                                "type": "object",
+                                "description": "Stock statuses.",
+                                "nullable": true
+                              },
+                              "internalCategories": {
+                                "type": "object",
+                                "description": "Internal Categories.",
+                                "nullable": true
+                              },
+                              "markupRange": {
+                                "type": "object",
+                                "description": "For an item to be eligible to the rule, it's markup should be in this Markup Range.",
+                                "nullable": true,
+                                "properties": {
+                                  "from": {
+                                    "type": "integer",
+                                    "description": "Item markup should be greater than or equal to this value."
+                                  },
+                                  "to": {
+                                    "type": "integer",
+                                    "description": "Item markup should be less than or equal to this value."
+                                  }
+                                }
+                              },
+                              "dateRange": {
+                                "type": "object",
+                                "description": "The rule will be active during this time range.",
+                                "nullable": true,
+                                "properties": {
+                                  "from": {
+                                    "type": "string",
+                                    "description": "Date when rule will be activated. Date format: `RFC3339`."
+                                  },
+                                  "to": {
+                                    "type": "string",
+                                    "description": "Date when the rule will be deactivated. Date format: `RFC3339`."
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "percentualModifier": {
+                      "type": "integer",
+                      "description": "Percentual modifier."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        },
+        "deprecated": false,
+        "servers": [
+          {
+            "url": "https://api.vtex.com/{account}/pricing",
+            "variables": {
+              "account": {
+                "default": "DefaultParameterValue"
+              }
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Price Tables"
+        ],
+        "summary": "Update rules for a price table",
+        "description": "Updates the rules of a specific price table, by deleting all the rules from the requested price table and creating new rules based on the content of the request.\r\n\r\n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Modify prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "name": "priceTableId",
+            "in": "path",
+            "description": "Price Table Name.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "rules"
+                ],
+                "example": {
+                  "rules": [
+                    {
+                      "id": 1,
+                      "context": {
+                        "categories": {
+                          "Category ID": "1",
+                          "Category Name": "Alimenta\u00e7\u00e3o"
+                        },
+                        "brands": {
+                          "Brand ID": "2000002",
+                          "Brand Name": "Whiskas"
+                        },
+                        "markupRange": {
+                          "from": 0,
+                          "to": 200
+                        },
+                        "dateRange": {
+                          "from": "2022-01-23T19:00:00.000Z",
+                          "to": "2023-10-26T00:00:00.000Z"
+                        }
+                      },
+                      "percentualModifier": 0
+                    }
+                  ]
+                },
+                "properties": {
+                  "rules": {
+                    "type": "array",
+                    "description": "Array of rules for the price table.",
+                    "items": {
+                      "type": "object",
+                      "description": "Object containing a price table rule.",
+                      "required": [
+                        "id",
+                        "context",
+                        "percentualModifier"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "Rule ID.",
+                          "example": 0
+                        },
+                        "context": {
+                          "type": "object",
+                          "description": "Rule Context is a group of filters to be checked at an item level when applying the rule. If all those filters check out, the rule will be applied for that item, unless there is a fixed price for that item.",
+                          "required": [
+                            "categories",
+                            "brands",
+                            "markupRange",
+                            "dateRange"
+                          ],
+                          "properties": {
+                            "categories": {
+                              "type": "object",
+                              "description": "Categories that an item should have to be eligible for the rule. Format: key: `categoryId`, value: `categoryName`.",
+                              "additionalProperties": {
+                                "type": "string",
+                                "description": "Category ID.",
+                                "example": "209",
+                                "additionalProperties": {
+                                  "type": "string",
+                                  "description": "Category Name.",
+                                  "example": "Books"
+                                }
+                              }
+                            },
+                            "brands": {
+                              "type": "object",
+                              "description": "Brands that an item should have to be eligible for the rule. Format: key: `brandId`, value: `brandName`.",
+                              "additionalProperties": {
+                                "type": "string",
+                                "description": "Brand ID.",
+                                "example": "421",
+                                "additionalProperties": {
+                                  "type": "string",
+                                  "description": "Brand Name.",
+                                  "example": "Goldman"
+                                }
+                              }
+                            },
+                            "stockStatuses": {
+                              "type": "object",
+                              "description": "Stock statuses.",
+                              "nullable": true,
+                              "example": null
+                            },
+                            "internalCategories": {
+                              "type": "object",
+                              "description": "Internal Categories.",
+                              "nullable": true,
+                              "example": null
+                            },
+                            "markupRange": {
+                              "type": "object",
+                              "description": "For an item to be eligible to the rule, it's markup should be in this Markup Range.",
+                              "nullable": true,
+                              "example": null,
+                              "required": [
+                                "from",
+                                "to"
+                              ],
+                              "properties": {
+                                "from": {
+                                  "type": "integer",
+                                  "description": "Item markup should be greater than or equal to this value.",
+                                  "example": 0
+                                },
+                                "to": {
+                                  "type": "integer",
+                                  "description": "Item markup should be less than or equal to this value.",
+                                  "example": 200
+                                }
+                              }
+                            },
+                            "dateRange": {
+                              "type": "object",
+                              "description": "The rule will be active during this time range.",
+                              "required": [
+                                "from",
+                                "to"
+                              ],
+                              "properties": {
+                                "from": {
+                                  "type": "string",
+                                  "description": "Date when rule will be activated. Date format: `RFC3339`.",
+                                  "example": "2019-10-23T19:00:00.000Z"
+                                },
+                                "to": {
+                                  "type": "string",
+                                  "description": "Date when the rule will be deactivated. Date format: `RFC3339`.",
+                                  "example": "2019-10-26T00:00:00.000Z"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "percentualModifier": {
+                          "type": "number",
+                          "description": "Percentual modifier.",
+                          "example": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pricing/tables/{priceTableId}": {
+      "put": {
+        "tags": [
+          "Price Tables"
+        ],
+        "summary": "Create price table",
+        "description": "Create a new price table.\r\n\r\n\r\n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Modify prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "name": "priceTableId",
+            "in": "path",
+            "description": "Price Table Name.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/pricing/pipeline/catalog": {
+      "get": {
+        "tags": [
+          "Price Tables"
+        ],
+        "summary": "Get all price tables and their rules",
+        "description": "Retrieves a list of all price tables and their rules.\r\n\r\n\r \n## Permissions\r\n\r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Read prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "getallpricetablesandrules",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "example": [
+                  {
+                    "tradePolicyId": "2",
+                    "rules": [
+                      {
+                        "id": 0,
+                        "context": {
+                          "categories": {},
+                          "brands": {},
+                          "stockStatuses": null,
+                          "internalCategories": null,
+                          "markupRange": null,
+                          "dateRange": null
+                        },
+                        "percentualModifier": 20
+                      }
+                    ]
+                  },
+                  {
+                    "tradePolicyId": "b2c",
+                    "rules": [
+                      {
+                        "id": 0,
+                        "context": {
+                          "categories": {},
+                          "brands": {
+                            "2000009": "Whiskas"
+                          },
+                          "stockStatuses": null,
+                          "internalCategories": null,
+                          "markupRange": null,
+                          "dateRange": null
+                        },
+                        "percentualModifier": 15
+                      }
+                    ]
+                  }
+                ],
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Information about the price table.",
+                    "properties": {
+                      "tradePolicyId": {
+                        "type": "string",
+                        "description": "Trade Policy ID (Price Table ID)."
+                      },
+                      "rules": {
+                        "type": "array",
+                        "description": "Array of rules for the price table.",
+                        "items": {
+                          "type": "object",
+                          "description": "Object containing a price table rule.",
+                          "properties": {
+                            "id": {
+                              "type": "number",
+                              "description": "Rule ID."
+                            },
+                            "context": {
+                              "type": "object",
+                              "description": "Rule Context is a group of filters to be checked at an item level when applying the rule. If all those filters check out, the rule will be applied for that item, unless there is a fixed price for that item.",
+                              "properties": {
+                                "categories": {
+                                  "type": "object",
+                                  "description": "Categories that an item should have to be eligible for the rule. Format: key: `categoryId`, value: `categoryName`.",
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "description": "Category ID.",
+                                    "additionalProperties": {
+                                      "type": "string",
+                                      "description": "Category Name."
+                                    }
+                                  }
+                                },
+                                "brands": {
+                                  "type": "object",
+                                  "description": "Brands that an item should have to be eligible for the rule. Format: key: `brandId`, value: `brandName`.",
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "description": "Brand ID.",
+                                    "additionalProperties": {
+                                      "type": "string",
+                                      "description": "Brand Name."
+                                    }
+                                  }
+                                },
+                                "stockStatuses": {
+                                  "type": "object",
+                                  "description": "Stock statuses.",
+                                  "nullable": true
+                                },
+                                "internalCategories": {
+                                  "type": "object",
+                                  "description": "Internal Categories.",
+                                  "nullable": true
+                                },
+                                "markupRange": {
+                                  "type": "object",
+                                  "description": "For an item to be eligible to the rule, it's markup should be in this Markup Range.",
+                                  "nullable": true,
+                                  "properties": {
+                                    "from": {
+                                      "type": "integer",
+                                      "description": "Item markup should be greater than or equal to this value."
+                                    },
+                                    "to": {
+                                      "type": "integer",
+                                      "description": "Item markup should be less than or equal to this value."
+                                    }
+                                  }
+                                },
+                                "dateRange": {
+                                  "type": "object",
+                                  "description": "The rule will be active during this time range.",
+                                  "nullable": true,
+                                  "properties": {
+                                    "from": {
+                                      "type": "string",
+                                      "description": "Date when rule will be activated. Date format: `RFC3339`."
+                                    },
+                                    "to": {
+                                      "type": "string",
+                                      "description": "Date when the rule will be deactivated. Date format: `RFC3339`."
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "percentualModifier": {
+                        "type": "integer",
+                        "description": "Percentual modifier."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "deprecated": false,
+        "servers": [
+          {
+            "url": "https://api.vtex.com/{account}/pricing",
+            "variables": {
+              "account": {
+                "default": "DefaultParameterValue"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "/pricing/tables": {
+      "get": {
+        "tags": [
+          "Price Tables"
+        ],
+        "summary": "List price tables",
+        "description": "Retrieves a list of all price tables.\r\n\r\n## Permissions\r\n \r\nAny user or [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys) must have at least one of the appropriate [License Manager resources](https://help.vtex.com/en/tutorial/license-manager-resources--3q6ztrC8YynQf6rdc6euk3) to be able to successfully run this request. Otherwise they will receive a status code `403` error. These are the applicable resources for this endpoint:\r \n\r\n| **Product** | **Category** | **Resource** |\r\n| --------------- | ----------------- | ----------------- |\r\n| Pricing | Price List | **Read prices** |\r\n\r\nThere are no applicable [predefined roles](https://help.vtex.com/en/tutorial/predefined-roles--jGDurZKJHvHJS13LnO7Dy) for this resource list. You must [create a custom role](https://help.vtex.com/en/tutorial/roles--7HKK5Uau2H6wxE1rH5oRbc#creating-a-role) and add at least one of the resources above in order to use this endpoint. To learn more about machine authentication at VTEX, see [Authentication overview](https://developers.vtex.com/docs/guides/authentication).\r \n\r\n>\u2757 To prevent integrations from having excessive permissions, consider the [best practices for managing app keys](https://help.vtex.com/en/tutorial/best-practices-application-keys--7b6nD1VMHa49aI5brlOvJm) when assigning License Manager roles to integrations.",
+        "operationId": "Listpricetables",
+        "parameters": [
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "Describes the type of the content being sent.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "default": "application/json"
+            }
+          },
+          {
+            "name": "Accept",
+            "in": "header",
+            "description": "HTTP Client Negotiation _Accept_ Header. Indicates the types of responses the client can understand.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "example": [
+                  "1",
+                  "2",
+                  "3",
+                  "b2c",
+                  "b2b",
+                  "gold"
+                ],
+                "schema": {
+                  "type": "array",
+                  "description": "Array of price tables.",
+                  "items": {
+                    "type": "string",
+                    "description": "Price table name."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "deprecated": false,
+        "servers": [
+          {
+            "url": "https://api.vtex.com/{account}/pricing",
+            "variables": {
+              "account": {
+                "default": "DefaultParameterValue"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FixedPrice": {
+        "required": [
+          "tradePolicyId",
+          "value",
+          "listPrice",
+          "minQuantity"
+        ],
+        "type": "object",
+        "description": "Fixed price request body information.",
+        "properties": {
+          "tradePolicyId": {
+            "type": "string",
+            "description": "Trade Policy ID."
+          },
+          "value": {
+            "type": "number",
+            "description": "Trade Policy Fixed Price Value."
+          },
+          "listPrice": {
+            "type": "number",
+            "description": "Trade Policy List Price Value.",
+            "nullable": true
+          },
+          "minQuantity": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Trade Policy Fixed Price Minimum Item Quantity."
+          },
+          "dateRange": {
+            "$ref": "#/components/schemas/DateRange"
+          }
+        }
+      },
+      "DateRange": {
+        "description": "Trade Policy Fixed Price Validity Period Object.",
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Indicates the date and time when the fixed price will start to be valid."
+          },
+          "to": {
+            "type": "string",
+            "description": "Indicates the date and time from which the fixed price will no longer be valid."
+          }
+        }
+      },
+      "Getprice": {
+        "required": [
+          "itemId",
+          "listPrice",
+          "costPrice",
+          "markup",
+          "basePrice",
+          "fixedPrices"
+        ],
+        "type": "object",
+        "description": "Price request body information.",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "description": "SKU ID."
+          },
+          "listPrice": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Suggested retail price for the SKU."
+          },
+          "costPrice": {
+            "type": "integer",
+            "format": "int32",
+            "description": "SKU's cost price."
+          },
+          "markup": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Desired profit margin with the SKU's sale."
+          },
+          "basePrice": {
+            "type": "integer",
+            "format": "int32",
+            "description": "SKU's reference price."
+          },
+          "fixedPrices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FixedPrice"
+            },
+            "description": "The fixed price is a price that overlaps all other existing price configurations of a price table."
+          }
+        }
+      },
+      "Getcomputedprice": {
+        "required": [
+          "tradePolicyId",
+          "listPrice",
+          "sellingPrice",
+          "priceValidUntil"
+        ],
+        "type": "object",
+        "description": "Computed price request body information.",
+        "properties": {
+          "tradePolicyId": {
+            "type": "string",
+            "description": "Trade Policy ID ou `priceTableId`."
+          },
+          "listPrice": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Trade Policy List Price, also known as \"from\" price."
+          },
+          "costPrice": {
+            "type": "number",
+            "description": "Cost price."
+          },
+          "sellingPrice": {
+            "type": "number",
+            "description": "Computed Price before applying coupons, promotions and taxes. This price may change before reaching the shelf."
+          },
+          "priceValidUntil": {
+            "type": "string",
+            "description": "Date until when the computed price will be valid, due to price scheduling. If no price scheduling applies, this will be set a year from the current time."
+          }
+        }
+      },
+      "PricingConfiguration": {
+        "required": [
+          "hasMigrated",
+          "defaultMarkup",
+          "minimumMarkups"
+        ],
+        "type": "object",
+        "description": "Pricing configuration request body information.",
+        "properties": {
+          "hasMigrated": {
+            "type": "boolean",
+            "description": "Defines if the account has migrated to Pricing V2."
+          },
+          "migrationStatus": {
+            "type": "string",
+            "description": "Pricing V2 migration status."
+          },
+          "defaultMarkup": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Account default markup."
+          },
+          "priceVariation": {
+            "type": "object",
+            "description": "Price Variation object.",
+            "properties": {
+              "upperLimit": {
+                "type": "integer",
+                "description": "Upper variation limit.",
+                "nullable": true
+              },
+              "lowerLimit": {
+                "type": "integer",
+                "description": "Lower variation limit.",
+                "nullable": true
+              }
+            }
+          },
+          "minimumMarkups": {
+            "type": "object",
+            "description": "Account minimum markup.",
+            "additionalProperties": {
+              "description": "Additional property.",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "tradePolicyConfigs": {
+            "type": "array",
+            "description": "Trade Policy Configurations array.",
+            "items": {
+              "type": "object",
+              "description": "Information trade polity configuration.",
+              "properties": {
+                "tradePolicyId": {
+                  "type": "string",
+                  "description": "Trade Policy ID."
+                },
+                "minimumMarkup": {
+                  "type": "integer",
+                  "description": "Trade Policy Minimum Markup."
+                },
+                "rulesShouldAffectListPrice": {
+                  "type": "boolean",
+                  "description": "Defines if the Price Rule should affect the list price too."
+                }
+              }
+            }
+          },
+          "sellersToOverride": {
+            "type": "array",
+            "description": "Overrides prices from sellers.",
+            "nullable": true,
+            "items": {
+              "type": "string",
+              "description": "Seller ID."
+            }
+          },
+          "hasPriceInheritance": {
+            "type": "boolean",
+            "description": "Deprecated. Use the `priceInheritance` field instead.",
+            "deprecated": true
+          },
+          "priceInheritance": {
+            "type": "string",
+            "description": "Condition of price inheritance from its parent account. This field can have three possible values: `never` if the store should never inherit prices, `nonexistent` if the store should only inherit prices in case of nonexistent prices for a given product, or `always` if the store should always inherit prices, regardless of its own prices."
+          },
+          "hasOptionalBasePrice": {
+            "type": "boolean",
+            "description": "Defines if optional base price is allowed."
+          },
+          "blockAccount": {
+            "type": "boolean",
+            "description": "Defines if access to the Pricing APIs is blocked for external requests."
+          },
+          "blockedRoutes": {
+            "type": "array",
+            "description": "Array with all blocked routes.",
+            "nullable": true,
+            "items": {
+              "type": "string",
+              "description": "Blocked route."
+            }
+          },
+          "priceTableSelectionStrategy": {
+            "type": "string",
+            "description": "The strategy used to get prices when there is more than one option. Possible values: `first`, `highest`, `lowest`. Default: `first`.",
+            "default": "first"
+          },
+          "priceTableLimit": {
+            "type": "integer",
+            "description": "Price Table Limit.",
+            "nullable": true
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "appKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-VTEX-API-AppKey",
+        "description": "Unique identifier of the [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys)."
+      },
+      "appToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-VTEX-API-AppToken",
+        "description": "Secret token of the [application key](https://developers.vtex.com/docs/guides/api-authentication-using-application-keys)."
+      },
+      "VtexIdclientAutCookie": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "VtexIdclientAutCookie",
+        "description": "[User token](https://developers.vtex.com/docs/guides/api-authentication-using-user-tokens), valid for 24 hours."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Price Tables"
+    },
+    {
+      "name": "Prices and Fixed Prices"
+    },
+    {
+      "name": "Pricing Configuration"
+    }
+  ],
+  "security": [
+    {
+      "appKey": [],
+      "appToken": []
+    },
+    {
+      "VtexIdclientAutCookie": []
+    }
+  ]
+}

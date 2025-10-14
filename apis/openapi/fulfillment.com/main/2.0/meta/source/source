@@ -1,0 +1,3044 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Fulfillment.com APIv2",
+    "version": "2.0",
+    "x-logo": {
+      "url": "https://fulfillment.github.io/api/FDC_API_144x144.png"
+    },
+    "contact": {
+      "email": "dev@fulfillment.com",
+      "name": "Fulfillment.com",
+      "url": "https://fulfillment.com"
+    },
+    "termsOfService": "https://fulfillment.github.io/api/terms/",
+    "description": "Welcome to our current iteration of our REST API. While we encourage you to upgrade to v2.0 we will continue support for our [SOAP API](https://github.com/fulfillment/soap-integration).\n \n# Versioning\n\nThe Fulfillment.com (FDC) REST API is version controlled and backwards compatible. We have many future APIs scheduled for publication within our v2.0 spec so please be prepared for us to add data nodes in our responses, however, we will not remove knowledge from previously published APIs.\n\n#### A Current Response\n\n```javascript\n{\n  id: 123\n}\n```\n\n#### A Potential Future Response\n\n```javascript\n{\n  id: 123,\n  reason: \"More Knowledge\"\n }\n```\n\n# Getting Started\n\nWe use OAuth v2.0 to authenticate clients, you can choose [implicit](https://oauth.net/2/grant-types/implicit/) or [password](https://oauth.net/2/grant-types/password/) grant type. To obtain an OAuth `client_id` and `client_secret` contact your account executive.\n\n**Tip**: Generate an additional login and use those credentials for your integration so that changes are accredited to that \"user\".\n\nYou are now ready to make requests to our other APIs by filling your `Authorization` header with `Bearer {access_token}`.\n\n## Perpetuating Access\n\nPerpetuating access to FDC without storing your password locally can be achieved using the `refresh_token` returned by [POST /oauth/access_token](#operation/generateToken).\n\nA simple concept to achieve this is outlined below.\n\n1. Your application/script will ask you for your `username` and `password`, your `client_id` and `client_secret` will be accessible via a DB or ENV.\n2. [Request an access_token](#operation/generateToken)\n  + Your function should be capable of formatting your request for both a `grant_type` of \\\"password\\\" (step 1) and \\\"refresh_token\\\" (step 4).\n3. Store the `access_token` and `refresh_token` so future requests can skip step 1\n4. When the `access_token` expires request anew using your `refresh_token`, replace both tokens in local storage.\n\n+ If this fails you will have to revert to step 1.\n \nAlternatively if you choose for your application/script to have access to your `username` and `password` you can skip step 4.\n\nIn all scenarios we recommend storing all credentials outside your codebase.\n\n## Date Time Definitions\n\n We will report all date-time stamps using the [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) standard. When using listing APIs where fromDate and toDate are available note that both dates are inclusive while requiring the fromDate to be before or at the toDate.\n\n### The Fulfillment Process\n\nMany steps are required to fulfill your order we report back to you three fundamental milestones inside the orders model.\n\n* `recordedOn` When we received your order. This will never change.\n \n* `dispatchDate` When the current iteration of your order was scheduled for fulfillment. This may change however it is an indicator that the physical process of fulfillment has begun and a tracking number has been **assigned** to your order. The tracking number **MAY CHANGE**. You will not be able to cancel an order once it has been dispatched. If you need to recall an order that has been dispatched please contact your account executive.\n\n* `departDate` When we recorded your order passing our final inspection and placed with the carrier. At this point it is **safe to inform the consignee** of the tracking number as it will not change.\n \n## Evaluating Error Responses\n\nWe currently return two different error models, with and without context. All errors will include a `message` node while errors with `context` will include additional information designed to save you time when encountering highly probable errors. For example, when you send us a request to create a duplicate order, we will reject your request and the context will include the FDC order `id` so that you may record it for your records.\n\n### Without Context\n\nNew order with missing required fields.\n\n| Header | Response |\n | ------ | -------- |\n| Status | `400 Bad Request` |\n\n```javascript\n{    \n  \"message\": \"Invalid request body\"\n}\n```\n\n### With Context\n\nNew order with duplicate `merchantOrderId`.\n\n| Header | Response |\n| ------ | -------- |\n| Status | `409 Conflict` |\n\n```javascript\n{\n  \"message\": \"Duplicate Order\",\n  \"context\": {\n    \"id\": 123\n  }\n}\n```\n\n## Status Codes\n\n Codes are a concatenation of State, Stage, and Detail.\n\n`^([0-9]{2})([0-9]{2})([0-9]{2})$`\n \n| Code | State              | Stage    | Detail         |\n| ---- | ------------------ | -------- | -------------- |\n| 010101 | Processing Order | Received | Customer Order |\n| 010102 | Processing Order | Received | Received |\n| 010201 | Processing Order | Approved | |\n| 010301 | Processing Order | Hold | Merchant Stock |\n | 010302 | Processing Order | Hold | Merchant Funds |\n| 010303 | Processing Order | Hold | For Merchant |\n| 010304 | Processing Order | Hold | Oversized Shipment |\n| 010305 | Processing Order | Hold | Invalid Parent Order |\n| 010306 | Processing Order | Hold | Invalid Address |\n| 010307 | Processing Order | Hold | By Admin |\n| 010401 | Processing Order | Address Problem | Incomplete Address |\n| 010402 | Processing Order | Address Problem | Invalid Locality |\n| 010403 | Processing Order | Address Problem | Invalid Region |\n| 010404 | Processing Order | Address Problem | Address Not Found |\n| 010405 | Processing Order | Address Problem | Many Addresses Found |\n| 010406 | Processing Order | Address Problem | Invalid Postal Code |\n| 010407 | Processing Order | Address Problem | Country Not Mapped |\n| 010408 | Processing Order | Address Problem | Invalid Recipient Name |\n | 010409 | Processing Order | Address Problem | Bad UK Address |\n| 010410 | Processing Order | Address Problem | Invalid Address Line 1 or 2 |\n| 010501 | Processing Order | Sku Problem | Invalid SKU |\n| 010501 | Processing Order | Sku Problem | Child Order has Invalid SKUs |\n| 010601 | Processing Order | Facility Problem | Facility Not Mapped |\n| 010701 | Processing Order | Ship Method Problem | Unmapped Ship Method |\n| 010702 | Processing Order | Ship Method Problem | Unmapped Ship Cost |\n| 010703 | Processing Order | Ship Method Problem | Missing Ship Method |\n| 010704 | Processing Order | Ship Method Problem | Invalid Ship Method |\n | 010705 | Processing Order | Ship Method Problem | Order Weight Outside of Ship Method Weight |\n| 010801 | Processing Order | Inventory Problem | Insufficient Inventory In Facility |\n| 010802 | Processing Order | Inventory Problem | Issue Encountered During Inventory Adjustment |\n| 010901 | Processing Order | Released To WMS | Released |\n| 020101 | Fulfillment In Progress | Postage Problem | Address Issue |\n| 020102 | Fulfillment In Progress | Postage Problem | Postage OK, OMS Issue Occurred |\n| 020103 | Fulfillment In Progress | Postage Problem | Postage Void Failed |\n| 020201 | Fulfillment In Progress | Postage Acquired | |\n| 020301 | Fulfillment In Progress | Postage Voided | Postage Void Failed Gracefully |\n | 020301 | Fulfillment In Progress | Hold | Departure Hold Requested |\n| 020401 | Fulfillment In Progress | 4PL Processing | |\n| 020501 | Fulfillment In Progress | 4PL Problem | Order is Proccessable, Postage Issue Occurred |\n| 020601 | Fulfillment In Progress | Label Printed | |\n| 020701 | Fulfillment In Progress | Shipment Cubed | |\n| 020801 | Fulfillment In Progress | Picking Inventory | |\n| 020901 | Fulfillment In Progress | Label Print Verified | |\n| 021001 | Fulfillment In Progress | Passed Final Inspection | |\n| 030101 | Shipped | Fulfilled By 4PL | |\n| 030102 | Shipped | Fulfilled By 4PL | Successfully Fulfilled, OMS Encountered Issue During Processing |\n| 030201 | Shipped | Fulfilled By FDC | |\n| 040101 | Returned | Returned | |\n| 050101 | Cancelled | Cancelled | |\n| 060101 | Test | Test | Test |\n",
+    "x-jentic-source-url": "https://fulfillment.github.io/api/openapi.json"
+  },
+  "servers": [
+    {
+      "url": "https://api.fulfillment.com/v2",
+      "description": "Production"
+    }
+  ],
+  "paths": {
+    "/users/me": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "About Me",
+        "description": "Returns the user profile of the access token's owner. This could be useful if managing multiple accounts or confirming validity of a token.",
+        "operationId": "get-users-me",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "UserContact.v2",
+                  "type": "object",
+                  "description": "",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "apiKey": {
+                      "type": "string",
+                      "description": "Deprecated",
+                      "deprecated": true
+                    },
+                    "contactInfo": {
+                      "title": "UserContact.v2",
+                      "type": "object",
+                      "description": "",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "apiKey": {
+                          "type": "string",
+                          "description": "Deprecated",
+                          "deprecated": true
+                        },
+                        "contactInfo": {
+                          "$ref": "#/paths/~1orders/post/responses/201/content/application~1json/schema/properties/originalConsignee"
+                        },
+                        "merchant": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "createDate": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedBy": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "status": {
+                          "type": "boolean"
+                        },
+                        "deptLeader": {
+                          "type": "boolean",
+                          "deprecated": true
+                        },
+                        "username": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ]
+                    },
+                    "merchant": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "createDate": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedBy": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "boolean"
+                    },
+                    "deptLeader": {
+                      "type": "boolean",
+                      "deprecated": true
+                    },
+                    "username": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/returns": {
+      "get": {
+        "tags": [
+          "Returns"
+        ],
+        "summary": "List Returns",
+        "description": "Retrieves summary return activity during the queried timespan. Although return knowledge can be learned from `GET /orders/{id}` it can take an unknown amount of time for an order that is refused or undeliverable to return to an FDC facility. Instead we recommend regularly querying this API.",
+        "operationId": "get-returns",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fromDate",
+            "in": "query",
+            "description": "Date-time in ISO 8601 format for selecting orders after, or at, the specified time",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "description": "Date-time in ISO 8601 format for selecting orders before, or at, the specified time",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "A multiplier of the number of items (limit parameter) to skip before returning results",
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The numbers of items to return",
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer",
+              "default": 80
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ReturnsArray.v2",
+                  "type": "object",
+                  "properties": {
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "pagination": {
+                          "title": "Pagination.v2",
+                          "type": "object",
+                          "properties": {
+                            "totalPages": {
+                              "type": "integer",
+                              "description": "Total number of pages available to request"
+                            },
+                            "currentPage": {
+                              "type": "integer",
+                              "description": "Current page of the response, this will match the page parameter"
+                            },
+                            "count": {
+                              "type": "integer",
+                              "description": "Count of records returned in response, this will be equal to or less then the limit parameter"
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Total number of records available to request"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "title": "Return.v2",
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "rmaItems": {
+                            "type": "array",
+                            "items": {
+                              "title": "RmaItem.v2",
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "nonRestockedReason": {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "title": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "quantityShipped": {
+                                  "type": "integer"
+                                },
+                                "quantityReturned": {
+                                  "type": "integer"
+                                },
+                                "quantityRestocked": {
+                                  "type": "integer"
+                                },
+                                "quantityExpected": {
+                                  "nullable": true,
+                                  "type": "integer"
+                                },
+                                "comments": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "item": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "sku": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "order": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "merchantId": {
+                                "type": "integer"
+                              },
+                              "merchantOrderId": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "updatedBy": {
+                            "title": "User.v2",
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "id"
+                            ]
+                          },
+                          "createdBy": {
+                            "$ref": "#/paths/~1returns/get/responses/200/content/application~1json/schema/properties/data/items/properties/updatedBy"
+                          },
+                          "status": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "title"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "reason": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "title"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "returnedBy": {
+                            "type": "string"
+                          },
+                          "comments": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "rmaNumber": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "updatedBy",
+                          "createdBy",
+                          "status",
+                          "reason",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Returns"
+        ],
+        "summary": "Inform us of an RMA",
+        "description": "Inform FDC of an expected return.",
+        "operationId": "put-returns",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "requestBody": {
+          "description": "RMA",
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "RmaRequest.v2",
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "sku": {
+                          "type": "string"
+                        },
+                        "quantityExpected": {
+                          "type": "integer",
+                          "example": 1,
+                          "minimum": 1
+                        }
+                      },
+                      "required": [
+                        "sku",
+                        "quantityExpected"
+                      ]
+                    }
+                  },
+                  "recipient": {
+                    "$ref": "#/paths/~1orders/post/requestBody/content/application~1json/schema/properties/recipient"
+                  },
+                  "merchantOrderId": {
+                    "type": "string"
+                  },
+                  "rmaNumber": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "items",
+                  "recipient",
+                  "rmaNumber"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "RMA Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "RmaResponse.v2",
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sku": {
+                            "type": "string"
+                          },
+                          "quantityExpected": {
+                            "type": "integer",
+                            "example": 1,
+                            "minimum": 1
+                          }
+                        },
+                        "required": [
+                          "sku",
+                          "quantityExpected"
+                        ]
+                      }
+                    },
+                    "recipient": {
+                      "title": "Consignee.v2",
+                      "type": "object",
+                      "description": "",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "updatedBy": {
+                          "$ref": "#/paths/~1returns/get/responses/200/content/application~1json/schema/properties/data/items/properties/updatedBy"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "iso": {
+                          "title": "IsoCountry.v2",
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "iso2": {
+                              "pattern": "[A-Z]{2}",
+                              "type": "string",
+                              "description": "Two character ISO code"
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "Country Name"
+                            }
+                          }
+                        },
+                        "companyName": {
+                          "type": "string"
+                        },
+                        "country": {
+                          "type": "string",
+                          "description": "Ideally provide the two character ISO code"
+                        },
+                        "postalCode": {
+                          "type": "string",
+                          "description": "Postal Code / Zip"
+                        },
+                        "addressRegion": {
+                          "type": "string",
+                          "description": "Province / State"
+                        },
+                        "addressLocality": {
+                          "type": "string",
+                          "description": "City"
+                        },
+                        "address2": {
+                          "type": "string"
+                        },
+                        "address1": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "country",
+                        "postalCode",
+                        "addressRegion",
+                        "addressLocality",
+                        "address1",
+                        "lastName",
+                        "firstName"
+                      ]
+                    },
+                    "merchantOrderId": {
+                      "type": "string"
+                    },
+                    "rmaNumber": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "recipient",
+                    "rmaNumber"
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "RMA Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1returns/put/responses/201/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A Component of Your Request Was Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "RMA Already Processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1returns/put/responses/201/content/application~1json/schema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/status": {
+      "put": {
+        "tags": [
+          "Partners"
+        ],
+        "summary": "Update Order Status",
+        "description": "Note, this API is used to update orders and is reserved for our shipping partners.",
+        "operationId": "put-orders-id-status",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The FDC order Id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "New status event",
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "StatusTypeSimple.v2",
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "description": "Human-readable description"
+                  },
+                  "status": {
+                    "type": "object",
+                    "required": [
+                      "code"
+                    ],
+                    "properties": {
+                      "code": {
+                        "pattern": "^\\d{6}$",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "reason",
+                  "status"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Order Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/post/responses/201/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "content": {}
+          }
+        },
+        "x-codegen-request-body-name": "body"
+      }
+    },
+    "/orders/{id}/ship": {
+      "put": {
+        "tags": [
+          "Partners"
+        ],
+        "summary": "Ship an Order",
+        "description": "Note, this API is used to update orders and is reserved for our shipping partners.",
+        "operationId": "put-orders-id-ship",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The FDC order Id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Shipping Details",
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "OrderShip.v2",
+                "type": "object",
+                "properties": {
+                  "weightOverride": {
+                    "type": "number",
+                    "description": "Override predicted weight of package",
+                    "format": "float"
+                  },
+                  "trackingNumber": {
+                    "description": "Tracking number of package",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "trackingNumber"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Order Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/post/responses/201/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "content": {}
+          }
+        },
+        "x-codegen-request-body-name": "body"
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Order Details",
+        "description": "For the fastest results use the FDC provided `id` however you can use your `merchantOrderId` as the `id`.",
+        "operationId": "getOrder",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The FDC order Id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "merchantId",
+            "in": "query",
+            "description": "Providing your `merchantId` indicates the `id` is your `merchantOrderId`. Although it is not necessary to provide this it will speed up your results when using your `merchantOrderId` however it will slow your results when using the FDC provided `id`",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/hydrateParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/200/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "content": {}
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Cancel an Order",
+        "operationId": "delete-orders-id",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of order that needs to be canceled",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your order was successfully canceled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/post/responses/201/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "content": {}
+          },
+          "405": {
+            "description": "Could not cancel your order, perhaps it already shipped",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          }
+        },
+        "description": "Request an order is canceled to prevent shipment."
+      }
+    },
+    "/orders": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "List of Orders",
+        "description": "Retrieve many orders at once",
+        "operationId": "get-orders",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/fromDateParam"
+          },
+          {
+            "$ref": "#/components/parameters/toDateParam"
+          },
+          {
+            "$ref": "#/components/parameters/merchantParam"
+          },
+          {
+            "$ref": "#/components/parameters/warehouseParam"
+          },
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "$ref": "#/components/parameters/hydrateParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/paths/~1orders/post/responses/201/content/application~1json/schema"
+                    },
+                    {
+                      "title": "OrderResponseHydrate.v2",
+                      "allOf": [
+                        {
+                          "$ref": "#/paths/~1orders/post/responses/201/content/application~1json/schema"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "integrator": {
+                              "type": "string",
+                              "description": ""
+                            },
+                            "lineItems": {
+                              "type": "array",
+                              "items": {
+                                "title": "LineItemsResponse.v2",
+                                "type": "object",
+                                "description": "",
+                                "properties": {
+                                  "id": {
+                                    "type": "integer"
+                                  },
+                                  "lineDetails": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "integer"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "description": {
+                                        "type": "string"
+                                      },
+                                      "externalSku": {
+                                        "type": "string"
+                                      },
+                                      "totalQuantity": {
+                                        "type": "integer"
+                                      }
+                                    }
+                                  },
+                                  "requestedSkuData": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "integer"
+                                      },
+                                      "sku": {
+                                        "type": "string"
+                                      },
+                                      "declaredValue": {
+                                        "type": "string",
+                                        "pattern": "^[0-9.]+$"
+                                      },
+                                      "quantity": {
+                                        "type": "integer"
+                                      }
+                                    }
+                                  },
+                                  "inventoryDetails": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "lotNum": {
+                                          "type": "string"
+                                        },
+                                        "quantity": {
+                                          "type": "integer"
+                                        },
+                                        "expirationDate": {
+                                          "type": "string",
+                                          "format": "date"
+                                        },
+                                        "serialNum": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "trackingNumbers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "carrier": {
+                                    "title": "CarrierHydrated.v2",
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "integer"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "symbol": {
+                                        "type": "string"
+                                      },
+                                      "includePeripherals": {
+                                        "type": "boolean"
+                                      },
+                                      "enabled": {
+                                        "type": "boolean"
+                                      },
+                                      "canReprintPostage": {
+                                        "type": "boolean"
+                                      },
+                                      "requiresDimensions": {
+                                        "type": "boolean"
+                                      },
+                                      "internalRatesOnly": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name",
+                                      "symbol"
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "description": "Requires hydrate to be set in the request and the corresponding node will be filled."
+                    }
+                  ],
+                  "title": "OrderResponseOneOf.v2",
+                  "description": "Standard Order Response or a Hydrated Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No Orders Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ErrorStandard.v2",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "New Order",
+        "description": "Error Notes&#58;\n* When `409 Conflict` is a 'Duplicate Order' the `context` will include the FDC `id`, see samples.\n",
+        "operationId": "post-orders",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "requestBody": {
+          "description": "The order to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "OrderRequest.v2",
+                "type": "object",
+                "properties": {
+                  "merchantId": {
+                    "type": "integer",
+                    "description": "Necessary if you have a multitenancy account, otherwise we will associate the order with your account"
+                  },
+                  "merchantOrderId": {
+                    "type": "string",
+                    "description": "Unique ID provided by the merchant"
+                  },
+                  "shippingMethod": {
+                    "type": "string",
+                    "description": "Custom for you, it will be mapped to an actual method within the OMS UI",
+                    "example": "Ground"
+                  },
+                  "recipient": {
+                    "title": "ConsigneeNew.v2",
+                    "type": "object",
+                    "properties": {
+                      "companyName": {
+                        "type": "string"
+                      },
+                      "country": {
+                        "type": "string",
+                        "description": "Country, for best results please provide the two character ISO code"
+                      },
+                      "postalCode": {
+                        "type": "string",
+                        "description": "Postal Code / Zip"
+                      },
+                      "addressRegion": {
+                        "type": "string",
+                        "description": "Province / State"
+                      },
+                      "addressLocality": {
+                        "type": "string",
+                        "description": "City"
+                      },
+                      "address2": {
+                        "type": "string",
+                        "description": "Address Line 2"
+                      },
+                      "address1": {
+                        "type": "string",
+                        "description": "Address Line 1"
+                      },
+                      "phone": {
+                        "type": "string",
+                        "description": "Phone number, required for international shipments"
+                      },
+                      "lastName": {
+                        "type": "string"
+                      },
+                      "firstName": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Email, required for international shipments"
+                      }
+                    },
+                    "required": [
+                      "country",
+                      "addressRegion",
+                      "addressLocality",
+                      "address1",
+                      "phone",
+                      "lastName",
+                      "firstName",
+                      "email"
+                    ]
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "quantity": {
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "sku": {
+                          "type": "string"
+                        },
+                        "declaredValue": {
+                          "type": "string",
+                          "description": "Using USD, a per unit value of a single SKU. If your declaring a kit this is the sum total for a single kit. In both scenarios we will multiply the `declaredValue` against the `quantity` for customs declaration.",
+                          "format": "double",
+                          "pattern": "^[0-9.]+$",
+                          "example": "129.99"
+                        }
+                      },
+                      "required": [
+                        "quantity",
+                        "sku",
+                        "declaredValue"
+                      ]
+                    }
+                  },
+                  "warehouse": {
+                    "type": "object",
+                    "description": "We automatically select a warehouse based on inventory availability, requested carrier and delivery schedule, and carrier cost. You may however override this process. Because this is not recommended please inform your AE prior to using so they may enable this feature.",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "integrator": {
+                    "type": "string",
+                    "description": "Use of this property requires special permission and must be discussed with your account executive; values are restricted while custom values need to be accepted by your AE.",
+                    "enum": [
+                      "1ShoppingCart",
+                      "3dCart",
+                      "AdobeBC",
+                      "AmazonAU",
+                      "AmazonEU",
+                      "AmazonNA",
+                      "BigCommerce",
+                      "BrandBoom",
+                      "BrightPearl",
+                      "BuyGoods",
+                      "Celery",
+                      "ChannelAdvisor",
+                      "Clickbank",
+                      "CommerceHub",
+                      "Custom",
+                      "Demandware",
+                      "Ebay",
+                      "Ecwid",
+                      "Etsy",
+                      "FoxyCart",
+                      "Goodsie",
+                      "Infusionsoft",
+                      "Konnektive",
+                      "LimeLight",
+                      "Linio",
+                      "Linnworks",
+                      "Magento",
+                      "Netsuite",
+                      "NewEgg",
+                      "Nexternal",
+                      "NuOrder",
+                      "Opencart",
+                      "OrderWave",
+                      "osCommerce1",
+                      "Overstock",
+                      "PayPal",
+                      "PrestaShop",
+                      "Pricefalls",
+                      "Quickbooks",
+                      "Rakuten",
+                      "Sears",
+                      "Sellbrite",
+                      "SellerCloud",
+                      "Shipstation",
+                      "Shopify",
+                      "Skubana",
+                      "SolidCommerce",
+                      "SparkPay",
+                      "SpreeCommerce",
+                      "spsCommerce",
+                      "StitchLabs",
+                      "StoneEdge",
+                      "TradeGecko",
+                      "UltraCart",
+                      "Volusion",
+                      "VTEX",
+                      "Walmart",
+                      "WooCommerce",
+                      "Yahoo"
+                    ]
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "merchantOrderId",
+                  "shippingMethod",
+                  "recipient",
+                  "items"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Order Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "OrderResponse.v2",
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "FDC ID for this order"
+                    },
+                    "trackingNumbers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "title": "TrackingNumber.v2",
+                        "x-tags": [
+                          "Tracking"
+                        ],
+                        "properties": {
+                          "carrier": {
+                            "title": "CarrierSimple.v2",
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "id"
+                            ]
+                          },
+                          "barcodeScanValue": {
+                            "type": "string",
+                            "description": "The computer readable alternative to the human readable",
+                            "deprecated": true
+                          },
+                          "value": {
+                            "type": "string",
+                            "description": "The human readable tracking number recipients (consignee) expect"
+                          }
+                        }
+                      }
+                    },
+                    "validatedConsignee": {
+                      "$ref": "#/paths/~1orders/post/responses/201/content/application~1json/schema/properties/originalConsignee"
+                    },
+                    "originalConsignee": {
+                      "title": "Consignee.v2",
+                      "type": "object",
+                      "description": "",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "updatedBy": {
+                          "$ref": "#/paths/~1returns/get/responses/200/content/application~1json/schema/properties/data/items/properties/updatedBy"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "iso": {
+                          "title": "IsoCountry.v2",
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "iso2": {
+                              "pattern": "[A-Z]{2}",
+                              "type": "string",
+                              "description": "Two character ISO code"
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "Country Name"
+                            }
+                          }
+                        },
+                        "companyName": {
+                          "type": "string"
+                        },
+                        "country": {
+                          "type": "string",
+                          "description": "Ideally provide the two character ISO code"
+                        },
+                        "postalCode": {
+                          "type": "string",
+                          "description": "Postal Code / Zip"
+                        },
+                        "addressRegion": {
+                          "type": "string",
+                          "description": "Province / State"
+                        },
+                        "addressLocality": {
+                          "type": "string",
+                          "description": "City"
+                        },
+                        "address2": {
+                          "type": "string"
+                        },
+                        "address1": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "country",
+                        "postalCode",
+                        "addressRegion",
+                        "addressLocality",
+                        "address1",
+                        "lastName",
+                        "firstName"
+                      ]
+                    },
+                    "currentStatus": {
+                      "title": "StatusEvent.v2",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "createdBy": {
+                          "$ref": "#/paths/~1returns/get/responses/200/content/application~1json/schema/properties/data/items/properties/updatedBy"
+                        },
+                        "status": {
+                          "title": "StatusType.v2",
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "description": "Deprecated, use code instead"
+                            },
+                            "isClosed": {
+                              "type": "boolean",
+                              "description": "Deprecated, does this status event close the order"
+                            },
+                            "actionRequiredBy": {
+                              "type": "object",
+                              "description": "Responsibility for resolving this issue",
+                              "properties": {
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "description": "Human readable description of responsible party to resolve the issue"
+                                }
+                              }
+                            },
+                            "stage": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "code": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "state": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "code": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "detail": {
+                              "type": "string"
+                            },
+                            "reason": {
+                              "type": "string",
+                              "description": "Deprecated"
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "Deprecated, use stage/state instead"
+                            },
+                            "detailCode": {
+                              "pattern": "^\\d{2}$",
+                              "type": "string"
+                            },
+                            "code": {
+                              "pattern": "^\\d{6}$",
+                              "type": "string",
+                              "description": "Code, see [status codes](#section/Getting-Started/Status-Codes)"
+                            }
+                          },
+                          "required": [
+                            "stage",
+                            "state",
+                            "detailCode",
+                            "code"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "description": "Explanation for status"
+                        },
+                        "date": {
+                          "type": "string",
+                          "description": "DateTime of Status Event",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ]
+                    },
+                    "warehouse": {
+                      "title": "Warehouse.v2",
+                      "type": "object",
+                      "description": "",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ]
+                    },
+                    "merchant": {
+                      "title": "Merchant.v2",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Merchant Company Name"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ]
+                    },
+                    "departDate": {
+                      "type": "string",
+                      "description": "DateTime order departed an FDC warehouse",
+                      "format": "date-time"
+                    },
+                    "dispatchDate": {
+                      "type": "string",
+                      "description": "DateTime order was dispatched for fulfillment by FDC",
+                      "format": "date-time"
+                    },
+                    "recordedOn": {
+                      "type": "string",
+                      "description": "DateTime order was recorded by FDC",
+                      "format": "date-time"
+                    },
+                    "merchantShippingMethod": {
+                      "type": "string",
+                      "description": "Requested ship method"
+                    },
+                    "purchaseOrderNum": {
+                      "type": "string",
+                      "description": "Merchant provided PO#"
+                    },
+                    "merchantOrderId": {
+                      "type": "string",
+                      "description": "Merchant provided ID"
+                    },
+                    "parentOrder": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "Reference to parent `id` if order was grouped"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "validatedConsignee",
+                    "originalConsignee",
+                    "currentStatus",
+                    "merchant",
+                    "recordedOn",
+                    "merchantShippingMethod",
+                    "merchantOrderId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid order object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "You do not have permission to create orders",
+            "content": {}
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ErrorStandardWithContext.v2",
+                  "type": "object",
+                  "properties": {
+                    "context": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "examples": {
+                  "duplicate-order": {
+                    "value": {
+                      "message": "Duplicate Order",
+                      "context": {
+                        "id": 123
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ErrorStandardWithContext.v2",
+                  "type": "object",
+                  "properties": {
+                    "context": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "examples": {
+                  "validation-failure": {
+                    "value": {
+                      "message": "Validation Failure",
+                      "context": {
+                        "id": 123
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-codegen-request-body-name": "body"
+      }
+    },
+    "/orders/simple": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "List of Simplified Orders",
+        "description": "Retrieve many simplifed orders at once",
+        "operationId": "get-orders-simple",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/fromDateParam"
+          },
+          {
+            "$ref": "#/components/parameters/toDateParam"
+          },
+          {
+            "$ref": "#/components/parameters/merchantParam"
+          },
+          {
+            "$ref": "#/components/parameters/warehouseParam"
+          },
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "OrderResponseSimple.v2",
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "FDC ID for this order"
+                    },
+                    "merchantOrderId": {
+                      "type": "string",
+                      "description": "Merchant-provided ID"
+                    },
+                    "parentOrderId": {
+                      "type": "integer",
+                      "description": "FDC ID for the parent of this order"
+                    },
+                    "warehouseId": {
+                      "type": "integer"
+                    },
+                    "firstPrintDate": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "departDate": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deliveryDate": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "carrier": {
+                      "type": "string"
+                    },
+                    "trackingNumbers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "The human readable tracking number recipients (consignee) expect"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No Orders Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ErrorStandard.v2",
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth/access_token": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Generate an Access Token",
+        "description": "By default tokens are valid for 7 days while refresh tokens are valid for 30 days. If your `grant_type` is \"password\" include the `username` and `password`, if however your `grant_type` is \"refresh_token\" the username/password are not required, instead set the `refresh_token`",
+        "externalDocs": {
+          "description": "More Information on Refresh Tokens",
+          "url": "#section/Getting-Started/Perpetuating-Access"
+        },
+        "operationId": "post-oauth-access_token",
+        "requestBody": {
+          "description": "Get an access token",
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "AccessTokenRequest.v2",
+                "oneOf": [
+                  {
+                    "title": "AccessTokenRequestPassword.v2",
+                    "allOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "username": {
+                            "type": "string",
+                            "description": ""
+                          },
+                          "password": {
+                            "type": "string",
+                            "description": ""
+                          }
+                        },
+                        "required": [
+                          "username",
+                          "password"
+                        ]
+                      },
+                      {
+                        "title": "AccessTokenRequestBase.v2",
+                        "type": "object",
+                        "properties": {
+                          "scope": {
+                            "type": "string",
+                            "description": "Currently limited to Order Management System",
+                            "default": "oms",
+                            "enum": [
+                              "oms"
+                            ]
+                          },
+                          "grant_type": {
+                            "type": "string",
+                            "description": "Indicates how you're authenticating your request",
+                            "enum": [
+                              "password",
+                              "refresh_token"
+                            ]
+                          },
+                          "client_secret": {
+                            "type": "string"
+                          },
+                          "client_id": {
+                            "type": "string",
+                            "description": "Id and secret provided by FDC"
+                          }
+                        },
+                        "required": [
+                          "scope",
+                          "grant_type",
+                          "client_secret",
+                          "client_id"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "title": "AccessTokenRequestRefresh.v2",
+                    "allOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "refresh_token": {
+                            "type": "string",
+                            "description": "You may request future tokens with the `refresh_token` from your previous `/oauth/access_token` request"
+                          }
+                        },
+                        "required": [
+                          "refresh_token"
+                        ]
+                      },
+                      {
+                        "$ref": "#/paths/~1oauth~1access_token/post/requestBody/content/application~1json/schema/oneOf/0/allOf/1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "AccessTokenResponse.v2",
+                  "type": "object",
+                  "properties": {
+                    "refresh_token": {
+                      "type": "string"
+                    },
+                    "expires_in": {
+                      "type": "integer"
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "default": "Bearer"
+                    },
+                    "access_token": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          }
+        },
+        "x-codegen-request-body-name": "body"
+      }
+    },
+    "/inventory": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "List of Item Inventories",
+        "description": "Retrieve inventory for one or more items. This API requires elevated permissions, please speak to your success manager.",
+        "operationId": "get-inventory",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "A multiplier of the number of items (limit parameter) to skip before returning results",
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The numbers of items to return",
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer",
+              "default": 80
+            }
+          },
+          {
+            "name": "externalSkuNames",
+            "in": "query",
+            "description": "A CSV of sku reference names, 'skuName1' or 'skuName1,skuName2,skuName3'",
+            "style": "form",
+            "explode": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found Inventory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ItemInventoryArray.v2",
+                  "type": "object",
+                  "properties": {
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "pagination": {
+                          "title": "Pagination.v2",
+                          "type": "object",
+                          "properties": {
+                            "totalPages": {
+                              "type": "integer",
+                              "description": "Total number of pages available to request"
+                            },
+                            "currentPage": {
+                              "type": "integer",
+                              "description": "Current page of the response, this will match the page parameter"
+                            },
+                            "count": {
+                              "type": "integer",
+                              "description": "Count of records returned in response, this will be equal to or less then the limit parameter"
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Total number of records available to request"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "title": "ItemInventory.v2",
+                        "type": "object",
+                        "properties": {
+                          "quantity": {
+                            "type": "object",
+                            "properties": {
+                              "total": {
+                                "type": "object",
+                                "properties": {
+                                  "availableToPromise": {
+                                    "type": "integer",
+                                    "description": "Number of items that are available to be used in an order"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "merchant": {
+                            "type": "object",
+                            "description": "Merchant that owns this item",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Merchants name for this item"
+                              }
+                            }
+                          },
+                          "item": {
+                            "type": "object",
+                            "description": "Item this inventory data is based on",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "description": "FDC ID for this Item"
+                              },
+                              "skuReference": {
+                                "type": "string",
+                                "description": "Sku reference name for this item"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No Inventory Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inventory/full": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "List of Inventories",
+        "description": "Retrieve inventory. This API requires elevated permissions, please speak to your success manager.",
+        "operationId": "get-inventory-full",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/externalSkuNameParam"
+          },
+          {
+            "$ref": "#/components/parameters/warehouseParam"
+          },
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found Inventory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "InventoryArray.v2",
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "title": "ItemInventory.v2",
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "FDC ID for this Inventory"
+                          },
+                          "availableToPromise": {
+                            "type": "integer",
+                            "description": "Number of items that are available to be used in an order"
+                          },
+                          "warehouse": {
+                            "type": "object",
+                            "description": "Warehouse that owns this inventory.",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "description": "FDC ID for this warehouse"
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Warehouses name for this item."
+                              }
+                            }
+                          },
+                          "item": {
+                            "type": "object",
+                            "description": "Item this inventory data is based on",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "description": "FDC ID for this Item"
+                              },
+                              "skuReference": {
+                                "type": "string",
+                                "description": "Sku reference name for this item"
+                              }
+                            }
+                          },
+                          "merchant": {
+                            "type": "object",
+                            "description": "Merchant that owns this inventory.",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "description": "FDC ID for this merchant."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Merchants name for this item"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "pagination": {
+                          "title": "Pagination.v2",
+                          "type": "object",
+                          "properties": {
+                            "totalPages": {
+                              "type": "integer",
+                              "description": "Total number of pages available to request"
+                            },
+                            "currentPage": {
+                              "type": "integer",
+                              "description": "Current page of the response, this will match the page parameter"
+                            },
+                            "count": {
+                              "type": "integer",
+                              "description": "Count of records returned in response, this will be equal to or less then the limit parameter"
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Total number of records available to request"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No Inventory Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/paths/~1orders/get/responses/404/content/application~1json/schema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/track": {
+      "get": {
+        "summary": "Tracking",
+        "tags": [
+          "Tracking"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "trackingResponse",
+                  "type": "object",
+                  "description": "",
+                  "x-tags": [
+                    "Tracking"
+                  ],
+                  "x-examples": {},
+                  "properties": {
+                    "trackedEvents": {
+                      "type": "array",
+                      "items": {
+                        "title": "TrackingEvent.v2",
+                        "type": "object",
+                        "x-tags": [
+                          "Tracking"
+                        ],
+                        "x-examples": {
+                          "example-1": {
+                            "eventStatus": "Delivered, In/At Mailbox",
+                            "eventCategory": "Delivered",
+                            "eventCategoryCode": 5,
+                            "eventDateTime": "2018-07-31 16:15:00",
+                            "eventLocation": {},
+                            "statusSource": "carrier"
+                          }
+                        },
+                        "properties": {
+                          "eventSource": {
+                            "type": "string",
+                            "enum": [
+                              "carrier",
+                              "internal"
+                            ],
+                            "example": "carrier"
+                          },
+                          "eventLocation": {
+                            "$ref": "#/paths/~1track/get/responses/200/content/application~1json/schema/properties/origin"
+                          },
+                          "eventDateTime": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "eventCategoryCode": {
+                            "type": "integer"
+                          },
+                          "eventCategory": {
+                            "type": "string"
+                          },
+                          "eventStatus": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "fdcOrderId": {
+                      "type": "integer"
+                    },
+                    "firstTransitEvent": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lastUpdatedDateTime": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lastCheckedDateTime": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "firstCheckedDateTime": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "statusMessage": {
+                      "type": "string"
+                    },
+                    "statusCategoryCode": {
+                      "type": "integer"
+                    },
+                    "statusDateTime": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "destination": {
+                      "$ref": "#/paths/~1track/get/responses/200/content/application~1json/schema/properties/origin"
+                    },
+                    "origin": {
+                      "title": "Feature",
+                      "type": "object",
+                      "description": "GeoJSon Feature",
+                      "x-tags": [
+                        "GeoJSON"
+                      ],
+                      "externalDocs": {
+                        "url": "https://tools.ietf.org/html/rfc7946#section-3.2"
+                      },
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "Feature"
+                          ],
+                          "example": "Feature"
+                        },
+                        "id": {
+                          "type": "integer"
+                        },
+                        "properties": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "geometry": {
+                          "title": "Geometry",
+                          "type": "object",
+                          "x-tags": [
+                            "GeoJSON"
+                          ],
+                          "externalDocs": {
+                            "url": "http://geojson.org/geojson-spec.html#geometry-objects"
+                          },
+                          "description": "GeoJSon geometry",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "description": "the geometry type",
+                              "enum": [
+                                "Point",
+                                "LineString",
+                                "Polygon",
+                                "MultiPoint",
+                                "MultiLineString",
+                                "MultiPolygon"
+                              ],
+                              "example": "Point"
+                            },
+                            "coordinates": {
+                              "oneOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/paths/~1track/get/responses/200/content/application~1json/schema/properties/origin/properties/geometry/properties/coordinates/oneOf/1"
+                                  }
+                                },
+                                {
+                                  "title": "Coordinates.v1",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "number"
+                                  },
+                                  "x-examples": {
+                                    "example": [
+                                      102,
+                                      0.5
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "coordinates"
+                          ]
+                        },
+                        "bbox": {
+                          "type": "array",
+                          "items": {}
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "centerline": {
+                          "$ref": "#/paths/~1track/get/responses/200/content/application~1json/schema/properties/origin/properties/geometry"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "properties",
+                        "geometry"
+                      ]
+                    },
+                    "trackingNumber": {
+                      "type": "object",
+                      "title": "TrackingNumber.v2",
+                      "x-tags": [
+                        "Tracking"
+                      ],
+                      "properties": {
+                        "carrier": {
+                          "title": "CarrierSimple.v2",
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id"
+                          ]
+                        },
+                        "barcodeScanValue": {
+                          "type": "string",
+                          "description": "The computer readable alternative to the human readable",
+                          "deprecated": true
+                        },
+                        "value": {
+                          "type": "string",
+                          "description": "The human readable tracking number recipients (consignee) expect"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        },
+        "operationId": "get-track",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "trackingNumber"
+          }
+        ],
+        "description": "Get uniformed tracking events for any package, this response is carrier independent. Please note, an API Key is required for throttling purposes, please contact your success manager for details."
+      }
+    },
+    "/accounting": {
+      "get": {
+        "tags": [
+          "Accounting"
+        ],
+        "summary": "List Order Accounting",
+        "description": "Retrieves accounting activity during the queried timespan.",
+        "operationId": "get-accounting",
+        "security": [
+          {
+            "fdcAuth": [
+              "oms"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fromDate",
+            "in": "query",
+            "description": "Orders invoice date. Date-time in ISO 8601 format for selecting orders after, or at, the specified time",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "description": "Orders invoice date. Date-time in ISO 8601 format for selecting orders before, or at, the specified time",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "A multiplier of the number of items (limit parameter) to skip before returning results",
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The numbers of items to return",
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer",
+              "default": 80
+            }
+          },
+          {
+            "name": "warehouseIds",
+            "in": "query",
+            "description": "A CSV of warehouse id, '123' or '1,2,3'",
+            "style": "form",
+            "explode": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "orderIds",
+            "in": "query",
+            "description": "A CSV of FDC order id, '123' or '1,2,3'",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "hydrate",
+            "in": "query",
+            "description": "Adds additional information to the response, uses a CSV format for multiple values.",
+            "example": "items",
+            "required": true,
+            "style": "form",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "items"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accounting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "AccountingArray.v2",
+                  "type": "object",
+                  "properties": {
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "pagination": {
+                          "title": "Pagination.v2",
+                          "type": "object",
+                          "properties": {
+                            "totalPages": {
+                              "type": "integer",
+                              "description": "Total number of pages available to request"
+                            },
+                            "currentPage": {
+                              "type": "integer",
+                              "description": "Current page of the response, this will match the page parameter"
+                            },
+                            "count": {
+                              "type": "integer",
+                              "description": "Count of records returned in response, this will be equal to or less then the limit parameter"
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "Total number of records available to request"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "title": "Accounting.v2",
+                        "type": "object",
+                        "properties": {
+                          "fees": {
+                            "type": "object",
+                            "properties": {
+                              "fulfillment": {
+                                "type": "number",
+                                "format": "float",
+                                "description": ""
+                              },
+                              "picking": {
+                                "type": "number",
+                                "format": "float",
+                                "description": ""
+                              },
+                              "envelope": {
+                                "type": "number",
+                                "format": "float",
+                                "description": ""
+                              },
+                              "insert": {
+                                "type": "number",
+                                "format": "float",
+                                "description": ""
+                              },
+                              "kitting": {
+                                "type": "number",
+                                "format": "float",
+                                "description": ""
+                              },
+                              "print": {
+                                "type": "number",
+                                "format": "float",
+                                "description": ""
+                              },
+                              "box": {
+                                "type": "number",
+                                "format": "float",
+                                "description": ""
+                              },
+                              "postage": {
+                                "type": "number",
+                                "format": "float",
+                                "description": ""
+                              },
+                              "total": {
+                                "type": "number",
+                                "format": "float",
+                                "description": ""
+                              }
+                            }
+                          },
+                          "order": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "description": "FDC order id"
+                              },
+                              "merchantOrderId": {
+                                "type": "integer",
+                                "description": "Merchant order id"
+                              },
+                              "recordedDate": {
+                                "type": "string",
+                                "description": "Date of the order when it was initially received.",
+                                "format": "date"
+                              },
+                              "invoiceDate": {
+                                "type": "string",
+                                "description": "Date of the order when it was recorded by accounting.",
+                                "format": "date"
+                              }
+                            }
+                          },
+                          "merchant": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Name of the merchant"
+                              }
+                            }
+                          },
+                          "warehouse": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "description": ""
+                              },
+                              "shortName": {
+                                "type": "string",
+                                "description": "Name of the merchant"
+                              }
+                            }
+                          },
+                          "itemCount": {
+                            "type": "integer",
+                            "description": "Total number of items accounted for"
+                          },
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "minimum": 1,
+                                  "type": "integer"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "quantity": {
+                                  "minimum": 1,
+                                  "type": "integer"
+                                },
+                                "wmsItemId": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-tagGroups": [
+    {
+      "name": "Support",
+      "tags": [
+        "Auth",
+        "Users"
+      ]
+    },
+    {
+      "name": "Order Management",
+      "tags": [
+        "Orders",
+        "Returns",
+        "Partners",
+        "Accounting"
+      ]
+    },
+    {
+      "name": "Items",
+      "tags": [
+        "Inventory"
+      ]
+    },
+    {
+      "name": "Services",
+      "tags": [
+        "Tracking"
+      ]
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "fdcAuth": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "tokenUrl": "https://api.fulfillment.com/v2/oauth/access_token",
+            "refreshUrl": "https://api.fulfillment.com/v2/oauth/access_token",
+            "scopes": {
+              "oms": "read & write access"
+            }
+          },
+          "implicit": {
+            "authorizationUrl": "https://api.fulfillment.com/v2/oauth/authorize",
+            "scopes": {
+              "oms": "read & write access"
+            }
+          }
+        }
+      },
+      "apiKey": {
+        "name": "x-api-key",
+        "type": "apiKey",
+        "in": "header",
+        "description": ""
+      }
+    },
+    "schemas": {},
+    "parameters": {
+      "authHeader": {
+        "name": "Authorization",
+        "in": "header",
+        "description": "OAuth 2.0 Bearer Access Token",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "fromDateParam": {
+        "name": "fromDate",
+        "in": "query",
+        "description": "Date-time in ISO 8601 format for selecting orders after, or at, the specified time",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "toDateParam": {
+        "name": "toDate",
+        "in": "query",
+        "description": "Date-time in ISO 8601 format for selecting orders before, or at, the specified time",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "pageParam": {
+        "name": "page",
+        "in": "query",
+        "description": "A multiplier of the number of items (limit parameter) to skip before returning results",
+        "schema": {
+          "minimum": 1,
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "limitParam": {
+        "name": "limit",
+        "in": "query",
+        "description": "The numbers of items to return",
+        "schema": {
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer",
+          "default": 80
+        }
+      },
+      "merchantParam": {
+        "name": "merchantIds",
+        "in": "query",
+        "description": "A CSV of merchant id, '123' or '1,2,3'",
+        "style": "form",
+        "explode": false,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "warehouseParam": {
+        "name": "warehouseIds",
+        "in": "query",
+        "description": "A CSV of warehouse identifiers.",
+        "style": "form",
+        "example": "12,21",
+        "explode": false,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "externalSkuNameParam": {
+        "name": "externalSkuNames",
+        "in": "query",
+        "description": "A CSV of sku reference names.",
+        "style": "form",
+        "example": "skuName1,skuName2,skuName3",
+        "explode": false,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "hydrateParam": {
+        "name": "hydrate",
+        "in": "query",
+        "description": "Adds additional information to the response, uses a CSV format for multiple values.'",
+        "style": "form",
+        "explode": false,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "integrator",
+              "lineItems",
+              "trackingNumbers.carrier"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Please note that in keeping with the OAuth standard, parameters are underscored however all other API parameters are camelCase."
+    },
+    {
+      "name": "Orders",
+      "description": "Creating, viewing, and canceling orders."
+    },
+    {
+      "name": "Inventory",
+      "description": ""
+    },
+    {
+      "name": "Partners",
+      "description": ""
+    },
+    {
+      "name": "Returns",
+      "description": ""
+    },
+    {
+      "name": "Tracking",
+      "description": "Carrier Independent Tracking"
+    },
+    {
+      "name": "Users",
+      "description": ""
+    },
+    {
+      "name": "Accounting",
+      "description": ""
+    }
+  ]
+}

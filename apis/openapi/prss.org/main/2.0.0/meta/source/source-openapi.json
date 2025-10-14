@@ -1,0 +1,3262 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ContentDepot",
+    "termsOfService": "https://www.npr.org/about-npr/179876898/terms-of-use",
+    "description": "ContentDepot hosts a range of API’s that allow clients to manage, discover, and obtain content. The API spans many parts of the ContentDepot functionality including MetaPub (a.k.a. metadata distribution) and content management.\n\n## MetaPub\n\nMetaPub collects, normalizes and distributes publicly available program, episode, and piece metadata through the public radio system. Backed by ContentDepot and its data model, MetaPub allows producers to supply metadata through various methods:\n\n1. MetaPub Agents that collect producer metadata by \"crawling\" existing public feeds (e.g. C24, BBC) or the producer's production system (e.g. ATC, ME, TED Radio Hour).\n2. Manually enter metadata in the ContentDepot Portal on each program and episode.\n3. Publish/push the metadata to the MetaPub upload API and execute an ingest job.\n\nMetaPub then distributes this data to stations through an electronic program guide (EPG model) for display on various listener devices such as smart phones, tablets, web streams, HD radios, RDBS enabled FM radios, and more. The EPG format is based on the RadioDNS specifications.\n\n### RadioDNS\n\nThe RadioDNS Service and Programme Information Specification ([ETSI TS 102 818 v3.4.1](https://www.etsi.org/deliver/etsi_ts/102800_102899/102818/03.04.01_60/ts_102818v030401p.pdf)) defines three primary documents: Service Information, Program Information, and Group Information. These documents, along with the core RadioDNS Hybrid Lookup for Radio Services Specification ([ETSI TS 103 270 v1.4.1](https://www.etsi.org/deliver/etsi_ts/103200_103299/103270/01.04.01_60/ts_103270v010401p.pdf)), define a system where an end listener device can dynamically discover program metadata and fetch the metadata via Internet Protocol (IP) requests. MetaPub's use of RadioDNS differs slightly in that MetaPub (a.k.a PRSS) acts as the \"service provider\" while the stations and related middleware act as the end devices. While this is not the primary use case of RadioDNS, the flexibility in the specification, service definitions, and DNS resolution allows this model to be easily represented. MetaPub provides both _National Metadata_ and _Station Metadata_.\n\nIt is strongly recommended that the related [RadioDNS specifications](https://radiodns.org/developers/documentation/) be read for implementation details, definitions, and required XML schemas.\n\n## ContentDepot Drive\n\nContentDepot Drive (CD Drive) provides a private, per customer file storage solution similar to other cloud storage solutions such as Google Drive, Box, and Dropbox. The CD Drive is used to stage content uploads such as metadata files, images, or segment audio before associating the content with specific programs or episodes.\n\nCD Drive content can be referenced using a URI by some operations such as synchronizing metadata. There are two possible CD Drive URI formats supported: ID and hierarchical path. The ID reference takes the form ```cddrive:id:{value}``` where value is the integer ID of the file or folder being referenced. The hierarchical path reference takes the form ```cddrive://{path}``` where path is the full, UNIX style path to the file or folder starting with '/'. For example, two CD Drive URIs pointing to the same file may be ```cddrive:id:12345``` and ```cddrive:///show1/episode2/metadata.xml```. More information about URIs can be found at [Wikipedia](https://en.wikipedia.org/wiki/Uniform_Resource_Identifier).\n\n## Authentication\n\nThe API currently uses OAuth 2.0.  All operations require ```cd:full``` access where the client access is only limited by the permissions of the ContentDepot user after authentication. Limiting access scope per client is not currently supported.\n",
+    "version": "2.0.0",
+    "x-jentic-source-url": "https://contentdepot.prss.org/api/swagger-v2.yaml"
+  },
+  "servers": [
+    {
+      "url": "https://contentdepot.prss.org/api"
+    }
+  ],
+  "paths": {
+    "/radiodns/spi/3.1/SI.xml": {
+      "servers": [
+        {
+          "url": "/",
+          "description": "National SI document"
+        },
+        {
+          "url": "https://radiodns.prss.org",
+          "description": "Station SI document"
+        },
+        {
+          "url": "https://radiodnsstage.prss.org",
+          "description": "Station SI document"
+        },
+        {
+          "url": "https://radiodnsdev.mgmt.prss.org",
+          "description": "Station SI document"
+        }
+      ],
+      "get": {
+        "tags": [
+          "RadioDNS"
+        ],
+        "summary": "Get the service information document.",
+        "description": "The service information (SI) document holds a definition of services provided by the service provider (e.g. MetaPub), including any relevant metadata and bearer details, such as:\n\n* Names\n* Descriptions\n* Logos\n* Bearers (broadcast and IP)\n\nMetaPub provides two SI documents. The _National SI document_ describes the distribution services provided by PRSS including basic service metadata, logos, and bearers. The current design defines two IP based services, although this may change in the future:\n\n* Streams\n    * Bearer ID: prss:streams\n    * Service ID: streams\n* Files\n    * Bearer ID: prss:files\n    * Service ID: files\n\nThe _Station SI document_ describes the stations and broadcast services served by PRSS. Only stations and broadcast services that have opted into metadata publishing are listed in this document.\n\nBased on [ETSI TS 102 818 v3.4.1](https://www.etsi.org/deliver/etsi_ts/102800_102899/102818/03.04.01_60/ts_102818v030401p.pdf) section 10.2.4, the SI document will be placed in a defined location on the service website. Using standard HTTP cache mechanisms, the SI document will only need to be fetched and processed occasionally.\n\nThe response will use standard HTTP cache-control headers to indicate when the document should be refreshed as well as an ETag to allow for lightweight change detection.\n",
+        "responses": {
+          "200": {
+            "description": "The service information document is returned in the body of the response.",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "RadioDNS Service Information (SI) as defined in [ETSI TS 102 818 v3.4.1](https://www.etsi.org/deliver/etsi_ts/102800_102899/102818/03.04.01_60/ts_102818v030401p.pdf) section 6"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/radiodns/spi/3.1/GI.xml": {
+      "get": {
+        "tags": [
+          "RadioDNS"
+        ],
+        "summary": "Get the group information document.",
+        "description": "The group information (GI) document allows programs to be put into groups such as serials, series, shows, or general themes and provide additional metadata for that group such as a description, links, and a logo. A program in the guide can be linked to its group using the \"memberOf\" field to allow clients to easily link programs together for a given Content Depot Program/Show in the EPG. GI will be published for all Content Depot programs that have the \"publish metadata\" option enabled. By using the group information, clients have the ability to access a single list of all metadata supported program titles, links, images, and descriptions. This information can be used to assist a station when setting up a schedule or it can be used in the end user metadata to provide additional information about the content such as displaying \"other episodes from this program\" or displaying the group, program, and program event images.\n\nCurrently all programs with \"publish metadata\" enabled will be included in the group information even if they are not active in the program guide. This may change in the future if the number of programs grows.\n\nNote that while the location of the GI document isn't expected to change in the near future, as per the RadioDNS specification the authoritative link to the document is defined in the SI document with the mime value ```application/xml+gi```.\n\nThe response will use standard HTTP cache-control headers to indicate when the document should be refreshed as well as an ETag to allow for lightweight change detection.\n",
+        "responses": {
+          "200": {
+            "description": "The group information document is returned in the body of the response.",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "RadioDNS Group Information (GI) as defined in [ETSI TS 102 818 v3.4.1](https://www.etsi.org/deliver/etsi_ts/102800_102899/102818/03.04.01_60/ts_102818v030401p.pdf) section 8"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/radiodns/spi/3.1/id/{fqdn}/{sid}/{date}_PI.xml": {
+      "servers": [
+        {
+          "url": "/",
+          "description": "National PI document"
+        },
+        {
+          "url": "https://radiodns.prss.org",
+          "description": "Station PI document"
+        },
+        {
+          "url": "https://radiodnsstage.prss.org",
+          "description": "Station PI document"
+        },
+        {
+          "url": "https://radiodnsdev.mgmt.prss.org",
+          "description": "Station PI document"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "fqdn",
+          "in": "path",
+          "description": "The fully qualified domain name for the environment where the service is running. The fqdn is defined in the `radiodns` element in the SI document in each Content Depot environment.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "sid",
+          "in": "path",
+          "description": "One of the valid service IDs defined in the SI document. For example, \"files\" or \"streams\".",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "date",
+          "in": "path",
+          "description": "The PI schedule date to retrieve in format yyyymmdd.",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "yyyymmdd"
+          }
+        },
+        {
+          "name": "x-radiodnsspi-api-key",
+          "in": "header",
+          "description": "The API client Id you received. This is required for National PI documents, but not Station PI documents. Contact help desk if you need one.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "RadioDNS"
+        ],
+        "summary": "Get the program information document.",
+        "description": "The program information (PI) document holds the linear and the on-demand schedule of programs for a service over a 24 hour period. This information provides an electronic program guide (EPG) to clients that defines the program metadata such as:\n\n*   Names\n*   Descriptions\n*   Logos\n*   Links\n*   Genres\n*   Program Events (a.k.a. pieces)\n\nMetaPub provides both _National PI documents_ and _Station PI documents_. For both documents, only programs with metadata publishing enabled are listed in the document. As per the RadioDNS specification, the authoritative list of services is defined in the corresponding SI document.\n\nThe National PI documents correspond to the services listed in the National SI document (streams and files). This EPG contains two types of programming, live and on-demand (a.k.a files). A \"live with subsequent file (LWSF)\" program may appear in both the streams and files services EPG data because it will both a live stream and an on-demand file. File programs with multi-day air windows will appear in the PI file on every day that the air window is open. That is, the EPG data for each day contains the information about programming available that day, even if the programming is also available on other days. The program ID can be used to resolve these duplicates down to a single instance when processing multiple services or multiple days of EPG data.\n\nThe Station PI documents correspond to the services listed in the Station SI document, and list program and schedule metadata for programs which are subscribed to by the given service. Note that stations may opt into \"static\" metadata publishing (station and broadcast service metadata) but not \"dynamic\" metadata publishing (program and schedule metadata). If this is the case, a service that is listed in the Station SI document will not have a corresponding PI document, and a 404 status code will be returned.\n\nEach PI document will contain 24 hours of program guide information. The current day, the previous day, and the next day will contain detailed program event information (a.k.a. Content Depot pieces) while PI files outside of this range will only contain the program (a.k.a Content Depot episode) level information. This may change in the future with the use of an API key as defined by the RadioDNS specification to identify \"trusted\" clients. If metadata for any program in the guide(s) changes, the PI document will be regenerated. Using standard HTTP cache mechanisms, the PI document for the current day can be fetched frequently (e.g. every 5 minutes) to receive last minute changes while future and past days will only be fetched and processed occasionally (e.g. every two hours).\n\nBy obtaining the full 24 hour guide, clients such as middleware can build a local database/lookup table of program and program event information that allows for more specific program selection based on user configuration, automation events, and other possible inputs. In the event that MetaPub is unreachable for a short period of time, the client has the full guide to prevent any interruption to the on-air broadcast.\n\nConstruction of the URL to the PI document is described in [ETSI TS 102 818 v3.4.1](https://www.etsi.org/deliver/etsi_ts/102800_102899/102818/03.04.01_60/ts_102818v030401p.pdf) section 10.3. Currently, MetaPub only supports PI URLs constructed from SPI SI, as described in [ETSI TS 103 270 v1.4.1](https://www.etsi.org/deliver/etsi_ts/103200_103299/103270/01.04.01_60/ts_103270v010401p.pdf) section 7.\n\nThe response will use standard HTTP cache-control headers to indicate when the document should be refreshed as well as an ETag to allow for lightweight change detection.\n",
+        "responses": {
+          "200": {
+            "description": "Program information document for the given 24 hour period.",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "RadioDNS Program Information (PI) as defined in [ETSI TS 102 818 v3.4.1](https://www.etsi.org/deliver/etsi_ts/102800_102899/102818/03.04.01_60/ts_102818v030401p.pdf) section 7"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The program information for the requested day or service cannot be found."
+          },
+          "403": {
+            "description": "Authorization failed, the client Id is incorrect."
+          }
+        }
+      }
+    },
+    "/api/v2/cddrive/files/content": {
+      "post": {
+        "tags": [
+          "CD Drive"
+        ],
+        "summary": "Upload a file.",
+        "description": "Upload a file to the customer's private CD Drive.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Content-MD5",
+            "in": "header",
+            "description": "If present, the MD5 will be compared against the file received as a message integrity check.",
+            "schema": {
+              "type": "string",
+              "format": "md5"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Form data defining the file to create.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "description": "The file content being uploaded.",
+                    "type": "string",
+                    "format": "binary",
+                    "required": true
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9 \\._-]*[a-zA-Z0-9]$",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "The name of the file, including extension. Filename must start and end with a letter or number, and can only contain letters, numbers, periods, hyphens, underscores, and spaces.",
+                    "required": true
+                  },
+                  "parent-id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "The ID of the parent folder or 0 for the root folder.",
+                    "required": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The file was created successfully. The response contains the file metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CDDriveFile"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A name conflict because the file already exists."
+          },
+          "404": {
+            "description": "A parent id cannot be found."
+          },
+          "400": {
+            "description": "The provided Content-MD5 header doesn't match the provided content, or a provided field is invalid."
+          },
+          "403": {
+            "description": "Authorization failed, Username or password not found or incorrect."
+          },
+          "413": {
+            "description": "File is bigger than maximum size of 500 MB."
+          }
+        }
+      }
+    },
+    "/api/v2/cddrive/files/{file-id}/content": {
+      "parameters": [
+        {
+          "name": "file-id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "description": "The ID of the file to download.",
+          "required": true
+        }
+      ],
+      "get": {
+        "summary": "UNDER DEVELOPMENT - Download a file.",
+        "description": "Download a file from the customer's private CD Drive.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Range",
+            "in": "header",
+            "description": "Can be used to limit the range of bytes retrieved. Only a single byte range in the format ```bytes={start-range}-{end-range}``` is supported.",
+            "schema": {
+              "type": "string",
+              "format": "single byte range"
+            }
+          }
+        ],
+        "tags": [
+          "CD Drive"
+        ],
+        "responses": {
+          "200": {
+            "description": "The file was found and will be returned in the body of the response.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "The file was found but should be downloaded at the URL presented in the Location header. This return code may be used when the file is available via a CDN or other optimized path.",
+            "headers": {
+              "Location": {
+                "description": "The location the file can be downloaded from",
+                "schema": {
+                  "type": "string",
+                  "format": "url"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The file cannot be found."
+          }
+        }
+      }
+    },
+    "/api/v2/cddrive/files/{file-id}": {
+      "parameters": [
+        {
+          "name": "file-id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "description": "The ID of the file to access.",
+          "required": true
+        }
+      ],
+      "get": {
+        "summary": "Get file information.",
+        "description": "Get the information about a file in the customer's private CD Drive.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "CD Drive"
+        ],
+        "responses": {
+          "200": {
+            "description": "The file information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CDDriveFile"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The file cannot be found."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a file.",
+        "description": "Delete a file from the customer's private CD Drive.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "CD Drive"
+        ],
+        "responses": {
+          "204": {
+            "description": "The file was successfully deleted."
+          },
+          "404": {
+            "description": "The file cannot be found."
+          }
+        }
+      }
+    },
+    "/api/v2/cddrive/folders": {
+      "post": {
+        "summary": "Create a folder.",
+        "description": "Create a new folder in the customer's private CD Drive.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "CD Drive"
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1,
+                    "required": true,
+                    "description": "the name of the folder"
+                  },
+                  "parent-id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "The ID of the parent folder or 0 for the root folder.",
+                    "required": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The folder information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CDDriveFolder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The provided folder name is invalid."
+          },
+          "409": {
+            "description": "The folder already exists."
+          },
+          "404": {
+            "description": "A parent id cannot be found."
+          },
+          "403": {
+            "description": "Authorization failed, username or password not found or incorrect."
+          }
+        }
+      }
+    },
+    "/api/v2/cddrive/folders/{folder-id}": {
+      "parameters": [
+        {
+          "name": "folder-id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "description": "The ID of the folder to get.",
+          "required": true
+        }
+      ],
+      "get": {
+        "summary": "UNDER DEVELOPMENT - Get folder information.",
+        "description": "Get the information about a folder in the customer's private CD Drive.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "CD Drive"
+        ],
+        "responses": {
+          "200": {
+            "description": "The folder information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CDDriveFolder"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The folder cannot be found."
+          }
+        }
+      },
+      "delete": {
+        "summary": "UNDER DEVELOPMENT - Delete a folder.",
+        "description": "Delete a file from the customer's private CD Drive.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recursive",
+            "in": "query",
+            "description": "Flag to indicate if the folder should be deleted if it has items inside of it.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "tags": [
+          "CD Drive"
+        ],
+        "responses": {
+          "204": {
+            "description": "The file was successfully deleted."
+          },
+          "404": {
+            "description": "The file cannot be found."
+          }
+        }
+      }
+    },
+    "/api/v2/cddrive/folders/{folder-id}/items": {
+      "parameters": [
+        {
+          "name": "folder-id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "description": "The ID of the folder to get. Folder ID 0 represents the uppermost CD drive folder.",
+          "required": true
+        }
+      ],
+      "get": {
+        "summary": "Get the items in the folder.",
+        "description": "Get the information about a folder in the customer's private CD Drive.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "description": "The offset into the items to begin the response."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "The maximum number of items to return in the response."
+          }
+        ],
+        "tags": [
+          "CD Drive"
+        ],
+        "responses": {
+          "200": {
+            "description": "The folder information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalCount": {
+                      "type": "integer",
+                      "format": "int32",
+                      "description": "The total number of entries available."
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "format": "int32",
+                      "description": "The start offset into the items."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "format": "int32",
+                      "description": "The maximum number of items to return."
+                    },
+                    "entries": {
+                      "type": "array",
+                      "description": "The item instances.",
+                      "items": {
+                        "$ref": "#/components/schemas/CDDriveItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The folder cannot be found."
+          }
+        }
+      }
+    },
+    "/api/v2/metapub/program-information/batch": {
+      "post": {
+        "summary": "Create a batch operation on EPG information.",
+        "deprecated": true,
+        "description": "Create a batch to process the metadata of one or more electronic program guide (EPG) programs using metadata that has been uploaded to the customer's CD Drive. If multiple EPG programs are present in the metadata, they will all be updated, however updates across programs are not atomic. Note that an EPG program maps to the ContentDepot concept of an episode which is also known as a \"program instance\".\n\nA batch operation must be explicitly created rather than the server attempting to detect new metadata in order to allow for all the content to be uploaded including any supporting content like images. A batch operation is accepted and queued for asynchronous processing at a later time. A client can poll the batch periodically to determine when it completes and the resulting state.\n",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "The batch operation definition.",
+                "required": [
+                  "uri",
+                  "format"
+                ],
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "The URI to the metadata file. Currently only the ```cddrive``` scheme is supported."
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "The format of the metadata file defining the create or update actions to be performed on one or more EPG programs. For more information on how RadioDNS EPG maps to ContentDepot <a href=\"/api/epg-cd-mapping.html\">click here </a>",
+                    "enum": [
+                      "radiodns"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "An optional human readable name for the batch."
+                  },
+                  "program": {
+                    "type": "object",
+                    "required": [
+                      "title",
+                      "airDate"
+                    ],
+                    "description": "The program information to associate the ingested metadata with. This is only required if the metadata format doesn't provide the program title and air date information directly.",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "airDate": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "the airdate in ISO 8601 format (yyyy-MM-dd'T'HH:mm:ss'Z')"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MetaPub"
+        ],
+        "responses": {
+          "202": {
+            "description": "The accepted batch information that is queued for processing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramInformationBatch"
+                }
+              }
+            }
+          }
+        },
+        "externalDocs": {
+          "description": "Find RadioDns to ContentDepot Mapping here",
+          "url": "/api/epg-cd-mapping.html"
+        }
+      }
+    },
+    "/api/v2/metapub/program-information/batch/{batch-id}": {
+      "parameters": [
+        {
+          "name": "batch-id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      ],
+      "get": {
+        "deprecated": true,
+        "summary": "Get an EPG batch operation.",
+        "description": "Gets the batch information which can be used to check the status of the operation or retrieve more details if the batch fails.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "MetaPub"
+        ],
+        "responses": {
+          "200": {
+            "description": "The batch information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgramInformationBatch"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The batch is not found."
+          },
+          "403": {
+            "description": "Authorization failed, Username or password not found or incorrect."
+          }
+        }
+      }
+    },
+    "/api/v2/broadcastservices/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "description": "The ID of the broadcast service to find.",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Returns the broadcast service matching the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Broadcast Services"
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching broadcast service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastService"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to view this broadcast service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The broadcast service cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/broadcastservices": {
+      "get": {
+        "summary": "Gets broadcast services matching the given criteria.",
+        "parameters": [
+          {
+            "name": "pageStart",
+            "description": "The start page of the results to return. The first item is indexed at 0.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "description": "The number of items to return. Must be between 0 and 500, inclusive.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 500,
+              "minimum": 0,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "orderById",
+            "description": "The sort order of the list of broadcast services, based on broadcast service ID. If unspecified, the broadcast services are returned in random order. If using paging to iterate through the results, sort order should be specified.",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Broadcast Services"
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching broadcast services.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Episode"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is missing required data or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, username or password not found or incorrect."
+          }
+        }
+      }
+    },
+    "/api/v2/segments/{id}/content": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "required": true
+          }
+        }
+      ],
+      "get": {
+        "summary": "UNDER DEVELOPMENT - Returns the audio content segment matching the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Segments"
+        ],
+        "responses": {
+          "200": {
+            "description": "The audio content of the requested segment.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The segment isn't found or the user doesn't have permission to get it."
+          }
+        }
+      }
+    },
+    "/api/v2/segments/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "required": true
+          }
+        }
+      ],
+      "get": {
+        "summary": "Returns the segment matching the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Segments"
+        ],
+        "responses": {
+          "200": {
+            "description": "The segment with the given ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to view the segment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The segment information cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Deletes the segment with the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Segments"
+        ],
+        "responses": {
+          "200": {
+            "description": "The segment was deleted."
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to delete the segment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The segment or the episode that owns the segment cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/segments": {
+      "get": {
+        "summary": "Returns the segments matching the query parameters.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Segments"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "episodeId",
+            "description": "The ID of the episode that owns the segment.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "required": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "segmentNumber",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageStart",
+            "description": "The start page of the results to return. The first item is indexed at 0.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "description": "The number of items to return. Must be between 0 and 500, inclusive.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 500,
+              "minimum": 0,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "orderById",
+            "description": "The sort order of the list of segments, based on segment ID. If unspecified, the segments are returned in random order. If using paging to iterate through the results, sort order should be specified.",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The segments matching the query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Segment"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to view this episode or its segments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The episode cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Creates a new segment.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Segments"
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "episodeId",
+                  "segmentNumber",
+                  "cdDriveUri"
+                ],
+                "properties": {
+                  "episodeId": {
+                    "description": "The ID of the episode that owns the segment.",
+                    "type": "integer",
+                    "format": "int64",
+                    "required": true
+                  },
+                  "segmentNumber": {
+                    "description": "The segment number of the segment.",
+                    "type": "integer",
+                    "format": "int32",
+                    "required": true
+                  },
+                  "cdDriveUri": {
+                    "description": "The URI to the segment content in CD Drive. Format should be 'cddrive:id:{value}' or 'cddrive://{path}'.",
+                    "type": "string",
+                    "required": true
+                  },
+                  "inCue": {
+                    "description": "The incue for the segment. Defaults to the subscription hour segment incue.",
+                    "type": "string"
+                  },
+                  "outCue": {
+                    "description": "The outcue for the segment. Defaults to the subscription hour segment outcue.",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created segment with fields populated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is missing required data or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to create the segment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The information for creating the segment cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/programs/search": {
+      "get": {
+        "summary": "Optimized free-text search for programs using various filters.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Programs"
+        ],
+        "parameters": [
+          {
+            "name": "keywords",
+            "description": "Free text search that matches against the program title or description.",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageStart",
+            "description": "The start page of the results to return. The first item is indexed at 0.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "description": "The number of items to return. Must be between 0 and 500, inclusive.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 500,
+              "minimum": 0,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Programs matching the search request sorted by relevance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Program"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, username or password not found or incorrect."
+          }
+        }
+      }
+    },
+    "/api/v2/programs/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "description": "The ID of the program to operate on.",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Returns the program matching the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Programs"
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching program.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Program"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to view this program.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The program cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/episodes/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "description": "The ID of the episode to operate on.",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Returns the episode matching the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Episodes"
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching episode.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Episode"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to view this episode.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The episode cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/episodes": {
+      "get": {
+        "summary": "Gets episodes matching the given criteria.",
+        "parameters": [
+          {
+            "name": "id",
+            "description": "Matches on the ID of the episode.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "beginAirDateAfter",
+            "description": "Matches on the begin air date of the episode (inclusive) in ISO 8601 format.",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endAirDateBefore",
+            "description": "Matches on the end air date of the episode (inclusive) in ISO 8601 format.",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "programId",
+            "description": "Matches on the ID of the program that owns the episode.",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "pageStart",
+            "description": "The start page of the results to return. The first item is indexed at 0.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "description": "The number of items to return. Must be between 0 and 500, inclusive.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 500,
+              "minimum": 0,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "orderById",
+            "description": "The sort order of the list of episodes, based on episode ID. If unspecified, the episodes are returned in random order. If using paging to iterate through the results, sort order should be specified.",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Episodes"
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching episode.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Episode"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is missing required data or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to view this program or its episodes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The program cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/pieces/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "required": true
+          }
+        }
+      ],
+      "get": {
+        "summary": "Returns the piece matching the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Pieces"
+        ],
+        "responses": {
+          "200": {
+            "description": "The piece with the given ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Piece"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The piece isn't found or the user doesn't have permission to get it."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Deletes the piece with the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Pieces"
+        ],
+        "responses": {
+          "200": {
+            "description": "The piece was deleted."
+          },
+          "403": {
+            "description": "The user isn't permitted to delete the piece."
+          },
+          "404": {
+            "description": "The piece isn't found."
+          }
+        }
+      }
+    },
+    "/api/v2/pieces": {
+      "get": {
+        "summary": "Returns the pieces matching the query parameters.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Pieces"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "episodeId",
+            "description": "The ID of the episode that owns the piece.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "required": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The pieces matching the query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Piece"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, Username or password not found or incorrect."
+          },
+          "404": {
+            "description": "Either the pieces or the episode aren't found."
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new piece.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Pieces"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Piece"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created piece with fields populated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Piece"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "If the request is missing required data or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The user isn't permitted to create the piece."
+          }
+        }
+      }
+    },
+    "/api/v2/spots/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "required": true
+          }
+        }
+      ],
+      "get": {
+        "summary": "Returns the spot matching the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Spots"
+        ],
+        "responses": {
+          "200": {
+            "description": "The spot with the given ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Spot"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to view the spot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The spot information cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Deletes the spot with the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Spots"
+        ],
+        "responses": {
+          "200": {
+            "description": "The spot was deleted."
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to delete the spot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The spot cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/spots": {
+      "get": {
+        "summary": "Returns the spots matching the query parameters.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Spots"
+        ],
+        "parameters": [
+          {
+            "name": "pageStart",
+            "description": "The start page of the spot to return. The first item is indexed at 0.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "description": "The number of items to return. Must be between 0 and 500, inclusive.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 500,
+              "minimum": 0,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "orderById",
+            "description": "The sort order of the list of spots, based on spot ID. If unspecified, the spots are returned in random order. If using paging to iterate through the results, sort order should be specified.",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The spots matching the query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Spot"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to view these spots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The spot cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Creates a new spot.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Spots"
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "cdDriveUri",
+                  "name",
+                  "notes"
+                ],
+                "properties": {
+                  "cdDriveUri": {
+                    "description": "The URI to the spot content in CD Drive. Format should be 'cddrive:id:{value}' or 'cddrive://{path}'.",
+                    "type": "string",
+                    "required": true
+                  },
+                  "name": {
+                    "description": "The name of the spot to create/update.",
+                    "type": "string",
+                    "required": true
+                  },
+                  "notes": {
+                    "description": "Notes pertaining to the spot.",
+                    "type": "string",
+                    "required": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created spot with fields populated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Spot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is missing required data or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to create the spot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The information for creating the spot cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/spotinsertions/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "required": true
+          }
+        }
+      ],
+      "get": {
+        "summary": "Returns the spot insertion matching the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Spot Insertions"
+        ],
+        "responses": {
+          "200": {
+            "description": "The spot insertion with the given ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpotInsertion"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to view the spot insertion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The spot insertion cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Deletes the spot insertion with the given ID.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Spot Insertions"
+        ],
+        "responses": {
+          "200": {
+            "description": "The spot insertion was deleted."
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to delete the spot insertion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The spot insertion cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/spotinsertions": {
+      "get": {
+        "summary": "Returns the spot insertions matching the query parameters.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Spot Insertions"
+        ],
+        "parameters": [
+          {
+            "name": "pageStart",
+            "description": "The start page of the results to return. The first item is indexed at 0.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "description": "The number of items to return. Must be between 0 and 500, inclusive.",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 500,
+              "minimum": 0,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "orderById",
+            "description": "The sort order of the list of spot insertions, based on ID. If unspecified, the spot insertions are returned in random order. If using paging to iterate through the results, sort order should be specified.",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The spot insertions matching the query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SpotInsertion"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Creates a new spot insertion.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Spot Insertions"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpotInsertion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created spot insertion with fields populated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpotInsertion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is missing required data or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to create the spot insertion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Creating the spot insertion failed, even though the request was valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/users/current": {
+      "get": {
+        "summary": "Returns the current user.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Account"
+        ],
+        "responses": {
+          "200": {
+            "description": "The current user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/customers/{id}": {
+      "post": {
+        "summary": "Gets the customer for the given id",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Account"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "required": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The customer with the given id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization failed, or the user is not permitted to view this customer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The customer cannot be found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/destinations/healths": {
+      "post": {
+        "summary": "Create a destination health record (please note - this endpoint is in alpha mode and may change or be removed in the future).",
+        "description": "Create a new health record for the specified destination.",
+        "security": [
+          {
+            "cd_oauth2": [
+              "cd:full"
+            ]
+          }
+        ],
+        "tags": [
+          "Destinations"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "The destination health record to create.",
+                "required": [
+                  "destinationId",
+                  "destinationType",
+                  "healthy",
+                  "message",
+                  "details",
+                  "reportedDate"
+                ],
+                "properties": {
+                  "destinationId": {
+                    "type": "integer",
+                    "description": "The ID of the related destination."
+                  },
+                  "destinationType": {
+                    "type": "string",
+                    "description": "The type of the related destination.",
+                    "enum": [
+                      "XDS_PRO",
+                      "FTP",
+                      "ICECAST",
+                      "CODEC",
+                      "CD_EDGE"
+                    ]
+                  },
+                  "healthy": {
+                    "type": "boolean",
+                    "description": "Whether or not the destination is reporting to be healthy"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Description of device health"
+                  },
+                  "details": {
+                    "type": "string",
+                    "description": "Destination type specific details. Details pending."
+                  },
+                  "reportedDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The time this health information was reported"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created destination health record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DestinationHealthResource"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The provided health record details are invalid."
+          },
+          "404": {
+            "description": "The destination could not be found"
+          },
+          "401": {
+            "description": "The current user does not have permission to report health information for this destination."
+          },
+          "403": {
+            "description": "Authorization failed, username or password not found or incorrect."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BroadcastService": {
+        "type": "object",
+        "description": "A broadcast service that can subscribe to content for multiple destinations.",
+        "required": [
+          "id",
+          "name",
+          "createdDate",
+          "lastModifiedDate"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the broadcast service.",
+            "format": "int64",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the broadcast service.",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "description": {
+            "type": "string",
+            "description": "The description of the broadcast service.",
+            "minLength": 0,
+            "maxLength": 1200
+          },
+          "createdDate": {
+            "description": "The date the broadcast service was created in ISO 8601 format.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastModifiedDate": {
+            "description": "The date the broadcast service was last modified in ISO 8601 format.",
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CDDriveFile": {
+        "type": "object",
+        "description": "A file in the CD Drive that contains content.",
+        "required": [
+          "name",
+          "id",
+          "parentId",
+          "createdDate",
+          "lastModifiedDate"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the file including the extension.",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9 \\._-]*[a-zA-Z0-9]$",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "parentId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "The ID of the parent folder or 0 for the root folder."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "The ID of the file."
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the file was created in ISO 8601 format."
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the file was last modified in ISO 8601 format."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The size of the file in bytes."
+          }
+        }
+      },
+      "CDDriveFolder": {
+        "type": "object",
+        "description": "A folder in the CD Drive that can contain other items such as files or folders.",
+        "required": [
+          "name",
+          "parentId",
+          "id",
+          "createdDate",
+          "lastModifiedDate"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the folder.",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "parentId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "The ID of the parent folder or 0 for the root folder."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "The ID of the folder."
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the folder was created in ISO 8601 format."
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the folder was last modified in ISO 8601 format. This may only represent a modification to to the folder metadata itself, not to the contents of the folder."
+          }
+        }
+      },
+      "CDDriveItem": {
+        "type": "object",
+        "description": "A generic reference to an item in the CD Drive such as a file or folder.",
+        "required": [
+          "name",
+          "type",
+          "id"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "folder"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "Segment": {
+        "type": "object",
+        "description": "An audio segment in an episode.",
+        "required": [
+          "episodeId",
+          "segmentNumber"
+        ],
+        "properties": {
+          "id": {
+            "description": "The unique ID of the segment. Generated at creation.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "episodeId": {
+            "description": "The ID of the episode that owns the segment.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "segmentNumber": {
+            "description": "The number of the segment in the episode, starting with 1.",
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "inCue": {
+            "description": "The in-cue copy that signals the start of the segment to a board operator.",
+            "type": "string"
+          },
+          "outCue": {
+            "description": "The out-cue copy that signals the end of the segment to a board operator.",
+            "type": "string"
+          },
+          "createdDate": {
+            "description": "The date the segment was created in ISO 8601 format. Generated at creation.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastModifiedDate": {
+            "description": "The date the segment was last modified/updated in ISO 8601 format. Automatically updated on any write operation.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "length": {
+            "description": "The length (duration) of the segment in seconds.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "channels": {
+            "description": "The number of audio channels in the segment. Generated at creation.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "fileSize": {
+            "description": "The size of the audio content file in bytes. Generated at creation.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "fileName": {
+            "description": "The name of the audio content file. Generated at creation.",
+            "type": "string"
+          },
+          "originalFileName": {
+            "description": "The original name of the audio content file.",
+            "type": "string"
+          }
+        }
+      },
+      "Piece": {
+        "type": "object",
+        "description": "The metadata about a \"piece\" which may be a story, song, report, etc.",
+        "required": [
+          "episodeId",
+          "title",
+          "relativeStartTime",
+          "relativeEndTime"
+        ],
+        "properties": {
+          "id": {
+            "description": "The unique ID of the piece. Generated at creation.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "readOnly": true
+          },
+          "episodeId": {
+            "description": "The ID of the episode that owns the piece.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "segmentNumber": {
+            "description": "The number of the segment that this piece is in, starting with 1. This is an optional field but it can be used to provide more detail by linking the piece to a specific audio segment.",
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "createdDate": {
+            "description": "The date the piece was created in ISO 8601 format. Generated at creation.",
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "lastModifiedDate": {
+            "description": "The date the piece was last modified/updated in ISO 8601 format. Automatically updated on any write operation.",
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "title": {
+            "description": "The human readable title of the piece that is normally displayed on an end user's device.",
+            "type": "string",
+            "maxLength": 37
+          },
+          "relativeStartTime": {
+            "description": "Seconds relative to the start of the episode.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "relativeEndTime": {
+            "description": "Seconds relative to the start of the episode.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "description": "The short description of the piece.",
+            "type": "string",
+            "maxLength": 180
+          },
+          "fullDescription": {
+            "description": "The long description of the piece.",
+            "type": "string",
+            "maxLength": 1200
+          },
+          "contributors": {
+            "description": "The list of contributors to the piece.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Contributor"
+            }
+          },
+          "imageFileSize": {
+            "description": "The size of the piece image file in bytes. Generated at creation.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "imageFileName": {
+            "description": "The name of the piece image file. Generated at creation.",
+            "type": "string"
+          },
+          "imageOriginalFileName": {
+            "description": "The user's original name of the piece image file.",
+            "type": "string"
+          },
+          "imageCdDriveUri": {
+            "description": "The URI to the piece image content in CD Drive. Format should be 'cddrive:id:{value}' or 'cddrive://{path}'. This property is only used on modification and is not returned.",
+            "type": "string"
+          }
+        }
+      },
+      "Contributor": {
+        "type": "object",
+        "description": "Details of who contributed to a piece.",
+        "required": [
+          "name",
+          "role"
+        ],
+        "properties": {
+          "name": {
+            "description": "The contributor's name",
+            "type": "string"
+          },
+          "role": {
+            "description": "The contributor's role",
+            "type": "string",
+            "enum": [
+              "ARTIST",
+              "COMPOSER",
+              "CONDUCTOR",
+              "ORCHESTRA_ENSEMBLE",
+              "SOLOIST_1",
+              "SOLOIST_2",
+              "SOLOIST_3",
+              "GUEST",
+              "OTHER",
+              "DESK_EDITOR",
+              "BOOKER",
+              "DESK_PRODUCER",
+              "SHOW_EDITOR",
+              "HOST",
+              "PRODUCER",
+              "REPORTER",
+              "SHOW_PRODUCER",
+              "DIGITAL_PRODUCER",
+              "LEAD_EDITOR",
+              "DIGITAL_EDITOR",
+              "RESEARCHER",
+              "COPY_EDITOR",
+              "ENGAGEMENT_EDITOR",
+              "AUDIO_ENGINEER",
+              "VISUALS_PRODUCER",
+              "VISUALS_EDITOR"
+            ]
+          }
+        }
+      },
+      "Program": {
+        "type": "object",
+        "description": "A program that stations can subscribe to to get live or file content.",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "description": "The unique ID of the program. Generated at creation.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "customerId": {
+            "description": "The ID of the customer that owns this program.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "title": {
+            "description": "The title of the program.",
+            "type": "string"
+          },
+          "createdDate": {
+            "description": "The date the segment was created in ISO 8601 format. Generated at creation.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastModifiedDate": {
+            "description": "The date the program was last modified/updated in ISO 8601 format. Automatically updated on any write operation.",
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Episode": {
+        "type": "object",
+        "description": "An episode that defines a specific air date for an instance of a program.",
+        "required": [
+          "title",
+          "programId",
+          "beginAirDate",
+          "endAirDate"
+        ],
+        "properties": {
+          "id": {
+            "description": "The unique ID of the episode. Generated at creation.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "programId": {
+            "description": "The ID of the program that owns this episode.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "customerId": {
+            "description": "The ID of the customer that owns this programs.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "title": {
+            "description": "The title of the program.",
+            "type": "string"
+          },
+          "createdDate": {
+            "description": "The date the segment was created in ISO 8601 format. Generated at creation.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastModifiedDate": {
+            "description": "The date the segment was last modified/updated in ISO 8601 format. Automatically updated on any write operation.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "beginAirDate": {
+            "description": "The date the air window opens for the episode in ISO 8601 format.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAirDate": {
+            "description": "The date the air window closes for the episode in ISO 8601 format.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "beginTransmissionDate": {
+            "description": "The date the live stream begins for the episode in ISO 8601 format. Only set for live and LWSF episodes.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTransmissionDate": {
+            "description": "The date the live stream ends for the episode in ISO 8601 format. Only set for live and LWSF episodes.",
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Spot": {
+        "type": "object",
+        "description": "An audio spot for insertion.",
+        "properties": {
+          "id": {
+            "description": "The unique ID of the spot. Generated at creation.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "name": {
+            "description": "The unique name of the spot",
+            "type": "string",
+            "minimum": 1
+          },
+          "notes": {
+            "description": "Miscellaneous notes about the spot",
+            "type": "string",
+            "minimum": 1
+          },
+          "duration": {
+            "description": "The length (duration) of the spot in seconds.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastModifiedDate": {
+            "description": "The date the spot was last modified/updated in ISO 8601 format. Automatically updated on any write operation.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdDate": {
+            "description": "The date the spot was created in ISO 8601 format. Generated at creation.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUploadedDate": {
+            "description": "The date the spot audio file was uploaded in ISO 8601 format. Automatically updated on upload.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "fileSize": {
+            "description": "The size of the audio content file in bytes. Generated at creation.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "fileName": {
+            "description": "The name of the audio content file. Generated at creation.",
+            "type": "string"
+          },
+          "originalFileName": {
+            "description": "The original name of the audio content file.",
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "description": "Standard error response. See the [Problem Details for HTTP APIs](https://datatracker.ietf.org/doc/html/rfc7807) for more details.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The general problem description."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The occurrence-specific problem description."
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The status code of the error."
+          }
+        }
+      },
+      "ProgramInformationBatch": {
+        "type": "object",
+        "description": "An electronic program guide (EPG) batch operation to create or update metadata on one or more guide programs.",
+        "required": [
+          "id",
+          "status",
+          "format",
+          "createdDate"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "The ID of the batch."
+          },
+          "name": {
+            "type": "string",
+            "description": "The optional name of the batch for human reference."
+          },
+          "message": {
+            "type": "string",
+            "description": "The human readable success or failure message."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "processing",
+              "failed",
+              "successful"
+            ],
+            "description": "The current processing status."
+          },
+          "uri": {
+            "type": "string",
+            "format": "uri",
+            "description": "The URI to the metadata file defining the batch creates/updates."
+          },
+          "format": {
+            "type": "string",
+            "description": "The format of the metadata file defining the create or update actions to be performed on one or more EPG programs.",
+            "enum": [
+              "radiodns"
+            ]
+          },
+          "program": {
+            "type": "object",
+            "required": [
+              "title",
+              "airDate"
+            ],
+            "description": "The program information to associate the ingested metadata with. This is only required if the metadata format doesn't provide the program title and air date information directly. If this is specified, it will overrite the value specfified in the metadata file. If this is specified, the metadata file should only contain one program.",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "The title of the program."
+              },
+              "airDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The airDate for the program in ISO 8601 format."
+              }
+            }
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the batch was created in ISO 8601 format."
+          },
+          "finishedDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the batch finished (either successful or failed) in ISO 8601 format."
+          }
+        }
+      },
+      "SpotInsertion": {
+        "type": "object",
+        "description": "A spot insertion for playing a series of spots when a cue is received during a program.",
+        "required": [
+          "programId",
+          "broadcastServiceId",
+          "cue",
+          "duration",
+          "spots",
+          "startDate",
+          "endDate"
+        ],
+        "properties": {
+          "id": {
+            "description": "The unique ID of the spot insertion. Generated at creation.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "readOnly": true
+          },
+          "programId": {
+            "description": "The ID of the program for the spot insertion.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "broadcastServiceId": {
+            "description": "The ID of the broadcast service for the spot insertion.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "customerId": {
+            "description": "The ID of the customer who owns the spot insertion. Set to the logged-in customer at creation.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "readOnly": true
+          },
+          "cue": {
+            "description": "The cue that triggers the spot insertion.",
+            "type": "string",
+            "pattern": "^S:[A-F0-9]{3,4}_[A-Za-z0-9_-]*$",
+            "example": "S:000_SPOT"
+          },
+          "duration": {
+            "description": "The duration of the spot insertion.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "spots": {
+            "description": "The ordered list of spot IDs to play.",
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "startDate": {
+            "description": "The date the spot insertion can start in yyyyMMdd format. The time will be set to midnight Eastern Time.",
+            "type": "string",
+            "format": "date",
+            "example": "2020-01-31"
+          },
+          "endDate": {
+            "description": "The date the spot insertion ends in yyyyMMdd format. The time will be set to midnight Eastern Time.",
+            "type": "string",
+            "format": "date",
+            "example": "2020-01-31"
+          },
+          "createdDate": {
+            "description": "The date and time the spot insertion was created in ISO 8601 format. Generated at creation.",
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "description": "A ContentDepot user.",
+        "properties": {
+          "id": {
+            "description": "The unique ID of the user.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "firstName": {
+            "description": "The first name of the user.",
+            "type": "string"
+          },
+          "lastName": {
+            "description": "The last name of the user.",
+            "type": "string"
+          },
+          "username": {
+            "description": "The username of the user.",
+            "type": "string"
+          },
+          "customerId": {
+            "description": "The customer ID of the user.",
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "description": "A Content Depot customer",
+        "properties": {
+          "id": {
+            "description": "The unique ID of the customer.",
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "name": {
+            "description": "The name of the customer.",
+            "type": "string"
+          },
+          "callLetters": {
+            "description": "The call letters of the customer.",
+            "type": "string"
+          }
+        }
+      },
+      "DestinationHealthResource": {
+        "type": "object",
+        "description": "The destination health record to create.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ID of the created health record"
+          },
+          "destinationId": {
+            "type": "integer",
+            "description": "The ID of the related destination."
+          },
+          "destinationType": {
+            "type": "string",
+            "description": "The type of the related destination.",
+            "enum": [
+              "XDS_PRO",
+              "FTP",
+              "ICECAST",
+              "CODEC",
+              "CD_EDGE"
+            ]
+          },
+          "healthy": {
+            "type": "boolean",
+            "description": "Whether or not the destination is reporting to be healthy"
+          },
+          "message": {
+            "type": "string",
+            "description": "Description of device health"
+          },
+          "details": {
+            "type": "string",
+            "description": "Destination type specific details. Details pending."
+          },
+          "reportedDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The time this health information was reported"
+          },
+          "createdDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this health record was created"
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this health record was last modified"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "cd_oauth2": {
+        "type": "oauth2",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "/api/oauth2/authorize",
+            "tokenUrl": "/api/oauth2/token",
+            "scopes": {
+              "cd:full": "Full access to the ContentDepot account"
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "RadioDNS",
+      "description": "Endpoints to access the RadioDNS formatted national program information (SI and PI documents) for stations to use in middleware that is capable of scheduling and extracting the information. Station specific SI and PI documents are provided via a different mechanism.",
+      "externalDocs": {
+        "url": "https://radiodns.org/developers/documentation/"
+      }
+    },
+    {
+      "name": "CD Drive",
+      "description": "ContentDepot Drive functionality for uploading and stating content files for use in other API operations."
+    },
+    {
+      "name": "Broadcast Services",
+      "description": "Broadcast services can subscribe to content for multiple destinations."
+    },
+    {
+      "name": "Spot Insertions",
+      "description": "Spot insertions define spots to play when a cue is received."
+    },
+    {
+      "name": "Programs",
+      "description": "Program information including searching for existing programs or fetching a specific program. A program is a collection of episodes that are delivered by ContentDepot as a live stream or pre-recorded files."
+    },
+    {
+      "name": "Episodes",
+      "description": "An episode is a specific instance of a program that will air on a specific date and time."
+    },
+    {
+      "name": "Segments",
+      "description": "Segments include the audio content and related information such as the in-cue and out-cue."
+    },
+    {
+      "name": "Pieces",
+      "description": "Pieces define specific story or song level metadata within an episode and segment. For example, an 18 minute audio segment may be composed of multiple 2 or 3 minute pieces."
+    },
+    {
+      "name": "MetaPub",
+      "description": "Endpoints to access MetaPub ingest functionality such as synchronizing producer metadata to programs and episodes. These API operations are deprecated. Use the pieces endpoints instead."
+    },
+    {
+      "name": "Spots",
+      "description": "A spot is an audio file that is to be inserted into streams using cues."
+    },
+    {
+      "name": "Account",
+      "description": "Endpoints to view account and customer information"
+    },
+    {
+      "name": "Destinations",
+      "description": "Endpoints related to destinations within ContentDepot"
+    }
+  ]
+}
