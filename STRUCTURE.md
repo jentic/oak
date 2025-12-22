@@ -1,7 +1,5 @@
 # Repository Structure (OAK Standard)
 
-## NOTE: the Directory Structure for APIs is still under development and will evolve into a structure described (WIP) in STAGING-STRUCTURE.md
-
 This document describes the standardized directory structure for an Open Agentic Knowledge (OAK) repository. This repository follows this standard to organize its API specifications and workflows.
 
 ## Overview
@@ -13,33 +11,43 @@ The repository uses a structured approach to organize:
 ## Directory Structure
 
 ```
-__data__/
-  ├── apis/                            # All API-related files
-  │   └── openapi/                     # OpenAPI specifications
-  │       ├── vendor.com/              # Vendor directory (usually domain name)
-  │       │   ├── main/                # Default API for vendors with single API
-  │       │   │   ├── meta.json        # API metadata with vendor/api_name/friendly_id fields
-  │       │   │   └── 1.0.0/           # Version directory
-  │       │   │       ├── openapi.json # Standardized OpenAPI spec with source URL in info section
-  │       │   │       └── orig/        # Original files directory
-  │       │   │           └── spec.yaml # Original spec file as downloaded
-  │       │   └── other-api/           # Additional APIs for vendor if present
-  │       │       ├── meta.json
-  │       │       └── 2.0.0/
-  │       │           ├── openapi.json # Standardized OpenAPI spec
-  │       │           └── orig/        # Original files directory
-  │       │               └── spec.yaml # Original spec file
-  ├── workflows/                       # All workflow-related files
-      ├── vendor1.com/                 # Vendor's main API workflows 
-      │   ├── workflows.arrazo.json    # Default workflow file for this API
-      │   └── payment-flows.arrazo.json # Purpose-specific workflow file
-      ├── vendor2.com~api3/            # Non-main API with ~ separator
-      │   ├── workflows.arrazo.json    # Default workflow file for this API
-      │   └── custom-flows.arrazo.json # Custom workflow file
-      └── vendor1.com+vendor2.com~api3/ # Multi-API workflows (alphabetical ordering)
-          ├── workflows.arrazo.json    # Default workflows for these APIs
-          └── integration-flows.arrazo.json # Specific integration workflows
+.
+├── apis                                                  # All API-related files
+│   └── openapi                                           # OpenAPI specifications
+│       ├── vendor1.com                                   # Vendor directory (usually domain name)
+│       │   └── main                                      # Default API for vendors with single API
+│       │       ├── 1.0.0                                 # Version directory
+│       │       │   ├── openapi.json                      # Standardized OpenAPI spec
+│       │       │   ├── apis.json                         # apis.json single API file - see https://apisjson.org/
+│       │       │   ├── scorecard.json                    # API scorecard file - see https://jentic.com/scorecard
+│       │       │   └── meta                              # A directory containing various metadata files
+│       │       │       ├── diagnostics.json              # Diagnostic information about the API
+│       │       │       ├── meta.json                     # various metrics and metadata about the API
+│       │       │       ├── import                        # A directory containing  metadata about the import process
+│       │       │       │   ├── diagnostics-import.json   # Diagnostic information related to the import process
+│       │       │       │   └── input-bundled.json        # Imported bundled OpenAPI spec 
+│       │       │       │   └── input-entry.json          # Imported unbundled OpenAPI spec
+│       │       │       │   └── output-bundled.json       # Processed bundled OpenAPI spec
+│       │       │       │   └── output-entry.json         # Processed unbundled OpenAPI spec
+│       │       │       │   └── meta.json                 # API metadata for the specific import process
+│       │       │       ├── overlay.json                  # Optional OpenAPI overlay file (applied before initial import)
+│       │       │       ├── feedback.json                 # Optional file detailing updates of spec (applied before initial import)
+│       │       │       └── source                        # A directory containing a pristine copy of the original file
+│       │       │          └── source.dat                 # A pristine copy of the original file
+│       │       └── meta.json                             # API metadata 
+|       ├── apis.json                                     # apis.json collection APIs file - see https://apisjson.org/
+├── workflows                                             # All workflow-related files
+    ├── vendor1.com/                                      # Vendor's main API workflows 
+    │   ├── workflows.arrazo.json                         # Default workflow file for this API
+    │   └── payment-flows.arrazo.json                     # Purpose-specific workflow file
+    ├── vendor2.com~api3/                                 # Non-main API with ~ separator
+    │   ├── workflows.arrazo.json                         # Default workflow file for this API
+    │   └── custom-flows.arrazo.json                      # Custom workflow file
+    └── vendor1.com+vendor2.com~api3/                     # Multi-API workflows (alphabetical ordering)
+        ├── workflows.arrazo.json                         # Default workflows for these APIs
+        └── integration-flows.arrazo.json                 # Specific integration workflows
 ```
+
 
 ## API Structure Details
 
