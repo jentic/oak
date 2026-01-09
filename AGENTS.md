@@ -8,6 +8,7 @@ This repository contains OpenAPI specifications and Arazzo workflows for 1,500+ 
 - `/workflows/{vendor}/{api}/` — Arazzo workflow definitions
 - `oak.csv` — Registry of connected OAK repositories
 - `STRUCTURE.md` — Detailed file naming conventions
+- `apis.json` — [AI-ready catalog](https://apisjson.org/) of public APIs.
 
 ## For AI coding agents
 
@@ -34,3 +35,4 @@ When working with this repository:
 - [OpenAPI Specification](https://spec.openapis.org/oas/latest.html)
 - [Arazzo Specification](https://spec.openapis.org/arazzo/latest.html)
 - [OAK Standard](./OAK.md)
+- [APIs JSON](https://apisjson.org/)
