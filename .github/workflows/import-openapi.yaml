@@ -1,14 +1,23 @@
-# Superseded by import-openapi.yaml
-name: Import OpenAPI Spec to OAK
+name: Import OpenAPI Spec to Public APIs
 
 on:
   issues:
     types: [ opened ]
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'URL of OpenAPI spec to import'
+        required: true
+      vendor:
+        description: 'Vendor name to use for the API'
+        required: true
+      api:
+        description: 'API name (optional)'
+        required: false
+        default: 'main' # Default to 'main' if not provided
 
 jobs:
   generate-repo-structure:
-    # Only run if the issue body contains the trigger string
-    if: contains(github.event.issue.body, 'import_oas_url:')
     runs-on: ubuntu-latest
     permissions:
       contents: write        # To push the new branch and commit files
@@ -18,9 +27,49 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
+      - name: Extract Info from inputs
+        # Only run if not coming from issue
+        if: github.event_name == 'workflow_dispatch'
+        id: extract_info_from_inputs
+        run: |
+          # set -x # Enable debugging output
+
+          URL=${{ inputs.url }}
+          echo "URL: $URL"
+          if [ -z "$URL" ]; then
+            echo "::error::Could not extract required 'import_oas_url:' field from input."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=Could not extract required 'import_oas_url:' field from input." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Extract Vendor Name (Required)
+          VENDOR_NAME=${{ inputs.vendor }}
+          echo "Vendor Name: $VENDOR_NAME"
+          if [ -z "$VENDOR_NAME" ]; then
+            echo "::error::Could not extract required 'vendor_name:' field from input."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=Could not extract required 'vendor_name:' field from input." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # Extract API Name
+          API_NAME=${{ inputs.api }}
+          echo "API Name: $API_NAME"
+
+          # Set the Apitools Label (always the vendor name now)
+          APITOOLS_LABEL="${VENDOR_NAME}/${API_NAME}"
+          echo "Using provided Vendor Name as Apitools label: $APITOOLS_LABEL"
+
+          echo "Extracted URL: $URL"
+          echo "Apitools Label: $APITOOLS_LABEL"
+          echo "import_oas_url=$URL" >> $GITHUB_OUTPUT
+          echo "apitools_label=$APITOOLS_LABEL" >> $GITHUB_OUTPUT
 
       - name: Extract Info from Issue
-        id: extract_info
+        # Only run if the issue body contains the trigger string
+        if: contains(github.event.issue.body, 'import_oas_url:')
+        id: extract_info_from_issue
         run: |
           # set -x # Enable debugging output
 
@@ -48,45 +97,95 @@ jobs:
             exit 1
           fi
 
-          # Set the Repotools Label (always the vendor name now)
-          REPOTOOLS_LABEL="$VENDOR_NAME"
-          echo "Using provided Vendor Name as Repotools label: $REPOTOOLS_LABEL"
+          # Set the Apitools Label (always the vendor name now)
+          APITOOLS_LABEL="$VENDOR_NAME"
+          echo "Using provided Vendor Name as Apitools label: $APITOOLS_LABEL"
 
           echo "Extracted URL: $URL"
-          echo "Repotools Label: $REPOTOOLS_LABEL"
+          echo "Apitools Label: $APITOOLS_LABEL"
           echo "import_oas_url=$URL" >> $GITHUB_OUTPUT
-          echo "repotools_label=$REPOTOOLS_LABEL" >> $GITHUB_OUTPUT
+          echo "apitools_label=$APITOOLS_LABEL" >> $GITHUB_OUTPUT
 
-      - name: Call Repotools Service and Download ZIP
-        id: call_repotools
+      - name: Consolidate extracted info
+        if: always()
+        id: extract_info
         run: |
-          echo "Calling Repotools Service for URL: ${{ steps.extract_info.outputs.import_oas_url }}"
-          echo "Using Repotools Label: ${{ steps.extract_info.outputs.repotools_label }}"
-          API_ENDPOINT="https://repo-tools.main.us-east-1.jenticprod.net/spec/download/openapi"
-          
-          REQUEST_BODY=$(cat <<EOF
-          {
-            "url": "${{ steps.extract_info.outputs.import_oas_url }}",
-            "label": "${{ steps.extract_info.outputs.repotools_label }}"
-          }
-          EOF
-          )
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "import_oas_url=${{ steps.extract_info_from_inputs.outputs.import_oas_url }}" >> $GITHUB_OUTPUT
+            echo "apitools_label=${{ steps.extract_info_from_inputs.outputs.apitools_label }}" >> $GITHUB_OUTPUT
+            echo "extract_failed=${{ steps.extract_info_from_inputs.outputs.extract_failed }}" >> $GITHUB_OUTPUT
+            echo "error_message=${{ steps.extract_info_from_inputs.outputs.error_message }}" >> $GITHUB_OUTPUT
+
+            LABEL="${{ steps.extract_info_from_inputs.outputs.apitools_label }}"
+            SAFE_LABEL=$(echo "$LABEL" | tr '/' '-')
+            echo "pr_ref=$LABEL" >> $GITHUB_OUTPUT
+            echo "branch_name=feat/import-oas-$SAFE_LABEL" >> $GITHUB_OUTPUT
+            echo "closes_line=" >> $GITHUB_OUTPUT
+            echo "has_issue=false" >> $GITHUB_OUTPUT
+          else
+            echo "import_oas_url=${{ steps.extract_info_from_issue.outputs.import_oas_url }}" >> $GITHUB_OUTPUT
+            echo "apitools_label=${{ steps.extract_info_from_issue.outputs.apitools_label }}" >> $GITHUB_OUTPUT
+            echo "extract_failed=${{ steps.extract_info_from_issue.outputs.extract_failed }}" >> $GITHUB_OUTPUT
+            echo "error_message=${{ steps.extract_info_from_issue.outputs.error_message }}" >> $GITHUB_OUTPUT
+
+            ISSUE_NUM="${{ github.event.issue.number }}"
+            echo "pr_ref=Issue #${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            echo "branch_name=feat/import-oas-${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            echo "closes_line=Closes #${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            echo "has_issue=true" >> $GITHUB_OUTPUT
+            echo "issue_number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Call Apitools Service and Download ZIP
+        id: call_apitools
+        run: |
+          echo "Calling Apitools Service for URL: ${{ steps.extract_info.outputs.import_oas_url }}"
+          echo "Using Apitools Label: ${{ steps.extract_info.outputs.apitools_label }}"
+          API_ENDPOINT="https://apitools.qa1.eu-west-1.jenticdev.net/openapi/import"
+
+          LABEL="${{ steps.extract_info.outputs.apitools_label }}"
+          IMPORT_URL="${{ steps.extract_info.outputs.import_oas_url }}"
+          REQUEST_BODY=$(jq -n \
+            --arg label "$LABEL" \
+            --arg url "$IMPORT_URL" \
+            ' {
+              meta: {
+                label: $label,
+                original_url: $url,
+                canonical_source_url: $url,
+                canonical_artifacts_base_url: "https://raw.githubusercontent.com/jentic/jentic-public-apis/refs/heads/main/apis/openapi",
+                canonical_artifacts_base_url_ui: "https://github.com/jentic/jentic-public-apis/tree/main/apis/openapi",
+                oas_process_configuration: {
+                  enable_spec_repair: false,
+                  enable_llm_analysis: true
+                }
+              },
+              spec: {
+                kind: "url",
+                url: $url
+              }
+            } ')
           
           echo "Request Body:"
           echo "$REQUEST_BODY"
           echo "Calling endpoint: $API_ENDPOINT"
 
           # Use -s for silent, -L to follow redirects, -OJ to save output to filename header value location
-          read -r STATUS_CODE FILE_STRUCTURE <<< $(curl -s -L -OJ -X POST \
+          {
+            IFS= read -r STATUS_CODE
+            IFS= read -r FILE_STRUCTURE
+          } < <(curl -s -L -OJ -X POST \
               -H "Content-Type: application/json" \
+              -H "Accept: application/zip" \
+              -H "API_KEY: ${{ secrets.JENTIC_API_KEY_QA }}" \
               -d "$REQUEST_BODY" \
-              -w "%{http_code} %{filename_effective}" \
+              -w "%{http_code}"$'\n'"%{filename_effective}" \
               "$API_ENDPOINT")
           
           OUTPUT_ZIP=$FILE_STRUCTURE
 
           if [ "$STATUS_CODE" -ne 200 ]; then
-              echo "::error::Repotools API call failed with status code $STATUS_CODE."
+              echo "::error::Apitools API call failed with status code $STATUS_CODE."
               echo "api_failed=true" >> $GITHUB_OUTPUT
 
               if [ -s "$OUTPUT_ZIP" ]; then
@@ -95,7 +194,7 @@ jobs:
                   echo "$ERROR_RESPONSE"
                   echo "error_response=$ERROR_RESPONSE" >> $GITHUB_OUTPUT
               else
-                  echo "error_response=Repotools API call failed with HTTP status code $STATUS_CODE. No additional error details available." >> $GITHUB_OUTPUT
+                  echo "error_response=Apitools API call failed with HTTP status code $STATUS_CODE. No additional error details available." >> $GITHUB_OUTPUT
               fi
               exit 1
           else
@@ -110,7 +209,7 @@ jobs:
                   echo "::error::Downloaded ZIP file seems empty or too small."
                   ls -l "$OUTPUT_ZIP"
                   echo "api_failed=true" >> $GITHUB_OUTPUT
-                  echo "error_response=Downloaded ZIP file from Repotools API is empty or too small. The OpenAPI URL may be invalid or inaccessible." >> $GITHUB_OUTPUT
+                  echo "error_response=Downloaded ZIP file from Apitools API is empty or too small. The OpenAPI URL may be invalid or inaccessible." >> $GITHUB_OUTPUT
                   exit 1
               fi
               echo "ZIP file size: $(stat -c%s "$OUTPUT_ZIP") bytes."
@@ -123,8 +222,8 @@ jobs:
         run: |
           # set -x # Enable debugging output
 
-          ZIP_FILE="${{ steps.call_repotools.outputs.zip_file }}"
-          ACTUAL_CONTENT_SUBPATH_IN_ZIP="${{ steps.call_repotools.outputs.actual_content_subpath_in_zip }}"
+          ZIP_FILE="${{ steps.call_apitools.outputs.zip_file }}"
+          ACTUAL_CONTENT_SUBPATH_IN_ZIP="${{ steps.call_apitools.outputs.actual_content_subpath_in_zip }}"
 
 
           EXTRACT_TEMP_DIR="openapi_temp_extract" # Temporary place to unzip at root
@@ -266,19 +365,25 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }} # Make sure this token has write permissions
-          commit-message: "feat: Import OpenAPI spec from Issue #${{ github.event.issue.number }}"
-          title: "feat: Import OpenAPI spec from Issue #${{ github.event.issue.number }}"
+          commit-message: "feat: Import OpenAPI spec from ${{ steps.extract_info.outputs.pr_ref }}"
+          title: "feat: Import OpenAPI spec from ${{ steps.extract_info.outputs.pr_ref }}"
           body: |
-            This PR adds/updates Jentic OAK with information from the OpenAPI URL provided in Issue #${{ github.event.issue.number }}.
+            This PR adds/updates Jentic Public APIs with information from the OpenAPI URL provided in ${{ steps.extract_info.outputs.pr_ref }}.
 
             **Source URL:** ${{ steps.extract_info.outputs.import_oas_url }}
 
             Files were automatically generated by the Jentic OpenAPI import service.
 
-            Closes #${{ github.event.issue.number }}
-          branch: feat/import-oas-${{ github.event.issue.number }}
+            ${{ steps.extract_info.outputs.closes_line }}
+          branch: ${{ steps.extract_info.outputs.branch_name }}
           base: main
           delete-branch: true
+
+      - name: Display PR URL
+        if: steps.create_pr_step.outputs.pull-request-url
+        env:
+          PR_URL: ${{ steps.create_pr_step.outputs.pull-request-url }}
+        run: echo "::notice::Import PR:${PR_URL}"
 
       - name: Post Repair Log Comment to PR
         if: steps.prepare_repair_log.outputs.log_found == 'true' && steps.create_pr_step.outputs.pull-request-number
@@ -324,7 +429,7 @@ jobs:
             });
 
       - name: Comment on Issue if Import Failed
-        if: failure() && (steps.extract_info.outputs.extract_failed == 'true' || steps.call_repotools.outputs.api_failed == 'true')
+        if: failure() && steps.extract_info.outputs.has_issue == 'true' && (steps.extract_info.outputs.extract_failed == 'true' || steps.call_apitools.outputs.api_failed == 'true')
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -337,8 +442,8 @@ jobs:
               errorMessage += "Please check your issue format and ensure it contains the required fields:\n";
               errorMessage += "- \`import_oas_url: <your-openapi-url>\`\n";
               errorMessage += "- \`vendor_name: <your-vendor-name>\`\n\n";
-            } else if ('${{ steps.call_repotools.outputs.api_failed }}' === 'true') {
-              const errorResponse = `${{ steps.call_repotools.outputs.error_response }}`;
+            } else if ('${{ steps.call_apitools.outputs.api_failed }}' === 'true') {
+              const errorResponse = `${{ steps.call_apitools.outputs.error_response }}`;
               errorMessage += `**Error:** Import service failed\n\n`;
               
               try {
@@ -360,7 +465,7 @@ jobs:
             errorMessage += "Alternatively create a new issue reporting the bug (https://github.com/jentic/jentic-public-apis/issues/new?template=BLANK_ISSUE).";
             
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: ${{ steps.extract_info.outputs.issue_number }},
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: errorMessage
