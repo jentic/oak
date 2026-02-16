@@ -34,7 +34,7 @@ jobs:
         run: |
           # set -x # Enable debugging output
 
-          URL=${{ inputs.url }}
+          URL=$"{{ inputs.url }}"
           echo "URL: $URL"
           if [ -z "$URL" ]; then
             echo "::error::Could not extract required 'import_oas_url:' field from input."
@@ -153,8 +153,8 @@ jobs:
                 label: $label,
                 original_url: $url,
                 canonical_source_url: $url,
-                canonical_artifacts_base_url: "https://raw.githubusercontent.com/jentic/jentic-public-apis/refs/heads/main/apis/openapi",
-                canonical_artifacts_base_url_ui: "https://github.com/jentic/jentic-public-apis/tree/main/apis/openapi",
+                canonical_artifacts_base_url: "https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/main/apis/openapi",
+                canonical_artifacts_base_url_ui: "https://github.com/${{ github.repository }}/tree/main/apis/openapi",
                 oas_process_configuration: {
                   enable_spec_repair: false,
                   enable_llm_analysis: true
@@ -217,17 +217,14 @@ jobs:
           echo "zip_file=$OUTPUT_ZIP" >> $GITHUB_OUTPUT
           echo "actual_content_subpath_in_zip=$ACTUAL_CONTENT_SUBPATH_IN_ZIP" >> $GITHUB_OUTPUT
 
-      - name: Unzip Generated Files and Adjust Structure
+      - name: Unzip Generated Files
         id: unzip_files
         run: |
-          # set -x # Enable debugging output
-
           ZIP_FILE="${{ steps.call_apitools.outputs.zip_file }}"
           ACTUAL_CONTENT_SUBPATH_IN_ZIP="${{ steps.call_apitools.outputs.actual_content_subpath_in_zip }}"
 
-
-          EXTRACT_TEMP_DIR="openapi_temp_extract" # Temporary place to unzip at root
-          FINAL_OAK_TARGET_BASE="apis/openapi"     # Base for OAK vendor/API dirs in the repo
+          EXTRACT_TEMP_DIR="openapi_temp_extract"
+          FINAL_OAK_TARGET_BASE="apis/openapi"
 
           echo "Ensuring temporary extraction directory $EXTRACT_TEMP_DIR exists and is empty..."
           rm -rf "$EXTRACT_TEMP_DIR"
@@ -243,9 +240,7 @@ jobs:
           echo "Contents of $EXTRACT_TEMP_DIR:"
           ls -lA "$EXTRACT_TEMP_DIR"
 
-          # Full path to the source content (meta.json, version dirs) within the unzipped temporary directory
           SOURCE_API_CONTENT_PATH="$EXTRACT_TEMP_DIR/$ACTUAL_CONTENT_SUBPATH_IN_ZIP"
-          # Corresponding target path in the OAK repository
           OAK_API_CONTENT_PATH="$FINAL_OAK_TARGET_BASE/$ACTUAL_CONTENT_SUBPATH_IN_ZIP"
 
           echo "Determined actual content subpath in zip: $ACTUAL_CONTENT_SUBPATH_IN_ZIP"
@@ -262,18 +257,72 @@ jobs:
               exit 1
           fi
 
+          echo "extract_temp_dir=$EXTRACT_TEMP_DIR" >> $GITHUB_OUTPUT
+          echo "source_api_content_path=$SOURCE_API_CONTENT_PATH" >> $GITHUB_OUTPUT
+          echo "oak_api_content_path=$OAK_API_CONTENT_PATH" >> $GITHUB_OUTPUT
+
+      - name: Check for Duplicate API Version
+        id: check_duplicate_version
+        run: |
+          SOURCE_API_CONTENT_PATH="${{ steps.unzip_files.outputs.source_api_content_path }}"
+          OAK_API_CONTENT_PATH="${{ steps.unzip_files.outputs.oak_api_content_path }}"
+
+          DUPLICATE_FOUND=false
+          DUPLICATE_VERSIONS=""
+
+          while IFS= read -r -d $'\0' source_version_dir_path; do
+            version_dir_name=$(basename "$source_version_dir_path")
+
+            # Try to read the version from meta/meta.json inside the version directory
+            VERSION_META="$source_version_dir_path/meta/meta.json"
+            if [ -f "$VERSION_META" ]; then
+              VERSION_LABEL=$(jq -r '.info.version // empty' "$VERSION_META")
+              if [ -z "$VERSION_LABEL" ]; then
+                echo "::warning::meta/meta.json in '$version_dir_name' does not contain info.version. Using directory name as version identifier."
+                VERSION_LABEL="$version_dir_name"
+              fi
+            else
+              echo "::warning::meta/meta.json not found in '$version_dir_name'. Using directory name as version identifier."
+              VERSION_LABEL="$version_dir_name"
+            fi
+
+            echo "Checking version directory '$version_dir_name' (version: $VERSION_LABEL)..."
+
+            if [ -d "$OAK_API_CONTENT_PATH/$version_dir_name" ]; then
+              echo "::error::Duplicate detected: version '$VERSION_LABEL' already exists at '$OAK_API_CONTENT_PATH/$version_dir_name/'."
+              DUPLICATE_FOUND=true
+              if [ -n "$DUPLICATE_VERSIONS" ]; then
+                DUPLICATE_VERSIONS="$DUPLICATE_VERSIONS, $VERSION_LABEL"
+              else
+                DUPLICATE_VERSIONS="$VERSION_LABEL"
+              fi
+            fi
+          done < <(find "$SOURCE_API_CONTENT_PATH" -mindepth 1 -maxdepth 1 -type d -print0)
+
+          echo "duplicate_detected=$DUPLICATE_FOUND" >> $GITHUB_OUTPUT
+          echo "duplicate_versions=$DUPLICATE_VERSIONS" >> $GITHUB_OUTPUT
+
+          if [ "$DUPLICATE_FOUND" = true ]; then
+            echo "::error::Import rejected: the following API version(s) already exist in the repository: $DUPLICATE_VERSIONS"
+            exit 1
+          fi
+
+          echo "No duplicate versions found. Proceeding with import."
+
+      - name: Copy Files to Repository
+        id: copy_files
+        run: |
+          SOURCE_API_CONTENT_PATH="${{ steps.unzip_files.outputs.source_api_content_path }}"
+          OAK_API_CONTENT_PATH="${{ steps.unzip_files.outputs.oak_api_content_path }}"
+
           echo "Ensuring target OAK API directory '$OAK_API_CONTENT_PATH' exists..."
           mkdir -p "$OAK_API_CONTENT_PATH"
 
-          # Copy version directories from source to OAK target
           echo "Copying version directories from '$SOURCE_API_CONTENT_PATH' to '$OAK_API_CONTENT_PATH'..."
-          # Find all directories (version directories like '1.0.0') directly under SOURCE_API_CONTENT_PATH
           find "$SOURCE_API_CONTENT_PATH" -mindepth 1 -maxdepth 1 -type d -print0 | while IFS= read -r -d $'\0' source_version_dir_path; do
             version_dir_name=$(basename "$source_version_dir_path")
             echo "Copying version directory: '$version_dir_name'"
-            # Use rsync for robust copy, creating the target version directory if it doesn't exist
-            # and syncing contents. Using -a to preserve attributes, checksum to be sure.
-            rsync -a --checksum "$source_version_dir_path/" "$OAK_API_CONTENT_PATH/$version_dir_name/"
+            rsync -a "$source_version_dir_path/" "$OAK_API_CONTENT_PATH/$version_dir_name/"
             if [ $? -ne 0 ]; then
               echo "::error::Failed to copy version directory '$version_dir_name' using rsync."
               exit 1
@@ -281,7 +330,7 @@ jobs:
           done
           echo "Version directories copied successfully."
 
-          # Handle meta.json
+          # Handle api-level meta.json
           SOURCE_META_JSON="$SOURCE_API_CONTENT_PATH/meta.json"
           OAK_META_JSON="$OAK_API_CONTENT_PATH/meta.json"
 
@@ -301,13 +350,23 @@ jobs:
             echo "Existing meta.json found at $OAK_META_JSON. Not overwriting."
           fi
 
-          # Cleanup temporary files
-          echo "Cleaning up temporary extraction directory $EXTRACT_TEMP_DIR..."
-          rm -rf "$EXTRACT_TEMP_DIR"
-          echo "Cleaning up ZIP file $ZIP_FILE..."
-          rm "$ZIP_FILE"
+      - name: Clean Up Temporary Files
+        if: always() && steps.unzip_files.outcome == 'success'
+        run: |
+          EXTRACT_TEMP_DIR="${{ steps.unzip_files.outputs.extract_temp_dir }}"
+          ZIP_FILE="${{ steps.call_apitools.outputs.zip_file }}"
+
+          if [ -n "$EXTRACT_TEMP_DIR" ] && [ -d "$EXTRACT_TEMP_DIR" ]; then
+            echo "Cleaning up temporary extraction directory $EXTRACT_TEMP_DIR..."
+            rm -rf "$EXTRACT_TEMP_DIR"
+          fi
+
+          if [ -n "$ZIP_FILE" ] && [ -f "$ZIP_FILE" ]; then
+            echo "Cleaning up ZIP file $ZIP_FILE..."
+            rm "$ZIP_FILE"
+          fi
+
           echo "Cleanup complete."
-          echo "oak_api_content_path=$OAK_API_CONTENT_PATH" >> $GITHUB_OUTPUT # Output the OAK content path
 
       - name: Check Git Status Before PR Action
         run: |
@@ -429,13 +488,13 @@ jobs:
             });
 
       - name: Comment on Issue if Import Failed
-        if: failure() && steps.extract_info.outputs.has_issue == 'true' && (steps.extract_info.outputs.extract_failed == 'true' || steps.call_apitools.outputs.api_failed == 'true')
+        if: failure() && steps.extract_info.outputs.has_issue == 'true' && (steps.extract_info.outputs.extract_failed == 'true' || steps.call_apitools.outputs.api_failed == 'true' || steps.check_duplicate_version.outputs.duplicate_detected == 'true')
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             let errorMessage = "❌ **Failed to import OpenAPI specification**\n\n";
-            
+
             // Check which step failed and provide appropriate error message
             if ('${{ steps.extract_info.outputs.extract_failed }}' === 'true') {
               errorMessage += `**Error:** ${{ steps.extract_info.outputs.error_message }}\n\n`;
@@ -445,7 +504,7 @@ jobs:
             } else if ('${{ steps.call_apitools.outputs.api_failed }}' === 'true') {
               const errorResponse = `${{ steps.call_apitools.outputs.error_response }}`;
               errorMessage += `**Error:** Import service failed\n\n`;
-              
+
               try {
                 const response = JSON.parse(errorResponse);
                 if (response.error) {
@@ -457,13 +516,19 @@ jobs:
               } catch (e) {
                 errorMessage += `**Details:** ${errorResponse}\n\n`;
               }
-              
+
               errorMessage += "Please check that your OpenAPI URL is accessible and contains a valid OpenAPI specification.\n\n";
+            } else if ('${{ steps.check_duplicate_version.outputs.duplicate_detected }}' === 'true') {
+              const duplicateVersions = `${{ steps.check_duplicate_version.outputs.duplicate_versions }}`;
+              errorMessage += `**Error:** Duplicate API version(s) detected\n\n`;
+              errorMessage += `The following version(s) already exist in the repository: **${duplicateVersions}**\n\n`;
+              errorMessage += "The import was rejected to prevent overwriting existing API data. ";
+              errorMessage += "If you intended to update an existing version, please remove the existing version first or contact the development team.\n\n";
             }
-            
+
             errorMessage += "If you believe this is a bug with the import service or need additional support, please contact the development team at Jentic Community Discord (https://discord.gg/yrxmDZWMqB).\n\n";
             errorMessage += "Alternatively create a new issue reporting the bug (https://github.com/jentic/jentic-public-apis/issues/new?template=BLANK_ISSUE).";
-            
+
             github.rest.issues.createComment({
               issue_number: ${{ steps.extract_info.outputs.issue_number }},
               owner: context.repo.owner,
