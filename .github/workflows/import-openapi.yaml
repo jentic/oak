@@ -34,7 +34,7 @@ jobs:
         run: |
           # set -x # Enable debugging output
 
-          URL=$"{{ inputs.url }}"
+          URL="${{ inputs.url }}"
           echo "URL: $URL"
           if [ -z "$URL" ]; then
             echo "::error::Could not extract required 'import_oas_url:' field from input."
@@ -170,19 +170,56 @@ jobs:
           echo "$REQUEST_BODY"
           echo "Calling endpoint: $API_ENDPOINT"
 
-          # Use -s for silent, -L to follow redirects, -OJ to save output to filename header value location
-          {
-            IFS= read -r STATUS_CODE
-            IFS= read -r FILE_STRUCTURE
-          } < <(curl -s -L -OJ -X POST \
+          # Use -sS for silent (no progress meter) but still show error messages on stderr
+          # Use set +e to prevent immediate exit on curl failure
+          CURL_STDERR_FILE=$(mktemp)
+          CURL_EXIT_CODE=0
+
+          set +e
+          CURL_OUTPUT=$(curl -sS -L -OJ -X POST \
               -H "Content-Type: application/json" \
               -H "Accept: application/zip" \
               -H "API_KEY: ${{ secrets.JENTIC_API_KEY_QA }}" \
               -d "$REQUEST_BODY" \
               -w "%{http_code}"$'\n'"%{filename_effective}" \
-              "$API_ENDPOINT")
-          
+              "$API_ENDPOINT" 2>"$CURL_STDERR_FILE")
+          CURL_EXIT_CODE=$?
+          set -e
+
+          # Parse curl -w output into STATUS_CODE and FILE_STRUCTURE
+          STATUS_CODE=$(echo "$CURL_OUTPUT" | sed -n '1p')
+          FILE_STRUCTURE=$(echo "$CURL_OUTPUT" | sed -n '2p')
           OUTPUT_ZIP=$FILE_STRUCTURE
+
+          # Layer 1: Check for transport-level curl failure (DNS, connection, SSL, timeout)
+          if [ "$CURL_EXIT_CODE" -ne 0 ]; then
+              CURL_STDERR=$(cat "$CURL_STDERR_FILE")
+              rm -f "$CURL_STDERR_FILE"
+              echo "::error::curl command failed with exit code $CURL_EXIT_CODE."
+              echo "curl stderr: $CURL_STDERR"
+              echo "api_failed=true" >> $GITHUB_OUTPUT
+              echo "error_response=curl failed with exit code $CURL_EXIT_CODE: $CURL_STDERR" >> $GITHUB_OUTPUT
+              exit 1
+          fi
+          rm -f "$CURL_STDERR_FILE"
+
+          # Layer 2: Validate STATUS_CODE is a numeric HTTP status
+          if [ -z "$STATUS_CODE" ] || ! [[ "$STATUS_CODE" =~ ^[0-9]+$ ]]; then
+              echo "::error::Failed to parse HTTP status code from curl output. Got: '$STATUS_CODE'"
+              echo "Full curl output: '$CURL_OUTPUT'"
+              echo "api_failed=true" >> $GITHUB_OUTPUT
+              echo "error_response=Failed to parse HTTP status code from Apitools API response. Got: '$STATUS_CODE'" >> $GITHUB_OUTPUT
+              exit 1
+          fi
+
+          # Layer 3: Validate FILE_STRUCTURE (filename from Content-Disposition header)
+          if [ -z "$FILE_STRUCTURE" ]; then
+              echo "::error::curl did not report a downloaded filename. The server may not have sent a Content-Disposition header."
+              echo "HTTP status code: $STATUS_CODE"
+              echo "api_failed=true" >> $GITHUB_OUTPUT
+              echo "error_response=Apitools API responded with HTTP $STATUS_CODE but did not provide a downloadable file (no Content-Disposition header)." >> $GITHUB_OUTPUT
+              exit 1
+          fi
 
           if [ "$STATUS_CODE" -ne 200 ]; then
               echo "::error::Apitools API call failed with status code $STATUS_CODE."
@@ -198,6 +235,13 @@ jobs:
               fi
               exit 1
           else
+              # Verify the downloaded file actually exists on disk
+              if [ ! -f "$OUTPUT_ZIP" ]; then
+                  echo "::error::curl reported filename '$OUTPUT_ZIP' but the file does not exist on disk."
+                  echo "api_failed=true" >> $GITHUB_OUTPUT
+                  echo "error_response=Apitools API responded with HTTP 200 but the downloaded file '$OUTPUT_ZIP' was not found on disk." >> $GITHUB_OUTPUT
+                  exit 1
+              fi
 
               # Remove filename extension, Replace all ':' with '/' to point to API endpoint location
               FILE_STRUCTURE=${FILE_STRUCTURE%.zip}
