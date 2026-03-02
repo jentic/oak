@@ -1,0 +1,1037 @@
+openapi: 3.0.3
+info:
+  title: Conversion Tools API
+  description: |
+    REST API for Conversion Tools file conversion services. Convert between 100+ file formats including XML, JSON, Excel, PDF, CSV, and more.
+
+    **Key Features:**
+    - Fast conversions with streaming support for files up to 100GB
+    - Secure processing with encryption
+    - Unlimited sandbox testing (doesn't count against quota)
+    - Support for 100+ file formats
+    - Webhook callbacks for automation
+    - Flexible pricing from free to enterprise
+
+    **Getting Started:**
+    1. Sign up at https://conversiontools.io
+    2. Get your API token from your Profile page
+    3. Upload a file â†’ Create a task â†’ Poll for completion â†’ Download result
+
+    **Sandbox Mode:**
+    Test your integration without consuming quota by adding `sandbox: true` to any task creation request.
+
+    **Support:**
+    - Documentation: https://conversiontools.io/api-documentation
+    - Contact: https://conversiontools.io/contact
+  version: 1.0.0
+  contact:
+    name: Conversion Tools Support
+    url: https://conversiontools.io/contact
+  license:
+    name: Proprietary
+    url: https://conversiontools.io/terms
+
+servers:
+  - url: https://api.conversiontools.io/v1
+    description: Production API
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Files
+    description: File upload, download, and management
+  - name: Tasks
+    description: Conversion task creation and status
+  - name: Configuration
+    description: API configuration and user info
+
+paths:
+  /files:
+    post:
+      tags:
+        - Files
+      summary: Upload a file
+      description: |
+        Upload a file to the server for conversion. The file will be stored temporarily and can be used in task creation.
+
+        **Note:** File upload does NOT count against your quota. Only task creation counts.
+
+        **For large files (>100MB):** Consider using chunked upload with Content-Range header.
+      operationId: uploadFile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The file to upload
+              required:
+                - file
+      responses:
+        '200':
+          description: File uploaded successfully
+          headers:
+            x-ratelimit-limit-filesize:
+              $ref: '#/components/headers/RateLimitFileSize'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    nullable: true
+                    example: null
+                  file_id:
+                    type: string
+                    description: Unique identifier for the uploaded file
+                    example: be87de1a680c4451a49a72df3fecd3fd
+              example:
+                error: null
+                file_id: be87de1a680c4451a49a72df3fecd3fd
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/FileSizeExceeded'
+
+  /files/{file_id}:
+    get:
+      tags:
+        - Files
+      summary: Download a file
+      description: |
+        Download a file by its ID. This is typically used to download conversion results.
+
+        **Note:** File download does NOT count against your quota.
+      operationId: downloadFile
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The file ID returned from upload or task completion
+          example: be87de1a680c4451a49a72df3fecd3fd
+      responses:
+        '200':
+          description: File content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /files/{file_id}/info:
+    get:
+      tags:
+        - Files
+      summary: Get file metadata
+      description: |
+        Get metadata about a file including size, name, and preview (for text files).
+
+        **Note:** This does NOT count against your quota.
+      operationId: getFileInfo
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The file ID
+          example: be87de1a680c4451a49a72df3fecd3fd
+      responses:
+        '200':
+          description: File metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileInfo'
+              example:
+                preview: false
+                size: 12345
+                name: result.xlsx
+                previewData:
+                  - Line 1 of file
+                  - Line 2 of file
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks:
+    post:
+      tags:
+        - Tasks
+      summary: Create a conversion task
+      description: |
+        Create a new conversion task. This is the main endpoint for performing conversions.
+
+        **WARNING: This counts against your quota** (unless using sandbox mode).
+
+        **Sandbox Mode:**
+        Add `sandbox: true` to the options to test without consuming quota. Returns mock data in 2-5 seconds.
+
+        **Workflow:**
+        1. Upload file (or provide URL for some conversions)
+        2. Create task with conversion type and options
+        3. Poll `/tasks/{task_id}` for status
+        4. Download result file when status is SUCCESS
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreateRequest'
+            examples:
+              xmlToExcel:
+                summary: XML to Excel conversion
+                value:
+                  type: convert.xml_to_excel
+                  options:
+                    file_id: be87de1a680c4451a49a72df3fecd3fd
+              jsonToExcelSandbox:
+                summary: JSON to Excel (Sandbox mode)
+                value:
+                  type: convert.json_to_excel
+                  options:
+                    file_id: be87de1a680c4451a49a72df3fecd3fd
+                    sandbox: true
+              websiteToPdf:
+                summary: Website to PDF (URL-based)
+                value:
+                  type: convert.website_to_pdf
+                  options:
+                    url: https://example.com
+              pdfToTextWithWebhook:
+                summary: PDF to Text with webhook callback
+                value:
+                  type: convert.pdf_to_text
+                  options:
+                    file_id: be87de1a680c4451a49a72df3fecd3fd
+                  callbackUrl: https://your-server.com/webhook
+      responses:
+        '200':
+          description: Task created successfully
+          headers:
+            x-ratelimit-limit-tasks:
+              $ref: '#/components/headers/RateLimitTasks'
+            x-ratelimit-limit-tasks-remaining:
+              $ref: '#/components/headers/RateLimitTasksRemaining'
+            x-ratelimit-limit-tasks-monthly:
+              $ref: '#/components/headers/RateLimitTasksMonthly'
+            x-ratelimit-limit-tasks-monthly-remaining:
+              $ref: '#/components/headers/RateLimitTasksMonthlyRemaining'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    nullable: true
+                    example: null
+                  task_id:
+                    type: string
+                    description: Unique identifier for the task
+                    example: 4147c475ffe94ec8a11aff9a6a8f437a
+                  sandbox:
+                    type: boolean
+                    description: Present and true if sandbox mode was used
+                    example: true
+                  message:
+                    type: string
+                    description: Additional information (present for sandbox mode)
+                    example: Sandbox mode - Returns mock data in 2-5s. Doesn't count against quota.
+              examples:
+                normalTask:
+                  summary: Normal task response
+                  value:
+                    error: null
+                    task_id: 4147c475ffe94ec8a11aff9a6a8f437a
+                sandboxTask:
+                  summary: Sandbox task response
+                  value:
+                    error: null
+                    task_id: 4147c475ffe94ec8a11aff9a6a8f437a
+                    sandbox: true
+                    message: Sandbox mode - Returns mock data in 2-5s. Doesn't count against quota.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: File not found
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+    get:
+      tags:
+        - Tasks
+      summary: List all tasks
+      description: |
+        Get all tasks for the authenticated user (up to 50 most recent tasks).
+
+        **Note:** This does NOT count against your quota.
+      operationId: listTasks
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - RUNNING
+              - SUCCESS
+              - ERROR
+          description: Filter tasks by status
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    nullable: true
+                    example: null
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TaskDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tasks/{task_id}:
+    get:
+      tags:
+        - Tasks
+      summary: Get task status
+      description: |
+        Get the current status of a conversion task. Poll this endpoint every 5-10 seconds until the task completes.
+
+        **Note:** Polling does NOT count against your quota.
+
+        **Status values:**
+        - `PENDING`: Task is queued
+        - `RUNNING`: Task is being processed
+        - `SUCCESS`: Task completed successfully - download the result file
+        - `ERROR`: Task failed - check the error field
+      operationId: getTaskStatus
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The task ID returned from task creation
+          example: 4147c475ffe94ec8a11aff9a6a8f437a
+      responses:
+        '200':
+          description: Task status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskStatus'
+              examples:
+                pending:
+                  summary: Task pending
+                  value:
+                    error: null
+                    status: PENDING
+                    file_id: null
+                    conversionProgress: 0
+                running:
+                  summary: Task running
+                  value:
+                    error: null
+                    status: RUNNING
+                    file_id: null
+                    conversionProgress: 45
+                success:
+                  summary: Task completed successfully
+                  value:
+                    error: null
+                    status: SUCCESS
+                    file_id: ce87de1a680c4451a49a72df3fecd3fe
+                    conversionProgress: 100
+                error:
+                  summary: Task failed
+                  value:
+                    error: Wrong file format
+                    status: ERROR
+                    file_id: null
+                    conversionProgress: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks/{task_id}/retention:
+    patch:
+      tags:
+        - Tasks
+      summary: Update task retention mode
+      description: |
+        Update the retention mode for a task. Only paid users can use ttl_15m mode.
+        If the task is already completed, dateExpires will be recomputed immediately.
+
+        **Retention modes:**
+        - `standard_24h`: Files deleted after 24 hours (default)
+        - `ttl_15m`: Files deleted after 15 minutes (paid users only)
+      operationId: updateTaskRetention
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Task ID
+          example: be87de1a680c4451a49a72df3fecd3fd
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                retentionMode:
+                  type: string
+                  enum: [standard_24h, ttl_15m]
+                  description: Retention mode
+              required:
+                - retentionMode
+            example:
+              retentionMode: ttl_15m
+      responses:
+        '200':
+          description: Retention updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    nullable: true
+                  retentionMode:
+                    type: string
+                  dateExpires:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Feature requires paid plan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: ttl_15m retention requires a paid plan
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Task files already deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Task files have been deleted
+
+  /tasks/{task_id}/delete:
+    post:
+      tags:
+        - Tasks
+      summary: Delete task files immediately
+      description: |
+        Permanently delete all files associated with a task (source, result, artifacts).
+        Only available to paid users. This action is irreversible.
+
+        After deletion, download endpoints will return 410 Gone.
+      operationId: deleteTaskFiles
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Task ID
+          example: be87de1a680c4451a49a72df3fecd3fd
+      responses:
+        '202':
+          description: File deletion scheduled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    nullable: true
+                  message:
+                    type: string
+                  dateDeleted:
+                    type: string
+                    format: date-time
+              example:
+                error: null
+                message: File deletion scheduled
+                dateDeleted: '2025-12-21T10:30:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Feature requires paid plan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: This feature requires a paid plan
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /config:
+    get:
+      tags:
+        - Configuration
+      summary: Get API configuration
+      description: |
+        Get available conversion types and their configuration.
+
+        **Note:** This does NOT count against your quota.
+      operationId: getConfig
+      responses:
+        '200':
+          description: API configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    nullable: true
+                    example: null
+                  conversions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          example: convert.xml_to_excel
+                        title:
+                          type: string
+                          example: XML to Excel
+                        options:
+                          type: array
+                          items:
+                            type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth:
+    get:
+      tags:
+        - Configuration
+      summary: Get authenticated user info
+      description: |
+        Get information about the authenticated user.
+
+        **Note:** This does NOT count against your quota.
+      operationId: getAuthInfo
+      responses:
+        '200':
+          description: User information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    nullable: true
+                    example: null
+                  email:
+                    type: string
+                    format: email
+                    example: user@example.com
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        API token obtained from your Profile page at https://conversiontools.io/profile
+
+        Include in the Authorization header: `Authorization: Bearer YOUR_API_TOKEN`
+
+  headers:
+    RateLimitTasks:
+      description: Daily task limit
+      schema:
+        type: integer
+        example: 30
+    RateLimitTasksRemaining:
+      description: Remaining tasks for today
+      schema:
+        type: integer
+        example: 25
+    RateLimitTasksMonthly:
+      description: Monthly task limit
+      schema:
+        type: integer
+        example: 300
+    RateLimitTasksMonthlyRemaining:
+      description: Remaining tasks for this month
+      schema:
+        type: integer
+        example: 275
+    RateLimitFileSize:
+      description: Maximum file size in bytes
+      schema:
+        type: integer
+        example: 10485760
+
+  schemas:
+    ConversionType:
+      type: string
+      description: |
+        Conversion type identifier in the format `convert.{source}_to_{target}`.
+
+        **Popular conversions for automation:**
+      enum:
+        # Document/Spreadsheet conversions
+        - convert.xml_to_excel
+        - convert.json_to_excel
+        - convert.csv_to_excel
+        - convert.excel_to_csv
+        - convert.excel_to_xml
+        - convert.excel_to_json
+        - convert.xml_to_csv
+        - convert.xml_to_json
+        - convert.json_to_xml
+        - convert.csv_to_xml
+        - convert.html_table_to_csv
+
+        # PDF conversions
+        - convert.pdf_to_text
+        - convert.pdf_to_excel
+        - convert.pdf_to_csv
+        - convert.pdf_to_word
+        - convert.pdf_to_jpg
+        - convert.pdf_to_png
+        - convert.word_to_pdf
+        - convert.excel_to_pdf
+        - convert.powerpoint_to_pdf
+
+        # Office document conversions
+        - convert.word_to_text
+        - convert.word_to_html
+        - convert.powerpoint_to_text
+        - convert.powerpoint_to_html
+
+        # Markdown conversions
+        - convert.markdown_to_pdf
+        - convert.markdown_to_html
+        - convert.markdown_to_epub
+
+        # Web/HTML conversions
+        - convert.website_to_pdf
+        - convert.website_to_jpg
+        - convert.website_to_png
+        - convert.html_to_jpg
+        - convert.html_to_png
+
+        # Image conversions
+        - convert.jpg_to_pdf
+        - convert.png_to_pdf
+        - convert.pdf_to_svg
+        - convert.png_to_svg
+        - convert.png_to_webp
+        - convert.jpg_to_avif
+        - convert.png_to_avif
+        - convert.avif_to_png
+        - convert.avif_to_jpg
+
+        # Audio/Video conversions
+        - convert.mp4_to_mp3
+        - convert.wav_to_mp3
+        - convert.flac_to_mp3
+        - convert.mp3_to_wav
+        - convert.mov_to_mp4
+        - convert.mkv_to_mp4
+        - convert.avi_to_mp4
+
+        # OCR conversions
+        - convert.ocr_pdf_to_text
+        - convert.ocr_jpg_to_text
+        - convert.ocr_png_to_text
+
+        # Office format conversions
+        - convert.excel_to_ods
+        - convert.ods_to_excel
+        - convert.ods_to_csv
+        - convert.ods_to_pdf
+
+        # XML utilities
+        - convert.fix_xml_escaping
+        - convert.excel_xml_to_excel_xlsx
+      example: convert.xml_to_excel
+
+    TaskCreateRequest:
+      type: object
+      required:
+        - type
+        - options
+      properties:
+        type:
+          $ref: '#/components/schemas/ConversionType'
+        options:
+          type: object
+          description: |
+            Conversion-specific options. Common options include:
+            - `file_id`: File ID from upload (required for most conversions)
+            - `url`: Public URL (required for website conversions)
+            - `sandbox`: Set to `true` for unlimited testing without quota usage
+          properties:
+            file_id:
+              type: string
+              description: File ID from upload endpoint
+              example: be87de1a680c4451a49a72df3fecd3fd
+            url:
+              type: string
+              format: uri
+              description: Public URL (for website conversions)
+              example: https://example.com
+            sandbox:
+              type: boolean
+              description: Enable sandbox mode for testing (doesn't count against quota)
+              example: true
+          additionalProperties: true
+        callbackUrl:
+          type: string
+          format: uri
+          description: Webhook URL for task completion notification
+          example: https://your-server.com/webhook
+
+    TaskStatus:
+      type: object
+      properties:
+        error:
+          type: string
+          nullable: true
+          description: Error message if task failed
+          example: null
+        status:
+          type: string
+          enum:
+            - PENDING
+            - RUNNING
+            - SUCCESS
+            - ERROR
+          description: Current task status
+          example: SUCCESS
+        file_id:
+          type: string
+          nullable: true
+          description: Result file ID (available when status is SUCCESS)
+          example: ce87de1a680c4451a49a72df3fecd3fe
+        conversionProgress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Conversion progress percentage
+          example: 100
+
+    TaskDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 4147c475ffe94ec8a11aff9a6a8f437a
+        type:
+          type: string
+          example: xml_to_excel
+        status:
+          type: string
+          enum:
+            - PENDING
+            - RUNNING
+            - SUCCESS
+            - ERROR
+          example: SUCCESS
+        error:
+          type: string
+          nullable: true
+          example: null
+        url:
+          type: string
+          nullable: true
+          example: null
+        dateCreated:
+          type: string
+          format: date-time
+          example: '2024-11-01T10:30:00.000Z'
+        dateFinished:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2024-11-01T10:32:15.000Z'
+        conversionProgress:
+          type: integer
+          example: 100
+        fileSource:
+          type: object
+          properties:
+            id:
+              type: string
+              example: be87de1a680c4451a49a72df3fecd3fd
+            name:
+              type: string
+              example: data.xml
+            size:
+              type: integer
+              example: 1048576
+            exists:
+              type: boolean
+              example: true
+        fileResult:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              example: ce87de1a680c4451a49a72df3fecd3fe
+            name:
+              type: string
+              example: data.xlsx
+            size:
+              type: integer
+              example: 524288
+            exists:
+              type: boolean
+              example: true
+        retentionMode:
+          type: string
+          enum:
+            - standard_24h
+            - ttl_15m
+          description: Retention mode for task artifacts
+          example: standard_24h
+        cleanupStatus:
+          type: string
+          enum:
+            - none
+            - scheduled
+            - running
+            - completed
+            - failed
+          description: Cleanup operation status
+          example: none
+        dateDeleted:
+          type: string
+          format: date-time
+          nullable: true
+          description: When task files were deleted
+          example: null
+        dateExpires:
+          type: string
+          format: date-time
+          nullable: true
+          description: When task files will expire
+          example: '2024-11-02T10:32:15.000Z'
+
+    FileInfo:
+      type: object
+      properties:
+        preview:
+          type: boolean
+          description: True if file exceeds plan limit (preview mode)
+          example: false
+        size:
+          type: integer
+          description: File size in bytes
+          example: 12345
+        name:
+          type: string
+          description: Original filename
+          example: result.xlsx
+        previewData:
+          type: array
+          items:
+            type: string
+          description: First 10 lines (for text files only)
+          example:
+            - Line 1 of file
+            - Line 2 of file
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: Not authorized
+
+  responses:
+    BadRequest:
+      description: Bad request - Invalid parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            badType:
+              summary: Invalid conversion type
+              value:
+                error: Bad type
+            missingFile:
+              summary: Missing file_id
+              value:
+                error: File ID is required
+
+    Unauthorized:
+      description: Not authorized - Invalid or missing API token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Not authorized
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            fileNotFound:
+              summary: File not found
+              value:
+                error: File not found
+            taskNotFound:
+              summary: Task not found
+              value:
+                error: Task not found
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            dailyLimit:
+              summary: Daily limit exceeded
+              value:
+                error: Rate limit exceeded
+            monthlyLimit:
+              summary: Monthly limit exceeded
+              value:
+                error: Monthly rate limit exceeded
+
+    FileSizeExceeded:
+      description: File size limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            fileSizeLimit:
+              summary: File too large
+              value:
+                error: File size limit exceeded
+            uploadLimit:
+              summary: Upload limit exceeded
+              value:
+                error: Upload limit exceeded
+
+  examples:
+    CompleteWorkflowXmlToExcel:
+      summary: Complete workflow - XML to Excel
+      description: |
+        Example of a complete conversion workflow from upload to download:
+
+        ```bash
+        # 1. Upload file
+        curl -X POST https://api.conversiontools.io/v1/files \
+          -H "Authorization: Bearer YOUR_TOKEN" \
+          -F "file=@data.xml"
+        # Response: {"error": null, "file_id": "FILE_ID"}
+
+        # 2. Create task
+        curl -X POST https://api.conversiontools.io/v1/tasks \
+          -H "Authorization: Bearer YOUR_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "type": "convert.xml_to_excel",
+            "options": {"file_id": "FILE_ID"}
+          }'
+        # Response: {"error": null, "task_id": "TASK_ID"}
+
+        # 3. Poll status (repeat every 5-10 seconds)
+        curl -X GET https://api.conversiontools.io/v1/tasks/TASK_ID \
+          -H "Authorization: Bearer YOUR_TOKEN"
+        # Response: {"error": null, "status": "RUNNING", "file_id": null}
+        # ... continue until status is SUCCESS
+
+        # 4. Download result
+        curl -X GET https://api.conversiontools.io/v1/files/RESULT_FILE_ID \
+          -H "Authorization: Bearer YOUR_TOKEN" \
+          -o result.xlsx
+        ```
+
+    SandboxTesting:
+      summary: Sandbox mode testing
+      description: |
+        Test your integration without consuming quota:
+
+        ```bash
+        curl -X POST https://api.conversiontools.io/v1/tasks \
+          -H "Authorization: Bearer YOUR_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "type": "convert.json_to_excel",
+            "options": {
+              "file_id": "FILE_ID",
+              "sandbox": true
+            }
+          }'
+        # Response includes sandbox: true
+        # Task completes in 2-5 seconds with mock data
+        # Does NOT count against quota
+        ```
