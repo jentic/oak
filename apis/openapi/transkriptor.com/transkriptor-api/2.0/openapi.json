@@ -1,0 +1,2051 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Transkriptor API",
+    "description": "Transkriptor API provides transcription, text-to-speech, speaker recognition, AI chat, file management, and webhook capabilities. Transcribe audio/video from local files, URLs, or live meetings (Google Meet, Microsoft Teams, Zoom).",
+    "version": "2.0",
+    "contact": {
+      "name": "Transkriptor",
+      "url": "https://developer.transkriptor.com/"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.tor.app/developer",
+      "description": "Production server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/transcription/local_file/get_upload_url": {
+      "post": {
+        "operationId": "getUploadUrl",
+        "summary": "Get upload URL for local file",
+        "description": "Generates a presigned upload URL for uploading a local audio/video file for transcription.",
+        "tags": ["Transcription"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["file_name"],
+                "properties": {
+                  "file_name": {
+                    "type": "string",
+                    "description": "Name of the file to upload"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload URL generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "upload_url": {
+                      "type": "string",
+                      "description": "Presigned URL to upload the file via PUT"
+                    },
+                    "public_url": {
+                      "type": "string",
+                      "description": "Public URL of the uploaded file, used to initiate transcription"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transcription/local_file/initiate_transcription": {
+      "post": {
+        "operationId": "initiateLocalFileTranscription",
+        "summary": "Initiate transcription of uploaded local file",
+        "description": "Starts transcription of a previously uploaded file using the public_url obtained from the upload step.",
+        "tags": ["Transcription"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url", "language", "service"],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The public URL of the uploaded file"
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "ISO language code for transcription (e.g., en-US)",
+                    "example": "en-US"
+                  },
+                  "service": {
+                    "type": "string",
+                    "description": "Transcription service type",
+                    "enum": ["Standard", "Subtitle"]
+                  },
+                  "folder_id": {
+                    "type": "string",
+                    "description": "Folder ID for storing the transcription"
+                  },
+                  "triggering_word": {
+                    "type": "string",
+                    "description": "Word that triggers line breaks in transcription"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Transcription initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "order_id": {
+                      "type": "string",
+                      "description": "Unique identifier for tracking the transcription"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transcription/meeting": {
+      "post": {
+        "operationId": "transcribeMeeting",
+        "summary": "Transcribe a meeting",
+        "description": "Sends a bot to join and transcribe a live meeting on Google Meet, Microsoft Teams, or Zoom.",
+        "tags": ["Transcription"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["meetingUrl"],
+                "properties": {
+                  "meetingUrl": {
+                    "type": "string",
+                    "description": "Meeting link for Google Meet, Microsoft Teams, or Zoom",
+                    "example": "https://meet.google.com/xqu-ouwe-yve"
+                  },
+                  "meeting_bot_name": {
+                    "type": "string",
+                    "description": "Custom bot name for Teams or Zoom meetings (not configurable for Google Meet)"
+                  },
+                  "meeting_language": {
+                    "type": "string",
+                    "description": "Language code for transcription",
+                    "example": "en-US"
+                  },
+                  "summary_template_id": {
+                    "type": "string",
+                    "description": "ID of summary template to apply"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bot is joining the meeting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "order_id": {
+                      "type": "string",
+                      "description": "Unique identifier for the meeting transcription"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authentication error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "406": {
+            "description": "Invalid meeting link or insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transcription/url": {
+      "post": {
+        "operationId": "transcribeUrl",
+        "summary": "Transcribe through URL",
+        "description": "Submits a publicly accessible URL (YouTube, Google Drive, Dropbox, OneDrive, or direct file link) for transcription.",
+        "tags": ["Transcription"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url", "service", "language"],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The URL of the file to be transcribed (must be publicly accessible)"
+                  },
+                  "service": {
+                    "type": "string",
+                    "description": "Service type",
+                    "enum": ["Standard", "Subtitle"]
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "ISO language code",
+                    "example": "en-US"
+                  },
+                  "folder_id": {
+                    "type": "string",
+                    "description": "Folder ID for storing the transcription; defaults to Recent Files"
+                  },
+                  "file_name": {
+                    "type": "string",
+                    "description": "Custom transcription filename; defaults to source name"
+                  },
+                  "triggering_word": {
+                    "type": "string",
+                    "description": "Word triggering line breaks"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "URL submitted for transcription",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "body": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "order_id": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing required fields or invalid URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer",
+                      "example": 400
+                    },
+                    "body": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer",
+                      "example": 500
+                    },
+                    "body": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{order_id}/content": {
+      "get": {
+        "operationId": "getFileContent",
+        "summary": "Get file content",
+        "description": "Retrieves the transcription content for a specific order. Returns status and content segments with timestamps and speaker labels.",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique identifier for the transcription order"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File content retrieved (may be completed or still processing)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "body": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "description": "Transcription status",
+                          "enum": ["Completed", "Processing"]
+                        },
+                        "service": {
+                          "type": "string"
+                        },
+                        "file_name": {
+                          "type": "string"
+                        },
+                        "language": {
+                          "type": "string"
+                        },
+                        "feature_name": {
+                          "type": "string"
+                        },
+                        "tid": {
+                          "type": "string"
+                        },
+                        "folder_id": {
+                          "type": "string"
+                        },
+                        "order_id": {
+                          "type": "string"
+                        },
+                        "date": {
+                          "type": "number"
+                        },
+                        "ai_chat_session_id": {
+                          "type": "string"
+                        },
+                        "summary_id": {
+                          "type": "string"
+                        },
+                        "is_trial": {
+                          "type": "boolean"
+                        },
+                        "mp3_file": {
+                          "type": "string",
+                          "description": "URL to the audio file"
+                        },
+                        "content": {
+                          "type": "array",
+                          "description": "Transcription segments (only present when status is Completed)",
+                          "items": {
+                            "$ref": "#/components/schemas/TranscriptionSegment"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing parameters"
+          },
+          "404": {
+            "description": "File not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateTranscriptionContent",
+        "summary": "Update transcription content",
+        "description": "Updates the full transcription content for a specific order, including text, timestamps, and speaker labels.",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique identifier for the transcription"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["content"],
+                "properties": {
+                  "content": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/TranscriptionSegment"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transcription content updated successfully"
+          }
+        }
+      }
+    },
+    "/files/{order_id}/content/speaker_labels": {
+      "put": {
+        "operationId": "updateSpeakerLabels",
+        "summary": "Update speaker labels",
+        "description": "Updates speaker labels in a transcription by replacing an old label with a new one.",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique identifier for the transcription"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["old_speaker_label", "new_speaker_label"],
+                "properties": {
+                  "old_speaker_label": {
+                    "type": "string",
+                    "description": "Current speaker label to replace"
+                  },
+                  "new_speaker_label": {
+                    "type": "string",
+                    "description": "New speaker label value"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Speaker labels updated successfully"
+          }
+        }
+      }
+    },
+    "/files/{order_id}/content/export": {
+      "post": {
+        "operationId": "exportTranscription",
+        "summary": "Export transcription",
+        "description": "Exports a transcription in the specified format (PDF, SRT, TXT, or DOCX).",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique identifier for the transcription order"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["export_type"],
+                "properties": {
+                  "export_type": {
+                    "type": "string",
+                    "description": "Export format",
+                    "enum": ["pdf", "srt", "txt", "docx"]
+                  },
+                  "include_speaker_names": {
+                    "type": "boolean",
+                    "description": "Include speaker labels in output"
+                  },
+                  "include_timestamps": {
+                    "type": "boolean",
+                    "description": "Add timestamps to text segments"
+                  },
+                  "merge_same_speaker_segments": {
+                    "type": "boolean",
+                    "description": "Combine consecutive segments from same speaker"
+                  },
+                  "is_single_paragraph": {
+                    "type": "boolean",
+                    "description": "Output as single paragraph"
+                  },
+                  "paragraph_size": {
+                    "type": "integer",
+                    "description": "Paragraph length in sentences",
+                    "enum": [1, 2, 4, 8]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Export generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "body": {
+                      "type": "object",
+                      "properties": {
+                        "presignedUrl": {
+                          "type": "string",
+                          "description": "URL to download the exported file"
+                        },
+                        "content": {
+                          "type": "string",
+                          "description": "Extracted text content"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Transcription is still processing"
+          },
+          "400": {
+            "description": "Missing required parameters or invalid export type"
+          },
+          "404": {
+            "description": "Order ID not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/files/{order_id}": {
+      "get": {
+        "operationId": "getFileDetail",
+        "summary": "Get file detail",
+        "description": "Retrieves metadata details for a specific file order.",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique identifier for the file order"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File details retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "body": {
+                      "type": "object",
+                      "properties": {
+                        "file_id": {
+                          "type": "string"
+                        },
+                        "file_name": {
+                          "type": "string"
+                        },
+                        "parent_folder_id": {
+                          "type": "string"
+                        },
+                        "order_id": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "description": "Creation timestamp"
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid parameters"
+          },
+          "404": {
+            "description": "File not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "put": {
+        "operationId": "renameFile",
+        "summary": "Rename file",
+        "description": "Renames a transcription file.",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique identifier for the transcription file"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["file_name"],
+                "properties": {
+                  "file_name": {
+                    "type": "string",
+                    "description": "The new name to assign to the file"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File renamed successfully"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteFile",
+        "summary": "Delete file",
+        "description": "Deletes all files associated with the specified order ID.",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique identifier for the order whose files to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Files deleted successfully"
+          }
+        }
+      }
+    },
+    "/files": {
+      "get": {
+        "operationId": "getFiles",
+        "summary": "Get files",
+        "description": "Retrieves a list of all transcription files.",
+        "tags": ["Files"],
+        "responses": {
+          "200": {
+            "description": "Files retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/folders": {
+      "get": {
+        "operationId": "getFolders",
+        "summary": "Get folders",
+        "description": "Retrieves a list of all user folders.",
+        "tags": ["Files"],
+        "responses": {
+          "200": {
+            "description": "Folders retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meetings/{order_id}": {
+      "get": {
+        "operationId": "getMeetingDetails",
+        "summary": "Get meeting details",
+        "description": "Retrieves details for a specific meeting including transcription metadata and bot configuration.",
+        "tags": ["Meetings"],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique identifier for the meeting"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Meeting details retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "meeting": {
+                      "$ref": "#/components/schemas/Meeting"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "operationId": "getUserDetails",
+        "summary": "Get user details",
+        "description": "Retrieves details about the user associated with the API key, including remaining transcription minutes.",
+        "tags": ["Users"],
+        "responses": {
+          "200": {
+            "description": "User details retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/integrations/webhooks": {
+      "get": {
+        "operationId": "viewWebhooks",
+        "summary": "View webhooks",
+        "description": "Retrieves all webhooks or a specific webhook by webhookType.",
+        "tags": ["Webhooks"],
+        "parameters": [
+          {
+            "name": "webhookType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The ID of a specific webhook to view. Omit to retrieve all webhooks."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhooks retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "webhooks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Webhook"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found"
+          },
+          "500": {
+            "description": "Failed to retrieve webhook"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWebhook",
+        "summary": "Create webhook",
+        "description": "Creates a new webhook to receive transcription notifications.",
+        "tags": ["Webhooks"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The web address where notifications are sent"
+                  },
+                  "export_format": {
+                    "type": "string",
+                    "description": "Transcript output format",
+                    "enum": ["Txt", "Json", "Csv"],
+                    "default": "Txt"
+                  },
+                  "include_timestamps": {
+                    "type": "boolean",
+                    "description": "Add timestamps to transcript",
+                    "default": false
+                  },
+                  "include_speaker_names": {
+                    "type": "boolean",
+                    "description": "Include speaker identification",
+                    "default": false
+                  },
+                  "merge_same_speaker_segments": {
+                    "type": "boolean",
+                    "description": "Combine consecutive segments from same speaker",
+                    "default": false
+                  },
+                  "is_single_paragraph": {
+                    "type": "boolean",
+                    "description": "Format as one paragraph",
+                    "default": false
+                  },
+                  "paragraph_size": {
+                    "type": "integer",
+                    "description": "Lines per paragraph",
+                    "enum": [1, 2, 4, 8],
+                    "default": 1
+                  },
+                  "folder_id": {
+                    "type": "string",
+                    "description": "Limit notifications to a specific folder"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "webhookType": {
+                      "type": "string",
+                      "description": "Unique identifier for the webhook"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or missing webhook URL"
+          },
+          "409": {
+            "description": "Webhook already exists"
+          },
+          "500": {
+            "description": "Failed to register webhook"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateWebhook",
+        "summary": "Update a webhook",
+        "description": "Updates an existing webhook's settings.",
+        "tags": ["Webhooks"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["webhookType", "url"],
+                "properties": {
+                  "webhookType": {
+                    "type": "string",
+                    "description": "The identifier of the webhook to modify"
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "The new destination address for webhook notifications"
+                  },
+                  "export_format": {
+                    "type": "string",
+                    "enum": ["Txt", "Json", "Csv"],
+                    "default": "Txt"
+                  },
+                  "include_timestamps": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "include_speaker_names": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "merge_same_speaker_segments": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "is_single_paragraph": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "paragraph_size": {
+                    "type": "integer",
+                    "enum": [1, 2, 4, 8],
+                    "default": 1
+                  },
+                  "folder_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook updated"
+          },
+          "400": {
+            "description": "webhookType is required"
+          },
+          "404": {
+            "description": "Webhook not found"
+          },
+          "500": {
+            "description": "Failed to update webhook"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWebhook",
+        "summary": "Delete a webhook",
+        "description": "Deletes a webhook to stop receiving notifications. This action cannot be undone.",
+        "tags": ["Webhooks"],
+        "parameters": [
+          {
+            "name": "webhookType",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The webhook identifier to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook deleted"
+          },
+          "400": {
+            "description": "webhookType is required"
+          },
+          "404": {
+            "description": "Webhook not found"
+          },
+          "500": {
+            "description": "Failed to delete webhook"
+          }
+        }
+      }
+    },
+    "/custom_vocabulary": {
+      "post": {
+        "operationId": "createCustomVocabulary",
+        "summary": "Create custom vocabulary",
+        "description": "Generates a presigned URL for uploading a custom vocabulary text file. After receiving the URL, upload a text file with comma-separated words/phrases via PUT.",
+        "tags": ["Advanced"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["language"],
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "description": "Language code (currently only en-US is supported)",
+                    "example": "en-US"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Presigned URL generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Presigned URL for uploading the vocabulary file via PUT"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error generating presigned URL"
+          }
+        }
+      }
+    },
+    "/annotations/profiles/create_url": {
+      "post": {
+        "operationId": "createSpeakerProfileUploadUrl",
+        "summary": "Generate upload URL for speaker profile",
+        "description": "Generates a presigned URL for uploading an audio file to create a speaker profile.",
+        "tags": ["Speaker Recognition"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["speaker_name"],
+                "properties": {
+                  "speaker_name": {
+                    "type": "string",
+                    "description": "Name of the speaker"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload URL generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "upload_url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Upload limit reached for this speaker"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/annotations/profiles": {
+      "get": {
+        "operationId": "listSpeakerProfiles",
+        "summary": "List speaker profiles",
+        "description": "Retrieves all speaker profiles associated with the account.",
+        "tags": ["Speaker Recognition"],
+        "responses": {
+          "200": {
+            "description": "Speaker profiles retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "body": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "speaker_name": {
+                            "type": "string"
+                          },
+                          "download_url": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "generateSpeakerProfile",
+        "summary": "Generate speaker profile from audio",
+        "description": "Processes a previously uploaded audio file to generate a speaker profile. Speaker profiles are capped at 20.",
+        "tags": ["Speaker Recognition"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["speaker_name"],
+                "properties": {
+                  "speaker_name": {
+                    "type": "string",
+                    "description": "Name of the speaker"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audio processed and profile created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "body": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Upload limit reached"
+          },
+          "500": {
+            "description": "Error processing audio file"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteSpeakerProfile",
+        "summary": "Delete speaker profile",
+        "description": "Deletes a speaker profile by name.",
+        "tags": ["Speaker Recognition"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["speaker_name"],
+                "properties": {
+                  "speaker_name": {
+                    "type": "string",
+                    "description": "Name of the speaker profile to delete"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Speaker deleted successfully"
+          },
+          "404": {
+            "description": "Speaker not found"
+          },
+          "500": {
+            "description": "Failed to delete speaker"
+          }
+        }
+      }
+    },
+    "/annotations/profiles/count": {
+      "get": {
+        "operationId": "getSpeakerProfileCount",
+        "summary": "Get speaker profile count",
+        "description": "Returns the number of speaker profiles and whether the limit has been reached.",
+        "tags": ["Speaker Recognition"],
+        "responses": {
+          "200": {
+            "description": "Profile count retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "body": {
+                      "type": "object",
+                      "properties": {
+                        "speaker_label_count": {
+                          "type": "integer"
+                        },
+                        "limit_reached": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch user settings"
+          }
+        }
+      }
+    },
+    "/annotations/profiles/create_from_transcription": {
+      "post": {
+        "operationId": "createSpeakerProfileFromTranscription",
+        "summary": "Create speaker profile from transcription",
+        "description": "Creates a speaker profile using a segment from an existing transcription.",
+        "tags": ["Speaker Recognition"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["start_time", "end_time", "order_id", "old_speaker_name", "new_speaker_name"],
+                "properties": {
+                  "start_time": {
+                    "type": "integer",
+                    "description": "Start time in milliseconds"
+                  },
+                  "end_time": {
+                    "type": "integer",
+                    "description": "End time in milliseconds"
+                  },
+                  "order_id": {
+                    "type": "string",
+                    "description": "Transcription order ID"
+                  },
+                  "old_speaker_name": {
+                    "type": "string",
+                    "description": "Current speaker label in the transcription"
+                  },
+                  "new_speaker_name": {
+                    "type": "string",
+                    "description": "New speaker name for the profile"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audio processed and profile created"
+          },
+          "400": {
+            "description": "Invalid or malformed request"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/text_to_speech": {
+      "post": {
+        "operationId": "textToSpeech",
+        "summary": "Text to speech",
+        "description": "Converts text to speech audio. Pro voices cost 5x more credits than Lite voices. API access is limited to Pro, Team, and Enterprise plans.",
+        "tags": ["Text to Speech"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text", "language", "voice_name"],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "Text to convert to speech (max 50,000 chars for Lite, 1,000 for Pro)"
+                  },
+                  "language": {
+                    "type": "string",
+                    "description": "Language code",
+                    "example": "en-US"
+                  },
+                  "voice_name": {
+                    "type": "string",
+                    "description": "Specific voice identifier from the dashboard"
+                  },
+                  "speed_rate": {
+                    "type": "number",
+                    "description": "Speaking speed adjustment",
+                    "minimum": 0.5,
+                    "maximum": 2.0,
+                    "default": 1.0
+                  },
+                  "generate_subtitle": {
+                    "type": "boolean",
+                    "description": "Generate SRT subtitle file",
+                    "default": false
+                  },
+                  "emotion": {
+                    "type": "string",
+                    "description": "Emotional tone (Pro voices only)",
+                    "enum": ["Angry", "Calm", "Cheerful", "Sad", "Excited", "Friendly", "Hopeful", "Shouting", "Terrified", "Unfriendly", "Whispering"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audio generated successfully. URLs are valid for 1 hour.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "audioUrl": {
+                      "type": "string",
+                      "description": "Pre-signed URL for MP3 audio file"
+                    },
+                    "subtitleUrl": {
+                      "type": "string",
+                      "description": "Pre-signed URL for SRT subtitle file (if generate_subtitle was true)"
+                    },
+                    "appliedSpeedRate": {
+                      "type": "number",
+                      "description": "Applied speed rate (if different from 1.0)"
+                    },
+                    "appliedEmotion": {
+                      "type": "string",
+                      "description": "Applied emotion (Pro voices only)"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai_chat/knowledgebases": {
+      "get": {
+        "operationId": "listKnowledgebases",
+        "summary": "List knowledgebases",
+        "description": "Retrieves all knowledgebases associated with the account.",
+        "tags": ["AI Chat"],
+        "responses": {
+          "200": {
+            "description": "Knowledgebases retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Knowledgebase"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createKnowledgebase",
+        "summary": "Create knowledgebase",
+        "description": "Creates a new knowledgebase.",
+        "tags": ["AI Chat"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the knowledgebase"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Knowledgebase created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Knowledgebase"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai_chat/knowledgebases/{knowledge_base_id}": {
+      "get": {
+        "operationId": "getKnowledgebase",
+        "summary": "Get knowledgebase",
+        "description": "Retrieves details for a specific knowledgebase.",
+        "tags": ["AI Chat"],
+        "parameters": [
+          {
+            "name": "knowledge_base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The knowledgebase ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Knowledgebase details retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Knowledgebase"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "updateKnowledgebase",
+        "summary": "Update knowledgebase",
+        "description": "Updates the knowledgebase name.",
+        "tags": ["AI Chat"],
+        "parameters": [
+          {
+            "name": "knowledge_base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The knowledgebase ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Knowledgebase updated"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteKnowledgebase",
+        "summary": "Delete knowledgebase",
+        "description": "Deletes the specified knowledgebase.",
+        "tags": ["AI Chat"],
+        "parameters": [
+          {
+            "name": "knowledge_base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The knowledgebase ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Knowledgebase deleted"
+          }
+        }
+      }
+    },
+    "/ai_chat/knowledgebases/{knowledge_base_id}/files": {
+      "post": {
+        "operationId": "addFileToKnowledgebase",
+        "summary": "Add file to knowledgebase",
+        "description": "Adds a transcription file to the specified knowledgebase.",
+        "tags": ["AI Chat"],
+        "parameters": [
+          {
+            "name": "knowledge_base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["transkriptor_order_id"],
+                "properties": {
+                  "transkriptor_order_id": {
+                    "type": "string",
+                    "description": "The Transkriptor order ID of the file to add"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File added to knowledgebase",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "knowledge_base_file_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai_chat/knowledgebases/{knowledge_base_id}/files/{file_id}": {
+      "delete": {
+        "operationId": "removeFileFromKnowledgebase",
+        "summary": "Remove file from knowledgebase",
+        "description": "Removes a file from the knowledgebase.",
+        "tags": ["AI Chat"],
+        "parameters": [
+          {
+            "name": "knowledge_base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File removed from knowledgebase"
+          }
+        }
+      }
+    },
+    "/ai_chat/knowledgebases/{knowledge_base_id}/sessions": {
+      "post": {
+        "operationId": "createChatSession",
+        "summary": "Create chat session",
+        "description": "Creates a new chat session within the specified knowledgebase.",
+        "tags": ["AI Chat"],
+        "parameters": [
+          {
+            "name": "knowledge_base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Chat session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai_chat/knowledgebases/{knowledge_base_id}/sessions/{session_id}": {
+      "get": {
+        "operationId": "getChatSession",
+        "summary": "Get chat session",
+        "description": "Retrieves details of a chat session.",
+        "tags": ["AI Chat"],
+        "parameters": [
+          {
+            "name": "knowledge_base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chat session details retrieved"
+          }
+        }
+      },
+      "post": {
+        "operationId": "sendChatMessage",
+        "summary": "Send chat message",
+        "description": "Sends a message to the AI chat session and receives a response.",
+        "tags": ["AI Chat"],
+        "parameters": [
+          {
+            "name": "knowledge_base_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The message to send to the AI"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI response received"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key obtained from https://app.transkriptor.com/account"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "TranscriptionSegment": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Transcribed text content"
+          },
+          "StartTime": {
+            "type": "integer",
+            "description": "Start timestamp in milliseconds"
+          },
+          "EndTime": {
+            "type": "integer",
+            "description": "End timestamp in milliseconds"
+          },
+          "VoiceStart": {
+            "type": "integer",
+            "description": "Voice start timestamp in milliseconds"
+          },
+          "VoiceEnd": {
+            "type": "integer",
+            "description": "Voice end timestamp in milliseconds"
+          },
+          "Speaker": {
+            "type": "string",
+            "description": "Speaker identifier (e.g., SPK_1)"
+          }
+        }
+      },
+      "Meeting": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "date": {
+            "type": "number",
+            "description": "Timestamp"
+          },
+          "status": {
+            "type": "string"
+          },
+          "video_url": {
+            "type": "string"
+          },
+          "transcription_order_id": {
+            "type": "string"
+          },
+          "meeting_settings": {
+            "type": "object",
+            "properties": {
+              "auto_join_microsoft": {
+                "type": "boolean"
+              },
+              "meeting_bot_name": {
+                "type": "string"
+              },
+              "meetingtor_auto_transcribe": {
+                "type": "boolean"
+              },
+              "delete_after_14_days": {
+                "type": "boolean"
+              },
+              "ai_summary_template_id": {
+                "type": "string"
+              },
+              "meeting_language": {
+                "type": "string"
+              },
+              "join_direction": {
+                "type": "string"
+              },
+              "join_minutes": {
+                "type": "string"
+              },
+              "keep_video": {
+                "type": "boolean"
+              },
+              "meetingtor_auto_join_option": {
+                "type": "string"
+              },
+              "keep_audio": {
+                "type": "boolean"
+              },
+              "meetingtor_share_settings": {
+                "type": "string"
+              },
+              "keep_transcript": {
+                "type": "boolean"
+              },
+              "auto_join_google": {
+                "type": "boolean"
+              },
+              "keep_summary": {
+                "type": "boolean"
+              },
+              "meetingtor_auto_transcribe_language": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "HashedId": {
+            "type": "string"
+          },
+          "webhookType": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "exportFormat": {
+            "type": "string"
+          },
+          "includeTimestamps": {
+            "type": "boolean"
+          },
+          "includeSpeakerNames": {
+            "type": "boolean"
+          },
+          "mergeSameSpeakerSegments": {
+            "type": "boolean"
+          },
+          "isSingleParagraph": {
+            "type": "boolean"
+          },
+          "paragraphSize": {
+            "type": "integer"
+          },
+          "folderId": {
+            "type": "string"
+          }
+        }
+      },
+      "Knowledgebase": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Transcription",
+      "description": "Transcribe audio/video from local files, URLs, or live meetings"
+    },
+    {
+      "name": "Files",
+      "description": "Manage transcription files and folders"
+    },
+    {
+      "name": "Meetings",
+      "description": "Manage meeting transcriptions"
+    },
+    {
+      "name": "Users",
+      "description": "User account operations"
+    },
+    {
+      "name": "Webhooks",
+      "description": "Manage webhook notifications for transcription events"
+    },
+    {
+      "name": "Advanced",
+      "description": "Custom vocabulary and advanced features"
+    },
+    {
+      "name": "Speaker Recognition",
+      "description": "Manage speaker profiles for recognition in transcriptions"
+    },
+    {
+      "name": "Text to Speech",
+      "description": "Convert text to speech audio"
+    },
+    {
+      "name": "AI Chat",
+      "description": "AI chat with knowledgebases built from transcriptions"
+    }
+  ]
+}
