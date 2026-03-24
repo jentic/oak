@@ -1,0 +1,3317 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GO1 API",
+    "description": "GO1 API provides access to GO1's online learning platform. Includes authentication (OAuth 2.0), content management, enrollments, users, and webhooks.",
+    "version": "v2",
+    "x-jentic-source-url": "https://go1developer.readme.io"
+  },
+  "servers": [
+    {
+      "url": "https://api.go1.com/v2",
+      "description": "GO1 API"
+    },
+    {
+      "url": "https://auth.go1.com",
+      "description": "GO1 Authentication"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/oauth/authorize": {
+      "get": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Start OAuth2 authorization flow",
+        "description": "This endpoint should be hit by the end user's browser. It will start the authentication and authorization flows.\n",
+        "parameters": [
+          {
+            "name": "client_id",
+            "in": "query",
+            "description": "Client ID of the application. If `new_client` is set, this can be any string that doesn't match an existing `client_id`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "description": "The desired [grant type](https://tools.ietf.org/html/rfc6749#section-3.1.1).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "code",
+                "token"
+              ]
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "description": "The URL to redirect to after the user authorizes your application. It must match your client `redirect_uri`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect",
+            "in": "query",
+            "description": "If set to `false`, the user will not be redirected at the end of the flow, but instead the credentials will be presented on a new page.\n\nCan only be used in conjunction with `response_type=code`.\n",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "description": "A list of space separated permissions that will be requested to the user.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "A state string that'll be sent back to the `redirect_uri`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "new_client",
+            "in": "query",
+            "description": "When set it will create a new OAuth client if the given `client_id` doesn't exist. The value should be the client name. The generated `client_id` and `client_secret` will be appended to the `redirect_uri` as part of the query string or fragment parameters. Only letters, digits and punctuation characters are allowed.\n",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "creation_path",
+            "in": "query",
+            "description": "If set, the value must be a creation path for an existing preset.\nRefer to presets in the `#onboard2` service for possible values.\n",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "partner_portal_id",
+            "in": "query",
+            "description": "If set, the value must be the ID of an existing distribution partner portal.\n",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "one_time_token",
+            "in": "query",
+            "description": "If you have a user's one time token, you can skip the login form (username & password) by passing the token in the url\n",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An HTML page asking the User to grant access to your application.",
+            "content": {}
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthException"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthException"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthException"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthException"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error.",
+            "content": {}
+          }
+        }
+      }
+    },
+    "/oauth/public-key": {
+      "get": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Validate an access token offline",
+        "description": "You can use this public key to validate an access token has been issued by this service. This is the preferred method as it can work offline provided you store the public key. Please make sure to respect the caching TTL and headers when doing so.\n",
+        "responses": {
+          "200": {
+            "description": "The RSA public key",
+            "content": {}
+          },
+          "304": {
+            "description": "Not modified",
+            "content": {}
+          }
+        }
+      }
+    },
+    "/oauth/token": {
+      "post": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Retrieve an access token",
+        "description": "It retrieves an access token for all grant types except _implicit_.",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "required": [
+                  "client_id",
+                  "grant_type"
+                ],
+                "properties": {
+                  "client_id": {
+                    "type": "string",
+                    "description": "The application client id."
+                  },
+                  "client_secret": {
+                    "type": "string",
+                    "description": "The application client secret. Required, except if your application does not have one."
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "Required when grant_type is authorization_code. Do not pass otherwise."
+                  },
+                  "refresh_token": {
+                    "type": "string",
+                    "description": "Required when grant_type is refresh_token. Do not pass otherwise."
+                  },
+                  "jwt": {
+                    "type": "string",
+                    "description": "Required when grant_type is go1_jwt. Do not pass otherwise."
+                  },
+                  "portal_name": {
+                    "type": "string",
+                    "description": "Required when your application is public and you're using a go1_jwt or password grant_type. Do not pass otherwise."
+                  },
+                  "grant_type": {
+                    "type": "string",
+                    "enum": [
+                      "authorization_code",
+                      "refresh_token",
+                      "client_credentials",
+                      "go1_jwt",
+                      "password"
+                    ]
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "The application redirect_uri. Required when grant_type is authorization_code. For security purposes it needs to match the one registered in the application.\n"
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "required": [
+                  "client_id",
+                  "grant_type"
+                ],
+                "properties": {
+                  "client_id": {
+                    "type": "string",
+                    "description": "The application client id."
+                  },
+                  "client_secret": {
+                    "type": "string",
+                    "description": "The application client secret. Required, except if your application does not have one."
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "Required when grant_type is authorization_code. Do not pass otherwise."
+                  },
+                  "refresh_token": {
+                    "type": "string",
+                    "description": "Required when grant_type is refresh_token. Do not pass otherwise."
+                  },
+                  "jwt": {
+                    "type": "string",
+                    "description": "Required when grant_type is go1_jwt. Do not pass otherwise."
+                  },
+                  "portal_name": {
+                    "type": "string",
+                    "description": "Required when your application is public and you're using a go1_jwt or password grant_type. Do not pass otherwise."
+                  },
+                  "grant_type": {
+                    "type": "string",
+                    "enum": [
+                      "authorization_code",
+                      "refresh_token",
+                      "client_credentials",
+                      "go1_jwt",
+                      "password"
+                    ]
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "The application redirect_uri. Required when grant_type is authorization_code. For security purposes it needs to match the one registered in the application.\n"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Access token response",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthToken"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthException"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error.",
+            "content": {}
+          }
+        }
+      }
+    },
+    "/oauth/validate": {
+      "get": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Validate an access token",
+        "description": "Checks whether the access token is valid and hasn't been revoked and returns back some information. You should only need to use it for debugging purposes or inside a resource server.\n",
+        "responses": {
+          "200": {
+            "description": "Validation successful",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthValidate"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid access token or inactive client",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "OAuth2": []
+          }
+        ]
+      }
+    },
+    "/oauth/revoke": {
+      "post": {
+        "tags": [
+          "Authorization"
+        ],
+        "summary": "Revoke an access token for the calling user.",
+        "description": "Checks whether the access token is valid and revokes it.\n",
+        "responses": {
+          "204": {
+            "description": "Revoke an access token successfully.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "OAuth2": []
+          }
+        ]
+      }
+    },
+    "/client": {
+      "get": {
+        "tags": [
+          "OAuth Client Management"
+        ],
+        "summary": "Get a list of OAuth clients",
+        "description": "Retrieves a list of OAuth client applications owned by the user, or associated with a specific portal. Only applications with special permissions are allowed to use this endpoint.\n",
+        "parameters": [
+          {
+            "name": "portal_name",
+            "in": "query",
+            "description": "When given it'll retrieve all OAuth clients registered to that portal. Omit for public clients.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Skip first N results",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Return N results maximum. Defaults to 10, and must be <= 50",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of OAuth clients",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OauthClient"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access forbidden",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "OAuth2": [
+              "app.write"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "OAuth Client Management"
+        ],
+        "summary": "Create a new OAuth client",
+        "description": "Creates a new OAuth client application. Only applications with special permissions are allowed to use this endpoint.\n",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "properties": {
+                  "portal_name": {
+                    "type": "string",
+                    "description": "When provided it'll create a private client. Omit for public clients."
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "The fully qualified URL that will be used to send responses in the authorization flow."
+                  },
+                  "client_name": {
+                    "type": "string",
+                    "description": "The OAuth client name. It'll be shown to the users when authenticating."
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "portal_name": {
+                    "type": "string",
+                    "description": "When provided it'll create a private client. Omit for public clients."
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "The fully qualified URL that will be used to send responses in the authorization flow."
+                  },
+                  "client_name": {
+                    "type": "string",
+                    "description": "The OAuth client name. It'll be shown to the users when authenticating."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OAuth Client created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OauthClient"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad parameters",
+            "content": {}
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "OAuth2": [
+              "app.write"
+            ]
+          }
+        ]
+      }
+    },
+    "/client/{clientId}": {
+      "put": {
+        "tags": [
+          "OAuth Client Management"
+        ],
+        "summary": "Update OAuth client",
+        "description": "Update OAuth client settings\n",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "description": "Client id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "description": "Client status. 0 = inactive, 1 = active",
+                    "format": "int32",
+                    "enum": [
+                      "0",
+                      "1"
+                    ]
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "The URL to redirect to after the user authorizes your application. It must match your client redirect_uri."
+                  },
+                  "client_name": {
+                    "type": "string",
+                    "description": "The client name. It'll be shown to the users when authenticating."
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "description": "Client status. 0 = inactive, 1 = active",
+                    "format": "int32",
+                    "enum": [
+                      "0",
+                      "1"
+                    ]
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "The URL to redirect to after the user authorizes your application. It must match your client redirect_uri."
+                  },
+                  "client_name": {
+                    "type": "string",
+                    "description": "The client name. It'll be shown to the users when authenticating."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "OK",
+            "content": {}
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {}
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {}
+          },
+          "404": {
+            "description": "Client not found",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "OAuth2": [
+              "app.write"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "OAuth Client Management"
+        ],
+        "summary": "Delete OAuth client",
+        "description": "Delete client\n",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "description": "Client id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "OK",
+            "content": {}
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {}
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {}
+          },
+          "404": {
+            "description": "Client not found",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "OAuth2": [
+              "app.write"
+            ]
+          }
+        ]
+      }
+    },
+    "/client/{clientId}/regenerate-secret": {
+      "post": {
+        "tags": [
+          "OAuth Client Management"
+        ],
+        "summary": "Changes the client's secret",
+        "description": "Generates a new random secret for the OAuth client. You need an application access token, thus obtained through client_credentials flow.",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "description": "Client id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegenerateSecret"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthException"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthException"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {}
+          },
+          "500": {
+            "description": "Server error.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "OAuth2": [
+              "app.write"
+            ]
+          }
+        ]
+      }
+    },
+    "/staff/client": {
+      "get": {
+        "tags": [
+          "Go1 Staff Client Management"
+        ],
+        "summary": "Browse OAuth applications",
+        "description": "Lists and filters existing OAuth applications for Go1 internal administrative purposes",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Skip first N results",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Return N results maximum. Defaults to 10, and must be <= 50",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "portal_name",
+            "in": "query",
+            "description": "Portal name must start with the given string",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "description": "Client id must match exactly",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "description": "Application must belong to the user id",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "client_name",
+            "in": "query",
+            "description": "Relevance text search is done over the client application name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of clients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffOauthClient"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GO1ErrorMessage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GO1ErrorMessage"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {}
+          },
+          "500": {
+            "description": "Server error.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "GO1BearerJWT": []
+          }
+        ]
+      }
+    },
+    "/staff/client/{clientId}": {
+      "put": {
+        "tags": [
+          "GO1 Staff Client Management"
+        ],
+        "summary": "Manage OAuth application",
+        "description": "Allows configuring OAuth applications for Go1 internal administrative purposes",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "description": "Client id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "description": "Client status. 0 = inactive, 1 = active",
+                    "format": "int32",
+                    "enum": [
+                      "0",
+                      "1"
+                    ]
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "The URL to redirect to after the user authorizes your application. It must match your client redirect_uri."
+                  },
+                  "client_name": {
+                    "type": "string",
+                    "description": "The client name. It'll be shown to the users when authenticating."
+                  },
+                  "login_user": {
+                    "type": "boolean",
+                    "description": "Whether it can generate one time login links for users"
+                  },
+                  "admin_login_only": {
+                    "type": "boolean",
+                    "description": "Whether only users with administrator role can login, or everyone can"
+                  },
+                  "admin_apps": {
+                    "type": "boolean",
+                    "description": "Whether the application is allowed to change details of other applications"
+                  },
+                  "password_grant": {
+                    "type": "boolean",
+                    "description": "Whether the application can send username and password directly to the"
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "description": "Client status. 0 = inactive, 1 = active",
+                    "format": "int32",
+                    "enum": [
+                      "0",
+                      "1"
+                    ]
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "The URL to redirect to after the user authorizes your application. It must match your client redirect_uri."
+                  },
+                  "client_name": {
+                    "type": "string",
+                    "description": "The client name. It'll be shown to the users when authenticating."
+                  },
+                  "login_user": {
+                    "type": "boolean",
+                    "description": "Whether it can generate one time login links for users"
+                  },
+                  "admin_login_only": {
+                    "type": "boolean",
+                    "description": "Whether only users with administrator role can login, or everyone can"
+                  },
+                  "admin_apps": {
+                    "type": "boolean",
+                    "description": "Whether the application is allowed to change details of other applications"
+                  },
+                  "password_grant": {
+                    "type": "boolean",
+                    "description": "Whether the application can send username and password directly to the"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Client modified",
+            "content": {}
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/GO1ErrorMessage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/GO1ErrorMessage"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {}
+          },
+          "404": {
+            "description": "Client not found",
+            "content": {}
+          },
+          "500": {
+            "description": "Server error.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "GO1BearerJWT": []
+          }
+        ]
+      }
+    },
+    "/saml/custom_attribute": {
+      "post": {
+        "tags": [
+          "SAML Custom Attributes Mapping"
+        ],
+        "summary": "Store a new custom attribute mapping for a particular config_id.",
+        "description": "Validates and stores custom attributes as entry for the entity - there exists a constraint so that there can be no two entries with the same combination of config_id + name",
+        "requestBody": {
+          "required": true,
+          "description": "type can be one of 'attr' or 'const', where the value field corresponds to the existing provided attributes or any value as is the case when type is const",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomAttributeMapping"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new custom attribute mapping was created and stored represented by the id of that entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": {
+                    "id": 1
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload or unable to process the custom attribute mapping or config_id + name combination already exists"
+          },
+          "401": {
+            "description": "Failed to authenticate user."
+          },
+          "403": {
+            "description": "User does not have Admin on Accounts"
+          },
+          "404": {
+            "description": "config_id passed within the payload does not exist"
+          },
+          "500": {
+            "description": "Unable to store the custom attribute mapping."
+          }
+        },
+        "security": [
+          {
+            "GO1BearerJWT": []
+          }
+        ]
+      }
+    },
+    "/saml/custom_attribute/{id}": {
+      "get": {
+        "tags": [
+          "SAML Custom Attributes Mapping"
+        ],
+        "summary": "Retrieve a custom attribute mapping for a particular id.",
+        "description": "Uses the provided `id` to locate and return a custom attribute mapping.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "the `custom_atribute_mapping` id.",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "description": "Required.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. A `custom_atribute_mapping` object is provided in the response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": {
+                    "id": "47",
+                    "config_id": "31",
+                    "name": "exampleCustomAttrOne",
+                    "type": "const",
+                    "value": "true",
+                    "desc": "This example attribute is a constant and will always have a value of true"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Failed to authenticate user."
+          },
+          "403": {
+            "description": "User does not have Admin on Accounts"
+          },
+          "404": {
+            "description": "id passed within the payload does not exist"
+          },
+          "500": {
+            "description": "Internal Server error. Unable to retrieve the custom attribute mapping."
+          }
+        },
+        "security": [
+          {
+            "GO1BearerJWT": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "SAML Custom Attributes Mapping"
+        ],
+        "summary": "Updates (partial modification) an existing custom attribute mapping for a given entry.",
+        "description": "Validates and updates field(s) of a custom attribute entry - there exists a constraint so that there can be no two entries with the same combination of config_id + name",
+        "requestBody": {
+          "required": true,
+          "description": "type can be one of 'attr' or 'const', where the value field corresponds to the existing provided attributes or any value as is the case when type is const",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomAttributeMappingOptional"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The custom attribute mapping was updated - the entry is returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": {
+                    "id": "47",
+                    "config_id": "31",
+                    "name": "exampleCustomAttrOne",
+                    "type": "const",
+                    "value": "true",
+                    "desc": "This example attribute is a constant and will always have a value of true"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload or unable to process the custom attribute mapping or config_id + name combination already exists"
+          },
+          "401": {
+            "description": "Failed to authenticate user"
+          },
+          "403": {
+            "description": "User does not have Admin on Accounts"
+          },
+          "404": {
+            "description": "url param id does not exist or config_id passed within the payload does not exist"
+          },
+          "500": {
+            "description": "Unable to store the custom attribute mapping."
+          }
+        },
+        "security": [
+          {
+            "GO1BearerJWT": []
+          }
+        ]
+      }
+    },
+    "/saml/custom_attribute/config/{id}": {
+      "get": {
+        "tags": [
+          "SAML Custom Attributes Mapping"
+        ],
+        "summary": "Retrieve a collection of `custom_atribute_mapping` objects for a particular config_id.",
+        "description": "Uses the provided `config_id` to locate and return a collection of `custom_atribute_mapping` objects for a particular config_id.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "the `custom_atribute_mapping` config_id.",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "description": "Required.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. A collection of `custom_atribute_mapping` objects is provided in the response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": [
+                    {
+                      "id": "47",
+                      "config_id": "31",
+                      "name": "customAttrTwo",
+                      "type": "const",
+                      "value": "true",
+                      "desc": "This customm attribute example will always have a value of 1"
+                    },
+                    {
+                      "id": "48",
+                      "config_id": "31",
+                      "name": "customAttrThree",
+                      "type": "const",
+                      "value": "true",
+                      "desc": "This customm attribute example will always have a value of 1"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Failed to authenticate user."
+          },
+          "403": {
+            "description": "User does not have Admin on Accounts"
+          },
+          "404": {
+            "description": "config_id passed within the payload does not exist"
+          },
+          "500": {
+            "description": "Internal Server error. Unable to retrieve the custom attribute mapping."
+          }
+        },
+        "security": [
+          {
+            "GO1BearerJWT": []
+          }
+        ]
+      }
+    },
+    "/saml/custom_attribute/{custom_attribute_mapping_id}": {
+      "delete": {
+        "tags": [
+          "SAML Custom Attributes Mapping"
+        ],
+        "summary": "Deletes a custom attribute mapping entry",
+        "description": "Deletes a custom attribute mapping entry",
+        "parameters": [
+          {
+            "name": "custom_attribute_mapping_id",
+            "in": "path",
+            "description": "a custom attribute mapping id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The custom attribute mapping was deleted succcessfully"
+          },
+          "401": {
+            "description": "Failed to authenticate user"
+          },
+          "403": {
+            "description": "User does not have Admin on Accounts"
+          },
+          "404": {
+            "description": "the custom_attribute_mapping_id value does not exist"
+          },
+          "500": {
+            "description": "Internal server errors"
+          }
+        },
+        "security": [
+          {
+            "GO1BearerJWT": []
+          }
+        ]
+      }
+    },
+    "/saml/metadata": {
+      "get": {
+        "tags": [
+          "SAML Metadata Storage"
+        ],
+        "summary": "Retrieves the metadata for the entity",
+        "description": "Retrieves the metadata for the provided entity_id. Note that only one of id or entity_id needs to be provided.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "the metadata id.",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "description": "The entity id.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "portal_id",
+            "in": "query",
+            "description": "the id of the portal the metadata is associated with.",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "jwt",
+            "in": "header",
+            "description": "Required.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. The metadata xml is provided in the response body.",
+            "content": {}
+          },
+          "404": {
+            "description": "Not found. The requested entry could not be found.",
+            "content": {}
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SAML Metadata Storage"
+        ],
+        "summary": "Update an existing metadata entry",
+        "description": "Validates and updates the metadata entry for an existing entity and portal. Note that only one of id or entity_id needs to be provided.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "the metadata id.",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "description": "The entity id.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "portal_id",
+            "in": "query",
+            "description": "the id of the portal the metadata is associated with.",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "jwt",
+            "in": "header",
+            "description": "Required.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The metadata xml",
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "204": {
+            "description": "The entry was successfully updated.",
+            "content": {}
+          },
+          "400": {
+            "description": "Bad request. The entry was not able to be stored.",
+            "content": {}
+          },
+          "401": {
+            "description": "User is not authorized to create metadata entries.",
+            "content": {}
+          },
+          "422": {
+            "description": "Unable to process or store the metadata.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "GO1BearerJWT": []
+          }
+        ],
+        "x-codegen-request-body-name": ""
+      },
+      "post": {
+        "tags": [
+          "SAML Metadata Storage"
+        ],
+        "summary": "Store a new metadata entry.",
+        "description": "Validates and stores the metadata entry for the entity.",
+        "parameters": [
+          {
+            "name": "portal_id",
+            "in": "query",
+            "description": "the id of the portal the metadata is associated with.",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The metadata xml",
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "201": {
+            "description": "The new entry was created and stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": {
+                    "config_id": 1
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. The entry was not able to be stored.",
+            "content": {}
+          },
+          "401": {
+            "description": "User is not authorized to create metadata entries.",
+            "content": {}
+          },
+          "422": {
+            "description": "Unable to process or store the metadata.",
+            "content": {}
+          }
+        },
+        "security": [
+          {
+            "GO1BearerJWT": []
+          }
+        ],
+        "x-codegen-request-body-name": ""
+      }
+    },
+    "/account": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "account.read"
+            ]
+          }
+        ],
+        "tags": [
+          "Account"
+        ],
+        "description": "Detailed information about an account.",
+        "summary": "Get account details"
+      }
+    },
+    "/collections/{collection-id}/items/add": {
+      "post": {
+        "summary": "Add items to a collection",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/collection-id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Items added to collection"
+          },
+          "400": {
+            "description": "Error with supplied parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "lo.write"
+            ]
+          }
+        ],
+        "tags": [
+          "Collections"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCollectionItems"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collections/{collection-id}/items/remove": {
+      "post": {
+        "summary": "Remove items from a collection",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/collection-id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Items removed from collection"
+          },
+          "400": {
+            "description": "Error with supplied parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "lo.write"
+            ]
+          }
+        ],
+        "tags": [
+          "Collections"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveCollectionItems"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/configuration": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalConfiguration"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "portal.read"
+            ]
+          }
+        ],
+        "tags": [
+          "Configuration"
+        ],
+        "summary": "Get portal configuration"
+      },
+      "put": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalConfiguration"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "portal.write"
+            ]
+          }
+        ],
+        "tags": [
+          "Configuration"
+        ],
+        "summary": "Modify portal configuration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalConfiguration"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/enrolments": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Offset to start paging from",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Number of items to return",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "description": "User id to filter enrolments. Use comma seperated list to get a list of enrolments for multiple users.",
+            "in": "query",
+            "name": "user_id",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "X-Total-Count": {
+                "description": "Total count of the records",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Enrollment"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "enrolment.read"
+            ]
+          }
+        ],
+        "tags": [
+          "Enrollments"
+        ],
+        "description": "Get list of enrolments for a particular user in the portal"
+      },
+      "post": {
+        "responses": {
+          "201": {
+            "description": "A new enrolment has been created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Enrollment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid enrolment supplied"
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "enrolment.write"
+            ]
+          }
+        ],
+        "tags": [
+          "Enrollments"
+        ],
+        "description": "Creates a new enrolment",
+        "operationId": "addEnrollent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollmentCreate"
+              }
+            }
+          },
+          "description": "Enrollment to create",
+          "required": true
+        }
+      }
+    },
+    "/enrolments/{enrolment-id}": {
+      "get": {
+        "summary": "Get enrolment details",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/enrolment-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The enrolment object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Enrollment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "404": {
+            "description": "Enrolment is not found"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "enrolment.read"
+            ]
+          }
+        ],
+        "tags": [
+          "Enrollments"
+        ],
+        "description": "The the enrolment object"
+      }
+    },
+    "/learning-objects": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-collection"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-facets"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-keyword"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-language"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-locale"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-country"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-locality"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-thoroughfare"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-provider"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-price-min"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-price-max"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-sort"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-subscribed"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-tags"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-type"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-event"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-event-limit"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-start"
+          },
+          {
+            "$ref": "#/components/parameters/learning-object-end"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningObjectsSearchResult",
+                  "description": "List of learning objects"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "lo.read"
+            ]
+          }
+        ],
+        "tags": [
+          "Learning Content"
+        ],
+        "description": "Search for learning objects.\n",
+        "summary": "Get a (filtered) list of learning objects"
+      }
+    },
+    "/learning-objects/{lo-id}": {
+      "get": {
+        "parameters": [
+          {
+            "description": "The learning object id",
+            "in": "path",
+            "name": "lo-id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningObjectResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "404": {
+            "description": "Learning object not found"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "lo.read"
+            ]
+          }
+        ],
+        "tags": [
+          "Learning Content"
+        ],
+        "description": "Detailed information about a learning object (LO).\n\nThe schema of the object returned depends on the LO type.\nCourses contain modules under `items`, and modules contain learning items under `items`.\nLearning items themselves have no `items`.\n",
+        "summary": "Get learning object details"
+      }
+    },
+    "/learning-objects/{lo-id}/scorm": {
+      "get": {
+        "parameters": [
+          {
+            "description": "The learning object id",
+            "in": "path",
+            "name": "lo-id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A SCORM package in a zip file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error with supplied parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "404": {
+            "description": "Learning object not found"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "lo.read"
+            ]
+          }
+        ],
+        "tags": [
+          "Learning Content"
+        ],
+        "description": "Download learning object as a SCORM package.",
+        "summary": "Download learning object as a SCORM package"
+      }
+    },
+    "/users": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "description": "First Name",
+            "in": "query",
+            "name": "first_name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last Name",
+            "in": "query",
+            "name": "last_name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "E-mail",
+            "in": "query",
+            "name": "email",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Roles",
+            "name": "roles[]",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Administrator",
+                  "Learner",
+                  "Assessor",
+                  "Manager",
+                  "Content administrator"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of user objects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSearchResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "user.read"
+            ]
+          }
+        ],
+        "tags": [
+          "Users"
+        ],
+        "summary": "Search users",
+        "description": "Retrieves a list of users filtered by the given search criteria"
+      },
+      "post": {
+        "responses": {
+          "201": {
+            "description": "The created user object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "user.write"
+            ]
+          }
+        ],
+        "tags": [
+          "Users"
+        ],
+        "description": "Will create a new user. An email will be sent to the user for them to login and set their password.",
+        "summary": "Create new user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "description": "User to create",
+          "required": true
+        }
+      }
+    },
+    "/users/{user-id}": {
+      "get": {
+        "summary": "Get user details",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/user-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The user object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User is unauthenticated"
+          },
+          "403": {
+            "description": "User is not authorized"
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauth": [
+              "user.read"
+            ]
+          }
+        ],
+        "tags": [
+          "Users"
+        ],
+        "description": "Get the user record"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "OAuth2": {
+        "type": "oauth2",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://auth.go1.com/oauth/authorize",
+            "tokenUrl": "https://auth.go1.com/oauth/token",
+            "scopes": {}
+          }
+        }
+      }
+    },
+    "schemas": {
+      "CustomAttributeMapping": {
+        "type": "object",
+        "properties": {
+          "config_id": {
+            "type": "number",
+            "nullable": false
+          },
+          "name": {
+            "type": "string",
+            "nullable": false
+          },
+          "type": {
+            "type": "string",
+            "nullable": false
+          },
+          "value": {
+            "type": "string",
+            "nullable": false
+          },
+          "desc": {
+            "type": "string",
+            "nullable": false
+          }
+        },
+        "required": [
+          "config_id",
+          "name",
+          "type",
+          "value",
+          "desc"
+        ]
+      },
+      "CustomAttributeMappingOptional": {
+        "type": "object",
+        "properties": {
+          "config_id": {
+            "type": "number",
+            "nullable": false
+          },
+          "name": {
+            "type": "string",
+            "nullable": false
+          },
+          "type": {
+            "type": "string",
+            "nullable": false
+          },
+          "value": {
+            "type": "string",
+            "nullable": false
+          },
+          "desc": {
+            "type": "string",
+            "nullable": false
+          }
+        }
+      },
+      "formData_status": {
+        "type": "integer",
+        "description": "Client status. 0 = inactive, 1 = active",
+        "format": "int32",
+        "enum": [
+          "0",
+          "1"
+        ]
+      },
+      "formData_redirectUri": {
+        "type": "string",
+        "description": "The URL to redirect to after the user authorizes your application. It must match your client redirect_uri."
+      },
+      "formData_clientName": {
+        "type": "string",
+        "description": "The client name. It'll be shown to the users when authenticating."
+      },
+      "GO1ErrorMessage": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "What the error is about"
+          }
+        }
+      },
+      "RegenerateSecret": {
+        "required": [
+          "secret"
+        ],
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "description": "The client secret",
+            "example": "285d2467075feeb8665c1742d7e9ee19d03c6357"
+          }
+        }
+      },
+      "OAuthException": {
+        "required": [
+          "error",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "An error code",
+            "example": "invalid_client"
+          },
+          "message": {
+            "type": "string",
+            "description": "An explanation of the error",
+            "example": "Client authentication failed"
+          },
+          "hint": {
+            "type": "string",
+            "description": "A user friendly description of what might have gone wrong",
+            "example": "Error while decoding to JSON"
+          }
+        },
+        "description": "An OAuth request that could not be completed successfully"
+      },
+      "OAuthToken": {
+        "required": [
+          "access_token",
+          "expires_in",
+          "token_type"
+        ],
+        "type": "object",
+        "properties": {
+          "token_type": {
+            "type": "string",
+            "example": "Bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Number of seconds until expiration",
+            "example": 3600
+          },
+          "access_token": {
+            "type": "string",
+            "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6ImE0ZjJmYmIwMDRkNjM5ZjFjOTFiY2NjMzQwY2U5ZjhiMzgxMDNkNWM3ZGFjYzVkN2VlYmU1YmEyYjFiY2MzMzE4ZDJlMTA0OTg0ZGZkYzM5In0.eyJhdWQiOiJjY2E3ODcxMDUyMWE1OGFiNWY4YzMwYmRjYWFiODgwYzg5NGMxNDM3IiwianRpIjoiYTRmMmZiYjAwNGQ2MzlmMWM5MWJjY2MzNDBjZTlmOGIzODEwM2Q1YzdkYWNjNWQ3ZWViZTViYTJiMWJjYzMzMThkMmUxMDQ5ODRkZmRjMzkiLCJpYXQiOjE1MjU5MzQ5OTYsIm5iZiI6MTUyNTkzNDk5NiwiZXhwIjoxNTI4NjEzMzk2LCJzdWIiOiI4Iiwic2NvcGVzIjpbImFjY291bnQucmVhZCIsImxvLnJlYWQiLCJsby53cml0ZSIsInBvcnRhbC5yZWFkIiwicG9ydGFsLndyaXRlIl19.xXBXOEZgb_wa0Eq98_KjklLmp3h8tRhM5nfYdclNaul-hbt0gQEcNMdKqddjikMH6csvSzXDTGO8HglOCsp8P9lyiLuBbq2ZryEnsXj6tdVtIa7lTcmhGpHaKOxD5wW9eUlhu0h5eCJqh03D8ksbS0CB9FBFLwZmpVMQney594l6qGdnROwhCqVjvncDZ7bRN6_qt3_CBzhn-oQe5z8v_ENB2yKLGH4xuHaIbnoqOpDhbn74-6S5UAHwPvkFswSeiwHDomOqHZg3IX15pAQR0h0_s4PyulX952yLURIXvhY4wvGSH8cCWMnq2h8riMZhpEq7WkrwbBhITMXhBNJe5g"
+          },
+          "refresh_token": {
+            "type": "string",
+            "example": "def502008fdefa1ea4cf495ac34ac94acc7c9ef5462727ba8acf921f06d7bd3cee95227941ef37f0c21e30148becec08ff750cff80c9a8a27dd9ea9874589e89b8dd56d1b290095a63fbcf5228f305f499783b0d005b460ff23f3f30a4aa972bca98ad8533077c6370609d6a21025f50439e3ec11b50a28f79fcb21750e537c8c1ddf9a752e6f929c38ad05f3059af952c50981dcddd8224b6d30eb33c5fd3f94a0ea5ab61d0fb0df8485475cab992304ba79625f18162bff962f84ef465f51e669390da3da6a016f507104c321a33f54c51ce3333c10bd8fd0e1d1056b95663a06fe5c711c1399482d4b987d8aa1b1a0d6e2113a6897990c5c122d4908b879d3aec1ef6ef5574632e93b95f8745fbac2ca3a3333850437201ba99d4d1a0e84f50afba2b28fefed18b20ba3a20ccc037462436775eeecfb2d65409fd8f2252cad4cb28d7900f7afb8914b3730988c5a926c8d97264c7019ca927923550a818cdae74ed454a73959e5daaad02fa1a9d669c75200a1e11511d990d7486529948358bf53aa972c1c32e819f0a297cd80ec8e47838d3ae206ab226f87580cd9218846a00daa3d4ff0b836191af2f9bad6c8475bb48a2a0524896e4334b8b5afd4e55ffe56bbb5a86409eb5ab"
+          }
+        },
+        "description": "A successful oauth token grant"
+      },
+      "OAuthValidate": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "example": "828354d9767c4ca4cfae33562e5f670b7be29f2b"
+          },
+          "userId": {
+            "type": "string",
+            "example": "4823"
+          },
+          "scopes": {
+            "type": "array",
+            "example": [
+              "account.read",
+              "lo.read",
+              "portal.read",
+              "portal.write"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Information extracted from the access token itself to facilitate consumption of the data by resource servers"
+      },
+      "OauthClient": {
+        "type": "object",
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "example": "828354d9767c4ca4cfae33562e5f670b7be29f2b"
+          },
+          "client_secret": {
+            "type": "string",
+            "example": "cacda6f67226b688c9c09774b458c9de7b71b3c9"
+          },
+          "client_name": {
+            "type": "string",
+            "example": "An OAuth application"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "example": "example.com"
+          },
+          "portal_id": {
+            "type": "integer",
+            "example": 1
+          },
+          "portal_name": {
+            "type": "string",
+            "example": "example.mygo1.com"
+          }
+        },
+        "description": "Oauth client entity"
+      },
+      "StaffOauthClient": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/OauthClient"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "login_user": {
+                "type": "boolean",
+                "description": "Whether it can generate one time login links for users"
+              },
+              "admin_login_only": {
+                "type": "boolean",
+                "description": "Whether only users with administrator role can login, or everyone can"
+              },
+              "admin_apps": {
+                "type": "boolean",
+                "description": "Whether the application is allowed to change details of other applications"
+              },
+              "password_grant": {
+                "type": "boolean",
+                "description": "Whether the application can send username and password directly to the"
+              }
+            },
+            "description": "Go1 Staff view of a client"
+          }
+        ]
+      },
+      "Account": {
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PortalPlan"
+          },
+          "url": {
+            "description": "Portal URL",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AddCollectionItems": {
+        "properties": {
+          "lo": {
+            "description": "An array of learning object IDs to be added.",
+            "example": [
+              15,
+              60
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "lo"
+        ],
+        "type": "object"
+      },
+      "BaseLO": {
+        "description": "A base learning object with no children items.",
+        "properties": {
+          "tags": {
+            "example": [
+              "tag1",
+              "tag2"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "created_time": {
+            "description": "Created date and time, according to RFC 3339",
+            "example": "2017-07-21T17:32:28+1000",
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "description": "Learning object description",
+            "example": "This is a longer description of the learning object.",
+            "type": "string"
+          },
+          "id": {
+            "example": 555,
+            "type": "integer"
+          },
+          "image": {
+            "description": "Image URL.",
+            "example": "https://res.cloudinary.com/v1431504122/ztiqbtyqcncc5bnk6ef1.png",
+            "type": "string"
+          },
+          "language": {
+            "description": "Language code, according to ISO 639-1",
+            "example": "en",
+            "type": "string"
+          },
+          "title": {
+            "example": "Learning Object Title",
+            "type": "string"
+          },
+          "assessable": {
+            "example": false,
+            "type": "boolean"
+          },
+          "type": {
+            "enum": [
+              "activities",
+              "attendance",
+              "assignment",
+              "course",
+              "document",
+              "h5p",
+              "iframe",
+              "interactive",
+              "module",
+              "question",
+              "quiz",
+              "resource",
+              "text",
+              "video",
+              "workshop",
+              "lti",
+              "event"
+            ],
+            "example": "course",
+            "type": "string"
+          },
+          "updated_time": {
+            "description": "Updated date and time, according to RFC 3339",
+            "example": "2018-03-14T12:01:55+1000",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CourseDelivery": {
+        "properties": {
+          "duration": {
+            "description": "Course duration in minutes.",
+            "example": 600,
+            "type": "integer"
+          },
+          "mode": {
+            "enum": [
+              "self-paced"
+            ],
+            "example": "self-paced",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CoursePricing": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Pricing"
+          }
+        ]
+      },
+      "CourseProvider": {
+        "properties": {
+          "logo": {
+            "description": "Image URL.",
+            "example": "https://res.cloudinary.com/v1431504122/ztiqbtyqcncc5bnk6ef1.png",
+            "type": "string"
+          },
+          "name": {
+            "example": "E3Learning",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CourseReviews": {
+        "properties": {
+          "count": {
+            "example": 60,
+            "type": "integer"
+          },
+          "rating": {
+            "example": 4.5,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CourseSubscription": {
+        "properties": {
+          "licenses": {
+            "description": "The number of licenses. -1 means unlimited.",
+            "example": 70,
+            "type": "integer"
+          },
+          "package": {
+            "enum": [
+              "premium"
+            ],
+            "example": "premium",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CourseWithItems": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CourseWithoutItems"
+          },
+          {
+            "description": "A course excluding its children items.",
+            "properties": {
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/Module"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "CourseWithoutItems": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseLO"
+          },
+          {
+            "description": "A course including its children items.",
+            "properties": {
+              "collections": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "delivery": {
+                "$ref": "#/components/schemas/CourseDelivery"
+              },
+              "pricing": {
+                "$ref": "#/components/schemas/CoursePricing"
+              },
+              "provider": {
+                "$ref": "#/components/schemas/CourseProvider"
+              },
+              "reviews": {
+                "$ref": "#/components/schemas/CourseReviews"
+              },
+              "subscription": {
+                "$ref": "#/components/schemas/CourseSubscription"
+              },
+              "type": {
+                "enum": [
+                  "course"
+                ],
+                "example": "course",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "Enrollment": {
+        "properties": {
+          "created_time": {
+            "description": "Epoc time (ms)",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lo_id": {
+            "description": "Learning object id",
+            "type": "integer"
+          },
+          "parent_lo_id": {
+            "description": "Either the course or module learning object id.",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "in-progress",
+              "completed"
+            ],
+            "type": "string"
+          },
+          "user_id": {
+            "description": "User id",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "EnrollmentCreate": {
+        "properties": {
+          "lo_id": {
+            "description": "Learning object id to enrol into.",
+            "type": "integer"
+          },
+          "parent_lo_id": {
+            "description": "Either the course or module learning object id.",
+            "type": "integer"
+          },
+          "user_id": {
+            "description": "User id",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "EnrolmentEvent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Event"
+          },
+          {
+            "properties": {
+              "data": {
+                "properties": {
+                  "created_time": {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "lo_id": {
+                    "type": "number"
+                  },
+                  "outcome": {
+                    "example": "passed",
+                    "type": "string"
+                  },
+                  "status": {
+                    "example": "in-progress",
+                    "type": "string"
+                  },
+                  "user_id": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "Error": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "Event": {
+        "properties": {
+          "date_sent": {
+            "description": "When the webhook was invoked",
+            "format": "date",
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Facet": {
+        "properties": {
+          "buckets": {
+            "items": {
+              "properties": {
+                "doc_count": {
+                  "example": 10,
+                  "type": "number"
+                },
+                "key": {
+                  "example": "en",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "doc_count_error_upper_bound": {
+            "example": 0,
+            "type": "number"
+          },
+          "sum_other_doc_count": {
+            "example": 3,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "UserSearchResult": {
+        "properties": {
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/User"
+            },
+            "type": "array"
+          },
+          "total": {
+            "example": 100,
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "hits"
+        ],
+        "type": "object"
+      },
+      "LearningItem": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseLO"
+          },
+          {
+            "description": "A learning item.",
+            "properties": {
+              "type": {
+                "enum": [
+                  "activities",
+                  "attendance",
+                  "assignment",
+                  "document",
+                  "h5p",
+                  "iframe",
+                  "interactive",
+                  "question",
+                  "quiz",
+                  "resource",
+                  "text",
+                  "video",
+                  "workshop",
+                  "lti",
+                  "event"
+                ],
+                "example": "quiz",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "LearningObjectResponse": {
+        "$ref": "#/components/schemas/CourseWithItems",
+        "type": "object"
+      },
+      "LearningObjectsSearchResult": {
+        "properties": {
+          "facets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Facet"
+            },
+            "type": "object"
+          },
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/CourseWithoutItems"
+            },
+            "type": "array"
+          },
+          "total": {
+            "example": 100,
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "hits"
+        ],
+        "type": "object"
+      },
+      "Module": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BaseLO"
+          },
+          {
+            "description": "A module including its children items.",
+            "properties": {
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/LearningItem"
+                },
+                "type": "array"
+              },
+              "type": {
+                "enum": [
+                  "module"
+                ],
+                "example": "module",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "PortalConfiguration": {
+        "properties": {
+          "pay_per_seat": {
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "PortalPlan": {
+        "properties": {
+          "active_user_count": {
+            "type": "integer"
+          },
+          "licensed_user_count": {
+            "type": "integer"
+          },
+          "name": {
+            "example": "annual",
+            "type": "string"
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/PortalPricing"
+          },
+          "region": {
+            "type": "string"
+          },
+          "renewal_date": {
+            "example": "2019-01-03T04:19:59+00:00",
+            "format": "date-time",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "marketplace",
+              "portal",
+              "premium"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PortalPricing": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Pricing"
+          }
+        ]
+      },
+      "Pricing": {
+        "properties": {
+          "currency": {
+            "example": "USD",
+            "type": "string"
+          },
+          "price": {
+            "example": 200,
+            "type": "number"
+          },
+          "tax": {
+            "example": 10,
+            "type": "number"
+          },
+          "tax_included": {
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "RemoveCollectionItems": {
+        "properties": {
+          "lo": {
+            "description": "An array of learning object IDs to be removed.",
+            "example": [
+              15,
+              60
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "lo"
+        ],
+        "type": "object"
+      },
+      "User": {
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "email": {
+            "type": "string"
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "created": {
+            "description": "Date time of when the user account was created",
+            "format": "date",
+            "type": "string"
+          },
+          "updated": {
+            "description": "Date time of when the user account was last updated",
+            "format": "date",
+            "type": "string"
+          },
+          "last_login": {
+            "description": "Last time the user logged in",
+            "format": "date",
+            "type": "string"
+          },
+          "roles": {
+            "description": "List of roles associated with the user",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Administrator",
+                "Learner",
+                "Assessor",
+                "Manager",
+                "Content administrator"
+              ]
+            }
+          },
+          "status": {
+            "description": "When false the user is blocked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "first_name",
+          "last_name",
+          "status",
+          "created"
+        ],
+        "type": "object"
+      },
+      "UserCreate": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "roles": {
+            "description": "Roles",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Administrator",
+                "Learner",
+                "Assessor",
+                "Manager",
+                "Content administrator"
+              ]
+            }
+          }
+        },
+        "required": [
+          "email",
+          "first_name",
+          "last_name"
+        ],
+        "type": "object"
+      },
+      "UserEvent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Event"
+          },
+          {
+            "properties": {
+              "data": {
+                "properties": {
+                  "created_time": {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "first_name": {
+                    "type": "string"
+                  },
+                  "full_name": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "last_name": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "Webhook": {
+        "description": "Webhook data",
+        "properties": {
+          "enrollment_create": {
+            "type": "boolean"
+          },
+          "enrollment_delete": {
+            "type": "boolean"
+          },
+          "enrollment_update": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "user_create": {
+            "type": "boolean"
+          },
+          "user_delete": {
+            "type": "boolean"
+          },
+          "user_update": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      }
+    }
+  }
+}

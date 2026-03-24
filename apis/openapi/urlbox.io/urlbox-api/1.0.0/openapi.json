@@ -1,0 +1,440 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Urlbox API",
+    "description": "Urlbox is a website screenshot and rendering API. It allows you to capture screenshots, generate PDFs, and render web pages in various formats including PNG, JPEG, WebP, AVIF, SVG, PDF, HTML, MP4, WebM, and Markdown.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Urlbox",
+      "url": "https://urlbox.com"
+    },
+    "x-jentic-source-url": "https://urlbox.io/docs"
+  },
+  "servers": [
+    {
+      "url": "https://api.urlbox.com",
+      "description": "Urlbox API Server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v1/render/sync": {
+      "post": {
+        "operationId": "createSyncRender",
+        "summary": "Create a synchronous render",
+        "description": "Generates a render and waits for completion, responding when ready. Maximum wait time is 95 seconds before a redirect is returned.",
+        "tags": [
+          "Render"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Render completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderResponse"
+                }
+              }
+            }
+          },
+          "307": {
+            "description": "Long-running render, follow Location header",
+            "headers": {
+              "Location": {
+                "description": "URL to poll for the completed render",
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing API key"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/v1/render/async": {
+      "post": {
+        "operationId": "createAsyncRender",
+        "summary": "Create an asynchronous render",
+        "description": "Accepts a render request and returns immediately with a render ID that can be used to poll for the result.",
+        "tags": [
+          "Render"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Render request accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncRenderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing API key"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/v1/render/{renderId}": {
+      "get": {
+        "operationId": "getRenderStatus",
+        "summary": "Check render status",
+        "description": "Poll the current status of an asynchronously created render.",
+        "tags": [
+          "Render"
+        ],
+        "parameters": [
+          {
+            "name": "renderId",
+            "in": "path",
+            "required": true,
+            "description": "The render ID returned from the async render endpoint",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Render status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Render ID not found"
+          }
+        }
+      }
+    },
+    "/v1/usage": {
+      "get": {
+        "operationId": "getUsage",
+        "summary": "Get account usage information",
+        "description": "Retrieve account usage statistics. Usage information is returned via response headers.",
+        "tags": [
+          "Account"
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage information returned in response headers",
+            "headers": {
+              "x-renders-used": {
+                "description": "Renders consumed in current billing period",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "x-renders-allowed": {
+                "description": "Total renders available",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "x-renders-remaining": {
+                "description": "Renders remaining",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "x-renders-reset": {
+                "description": "Reset date/time for billing cycle",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "Requests allowed per minute",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "Remaining requests in window",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "Rate limit window reset timestamp",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing API key"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API secret key used as Bearer token in the Authorization header"
+      }
+    },
+    "schemas": {
+      "RenderRequest": {
+        "type": "object",
+        "description": "Request parameters for creating a render",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL of the website to render. Either url or html is required.",
+            "example": "https://example.com"
+          },
+          "html": {
+            "type": "string",
+            "description": "Raw HTML content to render. Either url or html is required."
+          },
+          "format": {
+            "type": "string",
+            "description": "Output format",
+            "enum": [
+              "png",
+              "jpg",
+              "webp",
+              "avif",
+              "svg",
+              "pdf",
+              "html",
+              "mp4",
+              "webm",
+              "md"
+            ],
+            "default": "png"
+          },
+          "width": {
+            "type": "integer",
+            "description": "Viewport width in pixels",
+            "default": 1280
+          },
+          "height": {
+            "type": "integer",
+            "description": "Viewport height in pixels",
+            "default": 1024
+          },
+          "full_page": {
+            "type": "boolean",
+            "description": "Capture the entire scrollable page",
+            "default": false
+          },
+          "selector": {
+            "type": "string",
+            "description": "CSS selector to capture a specific element"
+          },
+          "hide_cookie_banners": {
+            "type": "boolean",
+            "description": "Automatically hide cookie consent banners",
+            "default": false
+          },
+          "click_accept": {
+            "type": "boolean",
+            "description": "Click the accept button on cookie banners",
+            "default": false
+          },
+          "block_ads": {
+            "type": "boolean",
+            "description": "Block ad network requests",
+            "default": false
+          },
+          "redirect_after": {
+            "type": "integer",
+            "description": "Custom redirect timeout in seconds for sync renders"
+          },
+          "response_type": {
+            "type": "string",
+            "description": "Response type - json returns metadata, binary returns the file directly",
+            "enum": [
+              "json",
+              "binary"
+            ]
+          }
+        }
+      },
+      "RenderResponse": {
+        "type": "object",
+        "properties": {
+          "renderUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the generated render"
+          },
+          "size": {
+            "type": "integer",
+            "description": "File size in bytes"
+          },
+          "renderTime": {
+            "type": "integer",
+            "description": "Time taken in milliseconds"
+          },
+          "queueTime": {
+            "type": "integer",
+            "description": "Queue time in milliseconds"
+          },
+          "bandwidth": {
+            "type": "integer",
+            "description": "Total bandwidth used in bytes"
+          }
+        }
+      },
+      "AsyncRenderResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Status of the render request",
+            "example": "created"
+          },
+          "renderId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the render"
+          },
+          "statusUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to poll for render status"
+          }
+        }
+      },
+      "RenderStatusResponse": {
+        "type": "object",
+        "properties": {
+          "renderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "retrying",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "statusUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "renderUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "renderTime": {
+            "type": "integer"
+          },
+          "queueTime": {
+            "type": "integer"
+          },
+          "bandwidth": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Error reason (when status is failed)"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string",
+                "enum": [
+                  "NoApiKeySupplied",
+                  "ApiKeyNotFound",
+                  "InvalidURLError",
+                  "URLDoesNotResolveError",
+                  "RenderTimeoutError",
+                  "NoS3BucketConfigured",
+                  "RateLimitExceededError",
+                  "OptionNotAvailableOnPlan"
+                ]
+              }
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Unique request identifier"
+          }
+        }
+      }
+    }
+  }
+}
