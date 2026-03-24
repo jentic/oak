@@ -1,0 +1,176 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Bouncer Email Verification API",
+    "version": "1.0.0",
+    "description": "Bouncer is an email verification API. Verify individual email addresses in real-time or submit batches for bulk verification.",
+    "x-jentic-source-url": "https://docs.usebouncer.com"
+  },
+  "servers": [
+    { "url": "https://api.usebouncer.com/v1.1", "description": "Production" }
+  ],
+  "security": [{ "apiKey": [] }],
+  "paths": {
+    "/email/verify": {
+      "get": {
+        "operationId": "verifyEmail",
+        "tags": ["Real-Time Verification"],
+        "summary": "Verify a single email address in real-time",
+        "parameters": [
+          { "name": "email", "in": "query", "required": true, "schema": { "type": "string", "format": "email" }, "description": "Email address to verify" },
+          { "name": "timeout", "in": "query", "schema": { "type": "integer" }, "description": "Timeout in seconds" }
+        ],
+        "responses": {
+          "200": { "description": "Verification result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VerificationResult" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/email/verify/batch": {
+      "post": {
+        "operationId": "createBatch",
+        "tags": ["Batch Verification"],
+        "summary": "Submit a batch of emails for bulk verification",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BatchRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Batch created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchCreatedResponse" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/email/verify/batch/{batchId}": {
+      "get": {
+        "operationId": "getBatch",
+        "tags": ["Batch Verification"],
+        "summary": "Get the status of a batch",
+        "parameters": [
+          { "name": "batchId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Batch status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchStatus" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/email/verify/batch/{batchId}/download": {
+      "get": {
+        "operationId": "downloadBatchResults",
+        "tags": ["Batch Verification"],
+        "summary": "Download batch verification results",
+        "parameters": [
+          { "name": "batchId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "CSV results file", "content": { "text/csv": { "schema": { "type": "string" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "API key obtained from the Bouncer dashboard"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "code": { "type": "string" }
+        }
+      },
+      "VerificationResult": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["deliverable", "risky", "undeliverable", "unknown"] },
+          "sub_status": { "type": "string" },
+          "free_email": { "type": "boolean" },
+          "disposable": { "type": "boolean" },
+          "role": { "type": "boolean" },
+          "domain": { "$ref": "#/components/schemas/DomainInfo" },
+          "account": { "$ref": "#/components/schemas/AccountInfo" },
+          "toxic": { "type": "string" },
+          "result": { "type": "string" }
+        }
+      },
+      "DomainInfo": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "acceptAll": { "type": "boolean" },
+          "disposable": { "type": "boolean" },
+          "free": { "type": "boolean" }
+        }
+      },
+      "AccountInfo": {
+        "type": "object",
+        "properties": {
+          "role": { "type": "boolean" },
+          "disabled": { "type": "boolean" },
+          "fullMailbox": { "type": "boolean" }
+        }
+      },
+      "BatchRequest": {
+        "type": "object",
+        "required": ["emails"],
+        "properties": {
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["email"],
+              "properties": {
+                "email": { "type": "string", "format": "email" },
+                "name": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "BatchCreatedResponse": {
+        "type": "object",
+        "properties": {
+          "batchId": { "type": "string" },
+          "name": { "type": "string" },
+          "created": { "type": "string", "format": "date-time" },
+          "total": { "type": "integer" },
+          "status": { "type": "string" }
+        }
+      },
+      "BatchStatus": {
+        "type": "object",
+        "properties": {
+          "batchId": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "processing", "completed", "failed"] },
+          "total": { "type": "integer" },
+          "processed": { "type": "integer" },
+          "deliverable": { "type": "integer" },
+          "undeliverable": { "type": "integer" },
+          "risky": { "type": "integer" },
+          "unknown": { "type": "integer" },
+          "created": { "type": "string", "format": "date-time" },
+          "completed": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      }
+    }
+  }
+}
