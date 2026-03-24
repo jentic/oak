@@ -1,0 +1,165 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DataHub Metadata Service API",
+    "version": "1.0.0",
+    "description": "DataHub's Metadata Service provides GraphQL and REST.li APIs for ingesting, retrieving, searching, and browsing metadata entities in the DataHub metadata graph.",
+    "x-jentic-source-url": "https://datahubproject.io/docs/metadata-service/"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Default local instance"
+    }
+  ],
+  "paths": {
+    "/api/graphql": {
+      "post": {
+        "operationId": "executeGraphQL",
+        "summary": "Execute GraphQL query",
+        "description": "Primary public API for fetching and mutating metadata using GraphQL.",
+        "tags": ["GraphQL"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": {"type": "string"},
+                  "variables": {"type": "object"},
+                  "operationName": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "GraphQL response", "content": {"application/json": {"schema": {"type": "object", "properties": {"data": {"type": "object"}, "errors": {"type": "array", "items": {"type": "object"}}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/aspects": {
+      "post": {
+        "operationId": "ingestAspectProposal",
+        "summary": "Ingest aspect proposal",
+        "description": "Ingest individual aspects (metadata about an entity) into the metadata graph via action=ingestProposal.",
+        "tags": ["Ingestion"],
+        "parameters": [
+          {"name": "action", "in": "query", "description": "Action to perform", "required": true, "schema": {"type": "string", "enum": ["ingestProposal", "getTimeseriesAspectValues"]}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/AspectProposal"}
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Aspect ingested", "content": {"application/json": {"schema": {"type": "object"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/entitiesV2/{urn}": {
+      "get": {
+        "operationId": "getEntityV2",
+        "summary": "Get entity by URN (v2)",
+        "description": "Fetch the latest aspects for an entity given its URN.",
+        "tags": ["Entities"],
+        "parameters": [
+          {"name": "urn", "in": "path", "description": "URL-encoded entity URN", "required": true, "schema": {"type": "string"}},
+          {"name": "aspects", "in": "query", "description": "Comma-separated list of aspect names to return", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Entity with aspects", "content": {"application/json": {"schema": {"type": "object"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Entity not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/entities/{urn}": {
+      "get": {
+        "operationId": "getEntity",
+        "summary": "Get entity snapshot by URN (legacy)",
+        "description": "Fetch entity snapshot by URN (legacy endpoint).",
+        "tags": ["Entities"],
+        "parameters": [
+          {"name": "urn", "in": "path", "description": "URL-encoded entity URN", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Entity snapshot", "content": {"application/json": {"schema": {"type": "object"}}}},
+          "404": {"description": "Entity not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/entities": {
+      "post": {
+        "operationId": "entityAction",
+        "summary": "Entity actions (ingest, browse, search, autocomplete)",
+        "description": "Perform various actions on entities: ingest, browse, search, autocomplete.",
+        "tags": ["Entities"],
+        "parameters": [
+          {"name": "action", "in": "query", "description": "Action to perform", "required": true, "schema": {"type": "string", "enum": ["ingest", "browse", "search", "autocomplete"]}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"type": "object"}
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Action result", "content": {"application/json": {"schema": {"type": "object"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/relationships": {
+      "get": {
+        "operationId": "getRelationships",
+        "summary": "Get entity relationships",
+        "description": "Get relationships/edges between entities in the metadata graph.",
+        "tags": ["Relationships"],
+        "parameters": [
+          {"name": "urn", "in": "query", "description": "URL-encoded entity URN", "required": true, "schema": {"type": "string"}},
+          {"name": "direction", "in": "query", "description": "Relationship direction", "required": true, "schema": {"type": "string", "enum": ["INCOMING", "OUTGOING"]}},
+          {"name": "types", "in": "query", "description": "Comma-separated relationship types", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Relationships", "content": {"application/json": {"schema": {"type": "object", "properties": {"entities": {"type": "array", "items": {"type": "string"}}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AspectProposal": {
+        "type": "object",
+        "properties": {
+          "entityType": {"type": "string"},
+          "entityUrn": {"type": "string"},
+          "changeType": {"type": "string"},
+          "aspectName": {"type": "string"},
+          "aspect": {"type": "object"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "string", "enum": ["error"]},
+          "code": {"type": "string"},
+          "message": {"type": "string"}
+        }
+      }
+    }
+  }
+}

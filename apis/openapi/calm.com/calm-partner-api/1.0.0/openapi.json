@@ -1,0 +1,336 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Calm Partner API",
+    "version": "1.0.0",
+    "description": "Calm's B2B partner API for managing user subscriptions, linking partner users to Calm accounts, and cancelling subscriptions.",
+    "x-jentic-source-url": "https://partner.calm.com/docs/api"
+  },
+  "servers": [
+    {
+      "url": "https://auth.calm.com",
+      "description": "Production"
+    },
+    {
+      "url": "https://auth-ga.aws-dev.useast1.calm.com",
+      "description": "Development"
+    }
+  ],
+  "paths": {
+    "/v0/authorize": {
+      "post": {
+        "operationId": "getAccessToken",
+        "summary": "Acquire access token",
+        "description": "Acquires access token for partner service authentication using OAuth 2.0 client credentials flow.",
+        "tags": [
+          "Authentication"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v0/b2b/users/link": {
+      "post": {
+        "operationId": "linkUserSubscription",
+        "summary": "Link user subscription",
+        "description": "Links a partner user to a Calm user account. Returns HTTP 303 redirect to Calm subscribe/access page.",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pseudo_redirect",
+            "in": "query",
+            "description": "If set to 1, returns 200 OK with redirect_location in JSON body instead of 303 redirect",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "enum": [
+                1
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful (pseudo-redirect mode)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkUserResponse"
+                }
+              }
+            }
+          },
+          "303": {
+            "description": "Redirect to Calm subscribe/access page"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v0/b2b/users/{partner_user_id}": {
+      "delete": {
+        "operationId": "cancelSubscription",
+        "summary": "Cancel subscription",
+        "description": "Prevents subscription auto-renewal; cancels on current period end.",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "partner_user_id",
+            "in": "path",
+            "required": true,
+            "description": "Partner-generated user identifier",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AuthRequest": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "client_secret",
+          "grant_type"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "Partner identifier"
+          },
+          "client_secret": {
+            "type": "string",
+            "description": "Partner secret"
+          },
+          "grant_type": {
+            "type": "string",
+            "enum": [
+              "client_credentials"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "description": "Requested scopes",
+            "example": "b2b.users.integrate,b2b.subscription.cancel"
+          }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "JWT access token"
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "token_id": {
+            "type": "string"
+          }
+        }
+      },
+      "LinkUserRequest": {
+        "type": "object",
+        "required": [
+          "partner_user_id"
+        ],
+        "properties": {
+          "partner_user_id": {
+            "type": "string",
+            "description": "Partner-generated GUID"
+          },
+          "error_url": {
+            "type": "string",
+            "description": "Custom error page redirect URL"
+          }
+        }
+      },
+      "LinkUserResponse": {
+        "type": "object",
+        "properties": {
+          "redirect_location": {
+            "type": "string",
+            "description": "URL to redirect user to"
+          }
+        }
+      },
+      "CancelResponse": {
+        "type": "object",
+        "properties": {
+          "partner_user_id": {
+            "type": "string"
+          },
+          "calm_user_id": {
+            "type": "string"
+          },
+          "expires": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "canceled",
+              "not_found"
+            ]
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "error"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}

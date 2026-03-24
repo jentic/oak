@@ -1,0 +1,215 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Monobank Open API",
+    "version": "2303",
+    "description": "Monobank personal banking open API for retrieving exchange rates, client account information, transaction statements, and webhook subscriptions. Provides access to personal and sole proprietorship (FOP) account data.",
+    "x-jentic-source-url": "https://api.monobank.ua/docs/",
+    "x-jentic-source": "https://raw.githubusercontent.com/andrew-demb/monobank-api-community-docs/refs/heads/main/specs/open_personal_api.json"
+  },
+  "servers": [
+    {
+      "url": "https://api.monobank.ua"
+    }
+  ],
+  "paths": {
+    "/bank/currency": {
+      "get": {
+        "operationId": "getCurrencyRates",
+        "summary": "Get exchange rates",
+        "description": "Retrieve basic currency exchange rates. Data is cached and updated every 5 minutes.",
+        "tags": ["Public"],
+        "responses": {
+          "200": {
+            "description": "Exchange rates list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/CurrencyInfo" }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/personal/client-info": {
+      "get": {
+        "operationId": "getClientInfo",
+        "summary": "Get client information and accounts",
+        "description": "Fetch information about the client including accounts and associated banks. Rate limited to once every 60 seconds.",
+        "tags": ["Personal"],
+        "responses": {
+          "200": {
+            "description": "Client information",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserInfo" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "429": { "description": "Too many requests (max 1 per 60 seconds)" }
+        }
+      }
+    },
+    "/personal/statement/{account}/{from}/{to}": {
+      "get": {
+        "operationId": "getStatement",
+        "summary": "Get account transaction statement",
+        "description": "Retrieve transaction statements for a specified period. Maximum period is 31 days + 1 hour. Returns max 500 transactions sorted from end of period.",
+        "tags": ["Personal"],
+        "parameters": [
+          { "name": "account", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Account ID or 0 for default account" },
+          { "name": "from", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "Start time (Unix timestamp in seconds)" },
+          { "name": "to", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "End time (Unix timestamp in seconds)" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction statement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/StatementItem" }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/personal/webhook": {
+      "post": {
+        "operationId": "setWebhook",
+        "summary": "Set webhook URL for balance change events",
+        "description": "Subscribe a webhook URL to receive real-time notifications about transactions. Server must respond with HTTP 200 to confirm.",
+        "tags": ["Webhooks"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["webHookUrl"],
+                "properties": {
+                  "webHookUrl": { "type": "string", "format": "uri", "description": "URL to receive webhook notifications" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Webhook set successfully" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CurrencyInfo": {
+        "type": "object",
+        "properties": {
+          "currencyCodeA": { "type": "integer", "description": "ISO 4217 currency code A" },
+          "currencyCodeB": { "type": "integer", "description": "ISO 4217 currency code B" },
+          "date": { "type": "integer", "description": "Unix timestamp" },
+          "rateSell": { "type": "number" },
+          "rateBuy": { "type": "number" },
+          "rateCross": { "type": "number" }
+        }
+      },
+      "UserInfo": {
+        "type": "object",
+        "properties": {
+          "clientId": { "type": "string" },
+          "name": { "type": "string" },
+          "webHookUrl": { "type": "string" },
+          "permissions": { "type": "string" },
+          "accounts": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Account" }
+          },
+          "jars": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Jar" }
+          }
+        }
+      },
+      "Account": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "sendId": { "type": "string" },
+          "balance": { "type": "integer", "description": "Balance in minimal currency units" },
+          "creditLimit": { "type": "integer" },
+          "type": { "type": "string", "enum": ["black", "white", "platinum", "iron", "fop", "yellow"] },
+          "currencyCode": { "type": "integer" },
+          "cashbackType": { "type": "string" },
+          "maskedPan": { "type": "array", "items": { "type": "string" } },
+          "iban": { "type": "string" }
+        }
+      },
+      "Jar": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "sendId": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "currencyCode": { "type": "integer" },
+          "balance": { "type": "integer" },
+          "goal": { "type": "integer" }
+        }
+      },
+      "StatementItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "time": { "type": "integer", "description": "Unix timestamp" },
+          "description": { "type": "string" },
+          "mcc": { "type": "integer" },
+          "originalMcc": { "type": "integer" },
+          "hold": { "type": "boolean" },
+          "amount": { "type": "integer", "description": "Amount in minimal currency units" },
+          "operationAmount": { "type": "integer" },
+          "currencyCode": { "type": "integer" },
+          "commissionRate": { "type": "integer" },
+          "cashbackAmount": { "type": "integer" },
+          "balance": { "type": "integer" },
+          "comment": { "type": "string" },
+          "receiptId": { "type": "string" },
+          "invoiceId": { "type": "string" },
+          "counterEdrpou": { "type": "string" },
+          "counterIban": { "type": "string" },
+          "counterName": { "type": "string" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "errorDescription": { "type": "string" }
+        }
+      }
+    },
+    "securitySchemes": {
+      "tokenAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Token",
+        "description": "Personal API token obtained from https://api.monobank.ua/"
+      }
+    }
+  },
+  "security": [
+    {
+      "tokenAuth": []
+    }
+  ]
+}

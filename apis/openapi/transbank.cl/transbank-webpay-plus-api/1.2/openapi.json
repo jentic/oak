@@ -1,0 +1,175 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Transbank Webpay Plus API",
+    "version": "1.2",
+    "description": "Transbank Webpay Plus API for processing credit and debit card transactions in Chile. Supports transaction creation, confirmation, status checking, refunds, and deferred captures.",
+    "x-jentic-source-url": "https://www.transbankdevelopers.cl/referencia/webpay"
+  },
+  "servers": [
+    {"url": "https://webpay3g.transbank.cl", "description": "Production"},
+    {"url": "https://webpay3gint.transbank.cl", "description": "Integration/Testing"}
+  ],
+  "paths": {
+    "/rswebpaytransaction/api/webpay/v1.2/transactions": {
+      "post": {
+        "operationId": "createTransaction",
+        "summary": "Create a new transaction",
+        "description": "Initialize a transaction in Webpay generating a unique token",
+        "tags": ["Transactions"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["buy_order", "session_id", "amount", "return_url"],
+                "properties": {
+                  "buy_order": {"type": "string", "maxLength": 26, "description": "Purchase order identifier"},
+                  "session_id": {"type": "string", "maxLength": 61, "description": "Session identifier"},
+                  "amount": {"type": "number", "description": "Transaction amount"},
+                  "return_url": {"type": "string", "maxLength": 256, "description": "Return URL after authorization"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Transaction created", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TransactionCreateResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/rswebpaytransaction/api/webpay/v1.2/transactions/{token}": {
+      "put": {
+        "operationId": "commitTransaction",
+        "summary": "Commit a transaction",
+        "description": "Confirm transaction and retrieve authorization results",
+        "tags": ["Transactions"],
+        "parameters": [{"name": "token", "in": "path", "required": true, "schema": {"type": "string", "maxLength": 64}}],
+        "responses": {
+          "200": {"description": "Transaction committed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TransactionDetail"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "get": {
+        "operationId": "getTransactionStatus",
+        "summary": "Get transaction status",
+        "tags": ["Transactions"],
+        "parameters": [{"name": "token", "in": "path", "required": true, "schema": {"type": "string", "maxLength": 64}}],
+        "responses": {
+          "200": {"description": "Transaction details", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TransactionDetail"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/rswebpaytransaction/api/webpay/v1.2/transactions/{token}/refunds": {
+      "post": {
+        "operationId": "refundTransaction",
+        "summary": "Refund or reverse a transaction",
+        "tags": ["Transactions"],
+        "parameters": [{"name": "token", "in": "path", "required": true, "schema": {"type": "string", "maxLength": 64}}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"type": "object", "required": ["amount"], "properties": {"amount": {"type": "number", "description": "Refund amount"}}}}}
+        },
+        "responses": {
+          "200": {"description": "Refund processed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RefundResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/rswebpaytransaction/api/webpay/v1.2/transactions/{token}/capture": {
+      "put": {
+        "operationId": "captureTransaction",
+        "summary": "Capture a deferred transaction",
+        "tags": ["Transactions"],
+        "parameters": [{"name": "token", "in": "path", "required": true, "schema": {"type": "string", "maxLength": 64}}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"type": "object", "required": ["buy_order", "authorization_code", "capture_amount"], "properties": {"buy_order": {"type": "string", "maxLength": 26}, "authorization_code": {"type": "string", "maxLength": 6}, "capture_amount": {"type": "number"}}}}}
+        },
+        "responses": {
+          "200": {"description": "Capture processed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CaptureResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TransactionCreateResponse": {
+        "type": "object",
+        "properties": {
+          "token": {"type": "string"},
+          "url": {"type": "string"}
+        }
+      },
+      "TransactionDetail": {
+        "type": "object",
+        "properties": {
+          "vci": {"type": "string"},
+          "amount": {"type": "number"},
+          "status": {"type": "string"},
+          "buy_order": {"type": "string"},
+          "session_id": {"type": "string"},
+          "card_detail": {"type": "object", "properties": {"card_number": {"type": "string"}}},
+          "accounting_date": {"type": "string"},
+          "transaction_date": {"type": "string", "format": "date-time"},
+          "authorization_code": {"type": "string"},
+          "payment_type_code": {"type": "string"},
+          "response_code": {"type": "integer"},
+          "installments_amount": {"type": "number"},
+          "installments_number": {"type": "integer"},
+          "balance": {"type": "number"}
+        }
+      },
+      "RefundResponse": {
+        "type": "object",
+        "properties": {
+          "type": {"type": "string"},
+          "authorization_code": {"type": "string"},
+          "authorization_date": {"type": "string", "format": "date-time"},
+          "nullified_amount": {"type": "number"},
+          "balance": {"type": "number"},
+          "response_code": {"type": "integer"}
+        }
+      },
+      "CaptureResponse": {
+        "type": "object",
+        "properties": {
+          "authorization_code": {"type": "string"},
+          "authorization_date": {"type": "string", "format": "date-time"},
+          "captured_amount": {"type": "number"},
+          "response_code": {"type": "integer"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error_message": {"type": "string"}
+        }
+      }
+    },
+    "securitySchemes": {
+      "apiKeyId": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Tbk-Api-Key-Id",
+        "description": "Commerce code"
+      },
+      "apiKeySecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Tbk-Api-Key-Secret",
+        "description": "API key secret"
+      }
+    }
+  },
+  "security": [{"apiKeyId": [], "apiKeySecret": []}]
+}
