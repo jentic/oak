@@ -1,0 +1,916 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Knackly API",
+    "description": "The Knackly API provides programmatic access to manage workspaces, catalogs, records, app execution, document generation, webhooks, and external user access in the Knackly document automation platform.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Knackly",
+      "url": "https://www.knackly.io"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.knackly.io",
+      "description": "Production server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {"name": "Authentication", "description": "Obtain access tokens"},
+    {"name": "Catalogs", "description": "Catalog and app listing"},
+    {"name": "App Schema", "description": "App models, data points, and tables"},
+    {"name": "Records", "description": "Record CRUD operations"},
+    {"name": "App Execution", "description": "Run apps and generate documents"},
+    {"name": "Webhooks", "description": "Webhook management"},
+    {"name": "External Users", "description": "External user provisioning and tokens"}
+  ],
+  "paths": {
+    "/{workspace}/api/v1/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Request an access token",
+        "description": "Obtain a JWT access token using API Key credentials.",
+        "tags": ["Authentication"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "workspace",
+            "in": "path",
+            "required": true,
+            "description": "Workspace identifier",
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["KeyID", "Secret"],
+                "properties": {
+                  "KeyID": {"type": "string", "description": "API key identifier"},
+                  "Secret": {"type": "string", "description": "API key secret"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {"type": "string", "description": "JWT bearer token for subsequent requests"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs": {
+      "get": {
+        "operationId": "listCatalogs",
+        "summary": "List catalogs",
+        "description": "Retrieve accessible catalogs and their associated apps.",
+        "tags": ["Catalogs"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of catalogs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/Catalog"}
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs/{catalog}/apps": {
+      "get": {
+        "operationId": "listApps",
+        "summary": "List apps in a catalog",
+        "description": "List available apps in a catalog.",
+        "tags": ["Catalogs"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "description": "Catalog name", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of apps",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/App"}
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Catalog not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs/{catalog}/apps/{app_name}": {
+      "get": {
+        "operationId": "getApp",
+        "summary": "Get app details",
+        "description": "Retrieve details for a specific app.",
+        "tags": ["Catalogs"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "app_name", "in": "path", "required": true, "description": "App name", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "App details",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/App"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "App not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      },
+      "post": {
+        "operationId": "createRecordAndRunApp",
+        "summary": "Create record and run app",
+        "description": "Create a new record and initiate an app to generate documents.",
+        "tags": ["App Execution"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "app_name", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "suspend", "in": "query", "description": "Delay document generation", "schema": {"type": "boolean"}},
+          {"name": "flat", "in": "query", "description": "Use flat data structure", "schema": {"type": "boolean"}},
+          {"name": "external", "in": "query", "description": "External user authentication token", "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Initial record data adhering to the catalog model schema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record created and app initiated",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/RecordWithApps"}
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs/{catalog}/apps/{app_name}/types": {
+      "get": {
+        "operationId": "listAppModels",
+        "summary": "Get all app models",
+        "description": "Retrieve all hierarchical schema/model information for an app's data structure.",
+        "tags": ["App Schema"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "app_name", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "App models",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/AppModel"}
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs/{catalog}/apps/{app_name}/types/{model_name}": {
+      "get": {
+        "operationId": "getAppModel",
+        "summary": "Get a specific app model",
+        "description": "Retrieve schema/model information for a specific model in an app.",
+        "tags": ["App Schema"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "app_name", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "model_name", "in": "path", "required": true, "description": "Model name", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Model details",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/AppModel"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Model not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs/{catalog}/apps/{app_name}/fields": {
+      "get": {
+        "operationId": "getAppFields",
+        "summary": "Get app data points",
+        "description": "Retrieve a flattened list of data points for an app.",
+        "tags": ["App Schema"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "app_name", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of data points",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {"type": "string"},
+                      "type": {"type": "string"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs/{catalog}/apps/{app_name}/tables": {
+      "get": {
+        "operationId": "listAppTables",
+        "summary": "List app tables",
+        "description": "Get information about all static tables used by an app.",
+        "tags": ["App Schema"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "app_name", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tables",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/AppTable"}
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs/{catalog}/apps/{app_name}/tables/{table_name}": {
+      "get": {
+        "operationId": "getAppTable",
+        "summary": "Get a specific app table",
+        "description": "Get information about a specific static table used by an app.",
+        "tags": ["App Schema"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "app_name", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_name", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Table details",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/AppTable"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Table not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs/{catalog}/items": {
+      "get": {
+        "operationId": "listRecords",
+        "summary": "List records",
+        "description": "List records in a catalog with pagination.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "skip", "in": "query", "description": "Pagination offset (default 0)", "schema": {"type": "integer", "default": 0}},
+          {"name": "limit", "in": "query", "description": "Page size (default 20)", "schema": {"type": "integer", "default": 20}},
+          {"name": "status", "in": "query", "description": "Filter by record status", "schema": {"type": "string"}},
+          {"name": "flat", "in": "query", "description": "Return data in flat structure", "schema": {"type": "boolean"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/RecordSummary"}
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Catalog not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      },
+      "post": {
+        "operationId": "createRecord",
+        "summary": "Create a record",
+        "description": "Generate a new data record in a catalog.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "flat", "in": "query", "description": "Use flat structure for nested data", "schema": {"type": "boolean"}},
+          {"name": "external", "in": "query", "description": "External user authentication token", "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "JSON object adhering to the catalog's model schema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Record created",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/RecordWithApps"}
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Catalog not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs/{catalog}/items/{record_id}": {
+      "get": {
+        "operationId": "getRecord",
+        "summary": "Get a record",
+        "description": "Retrieve a complete record including data and generated documents.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "record_id", "in": "path", "required": true, "description": "Record ID", "schema": {"type": "string"}},
+          {"name": "flat", "in": "query", "description": "Return data in flat structure", "schema": {"type": "boolean"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Record details",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/RecordWithApps"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Record not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      },
+      "put": {
+        "operationId": "updateRecord",
+        "summary": "Replace record data",
+        "description": "Replace all data in a record.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "record_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "flat", "in": "query", "description": "Interpret body as flat structure", "schema": {"type": "boolean"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Complete JSON object replacing existing data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record updated",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/RecordWithApps"}
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Record not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      },
+      "delete": {
+        "operationId": "deleteRecord",
+        "summary": "Delete a record",
+        "description": "Remove a record and its associated documents.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "record_id", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Record deleted"},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Record not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/catalogs/{catalog}/items/{record_id}/apps/{app_name}": {
+      "get": {
+        "operationId": "getAppStatus",
+        "summary": "Get app execution status",
+        "description": "Monitor app execution and document generation progress for a record.",
+        "tags": ["App Execution"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "record_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "app_name", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "App execution status",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/AppStatus"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      },
+      "post": {
+        "operationId": "runAppOnRecord",
+        "summary": "Run app on existing record",
+        "description": "Execute an app on an existing record to regenerate documents.",
+        "tags": ["App Execution"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "catalog", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "record_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "app_name", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "App execution initiated",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/RecordWithApps"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/webhooks": {
+      "get": {
+        "operationId": "listWebhooks",
+        "summary": "List webhooks",
+        "description": "Retrieve all registered webhooks in the workspace.",
+        "tags": ["Webhooks"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of webhooks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/Webhook"}
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      },
+      "post": {
+        "operationId": "createWebhook",
+        "summary": "Create a webhook",
+        "description": "Register a new event notification webhook.",
+        "tags": ["Webhooks"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/WebhookCreate"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook created",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Webhook"}
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/webhooks/{id}": {
+      "get": {
+        "operationId": "getWebhook",
+        "summary": "Get a webhook",
+        "description": "Retrieve specific webhook details.",
+        "tags": ["Webhooks"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "id", "in": "path", "required": true, "description": "Webhook ID", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook details",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Webhook"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Webhook not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      },
+      "delete": {
+        "operationId": "deleteWebhook",
+        "summary": "Delete a webhook",
+        "description": "Unregister a webhook.",
+        "tags": ["Webhooks"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Webhook deleted"},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Webhook not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/externals": {
+      "post": {
+        "operationId": "createExternalUser",
+        "summary": "Create external user and token",
+        "description": "Provision an external user with a limited-time access token.",
+        "tags": ["External Users"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["Email", "Name"],
+                "properties": {
+                  "Email": {"type": "string", "format": "email", "description": "User email address"},
+                  "Name": {"type": "string", "description": "Display name"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "External user created with tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "Token": {"type": "string", "description": "Access token"},
+                    "Refresh_Token": {"type": "string", "description": "Token refresh credential"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/externals/refresh": {
+      "post": {
+        "operationId": "refreshExternalToken",
+        "summary": "Refresh external token",
+        "description": "Obtain a new access token using a refresh token.",
+        "tags": ["External Users"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["Refresh_Token"],
+                "properties": {
+                  "Refresh_Token": {"type": "string", "description": "Previously issued refresh token"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New tokens issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "Token": {"type": "string"},
+                    "Refresh_Token": {"type": "string"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Invalid refresh token", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
+    "/{workspace}/api/v1/externals/validate": {
+      "get": {
+        "operationId": "validateExternalToken",
+        "summary": "Validate external token",
+        "description": "Verify token validity and retrieve user info.",
+        "tags": ["External Users"],
+        "parameters": [
+          {"name": "workspace", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Token is valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "email": {"type": "string"},
+                    "name": {"type": "string"},
+                    "valid": {"type": "boolean"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Invalid or expired token", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Bearer token obtained via the login endpoint."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {"type": "string", "description": "Error message"},
+          "code": {"type": "integer", "description": "Error code"}
+        }
+      },
+      "Catalog": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "description": "Catalog identifier"},
+          "label": {"type": "string", "description": "Display name"},
+          "typeName": {"type": "string", "description": "Base model name"},
+          "apps": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/App"}
+          }
+        }
+      },
+      "App": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "description": "App identifier"},
+          "label": {"type": "string", "description": "Display name"},
+          "version": {"type": "string", "description": "App version"},
+          "typeName": {"type": "string", "description": "Base model name"},
+          "url": {"type": "string", "description": "App URL"}
+        }
+      },
+      "AppModel": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "description": "Model identifier"},
+          "version": {"type": "integer", "description": "Schema version"},
+          "variables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "type": {"type": "string"},
+                "label": {"type": "string"},
+                "selectFrom": {"type": "string"},
+                "isList": {"type": "boolean"}
+              }
+            }
+          }
+        }
+      },
+      "AppTable": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "type": {"type": "string"}
+              }
+            }
+          }
+        }
+      },
+      "RecordSummary": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "Record identifier"},
+          "label": {"type": "string", "description": "Record label"},
+          "status": {"type": "string", "enum": ["Available", "In Use"], "description": "Record status"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "updatedAt": {"type": "string", "format": "date-time"}
+        }
+      },
+      "RecordWithApps": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "Record identifier"},
+          "label": {"type": "string"},
+          "status": {"type": "string", "enum": ["Available", "In Use"]},
+          "data": {"type": "object", "additionalProperties": true, "description": "Record data"},
+          "apps": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/AppStatus"}
+          }
+        }
+      },
+      "AppStatus": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "description": "App name"},
+          "status": {"type": "string", "enum": ["Completed", "Error", "Modified", "Running", "In Use"], "description": "Execution status"},
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "url": {"type": "string", "format": "uri"}
+              }
+            },
+            "description": "Generated documents with download URLs"
+          },
+          "lastRun": {"type": "string", "format": "date-time", "description": "Last execution timestamp"}
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "url": {"type": "string", "format": "uri", "description": "HTTPS endpoint for notifications"},
+          "events": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Event types (e.g., catalog.app.completed)"
+          },
+          "catalogs": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Catalog names or 'all'"
+          },
+          "customHeaders": {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "description": "Custom HTTP headers sent with webhook requests"
+          }
+        }
+      },
+      "WebhookCreate": {
+        "type": "object",
+        "required": ["url", "events", "catalogs"],
+        "properties": {
+          "url": {"type": "string", "format": "uri", "description": "HTTPS endpoint for notifications"},
+          "events": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Event types to subscribe to"
+          },
+          "catalogs": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Catalog names or ['all']"
+          },
+          "customHeaders": {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "description": "Optional custom HTTP headers"
+          }
+        }
+      }
+    }
+  }
+}

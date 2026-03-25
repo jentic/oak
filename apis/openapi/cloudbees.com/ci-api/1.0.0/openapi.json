@@ -1,0 +1,590 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CloudBees CI REST API",
+    "version": "1.0.0",
+    "description": "CloudBees CI (formerly CloudBees Jenkins Enterprise) provides a REST API based on the Jenkins REST API. It allows management of jobs, builds, queues, and nodes. The CloudBees Operations Center (CJOC) provides additional team and controller management endpoints. Authentication uses API tokens with Basic Auth (username:apitoken).",
+    "x-jentic-source-url": "https://docs.cloudbees.com/docs/cloudbees-ci/latest/"
+  },
+  "servers": [
+    {
+      "url": "https://{instance_url}",
+      "variables": {
+        "instance_url": {
+          "default": "your-instance.cloudbees.com",
+          "description": "Your CloudBees CI instance URL"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "basicAuth": []
+    }
+  ],
+  "tags": [
+    { "name": "Jobs", "description": "Manage Jenkins jobs/pipelines" },
+    { "name": "Builds", "description": "Trigger and monitor builds" },
+    { "name": "Queue", "description": "Build queue management" },
+    { "name": "Nodes", "description": "Manage build agents/nodes" },
+    { "name": "System", "description": "System information and management" }
+  ],
+  "paths": {
+    "/api/json": {
+      "get": {
+        "operationId": "getServerInfo",
+        "summary": "Get server information",
+        "description": "Returns top-level information about the Jenkins/CloudBees CI instance, including the list of jobs and views.",
+        "tags": ["System"],
+        "parameters": [
+          {
+            "name": "tree",
+            "in": "query",
+            "description": "Tree filter for response fields (e.g., jobs[name,url,color])",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "description": "Depth of nested objects to return",
+            "schema": { "type": "integer", "default": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerInfo"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/job/{jobName}/api/json": {
+      "get": {
+        "operationId": "getJob",
+        "summary": "Get job details",
+        "description": "Returns detailed information about a specific job/pipeline.",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "name": "jobName",
+            "in": "path",
+            "required": true,
+            "description": "Name of the job (use URL-encoded path for folder jobs, e.g., folder%2Fjob-name)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "tree",
+            "in": "query",
+            "description": "Tree filter for response fields",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/job/{jobName}/build": {
+      "post": {
+        "operationId": "triggerBuild",
+        "summary": "Trigger a build",
+        "description": "Trigger a new build for a job that does not require parameters.",
+        "tags": ["Builds"],
+        "parameters": [
+          {
+            "name": "jobName",
+            "in": "path",
+            "required": true,
+            "description": "Name of the job",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Build queued successfully",
+            "headers": {
+              "Location": {
+                "description": "URL of the queued item",
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/job/{jobName}/buildWithParameters": {
+      "post": {
+        "operationId": "triggerParameterizedBuild",
+        "summary": "Trigger a parameterized build",
+        "description": "Trigger a new build for a parameterized job, passing build parameters.",
+        "tags": ["Builds"],
+        "parameters": [
+          {
+            "name": "jobName",
+            "in": "path",
+            "required": true,
+            "description": "Name of the job",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": { "type": "string" },
+                "description": "Build parameters as key-value pairs"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Build queued successfully",
+            "headers": {
+              "Location": {
+                "description": "URL of the queued item",
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/job/{jobName}/{buildNumber}/api/json": {
+      "get": {
+        "operationId": "getBuild",
+        "summary": "Get build details",
+        "description": "Returns detailed information about a specific build.",
+        "tags": ["Builds"],
+        "parameters": [
+          {
+            "name": "jobName",
+            "in": "path",
+            "required": true,
+            "description": "Name of the job",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "buildNumber",
+            "in": "path",
+            "required": true,
+            "description": "Build number or 'lastBuild', 'lastSuccessfulBuild', 'lastFailedBuild'",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "tree",
+            "in": "query",
+            "description": "Tree filter for response fields",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Build details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Build"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/job/{jobName}/{buildNumber}/stop": {
+      "post": {
+        "operationId": "stopBuild",
+        "summary": "Stop a build",
+        "description": "Abort a running build.",
+        "tags": ["Builds"],
+        "parameters": [
+          {
+            "name": "jobName",
+            "in": "path",
+            "required": true,
+            "description": "Name of the job",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "buildNumber",
+            "in": "path",
+            "required": true,
+            "description": "Build number",
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "302": { "description": "Build stop initiated" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/job/{jobName}/{buildNumber}/consoleText": {
+      "get": {
+        "operationId": "getBuildConsoleOutput",
+        "summary": "Get build console output",
+        "description": "Returns the console output text for a specific build.",
+        "tags": ["Builds"],
+        "parameters": [
+          {
+            "name": "jobName",
+            "in": "path",
+            "required": true,
+            "description": "Name of the job",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "buildNumber",
+            "in": "path",
+            "required": true,
+            "description": "Build number",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Console output",
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/queue/api/json": {
+      "get": {
+        "operationId": "getQueue",
+        "summary": "Get build queue",
+        "description": "Returns the current build queue.",
+        "tags": ["Queue"],
+        "responses": {
+          "200": {
+            "description": "Queue information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Queue"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/computer/api/json": {
+      "get": {
+        "operationId": "listNodes",
+        "summary": "List build nodes/agents",
+        "description": "Returns information about all build nodes (agents) including their status.",
+        "tags": ["Nodes"],
+        "parameters": [
+          {
+            "name": "tree",
+            "in": "query",
+            "description": "Tree filter for response fields",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Node information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComputerSet"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/createItem": {
+      "post": {
+        "operationId": "createJob",
+        "summary": "Create a new job",
+        "description": "Create a new job by sending its XML configuration.",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "description": "Name of the new job",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/xml": {
+              "schema": {
+                "type": "string",
+                "description": "Job XML configuration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Job created successfully" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/job/{jobName}/config.xml": {
+      "get": {
+        "operationId": "getJobConfig",
+        "summary": "Get job configuration XML",
+        "description": "Returns the XML configuration of a job.",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "name": "jobName",
+            "in": "path",
+            "required": true,
+            "description": "Name of the job",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job configuration XML",
+            "content": {
+              "application/xml": {
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "operationId": "updateJobConfig",
+        "summary": "Update job configuration",
+        "description": "Update the XML configuration of a job.",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "name": "jobName",
+            "in": "path",
+            "required": true,
+            "description": "Name of the job",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/xml": {
+              "schema": { "type": "string", "description": "Job XML configuration" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Job configuration updated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/job/{jobName}/doDelete": {
+      "post": {
+        "operationId": "deleteJob",
+        "summary": "Delete a job",
+        "description": "Delete a job.",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "name": "jobName",
+            "in": "path",
+            "required": true,
+            "description": "Name of the job to delete",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "302": { "description": "Job deleted (redirects to parent)" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Basic auth with username and API token. Generate API tokens from {instance_url}/me/configure."
+      }
+    },
+    "schemas": {
+      "ServerInfo": {
+        "type": "object",
+        "properties": {
+          "assignedLabels": { "type": "array", "items": { "type": "object" } },
+          "mode": { "type": "string" },
+          "nodeDescription": { "type": "string" },
+          "numExecutors": { "type": "integer" },
+          "jobs": { "type": "array", "items": { "$ref": "#/components/schemas/JobSummary" } },
+          "views": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "url": { "type": "string" } } } }
+        }
+      },
+      "JobSummary": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "url": { "type": "string" },
+          "color": { "type": "string", "description": "Build status indicator (blue=success, red=failed, etc.)" }
+        }
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "url": { "type": "string" },
+          "color": { "type": "string" },
+          "buildable": { "type": "boolean" },
+          "builds": { "type": "array", "items": { "$ref": "#/components/schemas/BuildSummary" } },
+          "lastBuild": { "$ref": "#/components/schemas/BuildSummary" },
+          "lastSuccessfulBuild": { "$ref": "#/components/schemas/BuildSummary" },
+          "lastFailedBuild": { "$ref": "#/components/schemas/BuildSummary" },
+          "nextBuildNumber": { "type": "integer" },
+          "healthReport": { "type": "array", "items": { "type": "object", "properties": { "description": { "type": "string" }, "score": { "type": "integer" } } } }
+        }
+      },
+      "BuildSummary": {
+        "type": "object",
+        "properties": {
+          "number": { "type": "integer" },
+          "url": { "type": "string" }
+        }
+      },
+      "Build": {
+        "type": "object",
+        "properties": {
+          "number": { "type": "integer" },
+          "url": { "type": "string" },
+          "result": { "type": "string", "enum": ["SUCCESS", "FAILURE", "UNSTABLE", "ABORTED", "NOT_BUILT"], "nullable": true },
+          "building": { "type": "boolean" },
+          "duration": { "type": "integer", "description": "Build duration in milliseconds" },
+          "estimatedDuration": { "type": "integer" },
+          "timestamp": { "type": "integer", "description": "Build start time as Unix timestamp in milliseconds" },
+          "displayName": { "type": "string" },
+          "fullDisplayName": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "actions": { "type": "array", "items": { "type": "object" } },
+          "artifacts": { "type": "array", "items": { "type": "object", "properties": { "displayPath": { "type": "string" }, "fileName": { "type": "string" }, "relativePath": { "type": "string" } } } }
+        }
+      },
+      "Queue": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "task": { "type": "object", "properties": { "name": { "type": "string" }, "url": { "type": "string" } } },
+                "why": { "type": "string" },
+                "buildable": { "type": "boolean" },
+                "blocked": { "type": "boolean" },
+                "stuck": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      },
+      "ComputerSet": {
+        "type": "object",
+        "properties": {
+          "busyExecutors": { "type": "integer" },
+          "totalExecutors": { "type": "integer" },
+          "computer": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "displayName": { "type": "string" },
+                "offline": { "type": "boolean" },
+                "idle": { "type": "boolean" },
+                "numExecutors": { "type": "integer" }
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized - invalid credentials or API token",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,666 @@
+{
+  "openapi": "3.0.0",
+  "servers": [
+    {
+      "description": "APIHub API Auto Mocking AI RAG service APIs",
+      "url": "https://virtserver.swaggerhub.com/HMCTS-DTS/api-cp-ai-rag/0.0.9"
+    }
+  ],
+  "info": {
+    "title": "RAG Service API",
+    "version": "0.0.9",
+    "description": "API for RAG service for document ingestion and answer retrieval",
+    "contact": {
+      "email": "no-reply@hmcts.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/HMCTS-DTS/api-cp-ai-rag/0.0.9/swagger.json"
+  },
+  "components": {
+    "schemas": {
+      "uuid": {
+        "type": "string",
+        "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
+      },
+      "metadataFilter": {
+        "description": "A key value pair object representing a filter value to be applied to the metadata of the ingested documents",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Key attribute representation",
+            "maxLength": 40
+          },
+          "value": {
+            "type": "string",
+            "description": "Value field representation",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ]
+      },
+      "documentChunk": {
+        "description": "An object representing the chunked content used to generate the answer for user query",
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "$ref": "#/components/schemas/uuid"
+          },
+          "documentName": {
+            "type": "string",
+            "description": "Name of the document",
+            "maxLength": 50
+          },
+          "pageNumber": {
+            "type": "integer",
+            "description": "Page number in the document from which the chunk was derived, if applicable"
+          },
+          "chunkContent": {
+            "type": "string",
+            "description": "Content of the chunk used for generating the answer"
+          },
+          "customMetadata": {
+            "type": "array",
+            "description": "List of key value pair objects representing the custom metadata associated with the chunked entry",
+            "items": {
+              "$ref": "#/components/schemas/metadataFilter"
+            }
+          }
+        },
+        "required": [
+          "documentId",
+          "documentName",
+          "pageNumber",
+          "chunkContent"
+        ]
+      },
+      "documentIngestionStatus": {
+        "description": "Status of document ingestion",
+        "type": "string",
+        "enum": [
+          "INGESTION_SUCCESS",
+          "INGESTION_FAILED",
+          "METADATA_VALIDATED",
+          "INVALID_METADATA",
+          "AWAITING_UPLOAD",
+          "AWAITING_INGESTION"
+        ]
+      },
+      "answerGenerationStatus": {
+        "description": "Status of answer ingestion",
+        "type": "string",
+        "enum": [
+          "ANSWER_GENERATED",
+          "ANSWER_GENERATION_FAILED",
+          "ANSWER_GENERATION_PENDING"
+        ]
+      },
+      "documentUploadRequest": {
+        "description": "Payload representing document metadata to initiate upload",
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/uuid"
+              },
+              {
+                "description": "Document identifier provided by the client (must be unique per document)"
+              }
+            ]
+          },
+          "documentName": {
+            "type": "string",
+            "description": "Friendly name of the document",
+            "maxLength": 50
+          },
+          "metadataFilter": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/metadataFilter"
+            }
+          }
+        },
+        "required": [
+          "documentId",
+          "documentName",
+          "metadataFilter"
+        ]
+      },
+      "answerUserQueryRequest": {
+        "description": "Payload representing user query to generate answer",
+        "type": "object",
+        "properties": {
+          "userQuery": {
+            "type": "string",
+            "description": "Query sent by the user"
+          },
+          "queryPrompt": {
+            "type": "string",
+            "description": "Prompt used for querying the LLM"
+          },
+          "metadataFilter": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/metadataFilter"
+            }
+          }
+        },
+        "required": [
+          "userQuery",
+          "queryPrompt",
+          "metadataFilter"
+        ]
+      },
+      "fileStorageLocationReturnedSuccessfully": {
+        "description": "Payload indicating location where file needs to be uploaded",
+        "type": "object",
+        "properties": {
+          "storageUrl": {
+            "type": "string",
+            "description": "Location where file needs to be uploaded"
+          },
+          "documentReference": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/uuid"
+              },
+              {
+                "description": "Reference to file to be uploaded, to be used for subsequent status retrieval"
+              }
+            ]
+          }
+        },
+        "required": [
+          "storageUrl",
+          "documentReference"
+        ]
+      },
+      "documentIngestionStatusReturnedSuccessfully": {
+        "description": "Payload representing the response for successful document ingestion status retrieval",
+        "type": "object",
+        "properties": {
+          "documentName": {
+            "type": "string",
+            "description": "Name of the document",
+            "maxLength": 1024
+          },
+          "documentId": {
+            "$ref": "#/components/schemas/uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/documentIngestionStatus"
+          },
+          "lastUpdated": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of the last update"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for the current status, if applicable"
+          }
+        },
+        "required": [
+          "documentName",
+          "documentId",
+          "status",
+          "lastUpdated",
+          "reason"
+        ]
+      },
+      "documentStatusNotAvailable": {
+        "description": "Payload representing the response when document not known to the service",
+        "type": "object",
+        "properties": {
+          "documentName": {
+            "type": "string",
+            "description": "Name of the document",
+            "maxLength": 1024
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for the current status, if applicable"
+          }
+        },
+        "required": [
+          "documentName",
+          "reason"
+        ]
+      },
+      "userQueryAnswerReturnedSuccessfullySynchronously": {
+        "description": "Payload representing the response for successful answer generation to user query",
+        "type": "object",
+        "properties": {
+          "userQuery": {
+            "type": "string",
+            "description": "Query sent by the user"
+          },
+          "llmResponse": {
+            "type": "string",
+            "description": "Response generated by the LLM"
+          },
+          "queryPrompt": {
+            "type": "string",
+            "description": "Prompt used for querying the LLM"
+          },
+          "documentChunks": {
+            "type": "array",
+            "description": "List of chunked entries used to generate the answer",
+            "items": {
+              "$ref": "#/components/schemas/documentChunk"
+            }
+          },
+          "responseGenerationTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of when the response was generated"
+          },
+          "responseGenerationDuration": {
+            "type": "integer",
+            "description": "Time taken to generate the response in milliseconds"
+          }
+        },
+        "required": [
+          "userQuery",
+          "llmResponse",
+          "queryPrompt",
+          "documentChunks"
+        ]
+      },
+      "userQueryAnswerReturnedSuccessfullyAsynchronously": {
+        "description": "Payload representing the response for successful answer generation to user query",
+        "type": "object",
+        "properties": {
+          "transactionId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/uuid"
+              },
+              {
+                "description": "Reference to lookup the status of the asynchronous request"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/answerGenerationStatus"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for the current status, if applicable"
+          },
+          "userQuery": {
+            "type": "string",
+            "description": "Query sent by the user"
+          },
+          "llmResponse": {
+            "type": "string",
+            "description": "Response generated by the LLM"
+          },
+          "queryPrompt": {
+            "type": "string",
+            "description": "Prompt used for querying the LLM"
+          },
+          "documentChunks": {
+            "type": "array",
+            "description": "List of chunked entries used to generate the answer",
+            "items": {
+              "$ref": "#/components/schemas/documentChunk"
+            }
+          },
+          "responseGenerationTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of when the response was generated"
+          },
+          "responseGenerationDuration": {
+            "type": "integer",
+            "description": "Time taken to generate the response in milliseconds"
+          }
+        },
+        "required": [
+          "userQuery",
+          "llmResponse",
+          "queryPrompt",
+          "transactionId",
+          "status"
+        ]
+      },
+      "userQueryAnswerRequestAccepted": {
+        "description": "Payload representing the response for acceptance of answer generation to user query",
+        "type": "object",
+        "properties": {
+          "transactionId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/uuid"
+              },
+              {
+                "description": "Reference to lookup the status of the asynchronous request"
+              }
+            ]
+          }
+        },
+        "required": [
+          "transactionId"
+        ]
+      },
+      "requestErrored": {
+        "description": "Payload response for invalid user query answer request",
+        "type": "object",
+        "properties": {
+          "errorMessage": {
+            "type": "string",
+            "description": "Error message detailing the issue"
+          }
+        },
+        "required": [
+          "errorMessage"
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/document-upload": {
+      "post": {
+        "summary": "Initiate upload process by submitting document metadata",
+        "description": "Storage location URL returned for document to be uploaded",
+        "operationId": "initiate-document-upload",
+        "tags": [
+          "Document ingestion initiation"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/documentUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File upload location returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/fileStorageLocationReturnedSuccessfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/requestErrored"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/requestErrored"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/document-upload/{documentReference}": {
+      "get": {
+        "summary": "Get status for given document reference",
+        "description": "Obtain status of document uploaded for ingestion into AI search service using document reference",
+        "operationId": "document-status-by-reference",
+        "tags": [
+          "Document ingestion status"
+        ],
+        "parameters": [
+          {
+            "name": "documentReference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/uuid"
+            },
+            "description": "Name of the document to retrieve status for"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document ingestion status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/documentIngestionStatusReturnedSuccessfully"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/documentStatusNotAvailable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/document-status": {
+      "get": {
+        "summary": "Get document status",
+        "description": "Obtain status of document uploaded for ingestion into AI search service",
+        "operationId": "document-status",
+        "tags": [
+          "Document ingestion status"
+        ],
+        "parameters": [
+          {
+            "name": "document-name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "description": "Name of the document to retrieve status for"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document ingestion status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/documentIngestionStatusReturnedSuccessfully"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/documentStatusNotAvailable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/answer-user-query": {
+      "post": {
+        "summary": "Generate response for user query synchronously",
+        "description": "Summarised response generated by the LLM based on the user query and ingested documents",
+        "operationId": "answer-user-query",
+        "tags": [
+          "Document information summarised synchronously"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/answerUserQueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answer returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/userQueryAnswerReturnedSuccessfullySynchronously"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/requestErrored"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/requestErrored"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/answer-user-query-async": {
+      "post": {
+        "summary": "Generate response for user query asynchronously",
+        "description": "Accept request for providing a summarised response for user query.  Response generation happens asynchronously.",
+        "operationId": "answer-user-query-async",
+        "tags": [
+          "Document information summarised asynchronously"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/answerUserQueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Acceptance response returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/userQueryAnswerRequestAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Payload request invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/requestErrored"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/requestErrored"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/answer-user-query-async-status/{transactionId}": {
+      "get": {
+        "summary": "Check status of asynchronous request to provide summarised answer for user query",
+        "description": "Summarised response generated by the LLM based on the user query and ingested documents.  Response generation happens asynchronously.",
+        "operationId": "answer-user-query-status",
+        "tags": [
+          "Document information summarised asynchronously"
+        ],
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/uuid"
+            },
+            "description": "Reference to lookup the status of the asynchronous request"
+          },
+          {
+            "name": "withChunkedEntries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Optional parameter to indicate that chunked entries used to generate the answer should be included in the response"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Answer returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/userQueryAnswerReturnedSuccessfullyAsynchronously"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/requestErrored"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

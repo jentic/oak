@@ -1,0 +1,1054 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Digi-Key Product Information API",
+    "description": "Digi-Key's Product Information API provides access to electronic component data including part search, product details, keyword search, and category browsing. Supports both 2-legged (client credentials) and 3-legged (authorization code) OAuth 2.0 flows.",
+    "version": "4.0.0",
+    "contact": {
+      "name": "Digi-Key API Support",
+      "url": "https://developer.digikey.com"
+    },
+    "termsOfService": "https://www.digikey.com/en/terms-and-conditions",
+    "x-jentic-source-url": "https://www.digikey.com/en/resources/api-solutions"
+  },
+  "servers": [
+    {
+      "url": "https://api.digikey.com",
+      "description": "Production server"
+    },
+    {
+      "url": "https://sandbox-api.digikey.com",
+      "description": "Sandbox server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "OAuth",
+      "description": "Authentication and token management"
+    },
+    {
+      "name": "Product Search",
+      "description": "Search for electronic components"
+    },
+    {
+      "name": "Product Details",
+      "description": "Retrieve detailed product information"
+    },
+    {
+      "name": "Categories",
+      "description": "Browse product categories and taxonomies"
+    }
+  ],
+  "paths": {
+    "/v1/oauth2/authorize": {
+      "get": {
+        "tags": ["OAuth"],
+        "summary": "Authorize (3-legged OAuth)",
+        "description": "Initiates the authorization code flow for 3-legged OAuth. Redirects the user to the Digi-Key login page.",
+        "operationId": "authorize",
+        "parameters": [
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["code"]
+            },
+            "description": "Must be 'code' for authorization code flow."
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your application's client ID."
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "URI to redirect back to after authorization."
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to Digi-Key login page"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/v1/oauth2/token": {
+      "post": {
+        "tags": ["OAuth"],
+        "summary": "Obtain access token",
+        "description": "Exchange authorization code, client credentials, or refresh token for an access token.",
+        "operationId": "getToken",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "enum": ["authorization_code", "client_credentials", "refresh_token"],
+                    "description": "The type of grant being requested."
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "Authorization code (for authorization_code grant)."
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Must match the redirect_uri used in the authorize request."
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "description": "Your application's client ID."
+                  },
+                  "client_secret": {
+                    "type": "string",
+                    "description": "Your application's client secret."
+                  },
+                  "refresh_token": {
+                    "type": "string",
+                    "description": "Refresh token (for refresh_token grant)."
+                  }
+                },
+                "required": ["grant_type", "client_id", "client_secret"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/products/v4/search/{partNumber}/productdetails": {
+      "get": {
+        "tags": ["Product Details"],
+        "summary": "Get product details by part number",
+        "description": "Retrieves detailed product information for a specific part number including pricing, availability, specifications, and datasheets.",
+        "operationId": "getProductDetails",
+        "security": [
+          {
+            "oauth2": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "partNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The manufacturer or Digi-Key part number."
+          },
+          {
+            "$ref": "#/components/parameters/ClientId"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleSite"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleCurrency"
+          },
+          {
+            "$ref": "#/components/parameters/CustomerId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product details returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/products/v4/search/keyword": {
+      "post": {
+        "tags": ["Product Search"],
+        "summary": "Search products by keyword",
+        "description": "Search for products using keywords, filters, and sorting options. Returns matching products with pricing and availability.",
+        "operationId": "keywordSearch",
+        "security": [
+          {
+            "oauth2": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientId"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleSite"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleCurrency"
+          },
+          {
+            "$ref": "#/components/parameters/CustomerId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeywordSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeywordSearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/products/v4/search/digikeynumber/{digiKeyPartNumber}": {
+      "get": {
+        "tags": ["Product Details"],
+        "summary": "Get product by Digi-Key part number",
+        "description": "Retrieves product information using the Digi-Key part number.",
+        "operationId": "getProductByDigiKeyNumber",
+        "security": [
+          {
+            "oauth2": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "digiKeyPartNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The Digi-Key part number."
+          },
+          {
+            "$ref": "#/components/parameters/ClientId"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleSite"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleCurrency"
+          },
+          {
+            "$ref": "#/components/parameters/CustomerId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product details returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/products/v4/categories": {
+      "get": {
+        "tags": ["Categories"],
+        "summary": "List product categories",
+        "description": "Retrieves the full tree of product categories available in the Digi-Key catalog.",
+        "operationId": "getCategories",
+        "security": [
+          {
+            "oauth2": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientId"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleSite"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleLanguage"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category list returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/products/v4/categories/{categoryId}": {
+      "get": {
+        "tags": ["Categories"],
+        "summary": "Get category by ID",
+        "description": "Retrieves details for a specific product category including child categories and parametric filters.",
+        "operationId": "getCategoryById",
+        "security": [
+          {
+            "oauth2": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "categoryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The category identifier."
+          },
+          {
+            "$ref": "#/components/parameters/ClientId"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleSite"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleLanguage"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category details returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/products/v4/search/manufacturerproductnumber": {
+      "post": {
+        "tags": ["Product Search"],
+        "summary": "Search by manufacturer product number",
+        "description": "Search for products by manufacturer part number with optional filters.",
+        "operationId": "manufacturerProductNumberSearch",
+        "security": [
+          {
+            "oauth2": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientId"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleSite"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleCurrency"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManufacturerSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeywordSearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "oauth2": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://api.digikey.com/v1/oauth2/token",
+            "scopes": {}
+          },
+          "authorizationCode": {
+            "authorizationUrl": "https://api.digikey.com/v1/oauth2/authorize",
+            "tokenUrl": "https://api.digikey.com/v1/oauth2/token",
+            "scopes": {}
+          }
+        }
+      }
+    },
+    "parameters": {
+      "ClientId": {
+        "name": "X-DIGIKEY-Client-Id",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Your application's client ID."
+      },
+      "LocaleSite": {
+        "name": "X-DIGIKEY-Locale-Site",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "default": "US"
+        },
+        "description": "Two-letter country code for locale (e.g., US, DE, JP)."
+      },
+      "LocaleLanguage": {
+        "name": "X-DIGIKEY-Locale-Language",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "default": "en"
+        },
+        "description": "Two-letter language code (e.g., en, de, ja)."
+      },
+      "LocaleCurrency": {
+        "name": "X-DIGIKEY-Locale-Currency",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "default": "USD"
+        },
+        "description": "Three-letter currency code (e.g., USD, EUR, JPY)."
+      },
+      "CustomerId": {
+        "name": "X-DIGIKEY-Customer-Id",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Customer ID for pricing and availability."
+      }
+    },
+    "schemas": {
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "The access token to use for API requests."
+          },
+          "token_type": {
+            "type": "string",
+            "example": "Bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Token lifetime in seconds.",
+            "example": 599
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Refresh token for obtaining new access tokens."
+          }
+        }
+      },
+      "KeywordSearchRequest": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "string",
+            "description": "Search keywords.",
+            "example": "capacitor 100uf"
+          },
+          "recordCount": {
+            "type": "integer",
+            "description": "Number of results per page.",
+            "default": 10,
+            "maximum": 50
+          },
+          "recordStartPosition": {
+            "type": "integer",
+            "description": "Starting index for pagination.",
+            "default": 0
+          },
+          "filters": {
+            "$ref": "#/components/schemas/SearchFilters"
+          },
+          "sort": {
+            "$ref": "#/components/schemas/SortOptions"
+          }
+        },
+        "required": ["keywords"]
+      },
+      "ManufacturerSearchRequest": {
+        "type": "object",
+        "properties": {
+          "manufacturerProduct": {
+            "type": "string",
+            "description": "The manufacturer part number to search for."
+          },
+          "recordCount": {
+            "type": "integer",
+            "default": 10,
+            "maximum": 50
+          },
+          "recordStartPosition": {
+            "type": "integer",
+            "default": 0
+          }
+        },
+        "required": ["manufacturerProduct"]
+      },
+      "SearchFilters": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "integer",
+            "description": "Filter results to a specific category."
+          },
+          "manufacturerIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Filter by manufacturer IDs."
+          },
+          "parametricFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParametricFilter"
+            }
+          },
+          "inStock": {
+            "type": "boolean",
+            "description": "Only return in-stock items."
+          }
+        }
+      },
+      "ParametricFilter": {
+        "type": "object",
+        "properties": {
+          "parameterId": {
+            "type": "integer"
+          },
+          "valueId": {
+            "type": "integer"
+          }
+        }
+      },
+      "SortOptions": {
+        "type": "object",
+        "properties": {
+          "sortBy": {
+            "type": "string",
+            "enum": ["SortByDigiKeyPartNumber", "SortByManufacturerPartNumber", "SortByDescription", "SortByManufacturer", "SortByMinimumOrderQuantity", "SortByQuantityAvailable", "SortByUnitPrice"]
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": ["Ascending", "Descending"]
+          }
+        }
+      },
+      "KeywordSearchResponse": {
+        "type": "object",
+        "properties": {
+          "productsCount": {
+            "type": "integer",
+            "description": "Total number of matching products."
+          },
+          "exactManufacturerProductsCount": {
+            "type": "integer"
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSummary"
+            }
+          },
+          "filterOptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilterOption"
+            }
+          }
+        }
+      },
+      "ProductSummary": {
+        "type": "object",
+        "properties": {
+          "digiKeyPartNumber": {
+            "type": "string"
+          },
+          "manufacturerPartNumber": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "productDescription": {
+            "type": "string"
+          },
+          "quantityAvailable": {
+            "type": "integer"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "productUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "datasheetUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "photoUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategoryRef"
+          },
+          "minimumOrderQuantity": {
+            "type": "integer"
+          },
+          "packaging": {
+            "type": "string"
+          },
+          "series": {
+            "type": "string"
+          },
+          "productStatus": {
+            "type": "string",
+            "enum": ["Active", "Obsolete", "Discontinued", "LastTimeBuy", "NotForNewDesigns"]
+          }
+        }
+      },
+      "ProductDetails": {
+        "type": "object",
+        "properties": {
+          "digiKeyPartNumber": {
+            "type": "string"
+          },
+          "manufacturerPartNumber": {
+            "type": "string"
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "productDescription": {
+            "type": "string"
+          },
+          "detailedDescription": {
+            "type": "string"
+          },
+          "quantityAvailable": {
+            "type": "integer"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "productUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "datasheetUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "photoUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategoryRef"
+          },
+          "minimumOrderQuantity": {
+            "type": "integer"
+          },
+          "packaging": {
+            "type": "string"
+          },
+          "series": {
+            "type": "string"
+          },
+          "productStatus": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductParameter"
+            }
+          },
+          "pricingBreaks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceBreak"
+            }
+          },
+          "leadTime": {
+            "type": "string",
+            "description": "Estimated lead time for ordering."
+          },
+          "roHsStatus": {
+            "type": "string"
+          },
+          "moistureSensitivity": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductParameter": {
+        "type": "object",
+        "properties": {
+          "parameterId": {
+            "type": "integer"
+          },
+          "parameterName": {
+            "type": "string"
+          },
+          "valueId": {
+            "type": "integer"
+          },
+          "valueText": {
+            "type": "string"
+          }
+        }
+      },
+      "PriceBreak": {
+        "type": "object",
+        "properties": {
+          "breakQuantity": {
+            "type": "integer"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalPrice": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "CategoryRef": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "integer"
+          },
+          "parentId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "integer"
+          },
+          "parentId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "productCount": {
+            "type": "integer"
+          },
+          "childCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
+          }
+        }
+      },
+      "CategoryList": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
+          }
+        }
+      },
+      "FilterOption": {
+        "type": "object",
+        "properties": {
+          "parameterId": {
+            "type": "integer"
+          },
+          "parameterName": {
+            "type": "string"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "valueId": {
+                  "type": "integer"
+                },
+                "valueText": {
+                  "type": "string"
+                },
+                "productCount": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "httpStatusCode": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Malformed request or invalid parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Invalid or expired token, or not subscribed to API product",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Rate limit exceeded. Check Retry-After header.",
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Seconds to wait before retrying."
+          },
+          "X-RateLimit-Limit": {
+            "schema": {
+              "type": "integer"
+            }
+          },
+          "X-RateLimit-Remaining": {
+            "schema": {
+              "type": "integer"
+            }
+          },
+          "X-RateLimit-Reset": {
+            "schema": {
+              "type": "integer"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

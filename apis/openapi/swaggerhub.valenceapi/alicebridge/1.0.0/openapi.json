@@ -1,0 +1,740 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Alice Bridge API",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/ValenceAPI/AliceBridge/1.0.0/swagger.json"
+  },
+  "servers": [
+    {
+      "description": "Live API",
+      "url": "https://2antv2o7ma.execute-api.us-east-1.amazonaws.com"
+    }
+  ],
+  "tags": [
+    {
+      "name": "wallets",
+      "description": "Wallets"
+    },
+    {
+      "name": "contracts",
+      "description": "Contracts & Tokens"
+    }
+  ],
+  "paths": {
+    "/wallets/validate": {
+      "post": {
+        "tags": [
+          "wallets"
+        ],
+        "summary": "Validates a signed wallet message",
+        "operationId": "validateSignedWallet",
+        "requestBody": {
+          "description": "Signed message to be validated",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "object",
+                    "description": "Message object",
+                    "properties": {
+                      "domain": {
+                        "type": "string"
+                      },
+                      "uri": {
+                        "type": "string"
+                      },
+                      "address": {
+                        "type": "string"
+                      },
+                      "statement": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "string"
+                      },
+                      "chainId": {
+                        "type": "integer"
+                      },
+                      "nonce": {
+                        "type": "string"
+                      },
+                      "issuedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "example": {
+                      "domain": "https://origin.domain",
+                      "uri": "https://origin.domain",
+                      "address": "0x123... wallet address",
+                      "statement": "valence-siwe",
+                      "version": "1",
+                      "chainId": 1,
+                      "nonce": "abc123",
+                      "issuedAt": "2022-01-01T12:34:56"
+                    }
+                  },
+                  "signature": {
+                    "type": "string",
+                    "description": "Message signature",
+                    "example": "0x123... result of SIWE signature"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signature validation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    }
+                  },
+                  "example": {
+                    "valid": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/{walletAddress}/{contractAddress}/balance": {
+      "get": {
+        "tags": [
+          "wallets"
+        ],
+        "summary": "Returns the wallet balance for specified contract",
+        "operationId": "getWalletBalance",
+        "parameters": [
+          {
+            "name": "walletAddress",
+            "in": "path",
+            "description": "Wallet address, example: 0xfc47883C508520F6888ebcDFF89a51Bb4ebe0248",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contractAddress",
+            "in": "path",
+            "description": "Contract address, example: 0xee9A97AB8e18CdD8f65C035D18103B5b89666181",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chainId",
+            "in": "query",
+            "description": "Chain ID: 1 (mainnet - default), 4 (rinkeby), 5 (goerli)",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Wallet tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/WalletBalanceERC20"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WalletBalanceERC1155"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WalletBalanceERC721"
+                    }
+                  ]
+                },
+                "examples": {
+                  "example-erc1155": {
+                    "value": {
+                      "ownedTokens": [
+                        {
+                          "id": "1",
+                          "qty": 2
+                        },
+                        {
+                          "id": "2",
+                          "qty": 3
+                        },
+                        {
+                          "id": "3",
+                          "qty": 5
+                        }
+                      ],
+                      "tokenType": "ERC1155"
+                    }
+                  },
+                  "example-erc721": {
+                    "value": {
+                      "ownedTokens": [
+                        {
+                          "id": "1"
+                        },
+                        {
+                          "id": "2"
+                        },
+                        {
+                          "id": "3"
+                        }
+                      ],
+                      "tokenType": "ERC721"
+                    }
+                  },
+                  "example-erc20": {
+                    "value": {
+                      "balance": 42,
+                      "tokenType": "ERC20"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (incorrect wallet address or contract address format)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Wallet address not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "x-codegen-request-body-name": "body"
+      }
+    },
+    "/contracts/search": {
+      "get": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "Search for contracts by name or address",
+        "operationId": "searchContracts",
+        "parameters": [
+          {
+            "name": "chainId",
+            "in": "query",
+            "description": "Chain ID: 1 (mainnet - default), 5 (goerli - supports contract address search only, full text search is not available for testnet data)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "layer2",
+            "in": "query",
+            "description": "Optional Layer 2 Protocol: immutablex",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "description": "query contracts by name (including partial match) or address",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "verified",
+            "in": "query",
+            "description": "if true, only returns verified contract collections",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "limits the number of search items returned - only enabled if query is provided",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "pagination: page size - only enabled if no query is provided",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nextPageToken",
+            "in": "query",
+            "description": "pagination: token for next page from previous paging response: `meta.paging.next_page_token`",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of matching NFT contracts/collections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Name of the NFT collection"
+                          },
+                          "contracts": {
+                            "type": "array",
+                            "description": "Associated contract addresses",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "example": {
+                    "data": [
+                      {
+                        "name": "NFT Collection Name",
+                        "contracts": [
+                          "0x4241E32b16e64DD97506508721a999fD1B1C20f7"
+                        ]
+                      }
+                    ],
+                    "meta": {
+                      "paging": {
+                        "next_page_token": "1234"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contracts/{contractAddress}": {
+      "get": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "Returns details and metadata for specified contract",
+        "operationId": "getContract",
+        "parameters": [
+          {
+            "name": "contractAddress",
+            "in": "path",
+            "description": "Contract address, example: 0xee9A97AB8e18CdD8f65C035D18103B5b89666181",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chainId",
+            "in": "query",
+            "description": "Chain ID: 1 (mainnet - default), 4 (rinkeby), 5 (goerli)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "layer2",
+            "in": "query",
+            "description": "Optional Layer 2 Protocol: immutablex",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contract details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "logo": {
+                      "type": "string"
+                    },
+                    "contracts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object"
+                    }
+                  }
+                },
+                "example": {
+                  "name": "Example NFT",
+                  "description": "NFT description",
+                  "logo": "https://test.com/images/logo.png",
+                  "verified": true,
+                  "contracts": [
+                    {
+                      "name": "Example NFT",
+                      "symbol": "SYM",
+                      "type": "ERC721"
+                    }
+                  ],
+                  "meta": {
+                    "external_url": "http://test.com",
+                    "twitter_username": "ExampleNFT"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contracts/{contractAddress}/tokens": {
+      "get": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "Returns tokens for specified contract",
+        "operationId": "listTokens",
+        "parameters": [
+          {
+            "name": "contractAddress",
+            "in": "path",
+            "description": "Contract address, example: 0xee9A97AB8e18CdD8f65C035D18103B5b89666181",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chainId",
+            "in": "query",
+            "description": "Chain ID: 1 (mainnet - default), 4 (rinkeby)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "layer2",
+            "in": "query",
+            "description": "Optional Layer 2 Protocol: immutablex",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "metadata",
+            "in": "query",
+            "description": "Optional metadata search query in JSONATA format (see: <a>http://docs.jsonata.org/string-functions</a>)<br/> Examples:<br/>`[$contains(description, \"Token description\")]`<br/>`[name=\"Token name\" or name=\"Another\"]`",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "tokenID": {
+                        "type": "string",
+                        "description": "ID of the token"
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "description": "token metadata"
+                      }
+                    }
+                  },
+                  "example": [
+                    {
+                      "tokenID": "123",
+                      "metadata": {
+                        "name": "Token name",
+                        "description": "Token description",
+                        "image": "https://image.url",
+                        "attributes": [
+                          {
+                            "name": "attribute1",
+                            "value": "value"
+                          },
+                          {
+                            "name": "attribute2",
+                            "value": "value"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contracts/{contractAddress}/tokens/{tokenId}": {
+      "get": {
+        "tags": [
+          "contracts"
+        ],
+        "summary": "Token details for specified contract and token ID",
+        "operationId": "getTokenDetails",
+        "parameters": [
+          {
+            "name": "tokenId",
+            "in": "path",
+            "description": "Token ID, example: 123",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contractAddress",
+            "in": "path",
+            "description": "Contract address, example: 0xee9A97AB8e18CdD8f65C035D18103B5b89666181",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chainId",
+            "in": "query",
+            "description": "Chain ID: 1 (mainnet - default), 4 (rinkeby)",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Minted token details, returns owner (wallet address) and token metadata as a serialized JSON string",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "owner": {
+                      "type": "string",
+                      "description": "The wallet address that owns this token"
+                    },
+                    "metadata": {
+                      "type": "string",
+                      "description": "The token metadata (serialized JSON string)"
+                    }
+                  },
+                  "example": {
+                    "owner": "0xfc47883C508520F6888ebcDFF89a51Bb4ebe0248",
+                    "metadata": "{\"attributes\":[{\"trait_type\":\"some type\",\"value\":\"some value\"}],\"description\":\"Token description\",\"image\":\"Link to the image\",\"name\":\"Token name\"}"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Token not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "WalletBalanceERC20": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "number",
+            "description": "The amount of the ERC20 token owned by the contract"
+          },
+          "tokenType": {
+            "type": "string",
+            "description": "The type of the token of this contract, for instance: ERC20, ERC721, ERC1155, etc. In this case, the value is always ERC20."
+          }
+        }
+      },
+      "WalletBalanceERC1155": {
+        "type": "object",
+        "description": "An array of ERC1155 tokens owned by this wallet",
+        "properties": {
+          "ownedTokens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "ID of the ERC1155 token"
+                },
+                "qty": {
+                  "type": "number",
+                  "description": "Quantity of this token"
+                }
+              }
+            }
+          },
+          "tokenType": {
+            "type": "string",
+            "description": "The type of the token of this contract, for instance: ERC20, ERC721, ERC1155, etc. In this case, the value is always ERC1155."
+          }
+        }
+      },
+      "WalletBalanceERC721": {
+        "type": "object",
+        "description": "An array of ERC721 tokens owned by this wallet",
+        "properties": {
+          "ownedTokens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "ID of the ERC721 token"
+                }
+              }
+            }
+          },
+          "tokenType": {
+            "type": "string",
+            "description": "The type of the token of this contract, for instance: ERC20, ERC721, ERC1155, etc. In this case, the value is always ERC721."
+          }
+        }
+      },
+      "APIError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Name of the error"
+          },
+          "message": {
+            "type": "string",
+            "description": "Information about the error, along with suggestions on how to fix the problem"
+          }
+        },
+        "description": "Error information"
+      }
+    }
+  }
+}

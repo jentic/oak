@@ -1,0 +1,158 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PACER API",
+    "version": "1.0.0",
+    "description": "Public Access to Court Electronic Records (PACER) API for searching federal court cases and parties, authenticating users, and accessing court CM/ECF lookup data.",
+    "x-jentic-source-url": "https://pacer.uscourts.gov/file-case/developer-resources"
+  },
+  "servers": [
+    {
+      "url": "https://pacer.uscourts.gov"
+    }
+  ],
+  "paths": {
+    "/file-case/court-cmecf-lookup/data.json": {
+      "get": {
+        "operationId": "getCourtLookupJson",
+        "summary": "Get CM/ECF court lookup data (JSON)",
+        "description": "Retrieve individual court information including links to CM/ECF in JSON format",
+        "tags": ["Court Lookup"],
+        "responses": {
+          "200": {"description": "Court lookup data", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CourtLookupResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/file-case/court-cmecf-lookup/data.xml": {
+      "get": {
+        "operationId": "getCourtLookupXml",
+        "summary": "Get CM/ECF court lookup data (XML)",
+        "description": "Retrieve individual court information including links to CM/ECF in XML format",
+        "tags": ["Court Lookup"],
+        "responses": {
+          "200": {"description": "Court lookup data", "content": {"application/xml": {"schema": {"type": "string"}}}},
+          "400": {"description": "Bad request"},
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "authenticateUser",
+        "summary": "Authenticate PACER user",
+        "description": "Authenticate using PACER credentials to obtain an authentication token for subsequent API calls",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/AuthLoginRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Authentication successful", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthLoginResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Invalid credentials", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/api/pcl/search": {
+      "get": {
+        "operationId": "searchCases",
+        "summary": "Search PACER Case Locator",
+        "description": "Programmatic search of the PACER Case Locator for federal cases or associated parties",
+        "tags": ["Case Locator"],
+        "parameters": [
+          {"name": "caseName", "in": "query", "description": "Case name to search", "required": false, "schema": {"type": "string"}},
+          {"name": "caseNumber", "in": "query", "description": "Case number", "required": false, "schema": {"type": "string"}},
+          {"name": "partyName", "in": "query", "description": "Party name to search", "required": false, "schema": {"type": "string"}},
+          {"name": "courtType", "in": "query", "description": "Court type filter", "required": false, "schema": {"type": "string", "enum": ["appellate", "bankruptcy", "civil", "criminal"]}},
+          {"name": "dateFrom", "in": "query", "description": "Start date filter", "required": false, "schema": {"type": "string", "format": "date"}},
+          {"name": "dateTo", "in": "query", "description": "End date filter", "required": false, "schema": {"type": "string", "format": "date"}}
+        ],
+        "responses": {
+          "200": {"description": "Search results", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CaseSearchResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CourtLookupResponse": {
+        "type": "object",
+        "properties": {
+          "courts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "courtId": {"type": "string"},
+                "courtName": {"type": "string"},
+                "courtType": {"type": "string"},
+                "cmecfUrl": {"type": "string", "format": "uri"},
+                "state": {"type": "string"}
+              }
+            }
+          }
+        }
+      },
+      "AuthLoginRequest": {
+        "type": "object",
+        "properties": {
+          "loginId": {"type": "string", "description": "PACER username"},
+          "password": {"type": "string", "description": "PACER password"}
+        },
+        "required": ["loginId", "password"]
+      },
+      "AuthLoginResponse": {
+        "type": "object",
+        "properties": {
+          "loginResult": {"type": "string"},
+          "token": {"type": "string", "description": "Authentication token for subsequent API calls"}
+        }
+      },
+      "CaseSearchResponse": {
+        "type": "object",
+        "properties": {
+          "results": {"type": "array", "items": {"$ref": "#/components/schemas/CaseResult"}},
+          "totalCount": {"type": "integer"}
+        }
+      },
+      "CaseResult": {
+        "type": "object",
+        "properties": {
+          "caseId": {"type": "string"},
+          "caseName": {"type": "string"},
+          "caseNumber": {"type": "string"},
+          "courtName": {"type": "string"},
+          "dateFiled": {"type": "string", "format": "date"},
+          "parties": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "string", "enum": ["error"]},
+          "code": {"type": "string"},
+          "message": {"type": "string"}
+        }
+      }
+    },
+    "securitySchemes": {
+      "pacerToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-PACER-Token",
+        "description": "Authentication token obtained from the login endpoint"
+      }
+    }
+  },
+  "security": [
+    {"pacerToken": []}
+  ]
+}

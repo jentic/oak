@@ -1,0 +1,640 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Storj DCS S3-Compatible Gateway API",
+    "description": "Storj Decentralized Cloud Storage provides an S3-compatible gateway for object storage. This spec covers the primary S3-compatible operations supported by the Storj gateway, plus Storj-specific extensions such as object TTL and attribution.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Storj",
+      "url": "https://storj.dev/dcs/"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://gateway.storjshare.io",
+      "description": "Storj S3-compatible gateway"
+    }
+  ],
+  "security": [
+    {
+      "s3Auth": []
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "listBuckets",
+        "summary": "List all buckets",
+        "description": "Returns a list of all buckets owned by the authenticated sender of the request. Maximum 100 buckets.",
+        "responses": {
+          "200": {
+            "description": "Successful bucket listing",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListAllMyBucketsResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        }
+      }
+    },
+    "/{bucketName}": {
+      "put": {
+        "operationId": "createBucket",
+        "summary": "Create a bucket",
+        "description": "Creates a new bucket. Maximum of 100 buckets per project.",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the bucket to create"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bucket created successfully"
+          },
+          "409": {
+            "description": "Bucket already exists"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteBucket",
+        "summary": "Delete a bucket",
+        "description": "Deletes the specified bucket. The bucket must be empty.",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the bucket to delete"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Bucket deleted successfully"
+          },
+          "404": {
+            "description": "Bucket not found"
+          },
+          "409": {
+            "description": "Bucket not empty"
+          }
+        }
+      },
+      "head": {
+        "operationId": "headBucket",
+        "summary": "Check if a bucket exists",
+        "description": "Determines if a bucket exists and you have permission to access it.",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the bucket"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bucket exists"
+          },
+          "404": {
+            "description": "Bucket not found"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listObjectsV2",
+        "summary": "List objects in a bucket",
+        "description": "Returns some or all of the objects in a bucket. Encrypted path ordering may differ from standard S3.",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the bucket"
+          },
+          {
+            "name": "list-type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "enum": [2]
+            },
+            "description": "Set to 2 for ListObjectsV2"
+          },
+          {
+            "name": "prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Limits response to keys beginning with the prefix"
+          },
+          {
+            "name": "delimiter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Character used to group keys"
+          },
+          {
+            "name": "max-keys",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1000
+            },
+            "description": "Maximum number of keys to return"
+          },
+          {
+            "name": "continuation-token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token for pagination"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful object listing",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListBucketResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bucket not found"
+          }
+        }
+      }
+    },
+    "/{bucketName}/{objectKey}": {
+      "put": {
+        "operationId": "putObject",
+        "summary": "Upload an object",
+        "description": "Adds an object to a bucket. Supports the Storj-specific X-Amz-Meta-Object-Expires header for object TTL.",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Target bucket name"
+          },
+          {
+            "name": "objectKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Object key"
+          },
+          {
+            "name": "X-Amz-Meta-Object-Expires",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Storj extension: set object TTL via relative duration (e.g., '+2h') or RFC3339 timestamp"
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "MIME type of the object"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Object uploaded successfully",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Entity tag for the object"
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        }
+      },
+      "get": {
+        "operationId": "getObject",
+        "summary": "Download an object",
+        "description": "Retrieves objects from Storj. Note: the partNumber parameter is not supported.",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Source bucket name"
+          },
+          {
+            "name": "objectKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Object key"
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Byte range to retrieve (e.g., bytes=0-999)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Object data",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Object not found"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteObject",
+        "summary": "Delete an object",
+        "description": "Removes the specified object from the bucket.",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Bucket name"
+          },
+          {
+            "name": "objectKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Object key to delete"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Object deleted successfully"
+          },
+          "404": {
+            "description": "Object not found"
+          }
+        }
+      },
+      "head": {
+        "operationId": "headObject",
+        "summary": "Get object metadata",
+        "description": "Retrieves metadata from an object without returning the object itself.",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Bucket name"
+          },
+          {
+            "name": "objectKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Object key"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Object metadata",
+            "headers": {
+              "Content-Length": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Size of the object in bytes"
+              },
+              "Content-Type": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "MIME type of the object"
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Entity tag"
+              },
+              "Last-Modified": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Date the object was last modified"
+              }
+            }
+          },
+          "404": {
+            "description": "Object not found"
+          }
+        }
+      }
+    },
+    "/{bucketName}/{objectKey}?uploads": {
+      "post": {
+        "operationId": "createMultipartUpload",
+        "summary": "Initiate a multipart upload",
+        "description": "Initiates a multipart upload and returns an upload ID. Maximum 10,000 parts per upload.",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Target bucket name"
+          },
+          {
+            "name": "objectKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Object key for the multipart upload"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Multipart upload initiated",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitiateMultipartUploadResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{bucketName}?tagging": {
+      "put": {
+        "operationId": "putBucketTagging",
+        "summary": "Set bucket tags",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/xml": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tags set successfully"
+          }
+        }
+      },
+      "get": {
+        "operationId": "getBucketTagging",
+        "summary": "Get bucket tags",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bucket tags",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteBucketTagging",
+        "summary": "Delete bucket tags",
+        "parameters": [
+          {
+            "name": "bucketName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Tags deleted"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "s3Auth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "S3-compatible authentication using AWS Signature Version 4 with Storj access key ID and secret access key"
+      }
+    },
+    "schemas": {
+      "ListAllMyBucketsResult": {
+        "type": "object",
+        "properties": {
+          "Owner": {
+            "type": "object",
+            "properties": {
+              "ID": {
+                "type": "string"
+              },
+              "DisplayName": {
+                "type": "string"
+              }
+            }
+          },
+          "Buckets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Bucket"
+            }
+          }
+        }
+      },
+      "Bucket": {
+        "type": "object",
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "CreationDate": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ListBucketResult": {
+        "type": "object",
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "Prefix": {
+            "type": "string"
+          },
+          "KeyCount": {
+            "type": "integer"
+          },
+          "MaxKeys": {
+            "type": "integer"
+          },
+          "IsTruncated": {
+            "type": "boolean"
+          },
+          "Contents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          "NextContinuationToken": {
+            "type": "string"
+          }
+        }
+      },
+      "Object": {
+        "type": "object",
+        "properties": {
+          "Key": {
+            "type": "string"
+          },
+          "LastModified": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ETag": {
+            "type": "string"
+          },
+          "Size": {
+            "type": "integer"
+          },
+          "StorageClass": {
+            "type": "string"
+          }
+        }
+      },
+      "InitiateMultipartUploadResult": {
+        "type": "object",
+        "properties": {
+          "Bucket": {
+            "type": "string"
+          },
+          "Key": {
+            "type": "string"
+          },
+          "UploadId": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,3751 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Adafruit IO REST API",
+    "description": "### The Internet of Things for Everyone\n\nThe Adafruit IO HTTP API provides access to your Adafruit IO data from any programming language or hardware environment that can speak HTTP. The easiest way to get started is with [an Adafruit IO learn guide](https://learn.adafruit.com/series/adafruit-io-basics) and [a simple Internet of Things capable device like the Feather Huzzah](https://www.adafruit.com/product/2821).\n\nThis API documentation is hosted on GitHub Pages and is available at [https://github.com/adafruit/io-api](https://github.com/adafruit/io-api). For questions or comments visit the [Adafruit IO Forums](https://forums.adafruit.com/viewforum.php?f=56) or the [adafruit-io channel on the Adafruit Discord server](https://discord.gg/adafruit).\n\n#### Authentication\n\nAuthentication for every API request happens through the `X-AIO-Key` header or query parameter and your IO API key. A simple cURL request to get all available feeds for a user with the username \"io_username\" and the key \"io_key_12345\" could look like this:\n\n    $ curl -H \"X-AIO-Key: io_key_12345\" https://io.adafruit.com/api/v2/io_username/feeds\n\nOr like this:\n\n    $ curl \"https://io.adafruit.com/api/v2/io_username/feeds?X-AIO-Key=io_key_12345\n\nUsing the node.js [request](https://github.com/request/request) library, IO HTTP requests are as easy as:\n\n```js\nvar request = require('request');\n\nvar options = {\n  url: 'https://io.adafruit.com/api/v2/io_username/feeds',\n  headers: {\n    'X-AIO-Key': 'io_key_12345',\n    'Content-Type': 'application/json'\n  }\n};\n\nfunction callback(error, response, body) {\n  if (!error && response.statusCode == 200) {\n    var feeds = JSON.parse(body);\n    console.log(feeds.length + \" FEEDS AVAILABLE\");\n\n    feeds.forEach(function (feed) {\n      console.log(feed.name, feed.key);\n    })\n  }\n}\n\nrequest(options, callback);\n```\n\nUsing the ESP8266 Arduino HTTPClient library, an HTTPS GET request would look like this (replacing `---` with your own values in the appropriate locations):\n\n```arduino\n/// based on\n/// https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266HTTPClient/examples/Authorization/Authorization.ino\n\n#include <Arduino.h>\n#include <ESP8266WiFi.h>\n#include <ESP8266WiFiMulti.h>\n#include <ESP8266HTTPClient.h>\n\nESP8266WiFiMulti WiFiMulti;\n\nconst char* ssid = \"---\";\nconst char* password = \"---\";\n\nconst char* host = \"io.adafruit.com\";\n\nconst char* io_key = \"---\";\nconst char* path_with_username = \"/api/v2/---/dashboards\";\n\n// Use web browser to view and copy\n// SHA1 fingerprint of the certificate\nconst char* fingerprint = \"77 00 54 2D DA E7 D8 03 27 31 23 99 EB 27 DB CB A5 4C 57 18\";\n\nvoid setup() {\n  Serial.begin(115200);\n\n  for(uint8_t t = 4; t > 0; t--) {\n    Serial.printf(\"[SETUP] WAIT %d...\\n\", t);\n    Serial.flush();\n    delay(1000);\n  }\n\n  WiFi.mode(WIFI_STA);\n  WiFiMulti.addAP(ssid, password);\n\n  // wait for WiFi connection\n  while(WiFiMulti.run() != WL_CONNECTED) {\n    Serial.print('.');\n    delay(1000);\n  }\n\n  Serial.println(\"[WIFI] connected!\");\n\n  HTTPClient http;\n\n  // start request with URL and TLS cert fingerprint for verification\n  http.begin(\"https://\" + String(host) + String(path_with_username), fingerprint);\n\n  // IO API authentication\n  http.addHeader(\"X-AIO-Key\", io_key);\n\n  // start connection and send HTTP header\n  int httpCode = http.GET();\n\n  // httpCode will be negative on error\n  if(httpCode > 0) {\n    // HTTP header has been send and Server response header has been handled\n    Serial.printf(\"[HTTP] GET response: %d\\n\", httpCode);\n\n    // HTTP 200 OK\n    if(httpCode == HTTP_CODE_OK) {\n      String payload = http.getString();\n      Serial.println(payload);\n    }\n\n    http.end();\n  }\n}\n\nvoid loop() {}\n```\n\n#### Client Libraries\n\nWe have client libraries to help you get started with your project: [Python](https://github.com/adafruit/io-client-python), [Ruby](https://github.com/adafruit/io-client-ruby), [Arduino C++](https://github.com/adafruit/Adafruit_IO_Arduino), [Javascript](https://github.com/adafruit/adafruit-io-node), and [Go](https://github.com/adafruit/io-client-go) are available. They're all open source, so if they don't already do what you want, you can fork and add any feature you'd like.\n\n",
+    "version": "2.0.0",
+    "x-logo": {
+      "url": "https://io.adafruit.com/api/docs/adafruit-flower-left.png"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://io.adafruit.com/api/v2"
+    }
+  ],
+  "paths": {
+    "/user": {
+      "get": {
+        "summary": "Get information about the current user",
+        "operationId": "currentUser",
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "A User record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/throttle": {
+      "get": {
+        "summary": "Get the user's data rate limit and current activity level.",
+        "operationId": "getCurrentUserThrottle",
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data rate limit and current actions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data_rate_limit": {
+                      "type": "integer",
+                      "description": "Max possible actions inside the time window (usually 1 minute)."
+                    },
+                    "active_data_rate": {
+                      "type": "integer",
+                      "description": "Actions taken inside the time window."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/activities": {
+      "get": {
+        "summary": "All activities for current user",
+        "description": "The Activities endpoint returns information about the user's activities.",
+        "operationId": "allActivities",
+        "tags": [
+          "Activities"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/StartTime"
+          },
+          {
+            "$ref": "#/components/parameters/EndTime"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of activities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Activity"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Pagination-Limit": {
+                "type": "integer",
+                "description": "The limit this request is using, either your given value or the default (1000)."
+              },
+              "X-Pagination-Count": {
+                "type": "integer",
+                "description": "The number of records returned."
+              },
+              "X-Pagination-Start": {
+                "type": "string",
+                "description": "The created_at value for the oldest record returned."
+              },
+              "X-Pagination-End": {
+                "type": "string",
+                "description": "The created_at value for the newest record returned."
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "All activities for current user",
+        "description": "Delete all your activities.",
+        "operationId": "destroyActivities",
+        "tags": [
+          "Activities"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted activities successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/activities/{type}": {
+      "get": {
+        "summary": "Get activities by type for current user",
+        "description": "The Activities endpoint returns information about the user's activities.",
+        "operationId": "getActivity",
+        "tags": [
+          "Activities"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/ActivityTypePath"
+          },
+          {
+            "$ref": "#/components/parameters/StartTime"
+          },
+          {
+            "$ref": "#/components/parameters/EndTime"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of activities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Activity"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds": {
+      "get": {
+        "summary": "All feeds for current user",
+        "description": "The Feeds endpoint returns information about the user's feeds. The response includes the latest value of each feed, and other metadata about each feed.",
+        "operationId": "allFeeds",
+        "tags": [
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of feeds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Feed"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new Feed",
+        "description": "",
+        "operationId": "createFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupParam"
+          },
+          {
+            "$ref": "#/components/parameters/Feed"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}": {
+      "get": {
+        "summary": "Get feed by feed key",
+        "description": "Returns feed based on the feed key",
+        "operationId": "getFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feed response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace an existing Feed",
+        "description": "",
+        "operationId": "replaceFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/Feed"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update properties of an existing Feed",
+        "description": "",
+        "operationId": "updateFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/Feed"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an existing Feed",
+        "description": "",
+        "operationId": "destroyFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted feed successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}/details": {
+      "get": {
+        "summary": "Get detailed feed by feed key",
+        "description": "Returns more detailed feed record based on the feed key",
+        "operationId": "getFeedDetails",
+        "tags": [
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feed response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}/data": {
+      "get": {
+        "summary": "Get all data for the given feed",
+        "description": "",
+        "operationId": "allData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/StartTime"
+          },
+          {
+            "$ref": "#/components/parameters/EndTime"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/DataInclude"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataResponse"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Pagination-Limit": {
+                "type": "integer",
+                "description": "The limit this request is using, either your given value or the default (1000)."
+              },
+              "X-Pagination-Count": {
+                "type": "integer",
+                "description": "The number of records returned."
+              },
+              "X-Pagination-Start": {
+                "type": "string",
+                "description": "The created_at value for the oldest record returned."
+              },
+              "X-Pagination-End": {
+                "type": "string",
+                "description": "The created_at value for the newest record returned."
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create new Data",
+        "description": "Create new data records on the given feed.\n\n**NOTE:** when feed history is on, data `value` size is limited to 1KB, when feed history is turned off data value size is limited to 100KB.",
+        "operationId": "createData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/Data"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}/data/chart": {
+      "get": {
+        "summary": "Chart data for current feed",
+        "description": "The Chart API is what we use on io.adafruit.com to populate charts over varying timespans with a consistent number of data points. The maximum number of points returned is 480. This API works by aggregating slices of time into a single value by averaging.\n\nAll time-based parameters are optional, if none are given it will default to 1 hour at the finest-grained resolution possible.",
+        "operationId": "chartData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/StartTime"
+          },
+          {
+            "$ref": "#/components/parameters/EndTime"
+          },
+          {
+            "name": "resolution",
+            "in": "query",
+            "description": "A resolution size in minutes. By giving a resolution value you will get back grouped data points aggregated over resolution-sized intervals. NOTE: time span is preferred over resolution, so if you request a span of time that includes more than max limit points you may get a larger resolution than you requested. Valid resolutions are 1, 5, 10, 30, 60, and 120.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "The number of hours the chart should cover.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A JSON record containing chart data and the parameters used to generate it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "feed": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "properties": {}
+                    },
+                    "columns": {
+                      "type": "array",
+                      "description": "The names of the columns returned as data.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "The actual chart data.",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}/data/batch": {
+      "post": {
+        "summary": "Create multiple new Data records",
+        "operationId": "batchCreateData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/DataCollection"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}/data/previous": {
+      "get": {
+        "summary": "Previous Data in Queue",
+        "description": "Get the previously processed data point in the feed. NOTE: this method doesn't move the processing queue pointer.",
+        "operationId": "previousData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/DataInclude"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}/data/next": {
+      "get": {
+        "summary": "Next Data in Queue",
+        "description": "Get the next newest data point in the feed. If queue processing hasn't been started, the first data point in the feed will be returned.",
+        "operationId": "nextData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/DataInclude"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}/data/last": {
+      "get": {
+        "summary": "Last Data in Queue",
+        "description": "Get the most recent data point in the feed. This request sets the queue pointer to the end of the feed.",
+        "operationId": "lastData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/DataInclude"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}/data/first": {
+      "get": {
+        "summary": "First Data in Queue",
+        "description": "Get the oldest data point in the feed. This request sets the queue pointer to the beginning of the feed.",
+        "operationId": "firstData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/DataInclude"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}/data/retain": {
+      "get": {
+        "summary": "Last Data in MQTT CSV format",
+        "description": "Get the most recent data point in the feed in an MQTT compatible CSV format: `value,lat,lon,ele`",
+        "operationId": "retainData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV string in `value,lat,lon,ele` format. The lat, lon, and ele values are left blank if they are not set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/feeds/{feed_key}/data/{id}": {
+      "get": {
+        "summary": "Returns data based on feed key",
+        "description": "",
+        "operationId": "getData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/DataInclude"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace existing Data",
+        "description": "",
+        "operationId": "replaceData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Data"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated Data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update properties of existing Data",
+        "description": "",
+        "operationId": "updateData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Data"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated Data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete existing Data",
+        "description": "",
+        "operationId": "destroyData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted Group successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/groups": {
+      "get": {
+        "summary": "All groups for current user",
+        "description": "The Groups endpoint returns information about the user's groups. The response includes the latest value of each feed in the group, and other metadata about the group.\n",
+        "operationId": "allGroups",
+        "tags": [
+          "Groups"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Group"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new Group",
+        "description": "",
+        "operationId": "createGroup",
+        "tags": [
+          "Groups"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/Group"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New Group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/groups/{group_key}": {
+      "get": {
+        "summary": "Returns Group based on ID",
+        "operationId": "getGroup",
+        "tags": [
+          "Groups"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Group response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error\""
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace an existing Group",
+        "description": "",
+        "operationId": "replaceGroup",
+        "tags": [
+          "Groups"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          },
+          {
+            "$ref": "#/components/parameters/Group"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update properties of an existing Group",
+        "description": "",
+        "operationId": "updateGroup",
+        "tags": [
+          "Groups"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          },
+          {
+            "$ref": "#/components/parameters/Group"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated Group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an existing Group",
+        "description": "",
+        "operationId": "destroyGroup",
+        "tags": [
+          "Groups"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted Group successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/groups/{group_key}/add": {
+      "post": {
+        "summary": "Add an existing Feed to a Group",
+        "description": "",
+        "operationId": "addFeedToGroup",
+        "tags": [
+          "Groups",
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          },
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/groups/{group_key}/remove": {
+      "post": {
+        "summary": "Remove a Feed from a Group",
+        "description": "",
+        "operationId": "removeFeedFromGroup",
+        "tags": [
+          "Groups",
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          },
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/groups/{group_key}/feeds": {
+      "get": {
+        "summary": "All feeds for current user in a given group",
+        "description": "The Group Feeds endpoint returns information about the user's feeds. The response includes the latest value of each feed, and other metadata about each feed, but only for feeds within the given group.",
+        "operationId": "allGroupFeeds",
+        "tags": [
+          "Groups",
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          },
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of feeds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Feed"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new Feed in a Group",
+        "description": "",
+        "operationId": "createGroupFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          },
+          {
+            "$ref": "#/components/parameters/Feed"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/groups/{group_key}/data": {
+      "post": {
+        "summary": "Create new data for multiple feeds in a group",
+        "operationId": "createGroupData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupFeedData"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/groups/{group_key}/feeds/{feed_key}/data": {
+      "get": {
+        "summary": "All data for current feed in a specific group",
+        "description": "",
+        "operationId": "allGroupFeedData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "description": "Start time for filtering data. Returns data created after given time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "description": "End time for filtering data. Returns data created before give time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Limit the number of records returned.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create new Data in a feed belonging to a particular group",
+        "operationId": "createGroupFeedData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/Data"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/groups/{group_key}/feeds/{feed_key}/data/batch": {
+      "post": {
+        "summary": "Create multiple new Data records in a feed belonging to a particular group",
+        "operationId": "batchCreateGroupFeedData",
+        "tags": [
+          "Data"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/GroupPath"
+          },
+          {
+            "$ref": "#/components/parameters/FeedPath"
+          },
+          {
+            "$ref": "#/components/parameters/DataCollection"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/dashboards": {
+      "get": {
+        "summary": "All dashboards for current user",
+        "description": "The Dashboards endpoint returns information about the user's dashboards.\n",
+        "operationId": "allDashboards",
+        "tags": [
+          "Dashboards"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of dashboards",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Dashboard"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new Dashboard",
+        "description": "",
+        "operationId": "createDashboard",
+        "tags": [
+          "Dashboards"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/Dashboard"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New Dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/dashboards/{id}": {
+      "get": {
+        "summary": "Returns Dashboard based on ID",
+        "description": "",
+        "operationId": "getDashboard",
+        "tags": [
+          "Dashboards"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error\""
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace an existing Dashboard",
+        "description": "",
+        "operationId": "replaceDashboard",
+        "tags": [
+          "Dashboards"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Dashboard"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update properties of an existing Dashboard",
+        "description": "",
+        "operationId": "updateDashboard",
+        "tags": [
+          "Dashboards"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Dashboard"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated Dashboard",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an existing Dashboard",
+        "description": "",
+        "operationId": "destroyDashboard",
+        "tags": [
+          "Dashboards"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted Dashboard successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/dashboards/{dashboard_id}/blocks": {
+      "get": {
+        "summary": "All blocks for current user",
+        "description": "The Blocks endpoint returns information about the user's blocks.\n",
+        "operationId": "allBlocks",
+        "tags": [
+          "Blocks"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/DashboardIDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of blocks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Block"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new Block",
+        "description": "",
+        "operationId": "createBlock",
+        "tags": [
+          "Blocks"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/Block"
+          },
+          {
+            "$ref": "#/components/parameters/DashboardIDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New Block",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Block"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/dashboards/{dashboard_id}/blocks/{id}": {
+      "get": {
+        "summary": "Returns Block based on ID",
+        "description": "",
+        "operationId": "getBlock",
+        "tags": [
+          "Blocks"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/DashboardIDPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Block response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Block"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error\""
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace an existing Block",
+        "description": "",
+        "operationId": "replaceBlock",
+        "tags": [
+          "Blocks"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/DashboardIDPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Block"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated block",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Block"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update properties of an existing Block",
+        "description": "",
+        "operationId": "updateBlock",
+        "tags": [
+          "Blocks"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/DashboardIDPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Block"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated Block",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Block"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an existing Block",
+        "description": "",
+        "operationId": "destroyBlock",
+        "tags": [
+          "Blocks"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/DashboardIDPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted Block successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/tokens": {
+      "get": {
+        "summary": "All tokens for current user",
+        "description": "The Tokens endpoint returns information about the user's tokens.\n",
+        "operationId": "allTokens",
+        "tags": [
+          "Tokens"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Token"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new Token",
+        "description": "",
+        "operationId": "createToken",
+        "tags": [
+          "Tokens"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/Token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/tokens/{id}": {
+      "get": {
+        "summary": "Returns Token based on ID",
+        "description": "",
+        "operationId": "getToken",
+        "tags": [
+          "Tokens"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error\""
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace an existing Token",
+        "description": "",
+        "operationId": "replaceToken",
+        "tags": [
+          "Tokens"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update properties of an existing Token",
+        "description": "",
+        "operationId": "updateToken",
+        "tags": [
+          "Tokens"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an existing Token",
+        "description": "",
+        "operationId": "destroyToken",
+        "tags": [
+          "Tokens"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted Token successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/triggers": {
+      "get": {
+        "summary": "All triggers for current user",
+        "description": "The Triggers endpoint returns information about the user's triggers.\n",
+        "operationId": "allTriggers",
+        "tags": [
+          "Triggers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of triggers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Trigger"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new Trigger",
+        "description": "",
+        "operationId": "createTrigger",
+        "tags": [
+          "Triggers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/Trigger"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New Trigger",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trigger"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/triggers/{id}": {
+      "get": {
+        "summary": "Returns Trigger based on ID",
+        "description": "",
+        "operationId": "getTrigger",
+        "tags": [
+          "Triggers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trigger response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trigger"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error\""
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace an existing Trigger",
+        "description": "",
+        "operationId": "replaceTrigger",
+        "tags": [
+          "Triggers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Trigger"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated trigger",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trigger"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update properties of an existing Trigger",
+        "description": "",
+        "operationId": "updateTrigger",
+        "tags": [
+          "Triggers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Trigger"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated Trigger",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trigger"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an existing Trigger",
+        "description": "",
+        "operationId": "destroyTrigger",
+        "tags": [
+          "Triggers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted Trigger successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/{type}/{type_id}/acl": {
+      "get": {
+        "summary": "All permissions for current user and type",
+        "description": "The Permissions endpoint returns information about the user's permissions.\n",
+        "operationId": "allPermissions",
+        "tags": [
+          "Permissions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypeIDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Permission"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new Permission",
+        "description": "",
+        "operationId": "createPermission",
+        "tags": [
+          "Permissions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypeIDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Permission"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New Permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Permission"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/{username}/{type}/{type_id}/acl/{id}": {
+      "get": {
+        "summary": "Returns Permission based on ID",
+        "description": "",
+        "operationId": "getPermission",
+        "tags": [
+          "Permissions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypeIDPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Permission response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Permission"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error\""
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace an existing Permission",
+        "description": "",
+        "operationId": "replacePermission",
+        "tags": [
+          "Permissions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypeIDPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Permission"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Permission"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update properties of an existing Permission",
+        "description": "",
+        "operationId": "updatePermission",
+        "tags": [
+          "Permissions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypeIDPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          },
+          {
+            "$ref": "#/components/parameters/Permission"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated Permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Permission"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an existing Permission",
+        "description": "",
+        "operationId": "destroyPermission",
+        "tags": [
+          "Permissions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UsernamePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypePath"
+          },
+          {
+            "$ref": "#/components/parameters/PermTypeIDPath"
+          },
+          {
+            "$ref": "#/components/parameters/IDPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted Permission successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/webhooks/feed/:token": {
+      "post": {
+        "summary": "Send data to a feed via webhook URL.",
+        "description": "",
+        "operationId": "createWebhookFeedData",
+        "tags": [
+          "Webhooks",
+          "Data"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "New feed data record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/webhooks/feed/:token/raw": {
+      "post": {
+        "summary": "Send arbitrary data to a feed via webhook URL.",
+        "description": "The raw data webhook receiver accepts POST requests and stores the raw request body on your feed. This is useful when you don't have control of the webhook sender. If feed history is turned on, payloads will be truncated at 1024 bytes. If feed history is turned off, payloads will be truncated at 100KB.",
+        "operationId": "createRawWebhookFeedData",
+        "tags": [
+          "Webhooks",
+          "Data"
+        ],
+        "responses": {
+          "200": {
+            "description": "New feed data record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Activity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "readOnly": true
+          },
+          "action": {
+            "type": "string",
+            "readOnly": true
+          },
+          "model": {
+            "type": "string",
+            "readOnly": true
+          },
+          "data": {
+            "type": "object",
+            "readOnly": true
+          },
+          "user_id": {
+            "type": "number",
+            "readOnly": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "dateTime",
+            "readOnly": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "dateTime",
+            "readOnly": true
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "readOnly": true
+          },
+          "color": {
+            "type": "string",
+            "readOnly": true
+          },
+          "username": {
+            "type": "string",
+            "readOnly": true
+          },
+          "time_zone": {
+            "type": "string",
+            "readOnly": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "dateTime",
+            "readOnly": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "dateTime",
+            "readOnly": true
+          }
+        }
+      },
+      "Group": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "feeds": {
+            "type": "array",
+            "readOnly": true,
+            "items": {
+              "$ref": "#/components/schemas/Feed"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "readOnly": true
+          },
+          "updated_at": {
+            "readOnly": true,
+            "type": "string"
+          }
+        }
+      },
+      "ShallowGroup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "readOnly": true
+          },
+          "updated_at": {
+            "readOnly": true,
+            "type": "string"
+          }
+        }
+      },
+      "Feed": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "group": {
+            "type": "object",
+            "readOnly": true,
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ShallowGroup"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "readOnly": true,
+            "items": {
+              "$ref": "#/components/schemas/ShallowGroup"
+            }
+          },
+          "description": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "description": "Additional details about this feed.",
+            "readOnly": true,
+            "properties": {
+              "shared_with": {
+                "type": "array",
+                "description": "Access control list for this feed",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "first": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "$ref": "#/components/schemas/Data"
+                    }
+                  },
+                  "last": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "$ref": "#/components/schemas/Data"
+                    }
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "Number of data points stored by this feed."
+                  }
+                }
+              }
+            }
+          },
+          "unit_type": {
+            "type": "string"
+          },
+          "unit_symbol": {
+            "type": "string"
+          },
+          "history": {
+            "type": "boolean"
+          },
+          "visibility": {
+            "type": "string",
+            "default": "private",
+            "enum": [
+              "private",
+              "public"
+            ]
+          },
+          "license": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "last_value": {
+            "type": "string",
+            "readOnly": true
+          },
+          "status": {
+            "type": "string",
+            "readOnly": true
+          },
+          "status_notify": {
+            "type": "boolean",
+            "description": "Is status notification active?"
+          },
+          "status_timeout": {
+            "type": "integer",
+            "description": "Status notification timeout in minutes."
+          },
+          "created_at": {
+            "type": "string",
+            "readOnly": true
+          },
+          "updated_at": {
+            "type": "string",
+            "readOnly": true
+          }
+        }
+      },
+      "Permission": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "readOnly": true
+          },
+          "user_id": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "scope": {
+            "type": "string",
+            "default": "public",
+            "enum": [
+              "secret",
+              "public",
+              "user",
+              "organization"
+            ]
+          },
+          "scope_value": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string",
+            "default": "feed",
+            "enum": [
+              "feed",
+              "group",
+              "dashboard"
+            ]
+          },
+          "object_id": {
+            "type": "number"
+          },
+          "created_at": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "updated_at": {
+            "readOnly": true,
+            "type": "string"
+          }
+        }
+      },
+      "Data": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "readOnly": true
+          },
+          "value": {
+            "type": "string"
+          },
+          "feed_id": {
+            "type": "number"
+          },
+          "group_id": {
+            "readOnly": true,
+            "type": "number"
+          },
+          "expiration": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          },
+          "ele": {
+            "type": "number"
+          },
+          "completed_at": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "created_at": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "updated_at": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "created_epoch": {
+            "readOnly": true,
+            "type": "number"
+          }
+        }
+      },
+      "DataResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "feed_id": {
+            "type": "number"
+          },
+          "group_id": {
+            "type": "number"
+          },
+          "expiration": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          },
+          "ele": {
+            "type": "number"
+          },
+          "completed_at": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "created_epoch": {
+            "type": "number"
+          }
+        }
+      },
+      "Dashboard": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "blocks": {
+            "type": "array",
+            "readOnly": true,
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            }
+          }
+        }
+      },
+      "Block": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "visual_type": {
+            "type": "string"
+          },
+          "column": {
+            "type": "number"
+          },
+          "row": {
+            "type": "number"
+          },
+          "size_x": {
+            "type": "number"
+          },
+          "size_y": {
+            "type": "number"
+          },
+          "block_feeds": {
+            "type": "array",
+            "readOnly": true,
+            "items": {
+              "$ref": "#/components/schemas/BlockFeed"
+            }
+          }
+        }
+      },
+      "BlockFeed": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "feed": {
+            "$ref": "#/components/schemas/Feed"
+          },
+          "group": {
+            "$ref": "#/components/schemas/Group"
+          }
+        }
+      },
+      "Token": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
+      "Trigger": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "HeaderKey": {
+        "type": "apiKey",
+        "name": "X-AIO-Key",
+        "in": "header"
+      },
+      "QueryKey": {
+        "type": "apiKey",
+        "name": "X-AIO-Key",
+        "in": "query"
+      },
+      "HeaderSignature": {
+        "type": "apiKey",
+        "name": "X-AIO-Signature",
+        "in": "header"
+      }
+    },
+    "parameters": {}
+  },
+  "security": [
+    {
+      "HeaderKey": []
+    },
+    {
+      "HeaderSignature": []
+    },
+    {
+      "QueryKey": []
+    }
+  ]
+}

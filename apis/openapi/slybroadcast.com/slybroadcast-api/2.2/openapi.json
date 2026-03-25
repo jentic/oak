@@ -1,0 +1,248 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Slybroadcast API",
+    "description": "Slybroadcast provides a ringless voicemail delivery service. The API allows sending voicemail campaigns, managing campaigns (pause, resume, stop, cancel), retrieving campaign results and reports, managing audio files, and maintaining a Do Not Dial list. All campaign and management requests go to the /vmb.php endpoint via POST with form data. Different operations are distinguished by the c_option or other parameters in the request body. Requires TLS 1.1 or higher.",
+    "version": "2.2",
+    "contact": {
+      "name": "Slybroadcast",
+      "url": "https://www.slybroadcast.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://www.mobile-sphere.com/gateway",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/vmb.php": {
+      "post": {
+        "operationId": "campaignOperations",
+        "summary": "Campaign Operations",
+        "description": "Unified endpoint for all campaign operations. The operation performed depends on the parameters sent:\n\n- **Send campaign**: Provide c_phone, c_callerID, c_date, and audio source (c_record_audio or c_url+c_audio)\n- **Pause campaign**: Set c_option=pause with session_id\n- **Resume campaign**: Set c_option=run with session_id\n- **Stop campaign**: Set c_option=stop with session_id\n- **Cancel campaign**: Set c_option=cancel with session_id\n- **Get call status**: Set c_option=callstatus with session_id and c_phone\n- **Get campaign results**: Set c_option=campaign_result with session_id\n- **Get campaign reports**: Set c_option=campaign_reports with c_ctype\n- **Get campaigns by date**: Set c_option=campaign_by_date with date\n- **Add to Do Not Dial**: Set c_option=do_not_dial with c_phone\n- **Remove from Do Not Dial**: Set c_option=remove_do_not_dial with c_phone\n- **Get remaining credits**: Set remain_message=1",
+        "tags": ["Campaigns"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["c_uid", "c_password"],
+                "properties": {
+                  "c_uid": {
+                    "type": "string",
+                    "description": "Login email address for authentication."
+                  },
+                  "c_password": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "Account password for authentication."
+                  },
+                  "c_option": {
+                    "type": "string",
+                    "description": "Operation to perform on a campaign or list.",
+                    "enum": [
+                      "pause",
+                      "run",
+                      "stop",
+                      "cancel",
+                      "callstatus",
+                      "campaign_result",
+                      "campaign_reports",
+                      "campaign_by_date",
+                      "do_not_dial",
+                      "remove_do_not_dial"
+                    ]
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "description": "Campaign session ID. Required for pause, run, stop, cancel, callstatus, and campaign_result operations."
+                  },
+                  "c_record_audio": {
+                    "type": "string",
+                    "description": "Name of a previously recorded audio file (case-sensitive). Used when sending a campaign. Provide this OR c_url, not both."
+                  },
+                  "c_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL of an external audio file. Must be URL-encoded. Used when sending a campaign."
+                  },
+                  "c_audio": {
+                    "type": "string",
+                    "description": "Audio file type when using c_url.",
+                    "enum": ["wav", "mp3", "m4a"]
+                  },
+                  "c_phone": {
+                    "type": "string",
+                    "description": "Comma-separated list of phone numbers. For sending: max 10,000 per submission. Also used with callstatus, do_not_dial, and remove_do_not_dial."
+                  },
+                  "c_callerID": {
+                    "type": "string",
+                    "description": "Valid phone number to display as caller ID. Required when sending a campaign."
+                  },
+                  "c_date": {
+                    "type": "string",
+                    "description": "Scheduled date/time in Eastern Time, 24-hour format: YYYY-MM-DD HH:MM:SS. Use 'now' for immediate delivery. Required when sending a campaign."
+                  },
+                  "c_title": {
+                    "type": "string",
+                    "description": "Campaign name for identification."
+                  },
+                  "mobile_only": {
+                    "type": "integer",
+                    "enum": [1],
+                    "description": "Set to 1 to send only to mobile numbers."
+                  },
+                  "c_dispo_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Webhook URL for delivery status callbacks. Endpoint must return 'OK' to acknowledge receipt. Callback format: campaign_id|destination|dispoCode|dispoText|delivery_time|carrier"
+                  },
+                  "c_endtime": {
+                    "type": "string",
+                    "description": "Campaign stop time: YYYY-MM-DD HH:MM:SS (Eastern Time, 24-hour)."
+                  },
+                  "c_ctype": {
+                    "type": "string",
+                    "description": "Campaign type filter for campaign_reports operation.",
+                    "enum": ["running", "paused"]
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Date filter for campaign_by_date operation, format: YYYY-MM-DD."
+                  },
+                  "remain_message": {
+                    "type": "integer",
+                    "enum": [1],
+                    "description": "Set to 1 to retrieve remaining message credits."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation result. Format varies by operation:\n- Send campaign: 'OK session_id=<ID> number of phone=<count>'\n- Campaign results: pipe-delimited lines with Session ID|Call To|Status|Reason|Delivery Time|Carrier\n- Remaining credits: 'remaining messages=<count> pending messages=<count>'\n- Other operations: status text",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vmb.aflist.php": {
+      "post": {
+        "operationId": "listAudioFiles",
+        "summary": "List Audio Files",
+        "description": "Retrieves a list of all uploaded audio files, optionally including duration.",
+        "tags": ["Audio"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["c_uid", "c_password", "c_method"],
+                "properties": {
+                  "c_uid": {
+                    "type": "string",
+                    "description": "Login email address."
+                  },
+                  "c_password": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "Account password."
+                  },
+                  "c_method": {
+                    "type": "string",
+                    "description": "Method to call. get_audio_list returns names only; get_audio_list_with_duration includes duration in seconds.",
+                    "enum": ["get_audio_list", "get_audio_list_with_duration"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "List of audio files.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vmb.dla.php": {
+      "post": {
+        "operationId": "downloadAudioFile",
+        "summary": "Download Audio File",
+        "description": "Downloads a specific audio file by its 5-digit code and system filename.",
+        "tags": ["Audio"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["c_uid", "c_password", "c_audio_code", "c_sys_audio_name"],
+                "properties": {
+                  "c_uid": {
+                    "type": "string",
+                    "description": "Login email address."
+                  },
+                  "c_password": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "Account password."
+                  },
+                  "c_audio_code": {
+                    "type": "string",
+                    "description": "5-digit audio file code."
+                  },
+                  "c_sys_audio_name": {
+                    "type": "string",
+                    "description": "System audio filename."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audio file binary content.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Campaigns",
+      "description": "Send and manage ringless voicemail campaigns, retrieve results, and manage Do Not Dial lists."
+    },
+    {
+      "name": "Audio",
+      "description": "List and download audio files for voicemail campaigns."
+    }
+  ]
+}

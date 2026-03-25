@@ -1,0 +1,399 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Buy-now, Pay-later Loan API",
+    "description": "This OpenAPI description provides an example of a buy-now, pay-later (BNPL) Loan API\n",
+    "version": "1.0.0",
+    "termsOfService": "http://swagger.io/terms/",
+    "contact": {
+      "email": "frank.kilcommins@smartbear.com"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/frank-kilcommins/BNPL-Loans/1.0.0/swagger.json"
+  },
+  "servers": [
+    {
+      "url": "/bnpl/v1",
+      "description": "Default BNPL instance"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Loan Initiation",
+      "description": "Allows a loan to initiated and finalized"
+    }
+  ],
+  "paths": {
+    "/loan-transactions": {
+      "post": {
+        "summary": "Initiate a new loan transaction",
+        "description": "Initiate a new loan based on customer details and in-scope products.\n\nFor the sake of this example:\n\n* There is one error response, defined using the `default` keyword.\n",
+        "tags": [
+          "Loan Initiation"
+        ],
+        "operationId": "createBnplTransaction",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "Properties for the loan. the `enrolledCustomer` and `newCustomer` properties are required to support the two different sources in the calling Arazzo description",
+                "type": "object",
+                "required": [
+                  "products",
+                  "totalAmount"
+                ],
+                "properties": {
+                  "enrolledCustomer": {
+                    "description": "The customer resource URI for a previously enrolled customer",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/CustomerUri"
+                      }
+                    ]
+                  },
+                  "newCustomer": {
+                    "description": "A newly-created customer resource URI for this loan",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/CustomerUri"
+                      }
+                    ]
+                  },
+                  "products": {
+                    "description": "Product codes for products included in loan. Supplied to ensure any special terms are included in loan agreement",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/components/schemas/ProductCode"
+                    }
+                  },
+                  "totalAmount": {
+                    "description": "Loan amount being requested",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/CurrencyAndAmount"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "New loan initiated. This may require authorization before it is finalized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "loanTransactionId",
+                    "links"
+                  ],
+                  "properties": {
+                    "redirectAuthToken": {
+                      "description": "A token that allows the loan to be completed without further authorisation. Is omitted if authentication and authorisation by the End User is required"
+                    },
+                    "loanTransactionId": {
+                      "$ref": "#/components/schemas/LoanTransactionId"
+                    },
+                    "links": {
+                      "type": "object",
+                      "required": [
+                        "self"
+                      ],
+                      "properties": {
+                        "self": {
+                          "description": "Link to this resource",
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/loan-transactions/{loanTransactionId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/loanTransactionId"
+        }
+      ],
+      "get": {
+        "summary": "Retrieve loan",
+        "description": "Retrieve the finalised BNPL loan transaction with all installments",
+        "tags": [
+          "Loan Initiation"
+        ],
+        "operationId": "retrieveBnplLoanTransaction",
+        "responses": {
+          "200": {
+            "description": "Details of the loan transaction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoanTransaction"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/loan-transactions/{loanTransactionId}/status": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/loanTransactionId"
+        }
+      ],
+      "patch": {
+        "summary": "Update loan status",
+        "description": "Update the loan status to indicate order fulfilled and loan is active",
+        "tags": [
+          "Loan Initiation"
+        ],
+        "operationId": "updateBnplLoanTransactionStatus",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "$ref": "#/components/schemas/LoanTransactionStatuses"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Update to status acknowledged and applied to loan transaction"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "loanTransactionId": {
+        "name": "loanTransactionId",
+        "description": "Unique identifier for a given loan agreement",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/LoanTransactionId"
+        }
+      }
+    },
+    "responses": {
+      "ErrorResponse": {
+        "description": "The error response details, encoded in the ProblemDetails format (RFC9457)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "CustomerUri": {
+        "description": "The URI that identifies the customer resource for the loan transaction",
+        "type": "string",
+        "format": "uri"
+      },
+      "LoanTransaction": {
+        "description": "Details of the loan transaction including product codes, total amount and repayment schedule",
+        "type": "object",
+        "required": [
+          "customer",
+          "products",
+          "totalAmount",
+          "paymentSchedule"
+        ],
+        "properties": {
+          "customer": {
+            "description": "Link to customer resource",
+            "type": "string",
+            "format": "uri"
+          },
+          "products": {
+            "description": "List of products and purchase amounts included in BNPL loan transaction",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Products"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/LoanTransactionStatuses"
+          },
+          "totalAmount": {
+            "description": "The total loan amount including interest",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyAndAmount"
+              }
+            ]
+          },
+          "paymentSchedule": {
+            "description": "Schedule of payments for loan repayment",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "paymentDate",
+                "amount",
+                "lastPayment"
+              ],
+              "properties": {
+                "paymentDate": {
+                  "description": "The date on which the payment is due",
+                  "type": "string",
+                  "format": "date"
+                },
+                "amount": {
+                  "description": "The currency and amount due",
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/CurrencyAndAmount"
+                    }
+                  ]
+                },
+                "lastPayment": {
+                  "description": "Indicator of whether this is the last payment that completes the loan repayment",
+                  "type": "boolean",
+                  "default": false
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoanTransactionStatuses": {
+        "description": "Loan transaction status values. Explanation\n\n* Pending: Loan transaction is pending authorisation by the End User\n* Finalised: Loan transaction has been finalised and is awaiting completion\n* Completed: Loan transaction has been issued following completion of order and payments will be collected\n",
+        "type": "string",
+        "enum": [
+          "Pending",
+          "Finalised",
+          "Completed"
+        ]
+      },
+      "LoanTransactionId": {
+        "description": "Type for unique loan identifier",
+        "type": "string"
+      },
+      "ProductCode": {
+        "description": "Product code for loan application. Required for eligibility check",
+        "type": "string"
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "description": "The problem type, expressed as a URI",
+            "type": "string"
+          },
+          "status": {
+            "description": "The HTTP return code generated by the server",
+            "type": "string",
+            "pattern": "^[1-5][0-9]{2}$"
+          },
+          "title": {
+            "description": "The title of the problem, designed to be consumed by humans",
+            "type": "string"
+          },
+          "detail": {
+            "description": "A verbose error message, designed to be consumed by humans",
+            "type": "string"
+          },
+          "instance": {
+            "description": "A URI that identifies a specific occurrence of the problem",
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "CurrencyAndAmount": {
+        "description": "Amount and currency code",
+        "type": "object",
+        "required": [
+          "currency",
+          "amount"
+        ],
+        "properties": {
+          "currency": {
+            "description": "Currency code",
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "amount": {
+            "description": "Amount",
+            "type": "number"
+          }
+        }
+      },
+      "Products": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": [
+            "productCode",
+            "netAmount"
+          ],
+          "properties": {
+            "merchantCategoryCode": {
+              "description": "Merchant category code of merchant. Only required for marketplace eCommerce platforms",
+              "type": "string",
+              "pattern": "^[0-9]{4}$"
+            },
+            "productCode": {
+              "$ref": "#/components/schemas/ProductCode"
+            },
+            "purchaseAmount": {
+              "description": "Product purchase amount and currency code",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/CurrencyAndAmount"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

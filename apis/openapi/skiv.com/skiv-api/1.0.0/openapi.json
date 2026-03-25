@@ -1,0 +1,866 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Skiv API",
+    "version": "1.0.0",
+    "description": "Skiv is a video hosting and AI analysis platform. The API provides endpoints for video upload, management, collections, search, subtitles, audio/image analysis, and more.",
+    "x-jentic-source-url": "https://skiv.com/api"
+  },
+  "servers": [
+    {
+      "url": "https://skiv.com"
+    }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Create key using password",
+        "description": "Authenticate with email and password to get an API key.",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": { "type": "string", "description": "API key" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/auth/keys": {
+      "post": {
+        "operationId": "generateKey",
+        "summary": "Generate new authentication key",
+        "tags": ["Authentication"],
+        "security": [{ "apiKey": [] }],
+        "responses": {
+          "200": {
+            "description": "New key generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/upload": {
+      "post": {
+        "operationId": "uploadVideo",
+        "summary": "Upload video file",
+        "tags": ["Videos"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary", "description": "Video file to upload" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Video uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fid": { "type": "string", "description": "File ID" },
+                    "svid": { "type": "string", "description": "Skiv Video ID" },
+                    "duration": { "type": "number", "description": "Video duration" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/cut": {
+      "post": {
+        "operationId": "cutClip",
+        "summary": "Cut clip from video",
+        "tags": ["Videos"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["svid", "start", "end"],
+                "properties": {
+                  "svid": { "type": "string", "description": "Skiv Video ID" },
+                  "start": { "type": "number", "description": "Start time in seconds" },
+                  "end": { "type": "number", "description": "End time in seconds" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Clip created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Video" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/set/{fid}": {
+      "post": {
+        "operationId": "updateVideoMetadata",
+        "summary": "Update video metadata",
+        "tags": ["Videos"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "fid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "File ID" }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "visibility": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Metadata updated successfully" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/delete/{fid}": {
+      "delete": {
+        "operationId": "deleteVideo",
+        "summary": "Remove video",
+        "tags": ["Videos"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "fid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "File ID" }
+        ],
+        "responses": {
+          "200": { "description": "Video deleted successfully" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/videos": {
+      "get": {
+        "operationId": "listVideos",
+        "summary": "List all videos",
+        "tags": ["Videos"],
+        "security": [{ "apiKey": [] }],
+        "responses": {
+          "200": {
+            "description": "List of videos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Video" }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/videos/{svid}": {
+      "get": {
+        "operationId": "getVideo",
+        "summary": "Get specific video",
+        "tags": ["Videos"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "svid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Skiv Video ID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Video details",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Video" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/set/{fid}/cover": {
+      "post": {
+        "operationId": "setVideoCover",
+        "summary": "Set video thumbnail",
+        "description": "Set thumbnail by timestamp or upload a custom image.",
+        "tags": ["Videos"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "fid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "File ID" }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "t": { "type": "number", "description": "Timestamp for thumbnail" },
+                  "file": { "type": "string", "format": "binary", "description": "Custom thumbnail image" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Cover set successfully" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/subtitles/{svid}": {
+      "post": {
+        "operationId": "uploadSubtitles",
+        "summary": "Upload subtitles",
+        "tags": ["Subtitles"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "svid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["subtitles", "name"],
+                "properties": {
+                  "subtitles": { "type": "string", "format": "binary" },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subtitles uploaded",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" } } } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "get": {
+        "operationId": "listSubtitles",
+        "summary": "List subtitle files",
+        "tags": ["Subtitles"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "svid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map of subtitle IDs to names",
+            "content": { "application/json": { "schema": { "type": "object", "additionalProperties": { "type": "string" } } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/subtitles/{svid}/{id}": {
+      "get": {
+        "operationId": "downloadSubtitle",
+        "summary": "Download subtitle file",
+        "tags": ["Subtitles"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "svid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "VTT/SRT subtitle content", "content": { "text/plain": { "schema": { "type": "string" } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/subtitles/{svid}/{id}/set": {
+      "post": {
+        "operationId": "updateSubtitle",
+        "summary": "Update subtitle metadata",
+        "tags": ["Subtitles"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "svid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "name": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Subtitle updated" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/subtitles/{svid}/{id}/delete": {
+      "post": {
+        "operationId": "deleteSubtitle",
+        "summary": "Remove subtitles",
+        "tags": ["Subtitles"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "svid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Subtitle deleted" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/collections": {
+      "get": {
+        "operationId": "listCollections",
+        "summary": "List all collections",
+        "tags": ["Collections"],
+        "security": [{ "apiKey": [] }],
+        "responses": {
+          "200": {
+            "description": "List of collections",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Collection" } } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "post": {
+        "operationId": "createCollection",
+        "summary": "Create collection",
+        "tags": ["Collections"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "visibility": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Collection created",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "scid": { "type": "string" } } } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/collections/{scid}": {
+      "get": {
+        "operationId": "getCollection",
+        "summary": "Get specific collection",
+        "tags": ["Collections"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "scid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection details",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Collection" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCollection",
+        "summary": "Delete collection",
+        "tags": ["Collections"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "scid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Collection deleted" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/collections/{scid}/move": {
+      "post": {
+        "operationId": "moveCollection",
+        "summary": "Move collection",
+        "tags": ["Collections"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "scid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "scid": { "type": "string", "description": "Parent collection ID" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Collection moved", "content": { "application/json": { "schema": { "type": "object", "properties": { "path": { "type": "string" } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/collections/{scid}/add": {
+      "post": {
+        "operationId": "addVideoToCollection",
+        "summary": "Add video to collection",
+        "tags": ["Collections"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "scid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["svid"],
+                "properties": { "svid": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Video added to collection" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/files/collections/{scid}/{svid}": {
+      "delete": {
+        "operationId": "removeVideoFromCollection",
+        "summary": "Remove video from collection",
+        "tags": ["Collections"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "scid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "svid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Video removed from collection" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "operationId": "searchVideos",
+        "summary": "Search user's videos",
+        "tags": ["Search"],
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Search query" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SearchResult" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/search/channel/{id}": {
+      "get": {
+        "operationId": "searchChannel",
+        "summary": "Search public channel",
+        "tags": ["Search"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Search results", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SearchResult" } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/search/collection/{scid}": {
+      "get": {
+        "operationId": "searchCollection",
+        "summary": "Search public collection",
+        "tags": ["Search"],
+        "parameters": [
+          { "name": "scid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Search results", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SearchResult" } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/search/video/{svid}": {
+      "get": {
+        "operationId": "searchWithinVideo",
+        "summary": "Search within video",
+        "tags": ["Search"],
+        "parameters": [
+          { "name": "svid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Search results", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SearchResult" } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/speech": {
+      "post": {
+        "operationId": "transcribeAudio",
+        "summary": "Transcribe audio/video to text",
+        "tags": ["Audio Analysis"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Transcription result", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "transcript": { "type": "string" } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/align": {
+      "post": {
+        "operationId": "alignTranscript",
+        "summary": "Align transcript with audio timing",
+        "tags": ["Audio Analysis"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": { "type": "object", "required": ["file", "phrase"], "properties": { "file": { "type": "string", "format": "binary" }, "phrase": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Alignment result", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "words": { "type": "array", "items": { "type": "object" } } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/sounds": {
+      "post": {
+        "operationId": "identifySounds",
+        "summary": "Identify sound types",
+        "tags": ["Audio Analysis"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } } } }
+        },
+        "responses": {
+          "200": { "description": "Sound identification result", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "sounds": { "type": "array", "items": { "type": "object" } } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/faces": {
+      "post": {
+        "operationId": "detectFaces",
+        "summary": "Detect and cluster faces",
+        "tags": ["Image Analysis"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } } } }
+        },
+        "responses": {
+          "200": { "description": "Face detection result", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "faces": { "type": "array", "items": { "type": "object" } } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/faces/db": {
+      "get": {
+        "operationId": "listFaceDatabase",
+        "summary": "List face database",
+        "tags": ["Image Analysis"],
+        "security": [{ "apiKey": [] }],
+        "responses": {
+          "200": { "description": "Face database", "content": { "application/json": { "schema": { "type": "object", "properties": { "detected": { "type": "array", "items": { "type": "object" } }, "deleted": { "type": "array", "items": { "type": "object" } }, "ignored": { "type": "array", "items": { "type": "object" } } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/faces/modify": {
+      "post": {
+        "operationId": "modifyFace",
+        "summary": "Update face labels/status",
+        "tags": ["Image Analysis"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "face_id": { "type": "string" },
+                  "label": { "type": "string" },
+                  "delete": { "type": "boolean" },
+                  "ignore": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Face modified" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/objects": {
+      "post": {
+        "operationId": "recognizeObjects",
+        "summary": "Recognize objects in image",
+        "tags": ["Image Analysis"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } } } } },
+        "responses": {
+          "200": { "description": "Object recognition result", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "objects": { "type": "array", "items": { "type": "object" } } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/text": {
+      "post": {
+        "operationId": "extractText",
+        "summary": "Extract text from image (OCR)",
+        "tags": ["Image Analysis"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } } } } },
+        "responses": {
+          "200": { "description": "OCR result", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "text": { "type": "string" } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/colors": {
+      "post": {
+        "operationId": "identifyColors",
+        "summary": "Identify colors in image",
+        "tags": ["Image Analysis"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } } } } },
+        "responses": {
+          "200": { "description": "Color identification result", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "colors": { "type": "array", "items": { "type": "object" } } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/actions": {
+      "post": {
+        "operationId": "recognizeActions",
+        "summary": "Recognize video actions",
+        "tags": ["Motion Analysis"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } } } } },
+        "responses": {
+          "200": { "description": "Action recognition result", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "actions": { "type": "array", "items": { "type": "object" } } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/scenes": {
+      "post": {
+        "operationId": "detectScenes",
+        "summary": "Detect scene boundaries",
+        "tags": ["Motion Analysis"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["file"], "properties": { "file": { "type": "string", "format": "binary" } } } } } },
+        "responses": {
+          "200": { "description": "Scene detection result", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "scenes": { "type": "array", "items": { "type": "object" } } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/concepts": {
+      "post": {
+        "operationId": "findConcepts",
+        "summary": "Find related concepts",
+        "tags": ["Concepts"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["query"], "properties": { "query": { "type": "string" } } } } }
+        },
+        "responses": {
+          "200": { "description": "Related concepts", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "array", "items": { "type": "string" } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/sense": {
+      "post": {
+        "operationId": "analyzeSentiment",
+        "summary": "Sentiment analysis",
+        "tags": ["Concepts"],
+        "security": [{ "apiKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "text/plain": { "schema": { "type": "string" } } }
+        },
+        "responses": {
+          "200": { "description": "Sentiment analysis result", "content": { "application/json": { "schema": { "type": "object", "properties": { "positive": { "type": "number" }, "negative": { "type": "number" }, "total": { "type": "number" } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Video": {
+        "type": "object",
+        "properties": {
+          "fid": { "type": "string", "description": "File ID" },
+          "svid": { "type": "string", "description": "Skiv Video ID" },
+          "title": { "type": "string" },
+          "duration": { "type": "number" },
+          "visibility": { "type": "string" }
+        }
+      },
+      "Collection": {
+        "type": "object",
+        "properties": {
+          "scid": { "type": "string", "description": "Skiv Collection ID" },
+          "name": { "type": "string" },
+          "visibility": { "type": "string" },
+          "path": { "type": "string" }
+        }
+      },
+      "SearchResult": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "description": "Array of [svid, [timestamps]] pairs"
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["error"] },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Key",
+        "description": "API key obtained via login or key generation"
+      }
+    }
+  },
+  "security": [
+    { "apiKey": [] }
+  ]
+}

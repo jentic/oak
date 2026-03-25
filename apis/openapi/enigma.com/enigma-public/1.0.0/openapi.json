@@ -1,0 +1,1223 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Enigma Public API",
+    "description": "Enigma provides the broadest collection of public data, enabling businesses to match, identify, verify, and screen U.S. businesses using comprehensive public records. The API supports business matching, profile retrieval, Know Your Business (KYB) verification, and sanctions screening.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Enigma Technologies",
+      "url": "https://enigma.com"
+    },
+    "x-jentic-source-url": "https://developers.enigma.com/docs"
+  },
+  "servers": [
+    {
+      "url": "https://api.enigma.com",
+      "description": "Enigma API production server"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Match",
+      "description": "Match businesses against Enigma's database to find unique identifiers"
+    },
+    {
+      "name": "Lookup",
+      "description": "Retrieve detailed business profile data by Enigma ID"
+    },
+    {
+      "name": "KYB",
+      "description": "Know Your Business verification including legal entity checks and risk assessment"
+    },
+    {
+      "name": "Screening",
+      "description": "Sanctions and watchlist screening for entities and persons"
+    }
+  ],
+  "paths": {
+    "/businesses/match": {
+      "post": {
+        "operationId": "matchBusiness",
+        "summary": "Match a business",
+        "description": "Match a business or business location against Enigma's database using name, address, person, or website information. Returns matched entities with confidence scores.",
+        "tags": ["Match"],
+        "parameters": [
+          {
+            "name": "business_entity_type",
+            "in": "query",
+            "description": "Type of business entity to match against",
+            "schema": {
+              "type": "string",
+              "enum": ["business", "business_location"],
+              "default": "business_location"
+            }
+          },
+          {
+            "name": "match_threshold",
+            "in": "query",
+            "description": "Minimum confidence score (0-1) for a result to be considered a match",
+            "schema": {
+              "type": "number",
+              "format": "float",
+              "default": 0.5,
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          {
+            "name": "top_n",
+            "in": "query",
+            "description": "Number of top matches to return",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "show_non_matches",
+            "in": "query",
+            "description": "Set to 1 to include results below the match threshold",
+            "schema": {
+              "type": "integer",
+              "enum": [0, 1],
+              "default": 0
+            }
+          },
+          {
+            "name": "prioritization",
+            "in": "query",
+            "description": "Set to MTX to prioritize results with Merchant Transaction Signals revenue data",
+            "schema": {
+              "type": "string",
+              "enum": ["MTX"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful match response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/businesses/{id}": {
+      "get": {
+        "operationId": "getBusinessById",
+        "summary": "Get business by Enigma ID",
+        "description": "Retrieve detailed profile data for a business or business location using its Enigma ID. For large payloads, the API may perform a 302 redirect to a pre-signed S3 URL.",
+        "tags": ["Lookup"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The Enigma ID obtained from a match response",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attrs",
+            "in": "query",
+            "description": "Comma-separated list of desired attributes to include in the response. By default, basic attributes are returned.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lookback_months",
+            "in": "query",
+            "description": "For time-series attributes (Merchant Transaction Signals), requests historical data from Jan 2017 onward. Set to an integer for specific months, or '*' for maximum available.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Business profile data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessProfile"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirect to pre-signed S3 URL for large payloads"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/v1/kyb/": {
+      "post": {
+        "operationId": "verifyBusiness",
+        "summary": "Know Your Business verification",
+        "description": "Perform KYB verification on a business, including legal entity matching, registration status checks, and optional sanctions/watchlist screening. Returns risk ratings, verification task results, and matched entity data.",
+        "tags": ["KYB"],
+        "parameters": [
+          {
+            "name": "package",
+            "in": "query",
+            "description": "Verification package type",
+            "schema": {
+              "type": "string",
+              "enum": ["identify", "verify"],
+              "default": "verify"
+            }
+          },
+          {
+            "name": "attrs",
+            "in": "query",
+            "description": "Comma-delimited additional attributes to include: watchlist, tin_verification, ssn_verification, business_bankruptcy",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "match_threshold",
+            "in": "query",
+            "description": "Minimum match confidence (0-1)",
+            "schema": {
+              "type": "number",
+              "format": "float",
+              "default": 0.5,
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          {
+            "name": "top_n",
+            "in": "query",
+            "description": "Number of matches to return",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KybRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "KYB verification results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KybResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/evaluation/sanctions/screen": {
+      "post": {
+        "operationId": "screenSanctions",
+        "summary": "Screen entities against sanctions watchlists",
+        "description": "Screen persons or organizations against sanctions and watchlist databases. Supports both structured entity searches and unstructured text searches.",
+        "tags": ["Screening"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreeningRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Screening results with hit scores and alert status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreeningResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "API key for authenticating requests. Obtain from your Enigma developer account."
+      }
+    },
+    "schemas": {
+      "Address": {
+        "type": "object",
+        "properties": {
+          "street_address1": {
+            "type": "string",
+            "description": "Primary street address"
+          },
+          "street_address2": {
+            "type": "string",
+            "description": "Secondary street address (suite, floor, etc.)"
+          },
+          "city": {
+            "type": "string",
+            "description": "City name"
+          },
+          "state": {
+            "type": "string",
+            "description": "State abbreviation"
+          },
+          "postal_code": {
+            "type": "string",
+            "description": "ZIP or postal code"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country code"
+          }
+        }
+      },
+      "Person": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "description": "Person's first name"
+          },
+          "last_name": {
+            "type": "string",
+            "description": "Person's last name"
+          },
+          "ssn": {
+            "type": "string",
+            "description": "9-digit Social Security Number (KYB only)"
+          }
+        }
+      },
+      "MatchRequest": {
+        "type": "object",
+        "description": "Business match request. At least two of name, address, or person are required for location matching. Website alone is valid for business matching.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Business name"
+          },
+          "person": {
+            "$ref": "#/components/schemas/Person"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "website": {
+            "type": "string",
+            "description": "Business website URL (only valid for business entity type, not business_location)"
+          }
+        }
+      },
+      "MatchResult": {
+        "type": "object",
+        "properties": {
+          "enigma_id": {
+            "type": "string",
+            "description": "Unique Enigma identifier for the matched business or location"
+          },
+          "match_confidence": {
+            "type": "number",
+            "format": "float",
+            "description": "Confidence score between 0 and 1"
+          },
+          "is_matched": {
+            "type": "boolean",
+            "description": "Whether the match exceeds the threshold"
+          },
+          "matched_fields": {
+            "type": "object",
+            "description": "Map of which input fields matched"
+          },
+          "business_location_enigma_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of associated location IDs (business match only)"
+          }
+        }
+      },
+      "MatchResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchResult"
+            }
+          }
+        }
+      },
+      "BusinessProfile": {
+        "type": "object",
+        "properties": {
+          "enigma_id": {
+            "type": "string",
+            "description": "Unique Enigma identifier"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Known business names"
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Known business addresses"
+          },
+          "websites": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Known website URLs"
+          },
+          "business_location_enigma_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Associated location Enigma IDs"
+          },
+          "data_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Sources that contributed to this profile"
+          },
+          "industries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Industry"
+            },
+            "description": "Industry classifications"
+          }
+        }
+      },
+      "Industry": {
+        "type": "object",
+        "properties": {
+          "classification_code": {
+            "type": "string",
+            "description": "Industry classification code (e.g., NAICS, SIC)"
+          },
+          "classification_description": {
+            "type": "string",
+            "description": "Human-readable classification description"
+          },
+          "classification_type": {
+            "type": "string",
+            "description": "Type of classification system"
+          }
+        }
+      },
+      "KybRequest": {
+        "type": "object",
+        "description": "KYB verification request. Supports both standard and multiple-query formats. At least two of name, address, or person are required.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Business name"
+          },
+          "website": {
+            "type": "string",
+            "description": "Business website URL"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "tin": {
+            "type": "string",
+            "description": "9-digit Tax Identification Number"
+          },
+          "person": {
+            "$ref": "#/components/schemas/Person"
+          },
+          "persons_to_screen": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "$ref": "#/components/schemas/PersonToScreen"
+            },
+            "description": "Additional persons to screen against watchlists"
+          },
+          "data": {
+            "$ref": "#/components/schemas/KybMultiQueryData"
+          }
+        }
+      },
+      "KybMultiQueryData": {
+        "type": "object",
+        "description": "Multiple-query format allowing arrays of inputs",
+        "properties": {
+          "names": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "string"
+            }
+          },
+          "addresses": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          "persons": {
+            "type": "array",
+            "maxItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Person"
+            }
+          },
+          "websites": {
+            "type": "array",
+            "maxItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "tins": {
+            "type": "array",
+            "maxItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "persons_to_screen": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "$ref": "#/components/schemas/PersonToScreen"
+            }
+          }
+        }
+      },
+      "PersonToScreen": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "date_of_birth": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of birth in YYYY-MM-DD format"
+          }
+        }
+      },
+      "KybResponse": {
+        "type": "object",
+        "properties": {
+          "response_id": {
+            "type": "string",
+            "description": "Unique response identifier"
+          },
+          "risk_summary": {
+            "$ref": "#/components/schemas/RiskSummary"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "best_match": {
+                "$ref": "#/components/schemas/KybBestMatch"
+              },
+              "legal_entities": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/LegalEntity"
+                }
+              },
+              "brands": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Brand"
+                }
+              },
+              "watchlists": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WatchlistMatch"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RiskSummary": {
+        "type": "object",
+        "properties": {
+          "overall_risk_rating": {
+            "type": "string",
+            "enum": ["high", "low"]
+          },
+          "legal_existence_risk_rating": {
+            "type": "string",
+            "enum": ["high", "low"]
+          },
+          "activity_risk_rating": {
+            "type": "string",
+            "enum": ["high", "low"]
+          },
+          "watchlist_risk_rating": {
+            "type": "string",
+            "enum": ["high", "low"]
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationTask"
+            }
+          }
+        }
+      },
+      "VerificationTask": {
+        "type": "object",
+        "properties": {
+          "task_name": {
+            "type": "string",
+            "description": "Name of the verification task"
+          },
+          "status": {
+            "type": "string",
+            "description": "Task execution status"
+          },
+          "result": {
+            "type": "string",
+            "description": "Task result"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Explanation for the result"
+          }
+        }
+      },
+      "KybBestMatch": {
+        "type": "object",
+        "properties": {
+          "match_confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "matched_fields": {
+            "type": "object"
+          }
+        }
+      },
+      "LegalEntity": {
+        "type": "object",
+        "properties": {
+          "enigma_id": {
+            "type": "string"
+          },
+          "data_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "match_confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "matched_fields": {
+            "type": "object"
+          },
+          "registrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Registration"
+            }
+          }
+        }
+      },
+      "Registration": {
+        "type": "object",
+        "properties": {
+          "issue_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "registration_state": {
+            "type": "string"
+          },
+          "file_number": {
+            "type": "string"
+          },
+          "registered_name": {
+            "type": "string"
+          },
+          "jurisdiction_type": {
+            "type": "string",
+            "enum": ["domestic", "foreign"]
+          },
+          "home_jurisdiction_state": {
+            "type": "string"
+          },
+          "standardized_status": {
+            "type": "string",
+            "enum": ["active", "inactive"]
+          },
+          "registration_status": {
+            "type": "string"
+          },
+          "status": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "sub_status": {
+                "type": "string"
+              },
+              "status_detail": {
+                "type": "string"
+              }
+            }
+          },
+          "persons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "full_name": {
+                  "type": "string"
+                },
+                "titles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TypedAddress"
+            }
+          }
+        }
+      },
+      "TypedAddress": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Address type (e.g., mailing, registered)"
+          },
+          "street_address1": {
+            "type": "string"
+          },
+          "street_address2": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "postal_code": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          }
+        }
+      },
+      "Brand": {
+        "type": "object",
+        "properties": {
+          "enigma_id": {
+            "type": "string"
+          },
+          "data_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "match_confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "matched_fields": {
+            "type": "object"
+          },
+          "activities": {
+            "type": "object",
+            "properties": {
+              "compliance_risk_level": {
+                "type": "string"
+              },
+              "activity_types": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          "industries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Industry"
+            }
+          },
+          "websites": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "WatchlistMatch": {
+        "type": "object",
+        "properties": {
+          "enigma_id": {
+            "type": "string"
+          },
+          "match_confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "matched_fields": {
+            "type": "object"
+          },
+          "watchlist_entity": {
+            "type": "object",
+            "properties": {
+              "watchlist_name": {
+                "type": "string"
+              },
+              "entity_type": {
+                "type": "string",
+                "enum": ["organization", "person"]
+              },
+              "full_name": {
+                "type": "string"
+              },
+              "organization_name": {
+                "type": "string"
+              },
+              "dob": {
+                "type": "string",
+                "format": "date"
+              },
+              "full_address": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ScreeningRequest": {
+        "type": "object",
+        "required": ["tag", "query_type", "searches"],
+        "properties": {
+          "tag": {
+            "type": "string",
+            "description": "Description associated with the entire request"
+          },
+          "caller_id": {
+            "type": "string",
+            "description": "Hostname info for troubleshooting"
+          },
+          "query_type": {
+            "type": "string",
+            "description": "Must reference an existing query type",
+            "default": "enigma_data"
+          },
+          "configuration_overrides": {
+            "$ref": "#/components/schemas/ScreeningConfigOverrides"
+          },
+          "searches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScreeningSearch"
+            },
+            "description": "List of searches to perform"
+          }
+        }
+      },
+      "ScreeningConfigOverrides": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "object",
+            "properties": {
+              "alert_threshold": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "hit_threshold": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "max_results": {
+                "type": "integer"
+              },
+              "weights": {
+                "type": "object",
+                "properties": {
+                  "person_name": { "type": "number" },
+                  "dob": { "type": "number" },
+                  "country_of_affiliation": { "type": "number" },
+                  "address": { "type": "number" },
+                  "org_name": { "type": "number" }
+                }
+              }
+            }
+          },
+          "general": {
+            "type": "object",
+            "properties": {
+              "archive_retention_days": { "type": "integer" },
+              "entity_detail_level": { "type": "string" },
+              "overrides_on": { "type": "boolean" }
+            }
+          },
+          "list_groups": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "text": {
+            "type": "object",
+            "properties": {
+              "alert_threshold": { "type": "number" },
+              "hit_threshold": { "type": "number" }
+            }
+          }
+        }
+      },
+      "ScreeningSearch": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["ENTITY", "TEXT"],
+            "description": "Type of search"
+          },
+          "tag": {
+            "type": "string",
+            "description": "Tag to associate with this specific search"
+          },
+          "entity_description": {
+            "type": "object",
+            "description": "For ENTITY type searches",
+            "properties": {
+              "person_name": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "dob": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Dates of birth in YYYYMMDD format"
+              },
+              "country_of_affiliation": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "address": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "org_name": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "Free-text query for TEXT type searches"
+          }
+        }
+      },
+      "ScreeningResponse": {
+        "type": "object",
+        "properties": {
+          "alert": {
+            "type": "boolean",
+            "description": "Whether any search triggered an alert"
+          },
+          "caller_id": {
+            "type": "string"
+          },
+          "configuration_used": {
+            "type": "object",
+            "description": "Full configuration applied to this screening"
+          },
+          "query_type": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Server-generated request identifier"
+          },
+          "request_timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "search_results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchResult"
+            }
+          }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "alert": {
+            "type": "boolean"
+          },
+          "hits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScreeningHit"
+            }
+          },
+          "search_index": {
+            "type": "integer"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["ENTITY", "TEXT"]
+          }
+        }
+      },
+      "ScreeningHit": {
+        "type": "object",
+        "properties": {
+          "alert": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": "number",
+            "description": "Weighted average match score"
+          },
+          "attributes": {
+            "type": "object",
+            "description": "Scored attribute matches"
+          },
+          "attributes_used": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "entity": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "view_ids": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error", "message"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error type identifier"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message"
+          },
+          "status": {
+            "type": "integer",
+            "description": "HTTP status code"
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request - invalid or missing parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized - missing or invalid API key",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  }
+}

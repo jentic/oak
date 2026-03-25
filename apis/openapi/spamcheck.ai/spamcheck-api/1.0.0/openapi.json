@@ -1,0 +1,552 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SpamCheckAI: Spam Filter API",
+    "description": "This SpamCheckAI API provides a comprehensive and multifaceted spam detection service designed to maintain the integrity of user-generated content across various platforms.\n\nThe primary functionalities include:\n\n- **IP Spam Check:** This feature scrutinizes the originating IP address of a submission for associations with known spam activities. By leveraging our extensive spam source database, we can help you identify and block potential spam attacks originating from recurring sources. The key services under this feature include:\n\n    - **Block List Check**: Reviews top block list sources.\n\n    - **GeoIP:** Incorporates both Country and City GeoIP location information. This service enables the identification of geographic origin of the IP, allowing the identification of potential patterns or trends in spam activities. This product includes GeoLite2 data created by [MaxMind](https://www.maxmind.com).\n\n- **Email Validation and Spam Check:** This process includes a comprehensive check on the email used in the submission to ensure its validity and check for any associations with spam activities. Our process involves several stages:\n\n  - **Block List Check**: Reviews top block list sources.\n\n  - **Syntax Verification:** Initially, we perform a check on the syntax of the email. This checks for adherence to standard email formatting rules, such as presence of '@' symbol, valid domain suffixes, etc.\n\n  - **Domain/MX Records Check:** Post syntax verification, we validate the domain of the email address. This involves a DNS lookup to ensure that the domain exists and is set up to receive emails (MX records exist).\n\n  - **Email Validation Method:** A new parameter `email_validation_method` is introduced to control the type of email validation. The allowed values are `mx` and `smtp`. If not provided, the default is `mx`.\n\n  - **SMTP Validation:** The final stage of the validation process is the SMTP check. This stage is optional and can be slow. We interact with the mail server to verify that the specific email address exists within the server and can receive emails. This is done without sending an actual email, preserving the privacy and avoiding any disturbances to the recipient.\n\n  Through these multi-stage checks, we ensure that not only the submitted emails are legitimate, but also have no history of spam-related activities.\n\n- **Content Analysis:** Applies several spam-detection mechanisms on the submitted content:\n\n    - **AI Spam Detection:** Leverages advanced AI models to analyze content and identify spam patterns. The system uses state-of-the-art language models for accurate spam classification.\n\n    - **URL Analysis:** Checks for the presence of risky or short URLs, assessing their potential risk level.\n\n    - **Profanity Check:** Identifies the usage of explicit language within the content.\n\n    - **Language Detection:** Recognizes the language used in the content, supporting multilingual spam detection. The detection is performed using Google's CLD3 (Compact Language Detector 3), a neural network model for language identification. The system returns ISO 639-3 codes (three-letter codes) for detected languages along with probability scores, and can identify multiple languages within the same content.\n\n- **Lead Scoring (NEW):** Our advanced lead scoring system combines the power of modern AI, classical machine learning, and proven heuristics to evaluate lead quality:\n\n    - **Modern AI Analysis:** Leverages state-of-the-art language models to understand context, intent, and engagement quality in submissions.\n\n    - **Classical ML Features:** Incorporates traditional machine learning techniques including spam detection scores, email validation results, and geographic risk assessment.\n\n    - **Heuristic Rules:** Applies proven business logic and domain expertise to evaluate factors like company information, specific product interest, and professional communication patterns.\n\n    - **Contextual Scoring:** Provides business-context-aware scoring by considering your specific industry, target audience, and lead qualification criteria.\n\n    - **Comprehensive Evaluation:** Analyzes multiple dimensions including content quality, sender credibility, engagement signals, and business relevance to generate a 0-100 lead quality score.\n\n    To enable lead scoring, include both `context` (your business context) and `score_threshold` (minimum acceptable score) parameters in your request. The system will return detailed scoring results including the quality score, reasoning, and whether the lead meets your threshold criteria.\n\nThe strength of this API lies in its multifaceted approach to spam detection, examining various elements of a content submission (including the sender's IP, email, and the content itself) to accurately identify and block spam. This API is an invaluable tool for platforms with user-generated content, such as forums, comment sections, and more, enabling them to automate and enhance their spam filtering mechanisms and thereby improving overall user experience.\n\nFor all your API calls, remember to use the base [https://api.spamcheck.ai](https://api.spamcheck.ai)!",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.spamcheck.ai/api/v1"
+    }
+  ],
+  "paths": {
+    "/spam/check": {
+      "post": {
+        "tags": [
+          "Spam Check"
+        ],
+        "summary": "Check if json is spam",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpamCheck"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The SpamCheckAI response is broken into the sections IP, email, and content. A spam score greater than 0.5 indicates spam.\n\nA true result for IP, email, risky_urls, or content spam should be considered spam.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpamCheckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Invalid parameters provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Email parameter must be a string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing API key"
+          },
+          "429": {
+            "description": "Too Many Requests - Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/spam_reports": {
+      "get": {
+        "tags": [
+          "Spam Report"
+        ],
+        "summary": "Retrieve all spam reports",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "description": "The page number",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An array of spam reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SpamReport"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Spam Report"
+        ],
+        "summary": "Create a new spam report",
+        "description": "Creates a spam report to flag false positives or false negatives. The result and desired_outcome must be different (e.g., result=true/desired_outcome=false for a false positive).",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpamReportCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The spam report response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpamReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error (e.g., result and desired_outcome are the same)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Spam Report"
+        ],
+        "summary": "Delete a spam report",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "description": "The ID of the spam report to delete",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The spam report was deleted"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Api-Key"
+      }
+    },
+    "schemas": {
+      "SpamCheck": {
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "properties": {
+          "ip": {
+            "type": "string",
+            "description": "IP address of the sender (must be a valid IPv4 or IPv6 address string)",
+            "example": "192.168.1.1"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address to validate (must be a string)",
+            "example": "user@example.com"
+          },
+          "email_validation_method": {
+            "type": "string",
+            "enum": [
+              "mx",
+              "smtp"
+            ],
+            "description": "The method to use for email validation. Defaults to 'mx'."
+          },
+          "body": {
+            "type": "object",
+            "description": "The content to be checked for spam. Can contain any JSON object with form fields or message content."
+          },
+          "context": {
+            "type": "string",
+            "description": "Business context for lead scoring. When provided along with score_threshold, enables lead scoring functionality.",
+            "example": "We are a B2B SaaS company targeting enterprise customers with teams of 10+ developers"
+          },
+          "score_threshold": {
+            "type": "integer",
+            "description": "Minimum score threshold for lead scoring (0-100). When provided along with context, enables lead scoring functionality.",
+            "minimum": 0,
+            "maximum": 100,
+            "example": 70
+          }
+        }
+      },
+      "SpamCheckResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "ip",
+          "email",
+          "content",
+          "mark_as_incorrect"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The unique identifier of the spam check response"
+          },
+          "ip": {
+            "$ref": "#/components/schemas/IPBlock"
+          },
+          "email": {
+            "$ref": "#/components/schemas/EmailBlock"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ContentBlock"
+          },
+          "lead_score": {
+            "$ref": "#/components/schemas/LeadScoreBlock"
+          },
+          "mark_as_incorrect": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to mark the log as incorrect"
+          }
+        }
+      },
+      "SpamReportCreate": {
+        "type": "object",
+        "required": [
+          "body",
+          "result",
+          "desired_outcome"
+        ],
+        "properties": {
+          "ip": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          },
+          "result": {
+            "type": "boolean",
+            "description": "The actual spam check result (true=spam, false=ham)"
+          },
+          "desired_outcome": {
+            "type": "boolean",
+            "description": "The desired outcome (true=spam, false=ham). Must be different from result."
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "SpamReport": {
+        "type": "object",
+        "required": [
+          "id",
+          "ip",
+          "email",
+          "body",
+          "result",
+          "desired_outcome",
+          "notes",
+          "external_metadata"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The unique identifier of the spam report"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          },
+          "result": {
+            "type": "boolean"
+          },
+          "desired_outcome": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "external_metadata": {
+            "type": "object"
+          }
+        }
+      },
+      "IPBlock": {
+        "type": "object",
+        "properties": {
+          "blocked": {
+            "$ref": "#/components/schemas/BlockedData"
+          }
+        }
+      },
+      "BlockedData": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EmailBlock": {
+        "type": "object",
+        "properties": {
+          "blocked": {
+            "$ref": "#/components/schemas/BlockedData"
+          },
+          "mx_valid": {
+            "$ref": "#/components/schemas/MXValidData"
+          },
+          "regex_valid": {
+            "$ref": "#/components/schemas/RegexValidData"
+          },
+          "smtp_valid": {
+            "$ref": "#/components/schemas/SmtpValidData"
+          }
+        }
+      },
+      "MXValidData": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "boolean",
+            "description": "Validity of the MX record"
+          }
+        }
+      },
+      "RegexValidData": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "boolean",
+            "description": "Validity according to regex pattern"
+          }
+        }
+      },
+      "SmtpValidData": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "boolean",
+            "description": "Validity according to SMTP validation"
+          }
+        }
+      },
+      "ContentBlock": {
+        "type": "object",
+        "properties": {
+          "spam": {
+            "$ref": "#/components/schemas/SpamData"
+          },
+          "risky_urls": {
+            "$ref": "#/components/schemas/RiskyUrlsData"
+          },
+          "short_urls": {
+            "$ref": "#/components/schemas/ShortUrlsData"
+          },
+          "redirect_urls": {
+            "$ref": "#/components/schemas/RedirectUrlsData"
+          },
+          "profanity": {
+            "$ref": "#/components/schemas/ProfanityData"
+          },
+          "language": {
+            "$ref": "#/components/schemas/LanguageData"
+          }
+        }
+      },
+      "SpamData": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "RiskyUrlsData": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "keyword_counts": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ShortUrlsData": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RedirectUrlsData": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProfanityData": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "LanguageData": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "LeadScoreBlock": {
+        "type": "object",
+        "description": "Lead scoring results. Only present when both context and score_threshold parameters are provided.",
+        "properties": {
+          "above_threshold": {
+            "type": "object",
+            "properties": {
+              "result": {
+                "type": "boolean",
+                "description": "True if the lead score is equal to or above the threshold (indicating quality lead), false if below threshold or on error"
+              }
+            }
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "integer",
+                "description": "Lead score from 0-100, with higher scores indicating better quality leads"
+              },
+              "reasoning": {
+                "type": "string",
+                "description": "AI-generated reasoning explaining the lead score"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Sign up for your own API key",
+    "url": "https://spamcheck.ai/"
+  }
+}

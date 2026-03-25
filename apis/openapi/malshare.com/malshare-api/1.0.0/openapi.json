@@ -1,0 +1,406 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MalShare API",
+    "description": "MalShare is a free malware repository providing researchers access to samples, hashes, and sources. The API allows searching, downloading, and uploading malware samples.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "MalShare",
+      "url": "https://malshare.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://malshare.com",
+      "description": "MalShare API"
+    }
+  ],
+  "paths": {
+    "/api.php": {
+      "get": {
+        "operationId": "apiAction",
+        "summary": "Perform API actions",
+        "description": "Main API endpoint. The 'action' parameter determines the operation performed.",
+        "parameters": [
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": true,
+            "description": "Your MalShare API key.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": true,
+            "description": "The API action to perform.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "getlist",
+                "getlistraw",
+                "getsources",
+                "getfile",
+                "details",
+                "hashlookup",
+                "type_filter",
+                "search",
+                "getsearchresult",
+                "getlimit",
+                "download"
+              ]
+            }
+          },
+          {
+            "name": "hash",
+            "in": "query",
+            "required": false,
+            "description": "MD5, SHA1, or SHA256 hash. Used with actions: getfile, details, hashlookup, download.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "description": "File type to filter by (e.g., 'PE32', 'PDF'). Used with action: type_filter.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "description": "Search query string. Used with action: search.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search_id",
+            "in": "query",
+            "required": false,
+            "description": "Search ID returned from a previous search action. Used with action: getsearchresult.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response. Format varies by action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SampleList"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SampleDetails"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SourceList"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HashLookupResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ApiLimit"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SearchResult"
+                    }
+                  ]
+                }
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Raw malware sample file (for getfile/download actions)."
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "description": "Raw hash list (for getlistraw action)."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key."
+          },
+          "404": {
+            "description": "Sample not found."
+          },
+          "429": {
+            "description": "API rate limit exceeded."
+          }
+        },
+        "tags": ["Samples"]
+      },
+      "post": {
+        "operationId": "uploadSample",
+        "summary": "Upload a malware sample",
+        "description": "Upload a new malware sample to MalShare.",
+        "parameters": [
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": true,
+            "description": "Your MalShare API key.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": true,
+            "description": "Must be 'upload'.",
+            "schema": {
+              "type": "string",
+              "enum": ["upload"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["upload"],
+                "properties": {
+                  "upload": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The malware sample file to upload."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sample uploaded successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sha256": {
+                      "type": "string",
+                      "description": "SHA256 hash of the uploaded sample."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key."
+          },
+          "429": {
+            "description": "API rate limit exceeded."
+          }
+        },
+        "tags": ["Samples"]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SampleList": {
+        "type": "array",
+        "description": "List of samples from the last 24 hours (getlist action).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "md5": {
+              "type": "string"
+            },
+            "sha1": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "description": "File type."
+            },
+            "added": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "source": {
+              "type": "string"
+            },
+            "yarahits": {
+              "type": "object",
+              "description": "YARA rule matches.",
+              "properties": {
+                "yara": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "parentfiles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "subfiles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "SampleDetails": {
+        "type": "object",
+        "description": "Detailed information about a sample (details action).",
+        "properties": {
+          "MD5": {
+            "type": "string"
+          },
+          "SHA1": {
+            "type": "string"
+          },
+          "SHA256": {
+            "type": "string"
+          },
+          "SSDEEP": {
+            "type": "string"
+          },
+          "F_TYPE": {
+            "type": "string",
+            "description": "File type."
+          },
+          "ADDED": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "SOURCES": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "YARAHITS": {
+            "type": "object",
+            "properties": {
+              "yara": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "PARENTFILES": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "SUBFILES": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SourceList": {
+        "type": "array",
+        "description": "List of malware sources (getsources action).",
+        "items": {
+          "type": "string"
+        }
+      },
+      "HashLookupResult": {
+        "type": "object",
+        "description": "Result of a hash lookup.",
+        "properties": {
+          "MD5": {
+            "type": "string"
+          },
+          "SHA1": {
+            "type": "string"
+          },
+          "SHA256": {
+            "type": "string"
+          },
+          "SSDEEP": {
+            "type": "string"
+          },
+          "F_TYPE": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiLimit": {
+        "type": "object",
+        "description": "Current API usage limits (getlimit action).",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Daily request limit."
+          },
+          "remaining": {
+            "type": "integer",
+            "description": "Remaining requests for the day."
+          }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "description": "Search result or search ID.",
+        "properties": {
+          "search_id": {
+            "type": "string",
+            "description": "ID to retrieve search results."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "md5": {
+                  "type": "string"
+                },
+                "sha1": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Samples",
+      "description": "Search, download, and upload malware samples."
+    }
+  ]
+}

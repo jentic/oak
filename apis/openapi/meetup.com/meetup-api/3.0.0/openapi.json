@@ -1,0 +1,421 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Meetup API",
+    "description": "Meetup API v3 is a GraphQL-based API for accessing and managing Meetup data including events, groups, members, and RSVPs. The API uses a single GraphQL endpoint for queries and mutations.",
+    "version": "3.0.0",
+    "contact": {
+      "name": "Meetup API Support",
+      "url": "https://www.meetup.com/api/guide"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.meetup.com",
+      "description": "Meetup API Production Server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/gql": {
+      "post": {
+        "operationId": "graphqlQuery",
+        "summary": "Execute a GraphQL query or mutation",
+        "description": "Main GraphQL endpoint for the Meetup API v3. Supports queries for events, groups, members, pro networks, and mutations for creating/editing events and managing RSVPs. Rate limited to 500 points per 60 seconds.",
+        "tags": [
+          "GraphQL"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRequest"
+              },
+              "examples": {
+                "selfQuery": {
+                  "summary": "Get authenticated user info",
+                  "value": {
+                    "query": "query { self { id name email memberPhoto { baseUrl } } }"
+                  }
+                },
+                "eventQuery": {
+                  "summary": "Get event details by ID",
+                  "value": {
+                    "query": "query ($eventId: ID!) { event(id: $eventId) { id title description dateTime venue { name address } } }",
+                    "variables": {
+                      "eventId": "abc123"
+                    }
+                  }
+                },
+                "createEventMutation": {
+                  "summary": "Create a new event",
+                  "value": {
+                    "query": "mutation ($input: CreateEventInput!) { createEvent(input: $input) { event { id title } } }",
+                    "variables": {
+                      "input": {
+                        "groupUrlname": "my-group",
+                        "title": "Monthly Meetup",
+                        "description": "Our monthly gathering",
+                        "startDateTime": "2025-06-15T18:00:00",
+                        "duration": "PT2H",
+                        "publishStatus": "DRAFT"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful GraphQL response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphQLResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing Bearer token"
+          },
+          "429": {
+            "description": "Rate limited - quota of 500 points per 60 seconds exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphQLErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gql-ext": {
+      "post": {
+        "operationId": "graphqlExtQuery",
+        "summary": "Execute a GraphQL query or mutation (extended endpoint)",
+        "description": "Extended GraphQL endpoint for the Meetup API v3 with support for pro network operations. Supports all the same queries and mutations as the /gql endpoint plus additional pro network features.",
+        "tags": [
+          "GraphQL"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRequest"
+              },
+              "examples": {
+                "proNetworkQuery": {
+                  "summary": "Search groups in a pro network",
+                  "value": {
+                    "query": "query ($urlname: ID!, $first: Int, $after: String) { proNetwork(urlname: $urlname) { groupsSearch(first: $first, after: $after) { edges { node { id name urlname } } pageInfo { hasNextPage endCursor } } } }",
+                    "variables": {
+                      "urlname": "my-network",
+                      "first": 10
+                    }
+                  }
+                },
+                "proNetworkEventsQuery": {
+                  "summary": "Search events in a pro network",
+                  "value": {
+                    "query": "query ($urlname: ID!, $filter: ProNetworkEventsFilter) { proNetwork(urlname: $urlname) { eventsSearch(filter: $filter) { edges { node { id title dateTime } } } } }",
+                    "variables": {
+                      "urlname": "my-network",
+                      "filter": {
+                        "status": "UPCOMING"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful GraphQL response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphQLResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing Bearer token"
+          },
+          "429": {
+            "description": "Rate limited - quota of 500 points per 60 seconds exceeded"
+          }
+        }
+      }
+    },
+    "/oauth2/authorize": {
+      "get": {
+        "operationId": "oauthAuthorize",
+        "summary": "OAuth2 authorization endpoint",
+        "description": "Redirects users to Meetup's OAuth2 authorization page. Used in the server-side OAuth flow to obtain an authorization code.",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "description": "Your OAuth consumer key",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "description": "Must be 'code' for server-side flow",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "code"
+              ]
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "description": "Redirect URI registered with your OAuth consumer",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "Opaque value to prevent CSRF attacks",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to Meetup authorization page"
+          }
+        }
+      }
+    },
+    "/oauth2/access": {
+      "post": {
+        "operationId": "oauthAccessToken",
+        "summary": "Exchange authorization code for access token",
+        "description": "Exchanges an authorization code for an OAuth2 access token and refresh token.",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "client_id",
+                  "client_secret",
+                  "grant_type",
+                  "redirect_uri",
+                  "code"
+                ],
+                "properties": {
+                  "client_id": {
+                    "type": "string",
+                    "description": "Your OAuth consumer key"
+                  },
+                  "client_secret": {
+                    "type": "string",
+                    "description": "Your OAuth consumer secret"
+                  },
+                  "grant_type": {
+                    "type": "string",
+                    "enum": [
+                      "authorization_code",
+                      "refresh_token"
+                    ],
+                    "description": "The grant type"
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Must match the redirect_uri used in the authorize request"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "The authorization code received from the authorize endpoint"
+                  },
+                  "refresh_token": {
+                    "type": "string",
+                    "description": "The refresh token (when grant_type is refresh_token)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Access token response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "OAuth2 Bearer token. Obtain via the OAuth2 server flow using /oauth2/authorize and /oauth2/access endpoints."
+      }
+    },
+    "schemas": {
+      "GraphQLRequest": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The GraphQL query or mutation string"
+          },
+          "variables": {
+            "type": "object",
+            "description": "Variables for the GraphQL operation",
+            "additionalProperties": true
+          },
+          "operationName": {
+            "type": "string",
+            "description": "The name of the operation to execute (when the query contains multiple operations)"
+          }
+        }
+      },
+      "GraphQLResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The result of the GraphQL operation",
+            "additionalProperties": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphQLError"
+            },
+            "description": "Errors encountered during query execution"
+          }
+        }
+      },
+      "GraphQLErrorResponse": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphQLError"
+            }
+          }
+        }
+      },
+      "GraphQLError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A human-readable error message"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line": {
+                  "type": "integer"
+                },
+                "column": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "extensions": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code, e.g. RATE_LIMITED"
+              },
+              "resetAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When rate limit resets (for RATE_LIMITED errors)"
+              }
+            }
+          }
+        }
+      },
+      "OAuthTokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "The access token to use in API requests"
+          },
+          "token_type": {
+            "type": "string",
+            "example": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Token lifetime in seconds"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Token to use to refresh the access token"
+          }
+        }
+      }
+    }
+  }
+}

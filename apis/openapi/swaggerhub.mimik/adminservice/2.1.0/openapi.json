@@ -1,0 +1,985 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Admin Service API",
+    "description": "**Admin Service API** provides centralized administration for managing admin users,\ntheir permissions, and generating JWT tokens for accessing protected service endpoints.\n\n## What this service does\n- **Admin User Management** - Create, update, delete, and list admin users with granular service permissions.\n- **User Metadata** - Store deployment-specific attributes (e.g., `orgId`) alongside user permissions.\n- **Token Generation** - Generate scoped JWT tokens for authenticated access to other microservices.\n- **Scope-Based Access Control** - Manage permissions at the service and scope level.\n\n## Conventions\n- All successful JSON responses wrap results under a top-level `data` property.\n- OAuth2 scopes gate admin and user operations (see **Security Schemes**).\n- IDs are string identifiers from the identity provider; timestamps are ISO-8601 date-times with UTC `Z` (e.g., `2025-10-14T21:30:00Z`).\n- Cursor-based pagination via `pageSize` and `startAfter` query parameters on list endpoints.\n\n<p><a href=\"https://bitbucket.org/mimiktech/swagger-admin/src\">Repository</a></p>\n",
+    "contact": {
+      "name": "mimik technology inc.",
+      "url": "https://developer.mimik.com/",
+      "email": "support@mimik.com"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "version": "2.1.0",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/mimik/AdminService/2.1.0/swagger.json"
+  },
+  "servers": [
+    {
+      "url": "/adminService/v1"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Admin",
+      "description": "Operations for managing admin users and system information.\nThese endpoints require AdminSecurity OAuth2 credentials with appropriate scopes.\n"
+    },
+    {
+      "name": "User",
+      "description": "Operations for end-user authentication and token generation.\nThese endpoints allow authenticated users to generate JWT tokens for accessing protected services.\n"
+    }
+  ],
+  "paths": {
+    "/info": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Get system information",
+        "description": "Retrieves information about the resources in the service (e.g. the number of users)",
+        "operationId": "getInfo",
+        "parameters": [
+          {
+            "name": "types",
+            "in": "query",
+            "description": "Types of information to retrieve. Multiple types can be specified to get\ncombined information in a single request.\n",
+            "style": "form",
+            "explode": true,
+            "example": [
+              "users",
+              "healthCheck"
+            ],
+            "schema": {
+              "minItems": 1,
+              "uniqueItems": true,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "The type of system information to retrieve",
+                "enum": [
+                  "config",
+                  "healthCheck",
+                  "users"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved system information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Wrapper object containing the requested system information",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "Container for the requested information types",
+                      "properties": {
+                        "config": {
+                          "type": "object",
+                          "description": "Service configuration details"
+                        },
+                        "healthCheck": {
+                          "type": "object",
+                          "description": "Health status of the service",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "healthy",
+                                "unhealthy",
+                                "degraded"
+                              ]
+                            },
+                            "timestamp": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        },
+                        "users": {
+                          "type": "object",
+                          "description": "User statistics",
+                          "properties": {
+                            "count": {
+                              "type": "integer",
+                              "description": "Total number of admin users"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "data": {
+                    "users": {
+                      "count": 432
+                    },
+                    "healthCheck": {
+                      "status": "healthy",
+                      "timestamp": "2024-01-15T10:30:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "security": [
+          {
+            "AdminSecurity": [
+              "read:system"
+            ]
+          }
+        ],
+        "x-swagger-router-controller": "infoController"
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List admin users",
+        "description": "Retrieves a paginated list of admin users. Supports filtering by user ID\nand cursor-based pagination for efficient traversal of large result sets.\n",
+        "operationId": "getUsers",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Filter users by their unique identifier. Returns only the user matching this ID.",
+            "example": "2695334462234642354",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Number of users to return per page. Use with `startAfter` for pagination\nthrough large result sets.\n",
+            "example": 20,
+            "schema": {
+              "maximum": 100,
+              "minimum": 10,
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "startAfter",
+            "in": "query",
+            "description": "Document ID of the last record from the previous page. Used for cursor-based\npagination to fetch the next set of results.\n",
+            "example": "507f1f77bcf86cd799439011",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved the list of admin users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Paginated response containing admin users",
+                  "properties": {
+                    "count": {
+                      "type": "integer",
+                      "description": "Total number of users matching the query. Only available on the\nfirst page (when `startAfter` is not specified).\n",
+                      "example": 14
+                    },
+                    "nextPageUrl": {
+                      "type": "string",
+                      "description": "URL to fetch the next page of results. Null or absent when\nthere are no more results.\n",
+                      "format": "uri",
+                      "example": "https://api.example.com/adminService/v1/users?pageSize=10&startAfter=507f1f77bcf86cd799439011"
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "Array of admin user objects",
+                      "items": {
+                        "$ref": "#/components/schemas/User"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "count": 14,
+                  "nextPageUrl": "https://api.example.com/adminService/v1/users?pageSize=10&startAfter=507f1f77bcf86cd799439011",
+                  "data": [
+                    {
+                      "id": "2695334462234642354",
+                      "permissions": [
+                        {
+                          "serviceType": "Assessment",
+                          "scopes": [
+                            "read:assessment",
+                            "write:assessment"
+                          ]
+                        }
+                      ],
+                      "metadata": {
+                        "orgId": "org-group-id"
+                      },
+                      "createdAt": "2024-01-15T10:30:00Z",
+                      "updatedAt": "2024-01-20T14:45:00Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "security": [
+          {
+            "AdminSecurity": [
+              "read:users"
+            ]
+          }
+        ],
+        "x-swagger-router-controller": "userController"
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Create new admin user",
+        "description": "Creates a new admin user with the specified permissions. The user ID must be\nunique across the system. Use this endpoint to grant admin access to users\nfor specific services and scopes.\n\nScope elevation is not permitted: the caller cannot assign scopes they do not\nhold themselves. Any permission entry containing a scope not present in the\ncaller's own token returns 403.\n",
+        "operationId": "createUser",
+        "requestBody": {
+          "description": "Admin user details including unique ID, service permissions, and optional metadata",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewUser"
+              },
+              "example": {
+                "id": "2695334462234642354",
+                "permissions": [
+                  {
+                    "serviceType": "Assessment",
+                    "scopes": [
+                      "read:assessment",
+                      "write:assessment"
+                    ]
+                  }
+                ],
+                "metadata": {
+                  "orgId": "org-group-id"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Admin user successfully created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Wrapper containing the created user",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                },
+                "example": {
+                  "data": {
+                    "id": "2695334462234642354",
+                    "permissions": [
+                      {
+                        "serviceType": "Assessment",
+                        "scopes": [
+                          "read:assessment",
+                          "write:assessment"
+                        ]
+                      }
+                    ],
+                    "metadata": {
+                      "orgId": "org-group-id"
+                    },
+                    "createdAt": "2024-01-15T10:30:00Z",
+                    "updatedAt": "2024-01-15T10:30:00Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "403": {
+            "description": "The caller lacks the required scope, or attempted to assign scopes that\nexceed their own permissions (scope elevation is not permitted).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "insufficientScope": {
+                    "summary": "Missing create:user scope",
+                    "value": {
+                      "statusCode": 403,
+                      "title": "Forbidden",
+                      "message": "Insufficient permissions to perform this action",
+                      "info": {
+                        "requiredScope": "create:user",
+                        "providedScopes": [
+                          "read:users"
+                        ]
+                      }
+                    }
+                  },
+                  "scopeElevation": {
+                    "summary": "Scope elevation attempt",
+                    "value": {
+                      "statusCode": 403,
+                      "title": "Forbidden",
+                      "message": "Cannot assign scopes that exceed your own permissions",
+                      "info": {
+                        "elevatedScopes": [
+                          "delete:organization"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "security": [
+          {
+            "AdminSecurity": [
+              "create:user"
+            ]
+          }
+        ],
+        "x-swagger-router-controller": "userController"
+      }
+    },
+    "/users/{id}": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Update admin user",
+        "description": "Updates an existing admin user's permissions and/or metadata. Only\nprovided fields are modified - omitted fields retain their existing values.\n\nScope elevation is not permitted: the caller cannot assign scopes they do not\nhold themselves. Any permission entry containing a scope not present in the\ncaller's own token returns 403.\n",
+        "operationId": "updateUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Unique identifier of the admin user to update",
+            "required": true,
+            "example": "2695334462234642354",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Updated permissions and/or metadata for the user",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUser"
+              },
+              "example": {
+                "permissions": [
+                  {
+                    "serviceType": "Assessment",
+                    "scopes": [
+                      "read:assessment",
+                      "write:assessment"
+                    ]
+                  },
+                  {
+                    "serviceType": "Profile",
+                    "scopes": [
+                      "read:profile"
+                    ]
+                  }
+                ],
+                "metadata": {
+                  "orgId": "org-group-id"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Admin user successfully updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Wrapper containing the updated user",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                },
+                "example": {
+                  "data": {
+                    "id": "2695334462234642354",
+                    "permissions": [
+                      {
+                        "serviceType": "Assessment",
+                        "scopes": [
+                          "read:assessment",
+                          "write:assessment"
+                        ]
+                      },
+                      {
+                        "serviceType": "Profile",
+                        "scopes": [
+                          "read:profile"
+                        ]
+                      }
+                    ],
+                    "metadata": {
+                      "orgId": "org-group-id"
+                    },
+                    "createdAt": "2024-01-15T10:30:00Z",
+                    "updatedAt": "2024-01-20T14:45:00Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "403": {
+            "description": "The caller lacks the required scope, or attempted to assign scopes that\nexceed their own permissions (scope elevation is not permitted).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "insufficientScope": {
+                    "summary": "Missing update:user scope",
+                    "value": {
+                      "statusCode": 403,
+                      "title": "Forbidden",
+                      "message": "Insufficient permissions to perform this action",
+                      "info": {
+                        "requiredScope": "update:user",
+                        "providedScopes": [
+                          "read:users"
+                        ]
+                      }
+                    }
+                  },
+                  "scopeElevation": {
+                    "summary": "Scope elevation attempt",
+                    "value": {
+                      "statusCode": 403,
+                      "title": "Forbidden",
+                      "message": "Cannot assign scopes that exceed your own permissions",
+                      "info": {
+                        "elevatedScopes": [
+                          "delete:organization"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "security": [
+          {
+            "AdminSecurity": [
+              "update:user"
+            ]
+          }
+        ],
+        "x-swagger-router-controller": "userController"
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Delete admin user",
+        "description": "Permanently removes an admin user from the system, revoking all their\nadmin access to services. This action cannot be undone.\n",
+        "operationId": "deleteUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Unique identifier of the admin user to delete",
+            "required": true,
+            "example": "2695334462234642354",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin user successfully deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Confirmation of the deleted user",
+                  "properties": {
+                    "data": {
+                      "type": "string",
+                      "description": "ID of the deleted admin user",
+                      "example": "2695334462234642354"
+                    }
+                  }
+                },
+                "example": {
+                  "data": "2695334462234642354"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "security": [
+          {
+            "AdminSecurity": [
+              "delete:user"
+            ]
+          }
+        ],
+        "x-swagger-router-controller": "userController"
+      }
+    },
+    "/oauth/token": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Generate JWT admin token",
+        "description": "Generates a JWT access token for authenticating with protected admin endpoints\nof a specific service. The token is scoped to the requested service type and\nincludes the user's permissions for that service.\n",
+        "operationId": "createToken",
+        "requestBody": {
+          "description": "Token generation request specifying the target service",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              },
+              "example": {
+                "serviceType": "Assessment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "JWT token successfully generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Wrapper containing the generated token",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Token"
+                    }
+                  }
+                },
+                "example": {
+                  "data": {
+                    "accessToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyNjk1MzM0NDYyMjM0NjQyMzU0IiwiaXNzIjoiYWRtaW5TZXJ2aWNlIiwiZXhwIjoxNzA1MzI0MDAwfQ.signature",
+                    "tokenType": "Bearer"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        },
+        "security": [
+          {
+            "UserSecurity": [
+              "create:token"
+            ]
+          }
+        ],
+        "x-swagger-router-controller": "tokenController"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "description": "Standard error response format returned when an API request fails",
+        "required": [
+          "message",
+          "statusCode",
+          "title"
+        ],
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP status code indicating the type of error",
+            "example": 400
+          },
+          "title": {
+            "type": "string",
+            "description": "Short, human-readable title describing the error category",
+            "example": "Bad Request"
+          },
+          "message": {
+            "type": "string",
+            "description": "Detailed message explaining what went wrong and how to fix it",
+            "example": "The 'id' field is required and must be a non-empty string"
+          },
+          "info": {
+            "type": "object",
+            "description": "Additional context or metadata about the error for debugging purposes",
+            "additionalProperties": true,
+            "example": {
+              "field": "id",
+              "constraint": "required"
+            }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "description": "Represents an admin user with permissions, optional metadata, and timestamps.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NewUser"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "createdAt": {
+                "type": "string",
+                "description": "ISO 8601 timestamp when the user was created",
+                "format": "date-time",
+                "readOnly": true,
+                "example": "2024-01-15T10:30:00Z"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "ISO 8601 timestamp when the user was last modified",
+                "format": "date-time",
+                "readOnly": true,
+                "example": "2024-01-20T14:45:00Z"
+              }
+            }
+          }
+        ]
+      },
+      "UpdateUser": {
+        "type": "object",
+        "description": "Request payload for updating an admin user's permissions and/or metadata.\nBoth fields are optional on update - only provided fields are modified.\nOmitted fields retain their existing values.\n",
+        "properties": {
+          "permissions": {
+            "type": "array",
+            "description": "List of service permissions granted to this user. Each permission specifies\na service type and the scopes (actions) the user can perform on that service.\nReplaces the entire permission set when provided.\n",
+            "items": {
+              "type": "object",
+              "description": "Permission entry for a specific service",
+              "required": [
+                "scopes",
+                "serviceType"
+              ],
+              "properties": {
+                "serviceType": {
+                  "type": "string",
+                  "description": "The type of microservice this permission applies to (e.g., Assessment,\nProfile, Analytics). Must match the service's registered type.\n",
+                  "example": "Assessment"
+                },
+                "scopes": {
+                  "type": "array",
+                  "description": "List of OAuth2 scopes defining what actions the user can perform\non this service (e.g., read:profile, write:assessment).\n",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "description": "OAuth2 scope string. May be camelCase, multi-segment (e.g., patch:users:roles,\nreadById:assessment), or mixed case. No fixed pattern is enforced.\n",
+                    "example": "read:profile"
+                  }
+                }
+              }
+            },
+            "example": [
+              {
+                "serviceType": "Assessment",
+                "scopes": [
+                  "read:assessment",
+                  "write:assessment"
+                ]
+              },
+              {
+                "serviceType": "Profile",
+                "scopes": [
+                  "read:profile"
+                ]
+              }
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Optional key-value object for storing additional user attributes\nsuch as `orgId`. Required fields within metadata are\ndeployment-specific. Replaces the entire metadata object when\nprovided on update; omit to leave existing metadata unchanged.\n",
+            "additionalProperties": true,
+            "example": {
+              "orgId": "org-group-id"
+            }
+          }
+        }
+      },
+      "NewUser": {
+        "type": "object",
+        "description": "Request payload for creating a new admin user. The user ID must be unique,\npermissions define what services and scopes the user can access, and metadata\nstores optional deployment-specific attributes.\n",
+        "required": [
+          "id"
+        ],
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the admin user. This is typically the user's\naccount ID from the identity provider.\n",
+                "minLength": 1,
+                "example": "2695334462234642354"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/UpdateUser"
+          }
+        ]
+      },
+      "TokenRequest": {
+        "type": "object",
+        "description": "Request payload for generating a JWT admin token. The token will be scoped\nto the specified service type and include the user's permissions for that service.\n",
+        "required": [
+          "serviceType"
+        ],
+        "properties": {
+          "serviceType": {
+            "type": "string",
+            "description": "The type of microservice for which to generate an admin token.\nThe user must have permissions configured for this service type.\n",
+            "minLength": 1,
+            "example": "Assessment"
+          }
+        }
+      },
+      "Token": {
+        "type": "object",
+        "description": "JWT token response containing the access token for authenticating\nwith protected service endpoints.\n",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT access token to be included in the Authorization header when\ncalling protected endpoints. Format: \"Bearer {accessToken}\"\n",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyNjk1MzM0NDYyMjM0NjQyMzU0IiwiaXNzIjoiYWRtaW5TZXJ2aWNlIiwiZXhwIjoxNzA1MzI0MDAwfQ.signature"
+          },
+          "tokenType": {
+            "type": "string",
+            "description": "The type of token issued. Always \"Bearer\" for this API.",
+            "default": "Bearer",
+            "enum": [
+              "Bearer",
+              "bearer"
+            ],
+            "example": "Bearer"
+          }
+        }
+      }
+    },
+    "responses": {
+      "400": {
+        "description": "The request was malformed or contained invalid data. Check the error\nmessage for details on which fields failed validation.\n",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "statusCode": 400,
+              "title": "Bad Request",
+              "message": "The 'id' field is required and must be a non-empty string",
+              "info": {
+                "field": "id",
+                "constraint": "required"
+              }
+            }
+          }
+        }
+      },
+      "403": {
+        "description": "The request was authenticated but the user lacks the required permissions\nto perform this action. Ensure the OAuth2 token includes the necessary scopes.\n",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "statusCode": 403,
+              "title": "Forbidden",
+              "message": "Insufficient permissions to perform this action",
+              "info": {
+                "requiredScope": "create:user",
+                "providedScopes": [
+                  "read:users"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "The requested resource was not found. Verify the resource ID exists\nand is correctly formatted.\n",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "statusCode": 404,
+              "title": "Not Found",
+              "message": "User with ID '2695334462234642354' was not found",
+              "info": {
+                "resourceType": "User",
+                "resourceId": "2695334462234642354"
+              }
+            }
+          }
+        }
+      },
+      "409": {
+        "description": "The request conflicts with the current state of the server. This typically\noccurs when attempting to create a resource that already exists.\n",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "statusCode": 409,
+              "title": "Conflict",
+              "message": "A user with ID '2695334462234642354' already exists",
+              "info": {
+                "existingResourceId": "2695334462234642354"
+              }
+            }
+          }
+        }
+      },
+      "500": {
+        "description": "An unexpected error occurred on the server. If this error persists,\nplease contact support with the request ID from the response.\n",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "statusCode": 500,
+              "title": "Internal Server Error",
+              "message": "An unexpected error occurred while processing your request",
+              "info": {
+                "requestId": "req_abc123xyz",
+                "timestamp": "2024-01-15T10:30:00Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "AdminSecurity": {
+        "type": "oauth2",
+        "description": "OAuth2 client credentials flow for administrative operations.\nUsed by service accounts and backend systems to manage admin users.\nObtain credentials from the mimik developer portal.\n",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://mimik.com/oauth/token",
+            "scopes": {
+              "read:system": "Retrieve system information including health status and user counts",
+              "create:user": "Create new admin users with specified permissions",
+              "update:user": "Modify existing admin user permissions and metadata",
+              "read:users": "List and retrieve admin user details",
+              "delete:user": "Permanently remove admin users from the system"
+            }
+          }
+        }
+      },
+      "UserSecurity": {
+        "type": "oauth2",
+        "description": "OAuth2 implicit flow for end-user authentication.\nUsed by authenticated users to generate JWT tokens for accessing\nprotected service endpoints based on their assigned permissions.\n",
+        "flows": {
+          "implicit": {
+            "authorizationUrl": "https://mimik.com/authorize",
+            "scopes": {
+              "create:token": "Generate JWT admin tokens for accessing protected service endpoints"
+            }
+          }
+        }
+      }
+    }
+  }
+}

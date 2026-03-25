@@ -1,0 +1,866 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "description": "# Bringin APIs\n\nBringin APIs enable you to make Bitcoin on and off-ramp services available for your European customers. We provide a simple yet best-in-class crypto on and off-ramp solution with SEPA instant support at the best rates in the market.\n\n## Use Cases\n\n### 1. Offramp to bank directly \n\nThis option is ideal if you want users to add a \"Sell to bank\" button - allowing users to offramp their Bitcoin to Euros in their bank without any issues.\n\nA set of APIs to create an offramp order to convert incoming Bitcoin deposits into Euros into Bringin's IBAN for users to withdraw anytime.\n\n**For this use case, you only need to focus on the User Onboarding and Offramp sections.**\n\n#### Key Features:\n- Create an offramp order by providing IP, amount, beneficiary details. API returns a Bitcoin Address and a lightning invoice\n- Once we receive Bitcoin to the provided address or invoice, we swap BTC to Euros at market rate\n- You initiate a bank transfer to users bank\n\n### 2. Offramp to Bringin (2 days integration)\n\nConnect to the Bringin account to offer Bringin vIBAN and debit cards.\n\nPlease contact us at support@bringin.xyz for detailed documentation and integration support for this option.\n\n## Authentication\n\nWhile the APIs are available to the public to build with, we provide an `api-key` and `api-secret` for each company to make secure API calls.\n\n### Request Headers\n\nAll API requests must be accompanied by the following headers:\n\n| Header Parameter | Description |\n|------------------|-------------|\n| `api-key` | Contact us at info@bringin.xyz to obtain API key |\n| `Authorization` | A signature generated using the API Secret. Contact us at info@bringin.xyz to obtain the API secret. More information is below on generating a signature |\n| `Content-Type` | `application/json` |\n\n### Environments\n\nThe sandbox and production environments mirror each other, except for the base URL and your API keys. Please contact us at info@bringin.xyz to elevate your application to production.\n\n### Request Signature Calculation\n\nYou can calculate the value of the `Authorization` header by creating a SHA256HMAC digest of your request body, signed with your `API Secret`, in the following manner:\n\n#### Step 1: Get current UNIX timestamp\n\n```javascript\nconst time = Date.now().toString();\n```\n\n#### Step 2: Stringify request body\n\n```javascript\nconst bodyString = JSON.stringify(body);\n// For a GET request, please use an empty body such as:\n// const bodyString = JSON.stringify({});\n```\n\n#### Step 3: Calculate MD5 digest of request body\n\nCalculate the hex encoded MD5 digest of your request body exactly as it will be sent. For GET requests, please include an empty body `'{}'` that evaluates to an MD5 of `99914b932bd37a50b983c5e7c90ae93b`.\n\n```javascript\nconst requestContentHexString = CryptoJS.MD5(bodyString).toString(CryptoJS.enc.Hex);\n// For a GET request, the bodyString above for example would just be '{}' \n// and the calculated MD5 is 99914b932bd37a50b983c5e7c90ae93b\n```\n\n#### Step 4: Concatenate signature components\n\n```javascript\nconst signatureRawData = time + 'POST' + '/card/create' + requestContentHexString;\n```\n\n#### Step 5: Create SHA256 HMAC digest\n\nUse your API Secret to create a SHA256 HMAC digest in hex:\n\n```javascript\nconst apiSecret = '';\nconst requestSignatureHexString = CryptoJS.HmacSHA256(signatureRawData, apiSecret).toString(CryptoJS.enc.Hex);\n```\n\n#### Step 6: Create authorization header\n\nFinally, create your authorization header as follows, using the verb `'HMAC '` concatenated with the timestamp and the `requestSignatureHexString`, separated by a `:`\n\n```javascript\nconst authorizationHeader = 'HMAC ' + time + ':' + requestSignatureHexString;\n```\n\n### Complete Example\n\n```javascript\nimport crypto from 'crypto';\n\nconst hmac = crypto.createHmac('sha256', '');\nconst time = Date.now().toString();\n\nhmac.update(time);\nhmac.update('POST');\nhmac.update('/ping');\n\nconst contentHash = crypto.createHash('md5');\ncontentHash.update(JSON.stringify({\n    \"dummy\": 1,\n    \"data\": 2\n}));\n\nhmac.update(contentHash.digest('hex'));\n\nconsole.log(`HMAC ${time}:${hmac.digest('hex')}`);\n```",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Bringin Support",
+      "email": "info@bringin.xyz",
+      "url": "https://bringin.xyz"
+    },
+    "license": {
+      "name": "Proprietary",
+      "url": "https://bringin.xyz/terms"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/bringin-a9e/Bringin-offramp/1.0.0/swagger.json"
+  },
+  "servers": [
+    {
+      "description": "SwaggerHub API Auto Mocking",
+      "url": "https://virtserver.swaggerhub.com/bringin-a9e/Bringin-offramp/1.0.0"
+    },
+    {
+      "url": "https://api.bringin.xyz",
+      "description": "Production server"
+    },
+    {
+      "url": "https://sandbox-api.bringin.xyz",
+      "description": "Sandbox server"
+    }
+  ],
+  "security": [
+    {
+      "HMACAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "User Onboarding",
+      "description": "APIs for user onboarding and connection management"
+    },
+    {
+      "name": "Bank Beneficiaries",
+      "description": "APIs for managing bank beneficiary details"
+    },
+    {
+      "name": "Offramp",
+      "description": "APIs for Bitcoin to bank offramp operations"
+    }
+  ],
+  "paths": {
+    "/api/v0/application/connect": {
+      "post": {
+        "tags": [
+          "User Onboarding"
+        ],
+        "summary": "Connect user to Bringin or onboard new users",
+        "description": "One API to connect to Bringin or onboard users to Bringin.\n\nBringin checks if the email is associated with an existing user:\n- **If user exists but not connected**: Sends co-branded email requesting consent\n- **If user doesn't exist**: Sends co-branded onboarding email with signup link\n- **If user exists and connected**: Returns API key immediately\n",
+        "operationId": "connectUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "callback",
+                  "ref"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "User's email address",
+                    "example": "test5038671843@team889083.testinator.com"
+                  },
+                  "callback": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Callback URL to receive API key instantly",
+                    "example": "https://webhook.site/7b838e1d-af1b-45db-8f9c-a3a1cfdbc88c"
+                  },
+                  "ref": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Unique reference for the user from your end",
+                    "example": "3d1bac50-bed6-4c80-ac91-092140226f7d"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User connection initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/UserNotConnected"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UserConnected"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UserNotRegistered"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v0/user/kyc-status/{userId}": {
+      "get": {
+        "tags": [
+          "User Onboarding"
+        ],
+        "summary": "Get user's KYC onboarding status",
+        "description": "Retrieve the current KYC status and verification details for a user",
+        "operationId": "getKycStatus",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "User ID to check KYC status",
+            "example": "f2421f34-e973-4a58-8460-c93cc25c9e95"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "KYC status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KycStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v0/user/beneficiary": {
+      "post": {
+        "tags": [
+          "Bank Beneficiaries"
+        ],
+        "summary": "Add beneficiary bank details",
+        "description": "Add a new beneficiary bank account for EUR withdrawals",
+        "operationId": "addBeneficiary",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "iban",
+                  "bic",
+                  "shortName",
+                  "userId",
+                  "currency"
+                ],
+                "properties": {
+                  "iban": {
+                    "type": "string",
+                    "description": "IBAN number",
+                    "example": "NL34ABNA6285885613"
+                  },
+                  "bic": {
+                    "type": "string",
+                    "description": "BIC/SWIFT code",
+                    "example": "REVOLT21"
+                  },
+                  "shortName": {
+                    "type": "string",
+                    "description": "Friendly name for the beneficiary",
+                    "example": "My personal bank"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "User ID"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "enum": [
+                      "EUR"
+                    ],
+                    "example": "EUR"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Beneficiary added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Beneficiary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Beneficiary already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BeneficiaryError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/user/beneficiary/{userId}": {
+      "get": {
+        "tags": [
+          "Bank Beneficiaries"
+        ],
+        "summary": "Get all beneficiaries",
+        "description": "Retrieve all saved beneficiary bank accounts for a user",
+        "operationId": "getBeneficiaries",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "User ID",
+            "example": "f2421f34-e973-4a58-8460-c93cc25c9e95"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Beneficiaries retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BeneficiaryList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/offramp/rates": {
+      "post": {
+        "tags": [
+          "Offramp"
+        ],
+        "summary": "Get offramp exchange rates",
+        "description": "Get current exchange rates including transaction fees and markup",
+        "operationId": "getOfframpRates",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ticker"
+                ],
+                "properties": {
+                  "ticker": {
+                    "type": "string",
+                    "enum": [
+                      "BTCEUR"
+                    ],
+                    "description": "Trading pair ticker",
+                    "example": "BTCEUR"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exchange rates retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExchangeRate"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/offramp/": {
+      "post": {
+        "tags": [
+          "Offramp"
+        ],
+        "summary": "Create Offramp order",
+        "description": "Creates a new offramp order to convert Bitcoin to Euros with instant bank transfer capability.\n\n## Process Overview\n\n### 1. Order Creation\n- Provide Bitcoin amount (BTC), IP address, and destination bank details\n- System generates a unique order with Bitcoin address and Lightning invoice\n- Order ID is returned for tracking purposes\n\n### 2. Bitcoin Payment Options\n- **Standard Bitcoin Transaction**: Use the provided Bitcoin wallet address\n- **Lightning Network**: Use the generated Lightning invoice for faster payments\n\n### 3. Automatic Processing\n- Bitcoin is instantly converted to Euros upon receipt\n- Funds become immediately available for withdrawal\n- Webhook notification is sent when Bitcoin is received\n\n### 4. Withdrawal Process\n- User initiates withdrawal request\n- Verification codes are sent to registered phone and email\n- Upon successful code verification, Euros are transferred instantly to the user's bank account\n",
+        "operationId": "getOfframpAddress",
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "sourceAmount",
+                  "ipAddress",
+                  "beneficiaryId",
+                  "userId"
+                ],
+                "properties": {
+                  "ipAddress": {
+                    "type": "string",
+                    "format": "ipv4",
+                    "description": "Client IP address",
+                    "example": "212.30.36.15"
+                  },
+                  "sourceAmount": {
+                    "type": "string",
+                    "description": "Amount should be in lowest denomination and string. sats / cent for Bitcoin and Euros",
+                    "example": 123000
+                  },
+                  "beneficiaryId": {
+                    "type": "string",
+                    "description": "Create beneficiary using create beneficiary API which returns beneficiary Id to be passed on here. Bank detailed to which Euros to be transfered.",
+                    "example": "466124a4-d912-4820-8f42-426199e11149"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "description": "userId of the user",
+                    "example": "8bb747e8-105b-4205-b716-286b53deaa17"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Returns orderId, Bitcoin invoice and a Bitcoin address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfframpAddress"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/offramp/order/get-details": {
+      "post": {
+        "tags": [
+          "Offramp"
+        ],
+        "summary": "Get offramp order status",
+        "description": "Check the status of an offramp order.\n\nPossible statuses:\n- **INITIATED**: Order created, waiting for Bitcoin\n- **PROCESSING**: Bitcoin received, swapping to Euros\n- **PARTIAL**: Amount received is less than ordered\n- **SWAP_COMPLETED**: Swap completed successfully. Expecting to initiate the bank transfer\n- **AWAITING_AUTHENTICATION**: Once bank transfer is initiated\n- **TRANSFER_INITIATED**: Bank transfer successfully initiated - Nothing more to be done on our end\n- **SUCCESSFUL**: User received Euros into their bank account.\n",
+        "operationId": "getOfframpOrderStatus",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "userId",
+                  "orderId"
+                ],
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "User ID"
+                  },
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Order ID to check"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfframpOrder"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/offramp/transfer/initiate": {
+      "post": {
+        "tags": [
+          "Offramp"
+        ],
+        "summary": "Initiate bank transfer",
+        "description": "Once the Bitcoin is received and converted to Euro, you will receive a webhook notification about it. You need to initiate a bank transfer to the provided beneficiary while creating the order. This will send user a verificaion code over email and the phone.You need to pass this to confirm the SEPA transfer",
+        "operationId": "confirmOfframpTransfer",
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "orderId",
+                  "userId",
+                  "ipAddress"
+                ],
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Order ID to confirm"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "User ID of the user"
+                  },
+                  "ipAddress": {
+                    "type": "string",
+                    "format": "ipv4",
+                    "example": "34.141.84.253"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transfer confirmed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/offramp/transfer/confirm": {
+      "post": {
+        "tags": [
+          "Offramp"
+        ],
+        "summary": "Confirm bank transfer",
+        "description": "Confirm SEPA instant transfer to beneficiary bank account with OTP",
+        "operationId": "confirmOfframpTransfer",
+        "security": [
+          {
+            "JWTAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "orderId",
+                  "verificationCode",
+                  "ipAddress"
+                ],
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Order ID to confirm"
+                  },
+                  "verificationCode": {
+                    "type": "string",
+                    "description": "6-digit SMS verification code",
+                    "example": "123456"
+                  },
+                  "ipAddress": {
+                    "type": "string",
+                    "format": "ipv4",
+                    "example": "34.141.84.253"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transfer confirmed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "HMACAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "authorization",
+        "description": "HMAC signature in format: `HMAC timestamp:signature`\n\nRequired headers:\n- `api-key`: Your API key\n- `authorization`: HMAC signature\n- `Content-Type`: application/json\n"
+      },
+      "JWTAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token for authenticated endpoints"
+      }
+    },
+    "schemas": {
+      "UserNotConnected": {
+        "type": "object",
+        "properties": {
+          "userRegistered": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether user is registered on Bringin"
+          },
+          "isUserConnected": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether user is connected to application"
+          }
+        }
+      },
+      "UserConnected": {
+        "type": "object",
+        "properties": {
+          "userRegistered": {
+            "type": "boolean",
+            "example": true
+          },
+          "isUserConnected": {
+            "type": "boolean",
+            "example": true
+          },
+          "apiKey": {
+            "type": "string",
+            "description": "Base64 encoded API key for the user",
+            "example": "NzY1YWQzZGYwNTE4NDQ4NzkxMTcxMTIxYzVmY2NlMDI="
+          }
+        }
+      },
+      "UserNotRegistered": {
+        "type": "object",
+        "properties": {
+          "userRegistered": {
+            "type": "boolean",
+            "example": false
+          },
+          "signupURL": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL for user to complete signup",
+            "example": "https://bringin-lite-test.vercel.app/signup?inviteId=73388409-1f6a-4638-bd7d-dac9ee91358a"
+          }
+        }
+      },
+      "KycStatus": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "f2421f34-e973-4a58-8460-c93cc25c9e95"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "example": true
+          },
+          "mobileVerified": {
+            "type": "boolean",
+            "example": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REJECTED",
+              "REVIEW"
+            ],
+            "example": "APPROVED"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rejectionComments": {
+            "type": "object"
+          }
+        }
+      },
+      "ExchangeRate": {
+        "type": "object",
+        "properties": {
+          "rate": {
+            "type": "string",
+            "description": "Current exchange rate"
+          },
+          "fee": {
+            "type": "string",
+            "description": "Transaction fee percentage"
+          },
+          "effectiveRate": {
+            "type": "string",
+            "description": "Effective rate after fees"
+          }
+        }
+      },
+      "OfframpAddress": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique order identifier"
+          },
+          "bitcoinAddress": {
+            "type": "string",
+            "description": "Bitcoin address for deposits"
+          },
+          "lightningInvoice": {
+            "type": "string",
+            "description": "Lightning Network invoice"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Expiration timestamp"
+          }
+        }
+      },
+      "OfframpOrder": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "INITIATED",
+              "PROCESSING",
+              "PARTIAL",
+              "SWAP_COMPLETED"
+            ]
+          },
+          "sourceAmount": {
+            "type": "string",
+            "description": "Amount in satoshis"
+          },
+          "destinationAmount": {
+            "type": "string",
+            "description": "Amount in cents"
+          },
+          "exchangeRate": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updatedAt": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Beneficiary": {
+        "type": "object",
+        "properties": {
+          "beneficiaryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "iban": {
+            "type": "string"
+          },
+          "bic": {
+            "type": "string"
+          },
+          "shortName": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BeneficiaryList": {
+        "type": "object",
+        "properties": {
+          "beneficiaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Beneficiary"
+            }
+          }
+        }
+      },
+      "BeneficiaryError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code"
+          }
+        }
+      },
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

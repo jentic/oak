@@ -1,0 +1,1409 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "BinaryEdge API",
+    "description": "BinaryEdge is an internet scanning platform that provides real-time threat intelligence data. The API allows querying hosts, services, vulnerabilities, domains, torrents, dataleaks, sensors, and images across the internet.",
+    "version": "2.0.0",
+    "contact": {
+      "name": "BinaryEdge Support",
+      "url": "https://www.binaryedge.io"
+    },
+    "x-jentic-source-url": "https://docs.binaryedge.io/api-v2.html"
+  },
+  "servers": [
+    {
+      "url": "https://api.binaryedge.io/v2",
+      "description": "BinaryEdge API v2 production server"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "tags": [
+    { "name": "User", "description": "User account and subscription information" },
+    { "name": "Host", "description": "Query host/IP information including open ports and services" },
+    { "name": "Search", "description": "Search across BinaryEdge datasets" },
+    { "name": "Image", "description": "Remote desktop screenshots and image search" },
+    { "name": "Torrent", "description": "Torrent activity monitoring" },
+    { "name": "Dataleaks", "description": "Data breach and leak information" },
+    { "name": "Risk Score", "description": "IP risk scoring and CVE information" },
+    { "name": "Domains", "description": "Domain and DNS intelligence" },
+    { "name": "Sensors", "description": "Honeypot and sensor data from scanners" }
+  ],
+  "paths": {
+    "/user/subscription": {
+      "get": {
+        "operationId": "getUserSubscription",
+        "summary": "Get subscription details",
+        "description": "Return details about your current subscription package.",
+        "tags": ["User"],
+        "responses": {
+          "200": {
+            "description": "Subscription details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionInfo"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/ip/{target}": {
+      "get": {
+        "operationId": "queryIp",
+        "summary": "Query IP address",
+        "description": "Details about an IP address, including open ports and associated services. Supports IPv4 and CIDR notation up to /24.",
+        "tags": ["Host"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target IP address or CIDR (up to /24)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Host information with events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/ip/historical/{target}": {
+      "get": {
+        "operationId": "queryIpHistorical",
+        "summary": "Query IP historical data",
+        "description": "Historical events for an IP address up to 6 months. Available for paid subscriptions only.",
+        "tags": ["Host"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target IP address",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historical host information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/search": {
+      "get": {
+        "operationId": "querySearch",
+        "summary": "Search hosts",
+        "description": "Search for recent events matching a query across BinaryEdge datasets.",
+        "tags": ["Search"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "description": "Search query string",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Page number (1-1000)",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 1 }
+          },
+          {
+            "name": "only_ips",
+            "in": "query",
+            "required": false,
+            "description": "If 1, return only IP addresses in results",
+            "schema": { "type": "integer", "enum": [0, 1], "default": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/search/stats": {
+      "get": {
+        "operationId": "querySearchStats",
+        "summary": "Search statistics",
+        "description": "Get aggregated statistics for a search query.",
+        "tags": ["Search"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "description": "Search query string",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "description": "Type of statistics to aggregate",
+            "schema": { "type": "string", "enum": ["ports", "products", "versions", "tags", "services", "countries", "asn"] }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sort order",
+            "schema": { "type": "string", "enum": ["desc", "asc"], "default": "desc" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Statistics results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/image/ip/{target}": {
+      "get": {
+        "operationId": "queryImageIp",
+        "summary": "Query images by IP",
+        "description": "Get remote desktop screenshots from an IP address, with OCR and face detection data.",
+        "tags": ["Image"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target IP address",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Page number",
+            "schema": { "type": "integer", "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image results for IP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/image/search": {
+      "get": {
+        "operationId": "queryImageSearch",
+        "summary": "Search images",
+        "description": "Search for remote desktop images matching criteria.",
+        "tags": ["Image"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "description": "Search query string",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Page number (1-750)",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 750, "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/image/tags": {
+      "get": {
+        "operationId": "queryImageTags",
+        "summary": "List image tags",
+        "description": "Get a list of possible image tags.",
+        "tags": ["Image"],
+        "responses": {
+          "200": {
+            "description": "Array of available image tags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "example": ["RDP", "VNC", "HAS_FACES", "X11", "WINDOWS", "MOBILE"]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/query/torrent/ip/{target}": {
+      "get": {
+        "operationId": "queryTorrentIp",
+        "summary": "Query torrents by IP",
+        "description": "Get torrent transfer events for an IP address. Available for paid subscriptions only.",
+        "tags": ["Torrent"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target IP address",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Torrent events for IP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TorrentResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/torrent/historical/{target}": {
+      "get": {
+        "operationId": "queryTorrentHistorical",
+        "summary": "Query torrent historical data",
+        "description": "Historical torrent events for an IP address up to 6 months.",
+        "tags": ["Torrent"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target IP address",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historical torrent events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TorrentResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/torrent/search": {
+      "get": {
+        "operationId": "queryTorrentSearch",
+        "summary": "Search torrents",
+        "description": "Search for torrent events matching a query.",
+        "tags": ["Torrent"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 750, "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Torrent search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TorrentResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/torrent/search/stats": {
+      "get": {
+        "operationId": "queryTorrentSearchStats",
+        "summary": "Torrent search statistics",
+        "description": "Get aggregated statistics for a torrent search query.",
+        "tags": ["Torrent"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["ports", "countries", "asn", "ips", "rdns", "categories", "names"] }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 90 }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["desc", "asc"], "default": "desc" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Torrent statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/dataleaks/email/{email}": {
+      "get": {
+        "operationId": "queryDataleaksEmail",
+        "summary": "Check email for data leaks",
+        "description": "Check if an email address has been affected by known data breaches.",
+        "tags": ["Dataleaks"],
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "description": "Email address to check",
+            "schema": { "type": "string", "format": "email" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data leak results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataleakEmailResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/dataleaks/organization/{domain}": {
+      "get": {
+        "operationId": "queryDataleaksOrganization",
+        "summary": "Check organization for data leaks",
+        "description": "Check a domain for data breach exposure across the organization.",
+        "tags": ["Dataleaks"],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "description": "Domain to check",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Organization data leak results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataleakOrgResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/dataleaks/info": {
+      "get": {
+        "operationId": "queryDataleaksInfo",
+        "summary": "Get data leak information",
+        "description": "Get detailed information on available data breaches.",
+        "tags": ["Dataleaks"],
+        "parameters": [
+          {
+            "name": "leak",
+            "in": "query",
+            "required": false,
+            "description": "Specific leak name to get details for",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data leak information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataleakInfo"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/score/ip/{target}": {
+      "get": {
+        "operationId": "queryScoreIp",
+        "summary": "Get IP risk score",
+        "description": "Get a normalized risk score for an IP address with detailed breakdowns by category. Available for paid subscriptions only.",
+        "tags": ["Risk Score"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target IP address",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "IP risk score",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskScoreResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/cve/ip/{target}": {
+      "get": {
+        "operationId": "queryCveIp",
+        "summary": "Get CVEs for IP",
+        "description": "Get CVEs affecting a target IP address with CVSS scores.",
+        "tags": ["Risk Score"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target IP address",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CVE results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CveResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/domains/subdomain/{target}": {
+      "get": {
+        "operationId": "queryDomainsSubdomain",
+        "summary": "List subdomains",
+        "description": "Get known subdomains for a domain.",
+        "tags": ["Domains"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target domain",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 500, "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subdomain results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/domains/dns/{target}": {
+      "get": {
+        "operationId": "queryDomainsDns",
+        "summary": "Get DNS records",
+        "description": "Get DNS records (A, AAAA, NS, MX) for a domain.",
+        "tags": ["Domains"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target domain",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 500, "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DNS results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/domains/ip/{target}": {
+      "get": {
+        "operationId": "queryDomainsIp",
+        "summary": "Get domains by IP",
+        "description": "Get domains that have the specified IP address in their A or AAAA records.",
+        "tags": ["Domains"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target IP address (IPv4 or IPv6)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 500, "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Domain results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/domains/search": {
+      "get": {
+        "operationId": "queryDomainsSearch",
+        "summary": "Search domains",
+        "description": "Search domain and DNS data matching a query.",
+        "tags": ["Domains"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 500, "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Domain search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/domains/enumeration/{target}": {
+      "get": {
+        "operationId": "queryDomainsEnumeration",
+        "summary": "Enumerate subdomains",
+        "description": "Enumerate subdomains with optional DNS resolution. Available for Business subscriptions only.",
+        "tags": ["Domains"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target domain",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "validate",
+            "in": "query",
+            "required": false,
+            "description": "Validate subdomains with DNS resolution (0 or 1)",
+            "schema": { "type": "integer", "enum": [0, 1], "default": 0 }
+          },
+          {
+            "name": "total",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of results",
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enumeration results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/domains/homoglyphs/{target}": {
+      "get": {
+        "operationId": "queryDomainsHomoglyphs",
+        "summary": "Get domain homoglyphs",
+        "description": "Generate homoglyphs for a domain with optional DNS validation. Available for Business subscriptions only.",
+        "tags": ["Domains"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target domain",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "validate",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "enum": [0, 1], "default": 0 }
+          },
+          {
+            "name": "total",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Homoglyph results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/sensors/ip/{target}": {
+      "get": {
+        "operationId": "querySensorsIp",
+        "summary": "Query sensor data by IP",
+        "description": "Get scanner events for an IP or CIDR (up to /24) from honeypot sensors.",
+        "tags": ["Sensors"],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "description": "Target IP address or CIDR (up to /24)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sensor events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SensorResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/sensors/search": {
+      "get": {
+        "operationId": "querySensorsSearch",
+        "summary": "Search sensor data",
+        "description": "Search honeypot sensor events matching a query.",
+        "tags": ["Sensors"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "description": "Number of days to search back",
+            "schema": { "type": "integer", "default": 30 }
+          },
+          {
+            "name": "only_ips",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "enum": [0, 1], "default": 0 }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sensor search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SensorResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/sensors/search/stats": {
+      "get": {
+        "operationId": "querySensorsSearchStats",
+        "summary": "Sensor search statistics",
+        "description": "Get aggregated statistics for a sensor search query.",
+        "tags": ["Sensors"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["ports", "tags", "countries", "asn", "ips", "payloads", "http_path", "rdns"] }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 30 }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["desc", "asc"], "default": "desc" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sensor statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResult"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
+    "/query/sensors/tag/{tag}": {
+      "get": {
+        "operationId": "querySensorsTag",
+        "summary": "Get IPs by sensor tag",
+        "description": "Get IP addresses associated with a specific sensor tag.",
+        "tags": ["Sensors"],
+        "parameters": [
+          {
+            "name": "tag",
+            "in": "path",
+            "required": true,
+            "description": "Tag name",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "description": "Number of days (1-60)",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 60, "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "IP addresses matching tag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Key",
+        "description": "BinaryEdge API key passed via X-Key header"
+      }
+    },
+    "schemas": {
+      "SubscriptionInfo": {
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Subscription plan name" },
+              "end_date": { "type": "string", "format": "date-time", "description": "Subscription end date" },
+              "requests_left": { "type": "integer", "description": "Remaining API requests" }
+            }
+          }
+        }
+      },
+      "HostResult": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer", "description": "Total number of events" },
+          "query": { "type": "string" },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "port": { "type": "integer" },
+          "protocol": { "type": "string" },
+          "state": {
+            "type": "object",
+            "properties": {
+              "state": { "type": "string" }
+            }
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "string" },
+                      "product": { "type": "string" },
+                      "version": { "type": "string" },
+                      "banner": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "target": {
+            "type": "object",
+            "properties": {
+              "ip": { "type": "string" },
+              "port": { "type": "integer" }
+            }
+          },
+          "origin": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "ts": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "pagesize": { "type": "integer" },
+          "query": { "type": "string" },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          }
+        }
+      },
+      "StatsResult": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "total": { "type": "integer" },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": { "type": "string" },
+                "doc_count": { "type": "integer" }
+              }
+            }
+          }
+        }
+      },
+      "ImageResult": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "pagesize": { "type": "integer" },
+          "query": { "type": "string" },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ip": { "type": "string" },
+                "port": { "type": "integer" },
+                "image_id": { "type": "string" },
+                "thumb": { "type": "string" },
+                "url": { "type": "string" },
+                "tags": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "ocr": { "type": "string" },
+                "has_faces": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      },
+      "TorrentResult": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "query": { "type": "string" },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ip": { "type": "string" },
+                "port": { "type": "integer" },
+                "torrent": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "info_hash": { "type": "string" },
+                    "source": { "type": "string" },
+                    "category": { "type": "string" }
+                  }
+                },
+                "peer": {
+                  "type": "object",
+                  "properties": {
+                    "ip": { "type": "string" },
+                    "port": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "DataleakEmailResult": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer", "description": "Total number of leaks affecting this email" },
+          "events": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of leak names"
+          },
+          "query": { "type": "string" }
+        }
+      },
+      "DataleakOrgResult": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "leak": { "type": "string" },
+                "count": { "type": "integer" }
+              }
+            }
+          },
+          "query": { "type": "string" }
+        }
+      },
+      "DataleakInfo": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "date": { "type": "string" },
+          "total_records": { "type": "integer" },
+          "data_types": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "RiskScoreResult": {
+        "type": "object",
+        "properties": {
+          "normalized_ip_score": { "type": "number" },
+          "normalized_ip_score_detailed": {
+            "type": "object",
+            "properties": {
+              "cve": { "type": "number" },
+              "attack_surface": { "type": "number" },
+              "encryption": { "type": "number" },
+              "rms": { "type": "number" },
+              "storage": { "type": "number" },
+              "web": { "type": "number" },
+              "torrents": { "type": "number" }
+            }
+          },
+          "ip_address": { "type": "string" }
+        }
+      },
+      "CveResult": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "query": { "type": "string" },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cve": { "type": "string" },
+                "cvss": { "type": "number" },
+                "ports": {
+                  "type": "array",
+                  "items": { "type": "integer" }
+                },
+                "product": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "DomainResult": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "pagesize": { "type": "integer" },
+          "query": { "type": "string" },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "domain": { "type": "string" },
+                "A": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "AAAA": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "NS": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "MX": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "SensorResult": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "query": { "type": "string" },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ip": { "type": "string" },
+                "port": { "type": "integer" },
+                "payload": { "type": "string" },
+                "tags": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "extra": {
+                  "type": "object",
+                  "properties": {
+                    "http": {
+                      "type": "object",
+                      "properties": {
+                        "method": { "type": "string" },
+                        "path": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "integer" },
+          "title": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request - invalid query or parameters",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized - invalid or missing API key",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      }
+    }
+  }
+}

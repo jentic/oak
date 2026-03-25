@@ -1,0 +1,502 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FASHN API",
+    "version": "1.0.0",
+    "description": "FASHN AI API for virtual try-on, model creation, image editing, and fashion AI. All model endpoints use the universal /v1/run endpoint with model_name selection, and results are retrieved via /v1/status/{id} polling.",
+    "x-jentic-source-url": "https://docs.fashn.ai/"
+  },
+  "servers": [
+    {
+      "url": "https://api.fashn.ai"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Predictions",
+      "description": "Run model predictions and check status"
+    },
+    {
+      "name": "Utility",
+      "description": "Account utility endpoints"
+    }
+  ],
+  "paths": {
+    "/v1/run": {
+      "post": {
+        "operationId": "runPrediction",
+        "summary": "Run a prediction",
+        "description": "Submit a prediction request using any FASHN model. The model_name field determines which model pipeline is used. Returns a prediction ID for status polling. Supported models: tryon-v1.6, tryon-max, product-to-model, face-to-model, model-create, model-swap, edit, reframe, image-to-video, background-remove.",
+        "tags": [
+          "Predictions"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunPredictionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prediction queued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/status/{id}": {
+      "get": {
+        "operationId": "getPredictionStatus",
+        "summary": "Get prediction status",
+        "description": "Poll for the status and results of a prediction. Status values: starting, in_queue, processing, completed, failed. The x-fashn-credits-used response header indicates credit consumption.",
+        "tags": [
+          "Predictions"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The prediction ID returned from /v1/run."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Prediction status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/credits": {
+      "get": {
+        "operationId": "getCreditsBalance",
+        "summary": "Get credits balance",
+        "description": "Retrieve your current FASHN API credits balance including subscription and on-demand credits.",
+        "tags": [
+          "Utility"
+        ],
+        "responses": {
+          "200": {
+            "description": "Credits balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditsBalance"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (30 requests per 10 seconds)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "FASHN API key. Obtain from the Developer API Dashboard at https://app.fashn.ai/api"
+      }
+    },
+    "schemas": {
+      "RunPredictionRequest": {
+        "type": "object",
+        "required": [
+          "model_name",
+          "inputs"
+        ],
+        "description": "Universal prediction request. The inputs object structure varies by model_name.",
+        "properties": {
+          "model_name": {
+            "type": "string",
+            "enum": [
+              "tryon-v1.6",
+              "tryon-max",
+              "product-to-model",
+              "face-to-model",
+              "model-create",
+              "model-swap",
+              "edit",
+              "reframe",
+              "image-to-video",
+              "background-remove"
+            ],
+            "description": "The model to use for prediction."
+          },
+          "inputs": {
+            "type": "object",
+            "description": "Model-specific input parameters. See individual model documentation for required and optional fields.",
+            "properties": {
+              "model_image": {
+                "type": "string",
+                "description": "(tryon-v1.6, tryon-max, product-to-model, model-swap) Image URL or base64 of the person/model."
+              },
+              "garment_image": {
+                "type": "string",
+                "description": "(tryon-v1.6) Image URL or base64 of the garment to try on."
+              },
+              "product_image": {
+                "type": "string",
+                "description": "(tryon-max, product-to-model) Image URL or base64 of the product."
+              },
+              "face_image": {
+                "type": "string",
+                "description": "(face-to-model) Image URL or base64 of the face."
+              },
+              "image": {
+                "type": "string",
+                "description": "(edit, reframe, image-to-video, background-remove) Source image URL or base64."
+              },
+              "prompt": {
+                "type": "string",
+                "description": "(model-create, product-to-model, model-swap, edit, image-to-video, tryon-max) Text prompt for generation/editing."
+              },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "tops",
+                  "bottoms",
+                  "one-pieces"
+                ],
+                "description": "(tryon-v1.6) Garment category. Default: auto."
+              },
+              "segmentation_free": {
+                "type": "boolean",
+                "description": "(tryon-v1.6) Direct garment fitting without segmentation. Default: true."
+              },
+              "moderation_level": {
+                "type": "string",
+                "enum": [
+                  "conservative",
+                  "permissive",
+                  "none"
+                ],
+                "description": "(tryon-v1.6) Content moderation level. Default: permissive."
+              },
+              "garment_photo_type": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "flat-lay",
+                  "model"
+                ],
+                "description": "(tryon-v1.6) Type of garment photo. Default: auto."
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "performance",
+                  "balanced",
+                  "quality"
+                ],
+                "description": "(tryon-v1.6) Speed vs quality tradeoff. Default: balanced."
+              },
+              "seed": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Random seed for reproducibility. Default: 42."
+              },
+              "num_samples": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4,
+                "description": "(tryon-v1.6) Number of images to generate. Default: 1."
+              },
+              "num_images": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4,
+                "description": "(tryon-max, product-to-model, model-create, model-swap, reframe) Number of images to generate. Default: 1."
+              },
+              "output_format": {
+                "type": "string",
+                "enum": [
+                  "png",
+                  "jpeg"
+                ],
+                "description": "Output image format. Default: png."
+              },
+              "return_base64": {
+                "type": "boolean",
+                "description": "Return base64 instead of CDN URL. Default: false."
+              },
+              "face_reference": {
+                "type": "string",
+                "description": "(product-to-model, model-create, model-swap) Face identity reference image URL or base64."
+              },
+              "face_reference_mode": {
+                "type": "string",
+                "enum": [
+                  "match_base",
+                  "match_reference"
+                ],
+                "description": "How face reference influences output. Default: match_reference."
+              },
+              "image_reference": {
+                "type": "string",
+                "description": "(model-create) Image to guide composition and pose."
+              },
+              "image_prompt": {
+                "type": "string",
+                "description": "(product-to-model) Inspiration image for pose/environment."
+              },
+              "background_reference": {
+                "type": "string",
+                "description": "(product-to-model) Background image for generation."
+              },
+              "aspect_ratio": {
+                "type": "string",
+                "enum": [
+                  "1:1",
+                  "3:4",
+                  "4:3",
+                  "9:16",
+                  "16:9",
+                  "2:3",
+                  "3:2",
+                  "4:5",
+                  "5:4",
+                  "21:9"
+                ],
+                "description": "Target aspect ratio."
+              },
+              "resolution": {
+                "type": "string",
+                "enum": [
+                  "1k",
+                  "4k"
+                ],
+                "description": "(product-to-model, model-create, edit) Generation resolution profile. Default: 1k."
+              },
+              "mask": {
+                "type": "string",
+                "description": "(edit) Mask image to guide edit regions."
+              },
+              "image_context": {
+                "type": "string",
+                "description": "(edit) Reference image for visual context."
+              },
+              "duration": {
+                "type": "integer",
+                "enum": [
+                  5,
+                  10
+                ],
+                "description": "(image-to-video) Video duration in seconds. Default: 5."
+              }
+            }
+          },
+          "webhook_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Optional webhook URL for completion notification."
+          }
+        }
+      },
+      "PredictionCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique prediction ID for status polling."
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "description": "Error message, null on success."
+          }
+        }
+      },
+      "PredictionStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Prediction ID."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "starting",
+              "in_queue",
+              "processing",
+              "completed",
+              "failed"
+            ],
+            "description": "Current prediction status."
+          },
+          "output": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of output image/video URLs or base64 strings. Only present when status is completed."
+          },
+          "error": {
+            "description": "Error details. Only present when status is failed.",
+            "nullable": true,
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Error code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Error description."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "CreditsBalance": {
+        "type": "object",
+        "properties": {
+          "credits": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total available credits (subscription + on-demand)."
+              },
+              "subscription": {
+                "type": "integer",
+                "description": "Credits from monthly subscription plan."
+              },
+              "on_demand": {
+                "type": "integer",
+                "description": "Additional purchased credits."
+              }
+            }
+          }
+        }
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error code."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error description."
+          }
+        }
+      }
+    }
+  }
+}

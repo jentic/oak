@@ -1,0 +1,928 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Tabidoo API",
+    "description": "Tabidoo API v2 provides programmatic access to applications, tables, and records in the Tabidoo cloud database platform. Supports CRUD operations, bulk operations, filtering, sorting, pagination, file management, and user management.",
+    "version": "2.0.0",
+    "contact": {
+      "name": "Tabidoo",
+      "url": "https://www.tabidoo.cloud"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://app.tabidoo.cloud/api/v2",
+      "description": "Production server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {"name": "System", "description": "System health checks"},
+    {"name": "Applications", "description": "Application management"},
+    {"name": "Tables", "description": "Table schema and metadata"},
+    {"name": "Records", "description": "Record CRUD operations"},
+    {"name": "Bulk Operations", "description": "Bulk record operations"},
+    {"name": "Files", "description": "File and image management"},
+    {"name": "Users", "description": "User information"},
+    {"name": "Templates", "description": "Application templates"}
+  ],
+  "paths": {
+    "/ping": {
+      "get": {
+        "operationId": "ping",
+        "summary": "Ping the API",
+        "description": "Verify API connectivity.",
+        "tags": ["System"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API is reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {"type": "string", "example": "pong"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/apps": {
+      "get": {
+        "operationId": "listApplications",
+        "summary": "List applications",
+        "description": "List all applications accessible to the authenticated user.",
+        "tags": ["Applications"],
+        "responses": {
+          "200": {
+            "description": "List of applications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Application"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/apps/{app_id}": {
+      "get": {
+        "operationId": "getApplication",
+        "summary": "Get application",
+        "description": "Retrieve a specific application by ID or internal name.",
+        "tags": ["Applications"],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "description": "Application ID or internal name",
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"$ref": "#/components/schemas/Application"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Application not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/apps/{app_id}/tables": {
+      "get": {
+        "operationId": "listTables",
+        "summary": "List tables",
+        "description": "List all tables in an application.",
+        "tags": ["Tables"],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "description": "Application ID or internal name",
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tables",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Table"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Application not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/apps/{app_id}/tables/{table_id}": {
+      "get": {
+        "operationId": "getTable",
+        "summary": "Get table definition",
+        "description": "Get table definition with field metadata.",
+        "tags": ["Tables"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "description": "Table ID or internal name", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Table definition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"$ref": "#/components/schemas/Table"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Table not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/apps/{app_id}/tables/{table_id}/data": {
+      "get": {
+        "operationId": "listRecords",
+        "summary": "List records",
+        "description": "List records with pagination, sorting, and filtering via query string.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "description": "Records per page (0-1000, default 25)", "schema": {"type": "integer", "default": 25, "minimum": 0, "maximum": 1000}},
+          {"name": "skip", "in": "query", "description": "Pagination offset (default 0)", "schema": {"type": "integer", "default": 0}},
+          {"name": "sort", "in": "query", "description": "Sort fields, e.g. 'age' or 'age(desc)'", "schema": {"type": "string"}},
+          {"name": "filter", "in": "query", "description": "Filter conditions as JSON string", "schema": {"type": "string"}},
+          {"name": "dataResponseType", "in": "query", "description": "Response format", "schema": {"type": "string", "enum": ["All", "MetadataOnly", "None"]}},
+          {"name": "loadFields", "in": "query", "description": "Comma-separated list of fields to return", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of records",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/RecordListResponse"}
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "post": {
+        "operationId": "createRecord",
+        "summary": "Create a record",
+        "description": "Create a new record. Supports UPSERT mode with useUpsert parameter.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "useUpsert", "in": "query", "description": "Enable insert-or-update mode", "schema": {"type": "boolean"}},
+          {"name": "skipAudit", "in": "query", "description": "Skip change history logging", "schema": {"type": "boolean"}},
+          {"name": "dataResponseType", "in": "query", "schema": {"type": "string", "enum": ["All", "MetadataOnly", "None"]}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/RecordInput"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Record created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"$ref": "#/components/schemas/Record"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/apps/{app_id}/tables/{table_id}/data/filter": {
+      "post": {
+        "operationId": "filterRecords",
+        "summary": "Filter records",
+        "description": "List records using body-based filters for complex queries.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 25, "maximum": 1000}},
+          {"name": "skip", "in": "query", "schema": {"type": "integer", "default": 0}},
+          {"name": "sort", "in": "query", "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/FilterCondition"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Filtered records",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/RecordListResponse"}
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/apps/{app_id}/tables/{table_id}/data/count": {
+      "get": {
+        "operationId": "countRecords",
+        "summary": "Count records",
+        "description": "Get the count of records in a table.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "filter", "in": "query", "description": "Filter conditions as JSON string", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Record count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/apps/{app_id}/tables/{table_id}/data/count/filter": {
+      "post": {
+        "operationId": "countRecordsWithFilter",
+        "summary": "Count records with body filter",
+        "description": "Count records using body-based filter conditions.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/FilterCondition"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/apps/{app_id}/tables/{table_id}/data/summary": {
+      "post": {
+        "operationId": "summarizeRecords",
+        "summary": "Get record aggregations",
+        "description": "Get aggregated values (min, max, sum, avg) for fields.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {"type": "string"},
+                        "operation": {"type": "string", "enum": ["min", "max", "sum", "avg"]}
+                      }
+                    }
+                  },
+                  "filter": {"$ref": "#/components/schemas/FilterCondition"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aggregation results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/apps/{app_id}/tables/{table_id}/data/{record_id}": {
+      "get": {
+        "operationId": "getRecord",
+        "summary": "Get a record",
+        "description": "Retrieve a single record by ID.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "record_id", "in": "path", "required": true, "description": "Record ID", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Record details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"$ref": "#/components/schemas/Record"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Record not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "patch": {
+        "operationId": "patchRecord",
+        "summary": "Partial update record",
+        "description": "Partially update a record. Supports UPSERT mode.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "record_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "useUpsert", "in": "query", "schema": {"type": "boolean"}},
+          {"name": "skipAudit", "in": "query", "schema": {"type": "boolean"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/RecordInput"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"$ref": "#/components/schemas/Record"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Record not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "put": {
+        "operationId": "updateRecord",
+        "summary": "Full update record",
+        "description": "Fully replace a record. Supports UPSERT mode.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "record_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "useUpsert", "in": "query", "schema": {"type": "boolean"}},
+          {"name": "skipAudit", "in": "query", "schema": {"type": "boolean"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/RecordInput"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"$ref": "#/components/schemas/Record"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Record not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "delete": {
+        "operationId": "deleteRecord",
+        "summary": "Delete a record",
+        "description": "Delete a single record by ID.",
+        "tags": ["Records"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "record_id", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "204": {"description": "Record deleted"},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Record not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/apps/{app_id}/tables/{table_id}/data/bulk": {
+      "post": {
+        "operationId": "bulkCreateRecords",
+        "summary": "Bulk create records",
+        "description": "Create multiple records at once. Supports UPSERT mode.",
+        "tags": ["Bulk Operations"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "useUpsert", "in": "query", "schema": {"type": "boolean"}},
+          {"name": "skipAudit", "in": "query", "schema": {"type": "boolean"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/RecordInput"}
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Records created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Record"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "patch": {
+        "operationId": "bulkPatchRecords",
+        "summary": "Bulk partial update records",
+        "description": "Partially update multiple records. Supports UPSERT mode.",
+        "tags": ["Bulk Operations"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "useUpsert", "in": "query", "schema": {"type": "boolean"}},
+          {"name": "skipAudit", "in": "query", "schema": {"type": "boolean"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/RecordInput"}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Records updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Record"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "put": {
+        "operationId": "bulkUpdateRecords",
+        "summary": "Bulk full update records",
+        "description": "Fully replace multiple records. Supports UPSERT mode.",
+        "tags": ["Bulk Operations"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "useUpsert", "in": "query", "schema": {"type": "boolean"}},
+          {"name": "skipAudit", "in": "query", "schema": {"type": "boolean"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/RecordInput"}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Records replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Record"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "delete": {
+        "operationId": "bulkDeleteRecords",
+        "summary": "Bulk delete records",
+        "description": "Delete multiple records matching filter conditions.",
+        "tags": ["Bulk Operations"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "description": "Maximum records to delete", "schema": {"type": "integer"}},
+          {"name": "filter", "in": "query", "description": "Filter conditions as JSON string", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "204": {"description": "Records deleted"},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/apps/{app_id}/tables/{table_id}/files/{file_id}": {
+      "get": {
+        "operationId": "downloadFile",
+        "summary": "Download a file",
+        "description": "Download a file attached to a record.",
+        "tags": ["Files"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "file_id", "in": "path", "required": true, "description": "File ID", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "File content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {"type": "string", "format": "binary"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized"},
+          "404": {"description": "File not found"}
+        }
+      }
+    },
+    "/apps/{app_id}/tables/{table_id}/files/{file_id}/thumbnail": {
+      "get": {
+        "operationId": "getFileThumbnail",
+        "summary": "Get image thumbnail",
+        "description": "Get a thumbnail version of an image file.",
+        "tags": ["Files"],
+        "parameters": [
+          {"name": "app_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "table_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "file_id", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Thumbnail image",
+            "content": {
+              "image/*": {
+                "schema": {"type": "string", "format": "binary"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized"},
+          "404": {"description": "File not found"}
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "summary": "Get current user",
+        "description": "Retrieve the current authenticated user's profile (ID and email).",
+        "tags": ["Users"],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {"type": "string"},
+                        "email": {"type": "string", "format": "email"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/templates/createDevAppFromProdApp": {
+      "post": {
+        "operationId": "createDevAppFromProdApp",
+        "summary": "Create development app from production",
+        "description": "Create a development copy of a production application.",
+        "tags": ["Templates"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appId": {"type": "string", "description": "Production application ID"}
+                },
+                "required": ["appId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Development app created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"$ref": "#/components/schemas/Application"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Bearer token. Generate tokens in the Tabidoo app user settings under the API section."
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {"type": "string", "enum": ["info", "warning", "exception"]},
+                "id": {"type": "string"},
+                "message": {"type": "string"}
+              }
+            }
+          }
+        }
+      },
+      "Application": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "tables": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/TableSummary"}
+          }
+        }
+      },
+      "TableSummary": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"}
+        }
+      },
+      "Table": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "fields": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/Field"}
+          }
+        }
+      },
+      "Field": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "type": {
+            "type": "string",
+            "enum": ["text", "long_text", "number", "decimal", "percentage", "money", "money_with_currency", "checkbox", "date", "datetime", "dropdown", "radio", "dropdownmulti", "chips", "url_link", "markdown", "checklist", "chat", "picture", "file", "schema_link", "buttonform", "freehtmlinput"]
+          },
+          "required": {"type": "boolean"},
+          "readOnly": {"type": "boolean"}
+        }
+      },
+      "Record": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "fields": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Dynamic key-value pairs corresponding to table fields"
+          },
+          "createdAt": {"type": "string", "format": "date-time"},
+          "modifiedAt": {"type": "string", "format": "date-time"},
+          "createdBy": {"type": "string"},
+          "modifiedBy": {"type": "string"}
+        }
+      },
+      "RecordInput": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Key-value pairs corresponding to table fields"
+          }
+        }
+      },
+      "RecordListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/Record"}
+          }
+        }
+      },
+      "FilterCondition": {
+        "type": "object",
+        "description": "Filter conditions using supported operators: contains, notcontains, startswith, endswith, eq, neq, empty, notempty, in, notin, gt, lt, gte, lte, duplicity, currentuser",
+        "additionalProperties": true
+      }
+    }
+  }
+}

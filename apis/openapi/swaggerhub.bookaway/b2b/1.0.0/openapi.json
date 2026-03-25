@@ -1,0 +1,980 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "Transfers API",
+    "description": "# General\nBookaway B2B API give you access to all Bookaway inventory. You can use it to search, book and get the status of a specific booking.\n# Authentication\nTo authenticate to Bookaway B2B API you need first to get credentials a `client_id` and a `client_secret`.\nBookaway B2B API uses Oauth2 Client Credentials to perform the authentication. The Bookaway Oauth2 flow documentation is available [here](https://app.swaggerhub.com/apis-docs/Bookaway/Oauth/1.0.0).\n# Environments\n### Sandbox\nThe sandbox environment is used for test and development purposes. It works the same as the production environment but return slightly different data and requires to use sandbox credentials.\n  The base URL for each API call is:\n  \n  `https://stage.bookaway.com/api/b2b/v1`\n  \n### Production\nOnce you\u2019re finished developing your integration with Bookaway B2B API in the sandbox environment, and after reviewing your integration with Bookaway, you\u2019ll be given production credentials.\n  The base URL for each API call in production is:\n  \n`https://www.bookaway.com/api/b2b/v1`\n\n\n# Workflow\n### 1. Static API\nYou need first to retrieve the different destinations and transfers information that Bookaway offers. The destinations are available as JSON file. We recommand run an update on a weekly basis.\n\n  They\u2019re composed of 5 types of entities:\n\n  * **Stations**: Pickup/Dropoff point with specific coordinate\n  * **Cities**: List of available destinations\n  * **Routes**: \n    \n    * A route is a way to go from a station A to a station B. Example: Bangkok to Pattaya\n  \n    * A route is defined by a direction, Cusco to Machu Picchu is a route and Machu Picchu to Cusco is another route.\n    \n    * On a specific route there can be different types of transfers: train, bus, ferry, private car, etc\u2026\n  * **Transfers**: A transfer is a bus/train/ferry operated on a specific route. Each transfer has a operator\n  * **Operators**: List of available operators.\n  \nStatic API returns thousands of results, you should never send live requests but instead download `stations.json`, `cities.json`, `routes.json` , `transfers.json` and `operators.json` files on a daily basis and cache them in your system.\n\n### 2. Trips API\n\n  Let you search through all trips available in Bookaway B2B API.\n  \n  You can also look at a specific Trip.\n  \n  Trips might require additional information, some information is static which can be retreived from the transfers static endpoint.\n  Some information is dynamic like seatMap - trips which might require seatMap input will have a flag on them `hasExtraUserInputRequired` as `true`.\n  For those trips a call to `tripDetails` should be made. If an aditional info returned, its should be used on the booking process (selected seats for example).\n  \n  \n  \n### 3. Bookings API\n\n  Let you book a specific Trip.\n  \n  Let you see the status of a specific booking. \n  \n  Let you cancel a specific booking.\n  \n### 4. Post Bookings WebHooks\n\n  Booking updates can be retrieved by getting booking status - from Booking API, or by a webhook notification which will notify about booking updated.\n  \n  All webhooks will be delivered to the same endpoint which should response with a HTTP 200 status.\n  \n  The webhooks can be differentiated by `type` field\n  \n  All webhooks will use HTTP **POST**\n\n  **Please note:**\n  \n  The paths stated below are only used to make the documentation clearer to read and navigate. Nothing should follow the '/' in the path.\n  \n  for example `https://webhook-endpoint/approved` will be sent to your webhook url without the `/approved` safix\n    contact:\nname: omer chehmer\n    contact:\nemail: omer@bookaway.com\n  \n  ",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/Bookaway/B2B/1.0.0/swagger.json"
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/cities": {
+      "parameters": [
+        {
+          "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/parameters/bearerToken"
+        },
+        {
+          "in": "query",
+          "name": "limit",
+          "description": "limit the number of results. maximum allowed is 1000",
+          "required": false,
+          "schema": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        {
+          "in": "query",
+          "name": "offset",
+          "description": "result offset. default is zero.",
+          "required": false,
+          "schema": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Static API"
+        ],
+        "description": "Returns a json file containing all available cities",
+        "responses": {
+          "200": {
+            "description": "Array of stations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/City"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/stations": {
+      "parameters": [
+        {
+          "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/parameters/bearerToken"
+        },
+        {
+          "in": "query",
+          "name": "limit",
+          "description": "limit the number of results. maximum allowed is 2000",
+          "required": true,
+          "schema": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 2000
+          }
+        },
+        {
+          "in": "query",
+          "name": "offset",
+          "description": "result offset. default is zero.",
+          "required": false,
+          "schema": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Static API"
+        ],
+        "description": "Returns a json file containing all available stations, including their address and geo coordinates",
+        "responses": {
+          "200": {
+            "description": "Array of stations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Station"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/operators": {
+      "parameters": [
+        {
+          "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/parameters/bearerToken"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Static API"
+        ],
+        "description": "Returns a json file containing all available operators",
+        "responses": {
+          "200": {
+            "description": "Array of operators",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Operator"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/routes": {
+      "parameters": [
+        {
+          "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/parameters/bearerToken"
+        },
+        {
+          "in": "query",
+          "name": "limit",
+          "description": "limit the number of results. default is 100, maximum allowed is 10000",
+          "required": true,
+          "schema": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        },
+        {
+          "in": "query",
+          "name": "offset",
+          "description": "result offset. default is zero.",
+          "required": false,
+          "schema": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Static API"
+        ],
+        "description": "Returns a json file containing all available routes between stations.",
+        "responses": {
+          "200": {
+            "description": "Array of routes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Route"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/transfers": {
+      "parameters": [
+        {
+          "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/parameters/bearerToken"
+        },
+        {
+          "in": "query",
+          "name": "departureStation",
+          "description": "list of departure station ids, seperete by comma (,)",
+          "example": "58ade161b626ad00060bd174,58ade161b626ad00060bd174",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "in": "query",
+          "name": "arrivalStation",
+          "description": "list of arrival station ids, seperete by comma (,)",
+          "example": "58ade161b626ad00060bd174,58ade161b626ad00060bd174",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "in": "query",
+          "name": "limit",
+          "description": "limit the number of results. default is 100, maximum allowed is 1000",
+          "required": false,
+          "schema": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        {
+          "in": "query",
+          "name": "offset",
+          "description": "result offset. default is zero.",
+          "required": false,
+          "schema": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Static API"
+        ],
+        "description": "Return a json file containing all the available transfers with all their static information - images, description, amenities, ect.\n\nPlease note that some transfers also has extras and additional passenger information  which  require to provide in the booking request.",
+        "responses": {
+          "200": {
+            "description": "Array of transfers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Transfer"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/trips": {
+      "parameters": [
+        {
+          "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/parameters/bearerToken"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Trips API"
+        ],
+        "description": "Search available trips between stations for a specific date. Supports search by city to city as well.",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "description": "an authorization header as \"Bearer xxxxxxxxxxxxxx\"",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "departureStation",
+            "description": "list of departure station ids, seperete by comma (,)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "arrivalStation",
+            "description": "list of arrival station ids, seperete by comma (,)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fromCity",
+            "description": "Search for trips departing from a specific city",
+            "example": "58ade161b626ad00060bd174",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "toCity",
+            "description": "Search for trips arriving to a specific city",
+            "example": "58ade15cd8638d00070c04b2",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "departure",
+            "description": "the required date in format: \"YYYY-MM-DD\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "passengers",
+            "description": "amount of passengers [1..15], if not supplied, calculated attributes will assume single passenger",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 15
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "description": "limit the number of results. default is 100, maximum allowed is 5000",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5000
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "description": "result offset. default is zero.",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of Trips",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Trip"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/trips/{id}": {
+      "parameters": [
+        {
+          "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/parameters/bearerToken"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Trips API"
+        ],
+        "description": "Look at a specific trip",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "description": "an authorization header as \"Bearer xxxxxxxxxxxxxx\"",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "id of the Trip",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "5ac337d1e575a8b638046a0f"
+            }
+          },
+          {
+            "in": "query",
+            "name": "passengers",
+            "description": "amount of passengers [1..15], if not supplied, calculated attributes will assume single passenger",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 15
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trip"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": 404
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "The trip with id \"{id}\" does not exist."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/trips/{id}/details": {
+      "parameters": [
+        {
+          "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/parameters/bearerToken"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Trips API"
+        ],
+        "description": "Look at a specific trip extra details - like seatmap",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "description": "an authorization header as \"Bearer xxxxxxxxxxxxxx\"",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "id of the Trip",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "5ac337d1e575a8b638046a0f"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": 404
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "The trip does ont have extra dynamic details."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/bookings": {
+      "parameters": [
+        {
+          "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/parameters/bearerToken"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Bookings API"
+        ],
+        "description": "Book a specific Trip, booking consist of selected trip, and passengers info. Note that some trips requires extra information per passenger, this extra info is described in the transfers API.",
+        "requestBody": {
+          "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/requestBodies/BookingRequest"
+        },
+        "responses": {
+          "200": {
+            "description": "Booking",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/bookings/{id}/pay": {
+      "post": {
+        "tags": [
+          "Bookings API"
+        ],
+        "description": "Call this API after creating a booking. A booking can be approved only after this API is called.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the booking as was returned by the create booking API",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "5e775cdc21551cbd7b01432b"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": 404
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "The booking with id \"{id}\" does not exist."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/{id}": {
+      "get": {
+        "tags": [
+          "Bookings API"
+        ],
+        "description": "View a booking by id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the Booking",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "5e775cdc21551cbd7b01432b"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": 404
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "The booking with id \"{id}\" does not exist."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Bookings API"
+        ],
+        "description": "Cancel a booking by id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the booking, please verify cancellation policy for this transfer before. ",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "5e775cdc21551cbd7b01432b"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cancellationReason": {
+                    "description": "Cancellation reason free text",
+                    "type": "string",
+                    "example": "Health reasons"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": 404
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "The booking with id \"{id}\" does not exist."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/approved": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "description": "Webhook to notify a booking has been approved",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "example": "approved"
+                  },
+                  "booking": {
+                    "$ref": "#/components/schemas/Booking"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/cancelled": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "description": "Webhook to notify a booking has been cancelled",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "example": "cancelled"
+                  },
+                  "booking": {
+                    "$ref": "#/components/schemas/Booking"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/updated": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "description": "Webhook to notify a booking has been updated",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "example": "updated"
+                  },
+                  "oldBooking": {
+                    "$ref": "#/components/schemas/Booking"
+                  },
+                  "booking": {
+                    "$ref": "#/components/schemas/Booking"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/credits": {
+      "post": {
+        "tags": [
+          "Credits API"
+        ],
+        "description": "Get credits balance",
+        "responses": {
+          "200": {
+            "description": "Object containing remining credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "balance": {
+                      "type": "string",
+                      "example": 100
+                    },
+                    "currency": {
+                      "type": "string",
+                      "example": "USD"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "City": {
+        "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/schemas/City"
+      },
+      "Route": {
+        "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/schemas/Route"
+      },
+      "Station": {
+        "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/schemas/Station"
+      },
+      "Operator": {
+        "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/schemas/Operator"
+      },
+      "Transfer": {
+        "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/schemas/Transfer"
+      },
+      "Trip": {
+        "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/schemas/Trip"
+      },
+      "TripDetails": {
+        "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/schemas/TripDetails"
+      },
+      "Booking": {
+        "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/schemas/Booking"
+      }
+    },
+    "requestBodies": {
+      "BookingRequest": {
+        "description": "Book a specific trip",
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "https://api.swaggerhub.com/domains/Bookaway/Inventory/1.0.0#/components/requestBodies/BookingRequest"
+            }
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "SwaggerHub API Auto Mocking",
+      "url": "https://virtserver.swaggerhub.com/Bookaway/B2B/1.0.0"
+    },
+    {
+      "description": "Bookaway Sandbox",
+      "url": "https://stage.bookaway.com/api/b2b/v1"
+    },
+    {
+      "description": "Bookaway Production",
+      "url": "https://www.bookaway.com/api/b2b/v1"
+    }
+  ]
+}

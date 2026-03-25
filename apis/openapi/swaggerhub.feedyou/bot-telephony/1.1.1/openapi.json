@@ -1,0 +1,731 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "1.1.1",
+    "title": "Feedyou Bot Telephony API",
+    "description": "This API allows to use Feedyou bot with telephony PBX which implements TTS/STT voice processing on its own.\n\n - When user calls PBX, `call_start` event is sent to the bot\n - Bot loads set of intro messages and sends them one by one using `queue_tts` to the PBX (endpoint where PBX is listening for events from bot should be defined in `callback_endpoint` property)\n - PBX should transform them to the voice audio using TTS engine add then play them in sequence (some other messages can come even during playback of previous one)\n - When `queue_tts` has the `next_state=listen` flag, PBX should switch to the listening mode when given message played to the end and forward incoming audio stream to the STT service (some STT settings such as speech context could be included in the event from bot)\n - When STT detects end of user input, recognized text should be sent to the bot using `recognized_text` event (when end of utterance is not detected until selected `listen_timeout`, `listen_timeout_reached` event is sent to the bot)\n - Then the cycle continues until user hangs up bot sends `queue_tts` with `next_state=hangup` or `next_state=transfer` event (it transfers call to some other phone number)\n\nSee the following sequence diagram to understand basic principles.\n<br /><br /> <img alt=\"Sequence diagram\" src=\"https://feedyou.blob.core.windows.net/docs/voice-bot-pbx.png\" />\n",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/feedyou/bot-telephony/1.1.1/swagger.json"
+  },
+  "servers": [
+    {
+      "description": "SwaggerHub API Auto Mocking",
+      "url": "https://virtserver.swaggerhub.com/feedyou/bot-telephony/1.1.1"
+    },
+    {
+      "url": "https://{botId}.azurewebsites.net/api/messages/linuxbox",
+      "variables": {
+        "botId": {
+          "default": "feedbot-example",
+          "description": "Customer ID assigned by the service provider"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/call_start": {
+      "post": {
+        "summary": "Notify bot about new incoming call",
+        "description": "",
+        "tags": [
+          "PBX \u2192 Bot"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_type": {
+                    "type": "string",
+                    "description": "Message type of value call_start"
+                  },
+                  "call_id": {
+                    "type": "string",
+                    "description": "Call ID"
+                  },
+                  "callback_endpoint": {
+                    "type": "string",
+                    "description": "PBX URI for API requests - it can be just protocol+FQDN so default /queue_tts path will be used or full URL including any path"
+                  },
+                  "callback_oauth_server": {
+                    "type": "string",
+                    "description": "Optional name of OAuth server (protocol+FQDN) when client credentials flow should be used to authenticate callback calls"
+                  },
+                  "callback_oauth_token_endpoint": {
+                    "type": "string",
+                    "description": "Optional path on OAuth server which will be used for token retrieval"
+                  },
+                  "caller_num": {
+                    "type": "string",
+                    "description": "Number of calling party"
+                  },
+                  "caller_params": {
+                    "type": "object",
+                    "description": "Any optional information about caller"
+                  }
+                },
+                "required": [
+                  "call_id",
+                  "callback_endpoint",
+                  "caller_num"
+                ]
+              },
+              "example": {
+                "message_type": "call_start",
+                "call_id": "1592977019.104444",
+                "caller_num": "777093799",
+                "caller_params": {
+                  "name": "Jan"
+                },
+                "callback_endpoint": "https://pbx.example.com",
+                "callback_oauth_server": "https://auth.example.com",
+                "callback_oauth_token_endpoint": "/oauth/v2/token"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfull response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "status": "OK",
+                  "message": "Command successfull"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/recognized_text": {
+      "post": {
+        "summary": "Pass text recognized by STT to the bot",
+        "description": "",
+        "tags": [
+          "PBX \u2192 Bot"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_type": {
+                    "type": "string",
+                    "description": "Message type of value recognized_text"
+                  },
+                  "call_id": {
+                    "type": "string",
+                    "description": "Call ID"
+                  },
+                  "callback_endpoint": {
+                    "type": "string",
+                    "description": "PBX URI for API requests - it can be just protocol+FQDN so default /queue_tts path will be used or full URL including any path"
+                  },
+                  "callback_oauth_server": {
+                    "type": "string",
+                    "description": "Optional name of OAuth server (protocol+FQDN) when client credentials flow should be used to authenticate callback calls"
+                  },
+                  "callback_oauth_token_endpoint": {
+                    "type": "string",
+                    "description": "Optional path on OAuth server which will be used for token retrieval"
+                  },
+                  "text_lexical": {
+                    "type": "string",
+                    "description": "Recognized text"
+                  }
+                },
+                "required": [
+                  "call_id",
+                  "callback_endpoint",
+                  "text_lexical"
+                ]
+              },
+              "example": {
+                "message_type": "recognized_text",
+                "call_id": "1592977019.104444",
+                "text_lexical": "man\u017eelka",
+                "callback_endpoint": "https://pbx.example.com",
+                "callback_oauth_server": "https://auth.example.com",
+                "callback_oauth_token_endpoint": "/oauth/v2/token"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfull response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "status": "OK",
+                  "message": "Command successfull"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/listen_timeout_reached": {
+      "summary": "listen_timeout_reached",
+      "post": {
+        "summary": "Listen timeout has been reached",
+        "description": "",
+        "tags": [
+          "PBX \u2192 Bot"
+        ],
+        "operationId": "",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_type": {
+                    "type": "string",
+                    "description": "message type"
+                  },
+                  "call_id": {
+                    "type": "string",
+                    "description": "call ID"
+                  },
+                  "callback_endpoint": {
+                    "type": "string",
+                    "description": "PBX URI for API requests - it can be just protocol+FQDN so default /queue_tts path will be used or full URL including any path"
+                  },
+                  "callback_oauth_server": {
+                    "type": "string",
+                    "description": "Optional name of OAuth server (protocol+FQDN) when client credentials flow should be used to authenticate callback calls"
+                  },
+                  "callback_oauth_token_endpoint": {
+                    "type": "string",
+                    "description": "Optional path on OAuth server which will be used for token retrieval"
+                  }
+                },
+                "required": [
+                  "call_id",
+                  "callback_endpoint"
+                ]
+              },
+              "example": {
+                "message_type": "listen_timeout_reached",
+                "call_id": "1592977019.104444",
+                "callback_endpoint": "https://pbx.example.com",
+                "callback_oauth_server": "https://auth.example.com",
+                "callback_oauth_token_endpoint": "/oauth/v2/token"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfull response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "status": "OK",
+                  "message": "Command successfull"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/queue_tts": {
+      "post": {
+        "summary": "Play message using TTS engine to pending call, optionally switching call to requested state",
+        "description": "",
+        "tags": [
+          "Bot \u2192 PBX"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call_id": {
+                    "type": "string",
+                    "description": "Call ID"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Text to say"
+                  },
+                  "voice_name": {
+                    "type": "string",
+                    "description": "Name of the TTS speaker (default cs-CZ-VlastaNeural)"
+                  },
+                  "locale": {
+                    "type": "string",
+                    "description": "Requested TTS language (default cs-CZ)"
+                  },
+                  "next_state": {
+                    "type": "string",
+                    "description": "Requested state to switch to, after playback finishes (listen, transfer, hangup or dtmf_input)"
+                  },
+                  "next_state_params": {
+                    "type": "object",
+                    "description": "Parameters for next_state",
+                    "properties": {
+                      "dexten": {
+                        "type": "string",
+                        "description": "Destination extension (for transfer)"
+                      },
+                      "stt_params": {
+                        "type": "object",
+                        "description": "Parameters passed to STT engine (ie boost words list) when switching to listen state",
+                        "properties": {
+                          "speechContexts": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "phrases": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "boost": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          },
+                          "model": {
+                            "type": "string",
+                            "description": "Voice model"
+                          }
+                        }
+                      },
+                      "listen_timeout": {
+                        "type": "number",
+                        "description": "Send listen_timeout event when no response, count from start listen or end of typing sound"
+                      },
+                      "typing_sound": {
+                        "type": "boolean",
+                        "description": "Play typing sound when first interim result event occur"
+                      }
+                    }
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "call_id",
+                  "text"
+                ]
+              },
+              "examples": {
+                "listen": {
+                  "value": {
+                    "call_id": "1592977019.104444",
+                    "text": "P\u0159ejete si spojit s oper\u00e1torem?",
+                    "next_state": "listen",
+                    "next_state_params": {
+                      "stt_params": {
+                        "speechContexts": [
+                          {
+                            "phrases": [
+                              "ano",
+                              "ne"
+                            ],
+                            "boost": 10
+                          }
+                        ],
+                        "model": "commnand_and_search"
+                      },
+                      "listen_timeout": 5,
+                      "typing_sound": true
+                    },
+                    "metadata": {
+                      "gender": "male"
+                    }
+                  }
+                },
+                "transfer": {
+                  "value": {
+                    "call_id": "1592977019.104444",
+                    "text": "Budete p\u0159epojeni na oper\u00e1tora",
+                    "next_state": "transfer",
+                    "next_state_params": {
+                      "dexten": 800123456
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfull response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "status": "OK",
+                  "message": "Command successfull"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/call_end": {
+      "post": {
+        "summary": "Notify bot about finished call",
+        "description": "",
+        "tags": [
+          "PBX \u2192 Bot"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call_id": {
+                    "type": "string"
+                  },
+                  "call_type": {
+                    "type": "string",
+                    "enum": [
+                      "dialer",
+                      "incoming"
+                    ]
+                  },
+                  "callback_endpoint": {
+                    "type": "string"
+                  },
+                  "answered": {
+                    "type": "boolean"
+                  },
+                  "answered_duration": {
+                    "type": "number"
+                  },
+                  "duration": {
+                    "type": "number"
+                  },
+                  "custom_data\"": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "dial_count": {
+                    "type": "number"
+                  },
+                  "dialed_num": {
+                    "type": "string"
+                  },
+                  "hangup_status": {
+                    "type": "string",
+                    "description": "NORMAL (pro vyzvednut\u00e9 i nevyzvednut\u00e9), BUSY - obsazeno, REJECTED - odm\u00edtnuto (nap\u0159. u\u017eivatel hovor t\u00edpnul), INCORRECT - nespr\u00e1vn\u00e9 \u010d\u00edslo, TEMP_UNAVAIL - volan\u00fd je do\u010dasn\u011b nedostupn\u00fd, CONGESTION - obvykle probl\u00e9m u oper\u00e1tora, vy\u010derpan\u00e9 hovorov\u00e9 kan\u00e1ly atd, UNKNOWN - nezn\u00e1m\u00fd status\n",
+                    "enum": [
+                      "NORMAL",
+                      "BUSY",
+                      "REJECTED",
+                      "INCORRECT",
+                      "TEMP_UNAVAIL",
+                      "CONGESTION",
+                      "UNKNOWN"
+                    ]
+                  },
+                  "message_type": {
+                    "type": "string",
+                    "enum": [
+                      "call_end"
+                    ]
+                  }
+                },
+                "required": [
+                  "call_id",
+                  "callback_endpoint",
+                  "caller_num"
+                ]
+              },
+              "examples": {
+                "incoming": {
+                  "value": {
+                    "call_id": "1662959984.1517",
+                    "duration": 4.2,
+                    "call_type": "incoming",
+                    "dialed_num": "597317718",
+                    "message_type": "call_end",
+                    "hangup_status": "NORMAL",
+                    "callback_endpoint": "https://feedyou-test.lbserver.cz:8443"
+                  }
+                },
+                "dialer": {
+                  "value": {
+                    "call_id": "1662624900.1504",
+                    "answered_duration": 4.2,
+                    "answered": false,
+                    "call_type": "dialer",
+                    "dial_count": 1,
+                    "dialed_num": "777093799",
+                    "custom_data": {
+                      "testnum": 123,
+                      "testdata": "abc"
+                    },
+                    "message_type": "call_end",
+                    "hangup_status": "NORMAL",
+                    "callback_endpoint": "https://feedyou-test.lbserver.cz:8443"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfull response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "status": "OK",
+                  "message": "Command successfull"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_calls_overview": {
+      "get": {
+        "summary": "Get list of calls for specified period of time",
+        "description": "",
+        "tags": [
+          "Bot \u2192 PBX"
+        ],
+        "parameters": [
+          {
+            "name": "from_ts",
+            "in": "query",
+            "description": "from timestamp",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2020-06-22T10:30:00"
+          },
+          {
+            "name": "to_ts",
+            "in": "query",
+            "description": "to timestamp",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2020-06-22T11:45:00"
+          },
+          {
+            "name": "caller_num",
+            "in": "query",
+            "description": "number of calling party",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "591166214"
+          },
+          {
+            "name": "dialed_num",
+            "in": "query",
+            "description": "dialed (ie IVR) number",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "591169999"
+          },
+          {
+            "name": "feedbot_id",
+            "in": "query",
+            "description": "bot id/domain name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "feedbot-demo-linuxbox-dev.azurewebsites.net"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfull response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "status": "OK",
+                  "calls": [
+                    {
+                      "callStart": "2021-07-13T15:26:35",
+                      "callID": "1626182795.16",
+                      "callerNum": "774532168",
+                      "dialedNum": "591166188",
+                      "duration": 9
+                    },
+                    {
+                      "callStart": "2021-07-16T10:21:26",
+                      "callID": "1626423686.17",
+                      "callerNum": "774532168",
+                      "dialedNum": "591166188",
+                      "duration": 11
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_rec_file": {
+      "get": {
+        "summary": "Download recording file",
+        "description": "",
+        "tags": [
+          "Bot \u2192 PBX"
+        ],
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "query",
+            "description": "call ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "1628583747.16"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfull response",
+            "content": {
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_call_debug": {
+      "post": {
+        "summary": "Get call debug log",
+        "description": "",
+        "tags": [
+          "Bot \u2192 PBX"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "call_id": {
+                    "type": "string",
+                    "description": "call ID",
+                    "example": "1628583747.16"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfull response",
+            "content": {}
+          }
+        }
+      }
+    }
+  }
+}

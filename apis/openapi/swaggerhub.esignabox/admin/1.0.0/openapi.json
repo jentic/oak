@@ -1,0 +1,1201 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Admin API",
+    "description": "API de gesti\u00f3n de licencias de eSignaBox.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "eSignaBox",
+      "url": "https://www.esignabox.com",
+      "email": "support@esignabox.com"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/eSignaBox/Admin/1.0.0/swagger.json"
+  },
+  "security": [
+    {
+      "bearer_jwt": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://esignabox.indenova.eu/api/2.0",
+      "description": "Entorno de integraci\u00f3n"
+    },
+    {
+      "url": "https://www.esignabox.com/api/2.0",
+      "description": "Entorno de producci\u00f3n"
+    }
+  ],
+  "paths": {
+    "/organizations": {
+      "post": {
+        "operationId": "createOrganization",
+        "summary": "crea una nueva organizaci\u00f3n",
+        "description": "Crea una nueva organizaci\u00f3n si no exist\u00eda previamente.\n\nEs necesario que se incluya la informaci\u00f3n del usuario administrador de esta organizaci\u00f3n.\n<br>\nEste usuario podr\u00e1 gestionar, entre otras cosas, los usuarios de la organizaci\u00f3n, en funci\u00f3n de si el pack asignado a la misma incluye o no la posibilidad de tener m\u00e1s de un usuario.\n\n**IMPORTANTE**:\n<br>El usuario creado, no dispondr\u00e1 de credenciales de acceso. Podr\u00e1 acceder utilizando un certificado instalado en su equipo o un certificado centralizado (incluido un certificado emitido para la app Lleida Wallet).\n<br>Para generar unas credenciales de tipo usuario y contrase\u00f1a, tras una creaci\u00f3n exitosa del usuario, se deber\u00e1 lanzar la acci\u00f3n de usuario [SetUserCredentials](#/SetUserCredentials) utilizando el endpoint [doUserAction](#/Users/doUserAction)\n",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organization": {
+                    "$ref": "#/components/schemas/Organization"
+                  },
+                  "adminUser": {
+                    "$ref": "#/components/schemas/Person"
+                  },
+                  "packId": {
+                    "description": "Identificador del pack asociado a la organizaci\u00f3n. Define que items consumibles tiene disponibles inicialmente. <br>Si no se indica un pack, se asociar\u00e1 el pack por defecto de la comunidad en la que se est\u00e1 creando el usuario.",
+                    "type": "number",
+                    "format": "int32"
+                  }
+                },
+                "required": [
+                  "organization",
+                  "adminUser"
+                ]
+              }
+            }
+          }
+        },
+        "tags": [
+          "Organizations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Los datos de la organizaci\u00f3n generada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredOrganization"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error. Solicitud incorrecta. Alguno de los datos recibidos no es correcto o no se ha recibido alg\u00fan dato requerido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Nombre del campo que provoc\u00f3 el error."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "explicaci\u00f3n del motivo de error."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. No autorizado. Token de acceso no v\u00e1lido."
+          },
+          "409": {
+            "description": "Conflicto. El formato de la solicitud es correcto pero no se puede procesar por conflictos con datos preexistentes como:<br>\n  - ORGANIZATION_ALREADY_EXISTS: Se ha encontrado una organizaci\u00f3n con el mismo taxId\n  - USER_NAME_ALREADY_EXISTS: El nombre de usuario elegido para el usuario administrador ya existe\n  - PACK_NOT_ALLOWED: El identificador del pack indicado para la organizaci\u00f3n no se corresponde con ninguno de los packs permitidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "ORGANIZATION_ALREADY_EXISTS",
+                    "USER_NAME_ALREADY_EXISTS",
+                    "PACK_NOT_ALLOWED"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error inesperado"
+          }
+        }
+      },
+      "get": {
+        "operationId": "findOrganizations",
+        "summary": "buscar organizaciones",
+        "description": "Obtiene las organizaciones que coinciden con los creiterios de b\u00fasqueda\n",
+        "parameters": [
+          {
+            "name": "taxId",
+            "in": "query",
+            "description": "identificador de la organizaci\u00f3n (CIF, RUC, TaxId). Se realiza una b\u00fasqueda exacta.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 20
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "description": "Nombre de la organizaci\u00f3n. Se buscar\u00e1n organizaciones con nombres que contengan el valor recibido.",
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 3
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Estados de una organizaci\u00f3n. Si la organizaci\u00f3n no est\u00e1 activa, los usuarios que agrupa no pueden acceder ni operar en modo alguno con el sistema.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NOT_ACTIVE",
+                "ACTIVE",
+                "DELETED"
+              ]
+            }
+          },
+          {
+            "name": "X-PageSize",
+            "in": "header",
+            "description": "Tama\u00f1o de p\u00e1gina que se solicita para resultados paginados. Por defecto es 100.",
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 5
+            }
+          },
+          {
+            "name": "X-PageNumber",
+            "in": "header",
+            "description": "N\u00famero de p\u00e1gina que se solicita para resultados paginados. Por defecto es 0 representando que se solicita la primera p\u00e1gina.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Los datos de las organizaciones que coinciden con los par\u00e1metros de b\u00fasqueda. Se trata de una b\u00fasqueda paginada con un tam\u00e1\u00f1o de p\u00e1gina de 100 resultados. Puede utilizarse el par\u00e1metro de cabecera X-PageNumber para indicar el n\u00famero de p\u00e1gina que se desea obtener.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "resultsCount": {
+                      "type": "integer"
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RegisteredOrganization"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error. Solicitud incorrecta. Alguno de los datos recibidos no es correcto o no se ha recibido alg\u00fan dato requerido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Nombre del campo que provoc\u00f3 el error."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "explicaci\u00f3n del motivo de error."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. No autorizado. Token de acceso no v\u00e1lido."
+          },
+          "500": {
+            "description": "Error inesperado"
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}": {
+      "get": {
+        "operationId": "getOrganization",
+        "summary": "Otiene la informaci\u00f3n de una organizaci\u00f3n",
+        "description": "Recupera la informaci\u00f3n de una organizaci\u00f3n.\n",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "description": "identificador de la organizaci\u00f3n. Puede ser el identificador interno (integer retornado tras la creaci\u00f3n de la organizaci\u00f3n) o el identificador UUIDv4 enviado durante su creaci\u00f3n.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "d2af9e6c-3f9b-4b12-b035-b607d0dd13e9"
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Los datos de la organizaci\u00f3n solicitada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredOrganization"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No se ha encontrado ning\u00fana organizaci\u00f3n a la que tenga acceso el solicitante"
+          },
+          "401": {
+            "description": "Error. No autorizado. Token de acceso no v\u00e1lido."
+          },
+          "500": {
+            "description": "Error inesperado"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateOrganization",
+        "summary": "Actualiza los datos de una organizaci\u00f3n",
+        "description": "Actualiza los datos de una organizaci\u00f3n ya creada\n",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "description": "identificador de la organizaci\u00f3n. Puede ser el identificador interno (integer retornado tras la creaci\u00f3n de la organizaci\u00f3n) o el identificador UUIDv4 enviado durante su creaci\u00f3n.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "d2af9e6c-3f9b-4b12-b035-b607d0dd13e9"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organization": {
+                    "$ref": "#/components/schemas/Organization"
+                  }
+                },
+                "required": [
+                  "organization"
+                ]
+              }
+            }
+          }
+        },
+        "tags": [
+          "Organizations"
+        ],
+        "responses": {
+          "204": {
+            "description": "Actualizaci\u00f3n realizada con \u00e9xito."
+          },
+          "400": {
+            "description": "Error. Solicitud incorrecta. Alguno de los datos recibidos no es correcto o no se ha recibido alg\u00fan dato requerido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Nombre del campo que provoc\u00f3 el error."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "explicaci\u00f3n del motivo de error."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. No autorizado. Token de acceso no v\u00e1lido."
+          },
+          "403": {
+            "description": "Error. Prohibido. No tiene permisos para realizar la acci\u00f3n solicitada. Por ejemplo en caso de que se quiera realizar sobre una organizaci\u00f3n para la que no se dispone de permisos."
+          },
+          "409": {
+            "description": "Conflicto. El formato de la solicitud es correcto pero no se puede procesar por conflictos con datos preexistentes como:<br> - Se ha encontrado una organizaci\u00f3n con el mismo taxId<br>",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "ORGANIZATION_ALREADY_EXISTS"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error inesperado"
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/action": {
+      "post": {
+        "operationId": "doActions",
+        "summary": "Realiza una accion sobre la organizaci\u00f3n indicada",
+        "description": "Realiza una accion sobre la organizaci\u00f3n indicada.\n",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "description": "identificador de la organizaci\u00f3n. Puede ser el identificador interno (integer retornado tras la creaci\u00f3n de la organizaci\u00f3n) o el identificador UUIDv4 enviado durante su creaci\u00f3n.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "d2af9e6c-3f9b-4b12-b035-b607d0dd13e9"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationAction"
+              },
+              "example": "{\n  \"name\": \"SubscribeToNoticesAdministration\",\n  \"adminOrgId\": \"550e8400-e29b-41d4-a716-446655440000\"\n}"
+            }
+          }
+        },
+        "tags": [
+          "Organizations"
+        ],
+        "responses": {
+          "204": {
+            "description": "Acci\u00f3n realizada con \u00e9xito."
+          },
+          "400": {
+            "description": "Error. Solicitud incorrecta. Alguno de los datos recibidos no es correcto o no se ha recibido alg\u00fan dato requerido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Nombre del campo que provoc\u00f3 el error."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "explicaci\u00f3n del motivo de error."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. No autorizado. Token de acceso no v\u00e1lido."
+          },
+          "403": {
+            "description": "Error. Prohibido. No tiene permisos para realizar la acci\u00f3n solicitada. Por ejemplo en caso de que se quiera realizar sobre una organizaci\u00f3n para la que no se dispone de permisos."
+          },
+          "409": {
+            "description": "Conflicto. El formato de la solicitud es correcto pero no se puede procesar por conflictos con datos preexistentes. El conflicto encontrado depende del comando que se haya enviado y se indica en la respuesta. <br>Si la acci\u00f3n enviada puede provocar alg\u00fan conflicto, estos estar\u00e1n listados en su descripci\u00f3n. <br>IMPORTANTE: trate este valor con cuidado. El n\u00famero de acciones permitidas puede variar sin previo aviso por lo que es indispensable permitir valores no conocidos y tratarlos de forma adecuada. Este es un punto de extensi\u00f3n del API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error inesperado"
+          }
+        }
+      }
+    },
+    "/organizations/{orgId}/users": {
+      "post": {
+        "operationId": "addUser",
+        "summary": "a\u00f1ade un usuario a una organizaci\u00f3n",
+        "description": "A\u00f1ade un nuevo usuario a una organizaci\u00f3n si no exist\u00eda previamente.\n\n**IMPORTANTE**:\n<br>El usuario creado, no dispondr\u00e1 de credenciales de acceso. Podr\u00e1 acceder utilizando un certificado instalado en su equipo o un certificado centralizado (incluido un certificado emitido para la app Lleida Wallet).\n<br>Para generar unas credenciales de tipo usuario y contrase\u00f1a, tras una creaci\u00f3n exitosa del usuario, se deber\u00e1 lanzar la acci\u00f3n de usuario [SetUserCredentials](#/SetUserCredentials) utilizando el endpoint [doUserAction](#/Users/doUserAction)        \n",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "description": "identificador de la organizaci\u00f3n. Puede ser el identificador interno (integer retornado tras la creaci\u00f3n de la organizaci\u00f3n) o el identificador UUIDv4 enviado durante su creaci\u00f3n.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "d2af9e6c-3f9b-4b12-b035-b607d0dd13e9"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Person"
+              }
+            }
+          }
+        },
+        "tags": [
+          "Organizations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Los datos del usaurio generado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error. Solicitud incorrecta. Alguno de los datos recibidos no es correcto o no se ha recibido alg\u00fan dato requerido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Nombre del campo que provoc\u00f3 el error."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "explicaci\u00f3n del motivo de error."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. No autorizado. Token de acceso no v\u00e1lido."
+          },
+          "403": {
+            "description": "Error. Prohibido. No tiene permisos para realizar la acci\u00f3n solicitada. Por ejemplo en caso de que se quiera realizar sobre una organizaci\u00f3n para la que no se dispone de permisos."
+          },
+          "409": {
+            "description": "Conflicto. El formato de la solicitud es correcto pero no se puede procesar por conflictos con datos preexistentes como:<br> - El nombre de usuario elegido ya existe - El identificador del usaurio (DNI, C\u00e9dula, SSN, etc.) ya existe en la organizaci\u00f3n. - Ya existe otro usuario con el mismo email en la organizaci\u00f3n.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "USER_NAME_ALREADY_EXISTS",
+                    "USER_ID_ALREADY_EXISTS",
+                    "USER_EMAIL_ALREADY_EXISTS"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error inesperado"
+          }
+        }
+      },
+      "get": {
+        "operationId": "getOrganizationUsers",
+        "summary": "Obtiene los usuarios de una organizaci\u00f3n",
+        "description": "Obtiene los usuarios de una organizaci\u00f3n. Los par\u00e1metros enviados en el query se utilizar\u00e1n para filtrar los resultados. <br>No se retornar\u00e1n m\u00e1s de 100 resultados, por lo que se requiere que se env\u00ede la cabecera de n\u00famero de p\u00e1gina para obtener resultados m\u00e1s amplios.",
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "path",
+            "description": "identificador de la organizaci\u00f3n. Puede ser el identificador interno (integer retornado tras la creaci\u00f3n de la organizaci\u00f3n) o el identificador UUIDv4 enviado durante su creaci\u00f3n.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "d2af9e6c-3f9b-4b12-b035-b607d0dd13e9"
+            }
+          },
+          {
+            "name": "fullName",
+            "in": "query",
+            "description": "Buscar\u00e1 coincidencias en el nombre y apellidos de la persona",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "description": "Buscar\u00e1 coincidencias en el email del usuario",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idNumber",
+            "in": "query",
+            "description": "B\u00fasqueda exacta. Buscar\u00e1 coincidencias en el n\u00famero del documento de identidad (DNI, C\u00e9dula, SSN, etc.)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-PageSize",
+            "in": "header",
+            "description": "Tama\u00f1o de p\u00e1gina que se solicita para resultados paginados. Por defecto es 100.",
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 5
+            }
+          },
+          {
+            "name": "X-PageNumber",
+            "in": "header",
+            "description": "N\u00famero de p\u00e1gina que se solicita para resultados paginados. Por defecto es 0 representando que se solicita la primera p\u00e1gina.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "tags": [
+          "Organizations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Los datos de los usuarios que se han encontrado utlizando los par\u00e1metros de b\u00fasqueda. La respuesta est\u00e1 limitada a 100 resultados. Si el n\u00famero de resultados supera este l\u00edmite, se retornar\u00e1n los 100 primeros resultados indicando el n\u00ba de resultados totales<br> Ver el par\u00e1metro de cabecera X-PageNumber.<br> En caso de que no se encuentre ning\u00fan resultado, se indicar\u00e1 retornando resultsCount = 0.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "resultsCount": {
+                      "type": "integer"
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/User"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error. Solicitud incorrecta. Alguno de los datos recibidos no es correcto o no se ha recibido alg\u00fan dato requerido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Nombre del campo que provoc\u00f3 el error."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "explicaci\u00f3n del motivo de error."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. No autorizado. Token de acceso no v\u00e1lido."
+          },
+          "403": {
+            "description": "Error. Prohibido. No tiene permisos para realizar la acci\u00f3n solicitada. Por ejemplo en caso de que se quiera realizar sobre una organizaci\u00f3n para la que no se dispone de permisos."
+          },
+          "500": {
+            "description": "Error inesperado"
+          }
+        }
+      }
+    },
+    "/users/{userId}": {
+      "get": {
+        "operationId": "getUser",
+        "summary": "Otiene la informaci\u00f3n de un usuario",
+        "description": "Recupera la informaci\u00f3n de un usuario registrado.\n",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "identificador del usuario. Puede ser el identificador interno (integer retornado tras la creaci\u00f3n del usuario) o el identificador UUIDv4 enviado durante su creaci\u00f3n.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "e1de6265-8d15-4890-a973-3e0cbb31546a"
+            }
+          }
+        ],
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "Los datos del usuario solicitada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. No autorizado. Token de acceso no v\u00e1lido."
+          },
+          "403": {
+            "description": "Error. Prohibido. No tiene permisos para realizar la acci\u00f3n solicitada. Por ejemplo en caso de que se quiera obtener los datos de un usuario que pertenece a una organizaci\u00f3n para la que no se dispone de permisos."
+          },
+          "500": {
+            "description": "Error inesperado"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateUser",
+        "summary": "Actualiza la informaci\u00f3n de un usuario",
+        "description": "Actualiza la informaci\u00f3n de un usuario registrado.\n",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "identificador del usuario. Puede ser el identificador interno (integer retornado tras la creaci\u00f3n del usuario) o el identificador UUIDv4 enviado durante su creaci\u00f3n.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "e1de6265-8d15-4890-a973-3e0cbb31546a"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Person"
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "204": {
+            "description": "Actualizaci\u00f3n realizada con \u00e9xito"
+          },
+          "401": {
+            "description": "Error. No autorizado. Token de acceso no v\u00e1lido."
+          },
+          "403": {
+            "description": "Error. Prohibido. No tiene permisos para realizar la acci\u00f3n solicitada. Por ejemplo en caso de que se quiera obtener los datos de un usuario que pertenece a una organizaci\u00f3n para la que no se dispone de permisos."
+          },
+          "409": {
+            "description": "Conflicto. El formato de la solicitud es correcto pero no se puede procesar por conflictos con datos preexistentes como:<br> - El nombre de usuario elegido ya existe - El identificador del usaurio (DNI, C\u00e9dula, SSN, etc.) ya existe en la organizaci\u00f3n. - Ya existe otro usuario con el mismo email en la organizaci\u00f3n.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "USER_NAME_ALREADY_EXISTS",
+                    "USER_ID_ALREADY_EXISTS",
+                    "USER_EMAIL_ALREADY_EXISTS"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error inesperado"
+          }
+        }
+      }
+    },
+    "/users/{userId}/actions": {
+      "post": {
+        "operationId": "doUserAction",
+        "summary": "Realiza una acci\u00f3n sobre el usuario",
+        "description": "<a name=\"doUserAction\"></a>Realiza una acci\u00f3n sobre el usuario.\n",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "identificador del usuario. Puede ser el identificador interno (integer retornado tras la creaci\u00f3n del usuario) o el identificador UUIDv4 enviado durante su creaci\u00f3n.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "e1de6265-8d15-4890-a973-3e0cbb31546a"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAction"
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "204": {
+            "description": "Acci\u00f3n realizada con \u00e9xito."
+          },
+          "400": {
+            "description": "Error. Solicitud incorrecta. Alguno de los datos recibidos no es correcto o no se ha recibido alg\u00fan dato requerido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "Nombre del campo que provoc\u00f3 el error."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "explicaci\u00f3n del motivo de error."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error. No autorizado. Token de acceso no v\u00e1lido."
+          },
+          "403": {
+            "description": "Error. Prohibido. No tiene permisos para realizar la acci\u00f3n solicitada. Por ejemplo en caso de que se quiera realizar sobre un usaurio para el que no se dispone de permisos."
+          },
+          "409": {
+            "description": "Conflicto. El formato de la solicitud es correcto pero no se puede procesar por conflictos con datos preexistentes. El conflicto encontrado depende del comando que se haya enviado y se indica en la respuesta.<br> IMPORTANTE: trate este valor con cuidado. El n\u00famero de acciones permitidas puede variar sin previo aviso por lo que es indispensable permitir valores no conocidos y tratarlos de forma adecuada. Este es un punto de extensi\u00f3n del API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "USER_NAME_ALREADY_EXISTS",
+                    "NOTIFICATION_FAILURE",
+                    "NO_PREVIOUS_CREDENTIALS"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error inesperado"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Organization": {
+        "description": "Informaci\u00f3n de una organizaci\u00f3n.",
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "identificador en formato UUIDv4 de la organizaci\u00f3n. <br>Este identificador deber\u00e1 ser generado y enviado por el sistema integrado y se utilizar\u00e1 en todas las operaciones que impliquen a esta organizaci\u00f3n.",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "name": {
+            "type": "string",
+            "description": "Nombre de la organizaci\u00f3n.",
+            "maxLength": 255
+          },
+          "taxId": {
+            "type": "string",
+            "description": "N\u00famero de identificaci\u00f3n fiscal (CIF en Espa\u00f1a, RUC en Per\u00fa, etc.)",
+            "maxLength": 20
+          },
+          "country": {
+            "type": "string",
+            "format": "ISO 3166-1 alfa-2",
+            "example": "ES",
+            "description": "C\u00f3digo de pa\u00eds. Formato de 2 letras en may\u00fascula seg\u00fan especificaci\u00f3n ISO 3166-1 alfa-2",
+            "maxLength": 2
+          },
+          "noticesLevel": {
+            "type": "string",
+            "enum": [
+              "DISABLED",
+              "CLIENT",
+              "ADMINSTRATION"
+            ],
+            "description": "Indica si la organizaci\u00f3n tiene habilitada la funcionalidad Buz\u00f3n electr\u00f3nico (CLIENT) o no (DISABLED). <br>Si se trata de una administraci\u00f3n del Buz\u00f3n Electr\u00f3nico, deber\u00e1 tener el nivel ADMINISTRATION. <br>Una administraci\u00f3n del Buz\u00f3n Electr\u00f3nico puede enviar avisos de documentaci\u00f3n a los clientes que la hayan habilitado como remitente permitido. <br>En caso de no enviarse este campo, se tomar\u00e1 el valor DISABLED"
+          }
+        },
+        "required": [
+          "uuid",
+          "name",
+          "taxId",
+          "country"
+        ]
+      },
+      "RegisteredOrganization": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Organization"
+          }
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Identificador interno de la organiaci\u00f3n. Puede utilizarse, alternativamente al uuid, para identificarla en las llamadas que requieran un identificador de organizaci\u00f3n."
+          },
+          "status": {
+            "description": "Estados de una organizaci\u00f3n. Si la organizaci\u00f3n no est\u00e1 activa, los usuarios que agrupa no pueden acceder ni operar en modo alguno con el sistema.",
+            "type": "string",
+            "enum": [
+              "NOT_ACTIVE",
+              "ACTIVE",
+              "DELETED"
+            ]
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fecha de creaci\u00f3n de la organizaci\u00f3n en el sistema. Formato ISO-8601 en zona UTC (GMT+0).",
+            "example": "2023-02-14T22:00:00.000+0000"
+          },
+          "expiration": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fecha de expiraci\u00f3n de la licencia de uso para la organizaci\u00f3n. Tras esta fecha ser\u00e1 necesaria una renovaci\u00f3n para poder seguir utlizando eSignaBox. Formato ISO-8601 en zona UTC (GMT+0).",
+            "example": "2023-02-14T22:00:00.000+0000"
+          },
+          "packId": {
+            "type": "number",
+            "format": "int32",
+            "description": "Identificador del pack asociado a la organizaci\u00f3n. El pack determina los l\u00edmites de consumo que tiene establecidos la organizaci\u00f3n inicialmente. La adquisici\u00f3n de packs de ampliaci\u00f3n puede variar estos l\u00edmites de consumo."
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "packId"
+        ]
+      },
+      "Person": {
+        "description": "Informaci\u00f3n de un usuario",
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "identificador en formato UUIDv4 del usuario. <br>Este identificador deber\u00e1 ser generado por el sistema integrado y se utilizar\u00e1 en todas las operaciones que impliquen a este usuario.",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "name": {
+            "type": "string",
+            "description": "Nombre de la persona. En los casos en que se trate de una cuenta institucional, el nobre ser\u00e1 el de la organizaci\u00f3n.",
+            "maxLength": 200
+          },
+          "surname": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Apellidos de la persona. Aunque no es un campo obligatorio, si es preferible separar el nombre completo en nombre y apellidos. Permitir\u00e1 distinguirlo en algunas funcionalidades como plantillas de correo y permitir\u00e1 un trato m\u00e1s correcto en las notificaciones de eSignaBox."
+          },
+          "idNumber": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Documento nacional de indentidad (DNI, NIF, C\u00e9dula de Ciudadan\u00eda seg\u00fan pa\u00eds). En el caso de cuentas institucionales o cuentas personales debe ser igual que el taxId de la organizaci\u00f3n."
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 100,
+            "description": "Direcci\u00f3n de correo electr\u00f3nico de la persona. Es necesario que sea una direcci\u00f3n real y que permita recibir correo, pues se enviar\u00e1 a esta misma direcci\u00f3n la contrase\u00f1a generada para el usuario as\u00ed como las notificaciones del servicio."
+          },
+          "phone": {
+            "type": "string",
+            "format": "E146",
+            "description": "N\u00famero de tel\u00e9fono del usuario. Recomendado si se va a utilizar firma OTP. Debe enviarse en formato E146 internacional e incluir el c\u00f3digo de marcado de la regi\u00f3n (Ej. +34 para Espa\u00f1a, +1 para Rep\u00fablica Dominicana, etc.). Solo se aceptar\u00e1n tel\u00e9fonos m\u00f3viles, no fijos.",
+            "example": "+34655555555",
+            "maxLength": 30
+          },
+          "country": {
+            "type": "string",
+            "format": "ISO 3166-1 alfa-2",
+            "example": "ES",
+            "description": "C\u00f3digo de pa\u00eds. Formato de 2 letras en may\u00fascula seg\u00fan especificaci\u00f3n ISO 3166-1 alfa-2",
+            "maxLength": 2
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "country"
+        ]
+      },
+      "User": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Person"
+          }
+        ],
+        "description": "registered persona.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Identificador interno del usuario. Puede utilizarse, alternativamente al uuid, para identificarlo en las llamadas que requieran un identificador de usuario."
+          },
+          "status": {
+            "description": "Estado de un usuario. Si el usuario no est\u00e1 activo, no podr\u00e1 acceder ni interactuar con el sistema.",
+            "type": "string",
+            "enum": [
+              "NOT_ACTIVE",
+              "ACTIVE",
+              "DELETED"
+            ],
+            "default": "NOT_ACTIVE"
+          },
+          "orgId": {
+            "type": "number",
+            "format": "int32",
+            "description": "Identificador de la organizaci\u00f3n a la que pertenece el usuario."
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fecha de regsitro del usuario. Formato ISO-8601 en zona UTC (GMT+0).",
+            "example": "2023-02-14T22:00:00.000+0000"
+          },
+          "userName": {
+            "type": "string",
+            "description": "Nombre de usuario. Es \u00fanico en todo el sistema.",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "orgId"
+        ]
+      },
+      "Command": {
+        "description": "Acciones especiales que se permiten realizar sobre una organizaci\u00f3n o usuario.",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "SubscribeToNoticesAdministration": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Command"
+          }
+        ],
+        "description": "Habilita la organizaci\u00f3n para que la administraci\u00f3n del Buz\u00f3n Electr\u00f3nico indicada pueda interactuar con ella a trav\u00e9s del Buz\u00f3n electr\u00f3nico. <br>**IMPORTANTE**: la ejecuci\u00f3n de esta acci\u00f3n puede resultar en 409 - Conflicto con las siguientes descripciones:\n  - **NOT_A_NOTICES_ADMINISTRATION** Si la organizaci\u00f3n adminOrgId no es una administraci\u00f3n del Buz\u00f3n electr\u00f3nico.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "SubscribeToNoticesAdministration"
+            ]
+          },
+          "adminOrgId": {
+            "description": "identificador de la organizaci\u00f3n. Puede ser el identificador interno (integer retornado tras la creaci\u00f3n de la organizaci\u00f3n) o el identificador UUIDv4 enviado durante su creaci\u00f3n.",
+            "type": "string",
+            "example": "d2af9e6c-3f9b-4b12-b035-b607d0dd13e9"
+          }
+        },
+        "required": [
+          "name",
+          "adminOrgId"
+        ]
+      },
+      "SetDefaultTimezone": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Command"
+          }
+        ],
+        "description": "Establece la zona horaria que se usar\u00e1 para la organizaci\u00f3n.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "SetDefaultTimezone"
+            ]
+          },
+          "timezone": {
+            "type": "string",
+            "format": "IANA TZ Name",
+            "example": "Europe/Madrid"
+          }
+        },
+        "required": [
+          "name",
+          "timezone"
+        ]
+      },
+      "SetActiveStatus": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Command"
+          }
+        ],
+        "description": "Establece el estado de la organizaci\u00f3n. Para desactivar una organiaci\u00f3n de forma temporal, es preferible utilizar el estado NOT_ACTIVE, ya que el estado DELETED puede tener efectos en los contenidos generados por la organizaci\u00f3n (Trabajos de eliminaci\u00f3n autom\u00e1ticos, etc.)",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "SetActiveStatus"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_ACTIVE",
+              "ACTIVE",
+              "DELETED"
+            ],
+            "example": "NOT_ACTIVE"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ]
+      },
+      "OrganizationAction": {
+        "type": "object",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SubscribeToNoticesAdministration"
+          },
+          {
+            "$ref": "#/components/schemas/SetDefaultTimezone"
+          },
+          {
+            "$ref": "#/components/schemas/SetActiveStatus"
+          }
+        ],
+        "description": "tipo de acciones que pueden realizarse sobre una organizaci\u00f3n."
+      },
+      "SetUserStatus": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Command"
+          }
+        ],
+        "description": "Establece el estado del usuario. Del mismo modo que en el estado de la organizaci\u00f3n, para desactivar temporalmente un usaurio, es preferible utilizar el estado NOT_ACTIVE ya que el estado DELETED puede desencadenar tareas de eliminaci\u00f3n de contenidos pasado un tiempo.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "SetUserStatus"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_ACTIVE",
+              "ACTIVE",
+              "DELETED"
+            ],
+            "example": "NOT_ACTIVE"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ]
+      },
+      "SetUserCredentials": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Command"
+          }
+        ],
+        "description": "Establece el nombre de usuario (nickname) e indica si debe regenerarse la contrase\u00f1a. \n  <br>En caso de regenerarse la contrase\u00f1a, se enviar\u00e1 un correo al usuario con la nueva credencial.<br><br>\nPuede provocar 2 casos de error:<br>\n  - USER_NAME_ALREADY_EXISTS - El nombre de usuario que se ha indicado ya pertenece a otro usuario.\n  - NOTIFICATION_FAILURE - No ha podido enviarse el email con las nuevas credenciales a la direcci\u00f3n de correo del usuario.",
+        "example": "{ \"name\":\"SetUserCredentials\", \"userName\":\"newUserName\", \"regenPass\":true }",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "SetUserCredentials"
+            ]
+          },
+          "userName": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Nuevo nombre de usuario. Se comprobar\u00e1 que no exista previamente."
+          },
+          "regenPass": {
+            "type": "boolean",
+            "description": "Indica que se quiere generar una contrase\u00f1a aleatoria para el usuario. El usuario la recibir\u00e1 en la direcci\u00f3n de correo asociada a su cuenta."
+          }
+        }
+      },
+      "ResetUserPassword": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Command"
+          }
+        ],
+        "description": "Regenera la contrase\u00f1a de un usuario. La nueva contrase\u00f1a se enviar\u00e1 a la direcci\u00f3n de correo del usuario.<br> Puede provocar 2 casos de error:<br>\n  - NOTIFICATION_FAILURE - No ha podido enviarse el email con las nuevas credenciales a la direcci\u00f3n de correo del usuario.\n  - NO_PREVIOUS_CREDENTIALS - El usuario no ten\u00eda configuradas unas credenciales previas, por lo que no es posible realizar la acci\u00f3n.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "ResetUserPassword"
+            ]
+          }
+        }
+      },
+      "UserAction": {
+        "type": "object",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SetUserStatus"
+          },
+          {
+            "$ref": "#/components/schemas/SetUserCredentials"
+          },
+          {
+            "$ref": "#/components/schemas/ResetUserPassword"
+          }
+        ],
+        "description": "Conjunto de acciones que pueden realizarse sobre un usuario."
+      }
+    },
+    "securitySchemes": {
+      "bearer_jwt": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

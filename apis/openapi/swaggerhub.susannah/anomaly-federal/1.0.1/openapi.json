@@ -1,0 +1,811 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Anomaly Federal API",
+    "description": "API for configuring, managing, and receiving real-time alerts about UAP (Unidentified Aerial Phenomena) sightings, with on-demand network activation capabilities.",
+    "version": "1.0.1",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/SUSANNAH/anomaly-federal/1.0.1/swagger.json"
+  },
+  "servers": [
+    {
+      "url": "https://api.anomalyfederal.io/v1",
+      "description": "Production server"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Anomaly Alert Subscriptions",
+      "description": "Manage subscriptions for real-time alerts based on validated UAP sightings.\n- **Create** a new subscription for tailored alerts.\n- **Retrieve** details of an existing subscription.\n- **Update** criteria or webhook configurations for an active subscription.\n"
+    },
+    {
+      "name": "Anomaly Alerts",
+      "description": "Retrieve real-time alerts generated from configured subscriptions."
+    },
+    {
+      "name": "Enigma Network Activation",
+      "description": "On-demand activation of the Enigma Mobile Alert Network."
+    },
+    {
+      "name": "Sightings",
+      "description": "Query UAP sighting data."
+    }
+  ],
+  "paths": {
+    "/alert-subscriptions": {
+      "description": "Manage subscriptions for real-time alerts based on validated UAP sightings.  You can: - **Create** a new subscription for tailored notifications. - **Retrieve** details of an existing subscription. - **Update** criteria or webhook configurations for an active subscription.\n",
+      "post": {
+        "tags": [
+          "Anomaly Alert Subscriptions"
+        ],
+        "summary": "Create a new alert subscription",
+        "description": "Configure subscriptions for real-time alerts on validated UAP sightings based on specific criteria within an area of interest defined by geolocation. Subscribers can define an **area of interest** and **alert criteria** to tailor notifications for sightings that match granular parameters, such as shape, movement patterns, or media analysis results.\n\n**Key Features:**\n- **Area of Interest**  \n  Define the geographic scope of the subscription:\n  - `global`: Subscribe to sightings worldwide.\n  - `radius`: Specify a central coordinate (latitude, longitude) and radius in miles or kilometers.\n  - `bounding_box`: Define a rectangular area with two coordinate pairs (e.g., SW and NE corners).\n  - `polygon`: Define a custom area using multiple coordinate pairs connected sequentially.\n\n- **Criteria**  \n  Tailor subscriptions to specific sightings using available filters:\n  - Shapes: e.g., orb, disk, triangle.\n  - Movement Patterns: e.g., hovering, erratic, no movement.\n  - Noise Patterns: e.g., silent, low hum.\n  - Duration: Filter by the length of sightings in ms.\n\n- **Webhook Configuration**  \n  - If a valid `webhook_url` is provided, AF will push real-time alerts to this address with event and request metadata.\n  - Without a webhook, alerts are saved as records accessible through the `GET /alerts` endpoint.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Unique name for the alert subscription."
+                  },
+                  "webhook_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Webhook endpoint to receive real-time alerts."
+                  },
+                  "area_of_interest": {
+                    "$ref": "#/components/schemas/AreaOfInterest"
+                  },
+                  "criteria": {
+                    "$ref": "#/components/schemas/AlertCriteria"
+                  }
+                },
+                "required": [
+                  "name",
+                  "area_of_interest"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Alert subscription created successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "subscription_id": "langley-afb-subscription",
+                  "name": "Langley AFB Alert",
+                  "status": "active"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., malformed webhook URL, missing required fields)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Invalid webhook URL."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alert-subscriptions/{name}": {
+      "get": {
+        "tags": [
+          "Anomaly Alert Subscriptions"
+        ],
+        "summary": "Retrieve a specific alert subscription",
+        "description": "Fetch the details of an alert subscription by its unique identifier. Use this endpoint to check current configurations, including criteria, webhook details, and the area of interest.\n",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique name to identify the subscription."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Details of the alert subscription",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertSubscription"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Subscription with ID 'invalid-id' not found."
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Anomaly Alert Subscriptions"
+        ],
+        "summary": "Update an alert subscription",
+        "description": "Modify an existing alert subscription's criteria or webhook configuration.  For example:\n- Update the `webhook_url` if your endpoint changes.\n- Adjust the `area_of_interest` to expand or narrow the alert scope.\n- Refine `criteria` to match new data filtering preferences.\n",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique name to identify the subscription."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertSubscriptionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscription updated successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "subscription_id": "langley-afb-subscription",
+                  "name": "Langley AFB Subscription",
+                  "status": "active"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription not found"
+          }
+        }
+      }
+    },
+    "/alerts": {
+      "get": {
+        "tags": [
+          "Anomaly Alerts"
+        ],
+        "summary": "Retrieve triggered alerts",
+        "description": "Retrieve all alerts triggered by subscriptions, on-demand requests, or global anomalies.  Alerts are categorized into three sources:\n- **Subscription**: Alerts are generated based on user-defined criteria and area of interest.\n- **On-Demand**: Alerts are triggered by a network push, often targeting a specific area of interest. \n  If a matching subscription exists, users receive both the subscription and on-demand alerts.\n\n- **Global**: Patterns of Anomalies algorithmically detected by AF's system based on:\n  - Spikes in mass UAP sightings by location and/or time.\n  - Craft characteristics, flight patterns, and other patterns.\n  - Baseline global criteria (minimum corroboration of 2 sightings within the last 24 hours).\n",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "subscription",
+                "on_demand",
+                "global"
+              ]
+            },
+            "description": "Filter alerts by type:\n- **subscription**: Alerts generated from a user's configured subscription.\n- **on_demand**: Alerts triggered by network pushes.\n- **global**: Anomalies detected globally based on system thresholds and mapping.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of triggered alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Alert"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/enigma-network-activation/estimate": {
+      "post": {
+        "tags": [
+          "Enigma Network Activation"
+        ],
+        "summary": "Estimate reach for a network activation",
+        "description": "Use this API to estimate the number of mobile users in Enigma's Skywatcher Network who can be reached by a proposed network activation request.  Network activation targets a specific **Area of Interest (AoI)** to encourage users within that region to look up for potential UAP activity and report sightings.\n",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NetworkActivationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Estimated reach for the activation request",
+            "content": {
+              "application/json": {
+                "example": {
+                  "estimated_users": 15000,
+                  "area_of_interest": {
+                    "type": "bounding_box",
+                    "coordinates": [
+                      {
+                        "latitude": 37.09024,
+                        "longitude": -95.712891
+                      },
+                      {
+                        "latitude": 38.09024,
+                        "longitude": -96.712891
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/enigma-network-activation": {
+      "post": {
+        "tags": [
+          "Enigma Network Activation"
+        ],
+        "summary": "Activate the Enigma Mobile Alert Network",
+        "description": "Broadcast an **on-demand network activation** to the Enigma Mobile Network. A network activation targets users in a specific **Area of Interest (AoI)** to encourage them to observe the skies and report potential UAP sightings.\n\n**Details**:\n- By default, the **AoI** for the activation will also create a new subscription, \n  allowing users to receive continued alerts matching the defined parameters\n  after the broadcast ends.\n\n- To disable this behavior, set the `create_subscription` flag to `false`.\n",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "A unique name for the activation request."
+                  },
+                  "area_of_interest": {
+                    "$ref": "#/components/schemas/AreaOfInterest"
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The expiration time for the activation. If specified,  the activation will continue broadcasting to new users who enter the AoI during the active period.\n"
+                  },
+                  "text_description": {
+                    "type": "string",
+                    "description": "Information"
+                  },
+                  "create_subscription": {
+                    "type": "boolean",
+                    "description": "Whether to create a new subscription using the activation's AoI.  Defaults to `true`. If set to `false`, users will only receive alerts during the activation period, not ongoing subscription-based alerts.\n"
+                  }
+                },
+                "required": [
+                  "name",
+                  "area_of_interest"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Network activation successful",
+            "content": {
+              "application/json": {
+                "example": {
+                  "activation_id": "activation-langley-afb",
+                  "status": "active",
+                  "expires_at": "2024-11-19T12:00:00Z",
+                  "users_reached": 5000
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/enigma-network-activation/{name}": {
+      "get": {
+        "tags": [
+          "Enigma Network Activation"
+        ],
+        "summary": "Retrieve activation details and reach",
+        "description": "Retrieve details of an Enigma Network Activation request,  including the current or final number of users reached.\n\n**Behavior**:\n- For one-time activations, the response includes the final reach count.\n- For activations with an expiration date:\n  - If the activation is still active, the response includes the current reach.\n  - If the activation has expired, the response includes the final total reach.\n",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique identifier for the activation."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Details of the network activation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "activation_id": {
+                      "type": "string",
+                      "description": "The unique identifier for the activation request."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "expired"
+                      ],
+                      "description": "The status of the activation."
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Expiration date/time of the activation (if applicable)."
+                    },
+                    "users_reached": {
+                      "type": "integer",
+                      "description": "Total number of users reached by the activation."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sightings/query": {
+      "post": {
+        "tags": [
+          "Sightings"
+        ],
+        "summary": "Query sightings data",
+        "description": "Query UAP sightings based on customizable filters, including:\n- Geographic Area of Interest\n- Start and end times\n- Object characteristics, movement patterns, and Anomaly Score.\n- Linked to specific alert **subscriptions** to identify matches to alerts.\n",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filters": {
+                    "$ref": "#/components/schemas/SightingFilters"
+                  },
+                  "subscription_id": {
+                    "type": "string",
+                    "description": "The unique identifier for a subscription to filter sightings linked to it. If provided, only sightings associated with alerts from the specified subscription will be included.\n"
+                  }
+                },
+                "required": [
+                  "filters"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A list of sightings matching the query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Sighting"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "AlertSubscription": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Unique name for the subscription."
+          },
+          "webhook_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Webhook endpoint for alerts."
+          },
+          "area_of_interest": {
+            "$ref": "#/components/schemas/AreaOfInterest"
+          },
+          "criteria": {
+            "$ref": "#/components/schemas/AlertCriteria"
+          }
+        }
+      },
+      "AlertSubscriptionUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "webhook_url": {
+            "type": "string"
+          },
+          "criteria": {
+            "$ref": "#/components/schemas/AlertCriteria"
+          }
+        }
+      },
+      "Alert": {
+        "type": "object",
+        "properties": {
+          "alert_id": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "subscription",
+              "on_demand",
+              "global"
+            ]
+          },
+          "sighting": {
+            "$ref": "#/components/schemas/Sighting"
+          }
+        }
+      },
+      "NetworkActivationRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A unique name for the activation request."
+          },
+          "area_of_interest": {
+            "$ref": "#/components/schemas/AreaOfInterest"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The expiration time for the network activation request."
+          },
+          "text_description": {
+            "type": "string",
+            "description": "Information or details relating to the specific request."
+          }
+        }
+      },
+      "SightingQuery": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/SightingFilters"
+          }
+        }
+      },
+      "AreaOfInterest": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "bounding_box",
+              "radius",
+              "polygon",
+              "global"
+            ],
+            "description": "Defines the type of area for the subscription:\n- `bounding_box`: A rectangular area.\n- `radius`: A circular area.\n- `polygon`: A custom polygon area.\n- `global`: Includes sightings from all areas.\n"
+          },
+          "coordinates": {
+            "type": "array",
+            "description": "Coordinates defining the area of interest. Not required for `global`.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "latitude": {
+                  "type": "number"
+                },
+                "longitude": {
+                  "type": "number"
+                }
+              }
+            },
+            "minItems": 2
+          },
+          "radius": {
+            "type": "number",
+            "description": "Radius for the `radius` type, measured in the unit specified."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "mi",
+              "km"
+            ],
+            "description": "Unit of measurement for the radius."
+          }
+        }
+      },
+      "AlertCriteria": {
+        "type": "object",
+        "properties": {
+          "shape": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "movement_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "noise_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "anomaly_score_threshold": {
+            "type": "number",
+            "description": "Minimum Anomaly Score for a sighting to be included."
+          },
+          "media_types_included": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Sighting": {
+        "type": "object",
+        "properties": {
+          "sighting_id": {
+            "type": "string"
+          },
+          "sighting_started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "duration_ms": {
+            "type": "number"
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              }
+            }
+          },
+          "uas_details": {
+            "type": "object",
+            "properties": {
+              "shape": {
+                "type": "string"
+              },
+              "movement_pattern": {
+                "type": "string"
+              },
+              "noise_pattern": {
+                "type": "string"
+              }
+            }
+          },
+          "media_files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "analysis": {
+                  "type": "object",
+                  "properties": {
+                    "object_detection": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "bounding_box": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "confidence": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    },
+                    "triangulation": {
+                      "type": "object",
+                      "properties": {
+                        "flight_path": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "timestamp": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "position": {
+                                "type": "object",
+                                "properties": {
+                                  "latitude": {
+                                    "type": "number"
+                                  },
+                                  "longitude": {
+                                    "type": "number"
+                                  },
+                                  "altitude_meters": {
+                                    "type": "number"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "SightingFilters": {
+        "type": "object",
+        "properties": {
+          "shape": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "orb",
+                "changing",
+                "chevron",
+                "cigar",
+                "circle",
+                "cone",
+                "cross",
+                "cube",
+                "cylinder",
+                "diamond",
+                "disk",
+                "egg",
+                "fireball",
+                "flash",
+                "light",
+                "oval",
+                "rectangle",
+                "saucer",
+                "sphere",
+                "teardrop",
+                "triangle"
+              ]
+            }
+          },
+          "movement_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "hovering",
+                "floating",
+                "straight_and_steady",
+                "circular",
+                "slowly_descending",
+                "unpredictable_erratic",
+                "random_smooth",
+                "extremely_fast",
+                "abrupt_changes"
+              ]
+            }
+          },
+          "noise_patterns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "silent",
+                "low_hum",
+                "mechanical_hum",
+                "loud"
+              ]
+            }
+          },
+          "anomaly_score_threshold": {
+            "type": "number",
+            "description": "Minimum Anomaly Score for a sighting to be included."
+          },
+          "duration_ms": {
+            "type": "number",
+            "description": "Minimum duration of the sighting in milliseconds."
+          },
+          "area_of_interest": {
+            "$ref": "#/components/schemas/AreaOfInterest"
+          }
+        }
+      }
+    }
+  }
+}

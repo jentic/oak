@@ -1,0 +1,1917 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Bringin APIs",
+    "description": "This is Bringin APIs that you can use to make a Bitcoin on and off-ramp available for your European customers. We intend to provide a simple yet best crypto on and off-ramp solution with SEPA instant support at the best rates in the market.\n\n## Authentication\n\nWhile the APIs are available to the public to build, we provide an 'api-key' and 'api-secret' for each company to make secure API calls.\n\n### Request Headers\n\nAll API requests must be accompanied by the following headers:\n\n| Header Parameter | Description |\n| --- | --- |\n| api-key | Contact us at info@bringin.xyz to obtain API key. |\n| Authorization | A signature generated using the API Secret. Contact us at info@bringin.xyz to obtain the API secret. More information is below on generating a signature. |\n| Content-Type | application/json |\n\n> The sandbox and production environments mirror each other, except for the base URL and your API keys. Please contact us at info@bringin.xyz to elevate your application to production.\n\n### Calculating your request signature\n\nYou can calculate the value of the `Authorization` header above by creating a SHA256HMAC digest (MD5) of your request body, signed with your `API Secret`, in the following manner:\n\n1. Fetch the current UNIX timestamp\n2. Stringify the body of your request\n3. Calculate the hex encoded MD5 digest of your request body exactly as it will be sent\n4. Concatenate the UNIX timestamp with the request verb, path and the `requestContentHexString`\n5. Use your API Secret to create a SHA256 HMAC digest in hex\n6. Finally, create your authorization header as follows, using the verb 'HMAC ' concatenated with the timestamp and the `requestSignatureHexString`, separated by a `:`\n\n### Example Implementation\n\n```typescript\nimport crypto from 'crypto';\nconst hmac = crypto.createHmac('sha256', '');\nconst time = Date.now().toString();\nhmac.update(time);\nhmac.update('POST');\nhmac.update('/ping');\nconst contentHash = crypto.createHash('md5');\ncontentHash.update(JSON.stringify({\n    \"dummy\": 1,\n    \"data\": 2\n}));\nhmac.update(contentHash.digest('hex'));\nconsole.log(`HMAC ${time}:${hmac.digest('hex')}`);\n```\n\n## Webhooks\n\n### Order Status Webhook\n```\n{\n  orderId: string;\n  status: \"SUCCESSFUL\" | \"INITIATED\" | \"PROCESSING\" | \"FAILED\" | \"EXPIRED\";\n  userId: string;\n  sourceId: string;\n  label: string;\n  price: {\n    price: string;\n    currency: Currency;\n  };\n  sourceAmount: string;\n  destinationAmount: string;\n  destinationCurrency: Currency;\n  timestamp: string;\n}\n```\n\n### Verification Status Webhook\n```\n{\n    \"userId\": \"f5cbb00c-d36b-4b0d-b8ef-f412757603df\",\n    \"apikey\": \"MDU4MTJlNjdkYWU1NGJiZGE0ZjAxNzQ4YzM0NWJlYmE=\",\n    \"verificationStatus\": \"APPROVED\",\n    \"ref\": \"3d1bac50-bed6-4c80-ac91-092140226f7d\"\n}\n```\n",
+    "version": "1.0.0",
+    "contact": {
+      "email": "info@bringin.xyz"
+    },
+    "license": {
+      "name": "Proprietary"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/bringin-a9e/bringin-ap_is/1.0.0/swagger.json"
+  },
+  "servers": [
+    {
+      "url": "https://dev.bringin.xyz",
+      "description": "Development server"
+    },
+    {
+      "url": "https://api.bringin.xyz",
+      "description": "Production server"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": [],
+      "HMACAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "api-key"
+      },
+      "HMACAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "authorization",
+        "description": "HMAC signature in format \"HMAC {timestamp}:{signature}\""
+      }
+    },
+    "schemas": {
+      "Currency": {
+        "type": "string",
+        "enum": [
+          "BTC",
+          "EUR"
+        ],
+        "description": "Supported currencies"
+      },
+      "OrderStatus": {
+        "type": "string",
+        "enum": [
+          "INITIATED",
+          "PROCESSING",
+          "SUCCESSFUL",
+          "FAILED",
+          "EXPIRED"
+        ],
+        "description": "Order status values"
+      },
+      "TransactionType": {
+        "type": "string",
+        "enum": [
+          "OFFRAMP_WITHOUT_FIAT_WITHDRAWAL",
+          "ONRAMP_PARTIAL_FIAT_DEPOSIT",
+          "CRYPTO_DEPOSIT",
+          "CRYPTO_WITHDRAWAL",
+          "FIAT_DEPOSIT",
+          "FIAT_WITHDRAWAL"
+        ],
+        "description": "Transaction type values"
+      },
+      "KYCStatus": {
+        "type": "string",
+        "enum": [
+          "NOT_STARTED",
+          "PROCESSING",
+          "APPROVED",
+          "REJECTED"
+        ],
+        "description": "KYC verification status"
+      },
+      "Mobile": {
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "example": "+372"
+          },
+          "number": {
+            "type": "string",
+            "example": "56316716"
+          }
+        },
+        "required": [
+          "countryCode",
+          "number"
+        ]
+      },
+      "Price": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "string",
+            "description": "Price value as string"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          }
+        },
+        "required": [
+          "price",
+          "currency"
+        ]
+      },
+      "TierInfo": {
+        "type": "object",
+        "properties": {
+          "eligible": {
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KYCStatus"
+          },
+          "inboundLimitConsumed": {
+            "type": "object",
+            "properties": {
+              "all": {
+                "type": "string"
+              },
+              "va": {
+                "type": "string"
+              }
+            }
+          },
+          "inboundLimitAllowed": {
+            "type": "object",
+            "properties": {
+              "all": {
+                "type": "string"
+              },
+              "va": {
+                "type": "string"
+              }
+            }
+          },
+          "outboundLimitConsumed": {
+            "type": "string"
+          },
+          "outboundLimitAllowed": {
+            "type": "string"
+          }
+        }
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destinationAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "destinationAmount": {
+            "type": "string"
+          },
+          "sourceAmount": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TransactionType"
+          },
+          "subType": {
+            "type": "string",
+            "enum": [
+              "LIGHTNING",
+              "LN_ADDRESS",
+              "ONCHAIN"
+            ]
+          },
+          "destinationCurrency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "sourceCurrency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totalFeeCollected": {
+            "type": "object",
+            "properties": {
+              "totalFee": {
+                "type": "string"
+              },
+              "feeCurrency": {
+                "type": "string"
+              },
+              "networkFee": {
+                "type": "string"
+              },
+              "onchainNetworkFee": {
+                "type": "string"
+              }
+            }
+          },
+          "rate": {
+            "type": "string"
+          },
+          "withdrawalChallengeDetails": {
+            "type": "object"
+          },
+          "reasonOfFailure": {
+            "type": "string"
+          }
+        }
+      },
+      "BankDetails": {
+        "type": "object",
+        "properties": {
+          "internalAccountId": {
+            "type": "string"
+          },
+          "bankCountry": {
+            "type": "string"
+          },
+          "iban": {
+            "type": "string"
+          },
+          "bic": {
+            "type": "string"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "bankName": {
+            "type": "string"
+          },
+          "bankAccountHolderName": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "domestic": {
+            "type": "boolean"
+          },
+          "routingCodeEntries": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "payInReference": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Beneficiary": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "beneficiaryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shortName": {
+            "type": "string"
+          },
+          "iban": {
+            "type": "string"
+          },
+          "bic": {
+            "type": "string"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FeeEstimate": {
+        "type": "object",
+        "properties": {
+          "totalFee": {
+            "type": "string"
+          },
+          "networkFee": {
+            "type": "string"
+          },
+          "ourFee": {
+            "type": "string"
+          },
+          "theirFee": {
+            "type": "string"
+          },
+          "feeCurrency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "feePerByte": {
+            "type": "string"
+          },
+          "fixedFeeDetails": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "string"
+              },
+              "exchangeRate": {
+                "type": "string"
+              }
+            }
+          },
+          "percentageFeeDetails": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "code": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/v0/application/connect": {
+      "post": {
+        "tags": [
+          "User Onboarding"
+        ],
+        "summary": "Bringin Onboarding link",
+        "description": "One API to connect to Bringin or onboard users to Bringin.\n\nBringin checks if the email is associated with an existing Bringin user. Based on the result:\n\n**If the user exists and is not connected to the Application:**\n- Bringin sends a co-branded email requesting the user's consent to establish the connection.\n- The API response confirms that the user has been invited to approve the connection.\n- You should prompt the user to check their email and complete the process.\n- Once the user clicks on \"confirm connection link\" in the email, you should receive a callback.\n\n**If the user does not exist:**\n- Bringin sends a co-branded email inviting the user to onboard with Bringin via a signup link.\n- The API response includes the same signup link.\n- You can display this link in your application to guide the user to get started with Bringin.\n- You will get a webhook when the user completes the KYC.\n\n**If the user exists and the connection is already established:**\nAPI will return the userId.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@mailinator.com"
+                  },
+                  "callback": {
+                    "type": "string",
+                    "format": "uri",
+                    "example": "https://webhook.site/55a032b9-2f33-4559-a273-e9c8a0e8d9fe"
+                  },
+                  "ref": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                  }
+                },
+                "required": [
+                  "email",
+                  "callback",
+                  "ref"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User is a Bringin user but connection not enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "userRegistered": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "isUserConnected": {
+                      "type": "boolean",
+                      "example": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "User already connected or new user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "userRegistered": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "isUserConnected": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "apiKey": {
+                          "type": "string",
+                          "example": "NzY1YWQzZGYwNTE4NDQ4NzkxMTcxMTIxYzVmY2NlMDI="
+                        },
+                        "userId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "example": "7d9e7b27-da54-4eaf-8573-2f4dad2d1680"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "userRegistered": {
+                          "type": "boolean",
+                          "example": false
+                        },
+                        "signupURL": {
+                          "type": "string",
+                          "format": "uri",
+                          "example": "https://bringin-lite-test.vercel.app/signup?inviteId=73388409-1f6a-4638-bd7d-dac9ee91358a"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/user/kyc-status/{userId}": {
+      "get": {
+        "tags": [
+          "User Onboarding"
+        ],
+        "summary": "Get KYC status",
+        "description": "Get the User's onboarding status",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "KYC status information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "emailVerified": {
+                      "type": "boolean"
+                    },
+                    "mobileVerified": {
+                      "type": "boolean"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "currentTier": {
+                      "type": "integer"
+                    },
+                    "status": {
+                      "$ref": "#/components/schemas/KYCStatus"
+                    },
+                    "tier0": {
+                      "$ref": "#/components/schemas/TierInfo"
+                    },
+                    "tier1": {
+                      "$ref": "#/components/schemas/TierInfo"
+                    },
+                    "tier2": {
+                      "$ref": "#/components/schemas/TierInfo"
+                    },
+                    "tier3": {
+                      "$ref": "#/components/schemas/TierInfo"
+                    },
+                    "rejectionComments": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/offramp/rates": {
+      "post": {
+        "tags": [
+          "Offramp"
+        ],
+        "summary": "Get offramp rate",
+        "description": "This API is used to get the rate. The response contains the actual rate and the rate that includes our transaction fee. Our transaction fee also includes your markup. You can configure the markup.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ticker": {
+                    "type": "string",
+                    "example": "BTCEUR"
+                  }
+                },
+                "required": [
+                  "ticker"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current offramp rates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ticker": {
+                      "type": "string",
+                      "example": "BTCEUR"
+                    },
+                    "price": {
+                      "type": "string",
+                      "example": "25188.12"
+                    },
+                    "bringinPrice": {
+                      "type": "string",
+                      "example": "24936.2388"
+                    },
+                    "currency": {
+                      "$ref": "#/components/schemas/Currency"
+                    },
+                    "timestamp": {
+                      "type": "integer",
+                      "format": "int64",
+                      "example": 1695215292505
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/offramp/address": {
+      "post": {
+        "tags": [
+          "Offramp"
+        ],
+        "summary": "Get Offramp address",
+        "description": "API to request a Bitcoin address for off-ramping - any amount of Bitcoin can be sent to this address based on allowed limits.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ipAddress": {
+                    "type": "string",
+                    "format": "ipv4",
+                    "example": "212.30.36.15"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "ipAddress",
+                  "userId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bitcoin address for offramp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "maximumDepositAmount": {
+                      "type": "string",
+                      "example": "16061358"
+                    },
+                    "minimumDepositAmount": {
+                      "type": "string",
+                      "example": "0"
+                    },
+                    "address": {
+                      "type": "string",
+                      "example": "tb1q89k3hqc97rxuxkaxnj9apczjux7kjtdqj5v4e3"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/account/get-balance": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Get user balance",
+        "description": "Get users' Bitcoin and Euro balance.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currency": {
+                    "$ref": "#/components/schemas/Currency"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "currency",
+                  "userId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "balance": {
+                      "type": "string",
+                      "example": "1369"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/account/get-details": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Deposit Details",
+        "description": "Get Euro / Bitcoin deposit details.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currency": {
+                    "$ref": "#/components/schemas/Currency"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "currency",
+                  "userId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deposit details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "bankDetails": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/BankDetails"
+                          }
+                        },
+                        "accountId": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "addressDetails": {
+                          "type": "object",
+                          "properties": {
+                            "blockchainDepositAddress": {
+                              "type": "string",
+                              "example": "tb1q8u6mjlatvc0erads4k380xwcaswek9am4swest"
+                            }
+                          }
+                        },
+                        "accountId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/account/transactions": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Get Transactions",
+        "description": "Get all transactions of the users. Transaction types include:\n\n- OFFRAMP_WITHOUT_FIAT_WITHDRAWAL // Deposit Bitcoin, convert to Euro and leave it on the IBAN account\n- ONRAMP_PARTIAL_FIAT_DEPOSIT // Deposit Euro is already done, swap and withdraw to an address and automatically withdraws\n- CRYPTO_DEPOSIT // Bitcoin deposit\n- CRYPTO_WITHDRAWAL // Bitcoin withdrawal\n- FIAT_DEPOSIT // Fiat deposit\n- FIAT_WITHDRAWAL // Fiat Withdrawal\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "startDate": {
+                    "type": "integer",
+                    "format": "int64",
+                    "example": 1704034839427
+                  },
+                  "endDate": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "example": 10
+                  },
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "startDate",
+                  "endDate",
+                  "limit",
+                  "userId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transactions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Transaction"
+                      }
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "totalCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/account/send/initiate/onchain/fee-estimate": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Get Estimated Onchain Fee",
+        "description": "Get real-time on-chain fee estimation by providing the whitelisted Bitcoin address and the amount.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "amount": {
+                    "type": "string",
+                    "example": "10000000"
+                  },
+                  "whitelistedAddressId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "amount",
+                  "whitelistedAddressId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Fee estimation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeEstimate"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/account/send/initiate/onchain-withdrawal": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Initiate Bitcoin Withdrawal",
+        "description": "Initiate a Bitcoin withdrawal to one of the whitelisted Bitcoin addresses. All withdrawals need to be confirmed with a verification code.\n\nThe destination could also be a bolt11 Lightning invoice. We do not support 0 sat invoice or Bolt 12 invoices.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currency": {
+                    "$ref": "#/components/schemas/Currency"
+                  },
+                  "amount": {
+                    "type": "string",
+                    "example": "100000"
+                  },
+                  "ipAddress": {
+                    "type": "string",
+                    "format": "ipv4"
+                  },
+                  "price": {
+                    "type": "string",
+                    "example": "64058.21"
+                  },
+                  "onrampMethod": {
+                    "type": "string",
+                    "enum": [
+                      "LIGHTNING",
+                      "ONCHAIN"
+                    ]
+                  },
+                  "lnInvoice": {
+                    "type": "string",
+                    "description": "Lightning invoice (bolt11)"
+                  }
+                },
+                "required": [
+                  "currency",
+                  "amount",
+                  "ipAddress"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Withdrawal initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/account/send/initiate/bank": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Initiate Bank Transfer",
+        "description": "Initiate a bank transfer to move the Euros to the beneficiary bank account - need verification code from the user to confirm the transfer.\n\nVerification code is sent to their phone and email.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currency": {
+                    "$ref": "#/components/schemas/Currency"
+                  },
+                  "bankTransferType": {
+                    "type": "string",
+                    "enum": [
+                      "SEPA"
+                    ]
+                  },
+                  "amount": {
+                    "type": "string",
+                    "example": "1000"
+                  },
+                  "beneficiaryId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "ipAddress": {
+                    "type": "string",
+                    "format": "ipv4"
+                  }
+                },
+                "required": [
+                  "currency",
+                  "bankTransferType",
+                  "amount",
+                  "beneficiaryId",
+                  "ipAddress"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bank transfer initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/account/send/confirm": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Confirm Withdrawal",
+        "description": "API to confirm bank transfer or withdrawal with OTP",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "verificationCode": {
+                    "type": "string",
+                    "example": "123456"
+                  },
+                  "ipAddress": {
+                    "type": "string",
+                    "format": "ipv4"
+                  }
+                },
+                "required": [
+                  "orderId",
+                  "verificationCode",
+                  "ipAddress"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Withdrawal confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/account/whitelist-address": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Whitelist BTC address",
+        "description": "Add a Bitcoin address to the whitelist for withdrawals",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "address": {
+                    "type": "string",
+                    "example": "2N3oefVeg6stiTb5Kh3ozCSkaqmx91FDbsm"
+                  },
+                  "label": {
+                    "type": "string",
+                    "example": "Deposit Bitcoin address"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "address",
+                  "label"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Address whitelisted successfully"
+          }
+        }
+      }
+    },
+    "/api/v0/account/whitelist-address/{userId}": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Get all Whitelisted BTC addresses",
+        "description": "Get all whitelisted Bitcoin addresses for a user",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of whitelisted addresses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "address": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/transaction/bank-transfer/resend-otp": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Resend OTP",
+        "description": "Resend verification code.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "orderId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP resent successfully"
+          }
+        }
+      }
+    },
+    "/api/v0/user/beneficiary": {
+      "post": {
+        "tags": [
+          "Manage Bank Beneficiary"
+        ],
+        "summary": "Add Beneficiary Bank details",
+        "description": "API to add beneficiary details for getting euros to. The API stores the beneficiary details and responds with a corresponding ID.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "iban": {
+                    "type": "string",
+                    "example": "NL20INGB4452759149"
+                  },
+                  "bic": {
+                    "type": "string",
+                    "example": "REVOLT21"
+                  },
+                  "shortName": {
+                    "type": "string",
+                    "example": "My personal bank"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "currency": {
+                    "$ref": "#/components/schemas/Currency"
+                  }
+                },
+                "required": [
+                  "iban",
+                  "bic",
+                  "shortName",
+                  "userId",
+                  "currency"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Beneficiary added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "beneficiaryId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/user/beneficiary/{userId}": {
+      "get": {
+        "tags": [
+          "Manage Bank Beneficiary"
+        ],
+        "summary": "Get all Beneficiaries",
+        "description": "API to get all saved beneficiary details.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of beneficiaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "beneficiaries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Beneficiary"
+                      }
+                    },
+                    "number": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/onramp/rates": {
+      "post": {
+        "tags": [
+          "Onramp"
+        ],
+        "summary": "Get onramp rate",
+        "description": "Get current onramp rates for buying Bitcoin with Euros",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ticker": {
+                    "type": "string",
+                    "example": "BTCEUR"
+                  }
+                },
+                "required": [
+                  "ticker"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current onramp rates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ticker": {
+                      "type": "string"
+                    },
+                    "price": {
+                      "type": "string"
+                    },
+                    "bringinPrice": {
+                      "type": "string"
+                    },
+                    "currency": {
+                      "$ref": "#/components/schemas/Currency"
+                    },
+                    "timestamp": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/onramp/order": {
+      "post": {
+        "tags": [
+          "Onramp"
+        ],
+        "summary": "Create Onramp order",
+        "description": "Create an onramp order to buy Bitcoin with Euros",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ipAddress": {
+                    "type": "string",
+                    "format": "ipv4"
+                  },
+                  "sourceAmount": {
+                    "type": "string",
+                    "example": "6002"
+                  },
+                  "sourceCurrency": {
+                    "$ref": "#/components/schemas/Currency"
+                  },
+                  "destinationCurrency": {
+                    "$ref": "#/components/schemas/Currency"
+                  },
+                  "onrampMethod": {
+                    "type": "string",
+                    "enum": [
+                      "LIGHTNING",
+                      "ONCHAIN"
+                    ]
+                  },
+                  "lnInvoice": {
+                    "type": "string",
+                    "description": "Lightning invoice (bolt11)"
+                  }
+                },
+                "required": [
+                  "ipAddress",
+                  "sourceAmount",
+                  "sourceCurrency",
+                  "destinationCurrency",
+                  "onrampMethod"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Onramp order created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/onramp/order/get-details": {
+      "post": {
+        "tags": [
+          "Onramp"
+        ],
+        "summary": "Get Onramp status",
+        "description": "Get the status and details of an onramp order",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "orderId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Onramp order details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "$ref": "#/components/schemas/OrderStatus"
+                    },
+                    "sourceAmount": {
+                      "type": "string"
+                    },
+                    "destinationAmount": {
+                      "type": "string"
+                    },
+                    "rate": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/onramp/withdraw/initiate": {
+      "post": {
+        "tags": [
+          "Onramp"
+        ],
+        "summary": "Initiate onchain withdrawal",
+        "description": "Initiate withdrawal of Bitcoin from onramp order",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "orderId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Withdrawal initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/onramp/withdraw/confirm": {
+      "post": {
+        "tags": [
+          "Onramp"
+        ],
+        "summary": "Confirm Onramp withdrawal",
+        "description": "Confirm withdrawal of Bitcoin from onramp order with verification code",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "verificationCode": {
+                    "type": "string",
+                    "example": "123456"
+                  },
+                  "ipAddress": {
+                    "type": "string",
+                    "format": "ipv4"
+                  }
+                },
+                "required": [
+                  "orderId",
+                  "verificationCode",
+                  "ipAddress"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Withdrawal confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/onramp/withdraw/resend-otp": {
+      "post": {
+        "tags": [
+          "Onramp"
+        ],
+        "summary": "Resend OTP",
+        "description": "Resend verification code for onramp withdrawal",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "orderId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP resent successfully"
+          }
+        }
+      }
+    },
+    "/api/v0/onramp/get-pending-tx": {
+      "post": {
+        "tags": [
+          "Onramp"
+        ],
+        "summary": "Get Pending Transactions",
+        "description": "Get pending onramp transactions for a user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "status": {
+                    "type": "string",
+                    "example": "SWAP_COMPLETED"
+                  },
+                  "type": {
+                    "type": "string",
+                    "example": "ONRAMP_PARTIAL_FIAT_DEPOSIT"
+                  }
+                },
+                "required": [
+                  "userId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "List of pending transactions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transactions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Transaction"
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/swap": {
+      "post": {
+        "tags": [
+          "SWAP Currency"
+        ],
+        "summary": "Create Swap Request",
+        "description": "Provide source and destination currency details with the IP address. The amount provided must be of the source currency at the lower denomination in string. The swap will happen at the market order.\n\nYou get the rate in real-time to display the information to the user accordingly.\n\n**Note:** This API is only available for Business accounts with Bitcoin custody enabled.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceCurrency": {
+                    "$ref": "#/components/schemas/Currency"
+                  },
+                  "destinationCurrency": {
+                    "$ref": "#/components/schemas/Currency"
+                  },
+                  "sourceAmount": {
+                    "type": "string",
+                    "description": "Amount in the lowest denomination (sats or cents) as string",
+                    "example": "1223423"
+                  },
+                  "ipAddress": {
+                    "type": "string",
+                    "format": "ipv4",
+                    "example": "212.30.36.15"
+                  }
+                },
+                "required": [
+                  "sourceCurrency",
+                  "destinationCurrency",
+                  "sourceAmount",
+                  "ipAddress"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Swap request created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "rate": {
+                      "type": "string"
+                    },
+                    "sourceAmount": {
+                      "type": "string"
+                    },
+                    "destinationAmount": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v0/swap/{orderId}": {
+      "get": {
+        "tags": [
+          "SWAP Currency"
+        ],
+        "summary": "Get Swap Transaction By Id",
+        "description": "Get details of a specific swap transaction by order ID",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Swap transaction details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sourceCurrency": {
+                      "$ref": "#/components/schemas/Currency"
+                    },
+                    "destinationCurrency": {
+                      "$ref": "#/components/schemas/Currency"
+                    },
+                    "sourceAmount": {
+                      "type": "string"
+                    },
+                    "destinationAmount": {
+                      "type": "string"
+                    },
+                    "rate": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "$ref": "#/components/schemas/OrderStatus"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "completedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Swap transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "User Onboarding",
+      "description": "The user needs to accept Bringin's terms and conditions, and onboarding is done on the Bringin interface. We have reduced the onboarding to just 1 API, which requires email and a few more references.\n"
+    },
+    {
+      "name": "Offramp",
+      "description": "## Offramp Bitcoin to Bringin IBAN\n\nA set of APIs to create an offramp order to convert incoming Bitcoin deposits into Euros into Bringin's IBAN for users to withdraw anytime.\n\nSingle APIs to fetch a Bitcoin address. The Bitcoin sent to this address will be converted to Euro and will be available on Bringin's IBAN.\n\nIt is important to get the address by sharing the IP address - the IP is cached against the address for 2 days.\n\nTo make a Bitcoin deposit and not convert to Euros, please refer to the account section to get the deposit instructions for the BTC account.\n\nWith a new Lightning address, you can get an LN invoice that funds the Euro account. More details here: https://github.com/bringinxyz/ln-address-offramping\n"
+    },
+    {
+      "name": "Account",
+      "description": "APIs to deposit Bitcoin / Euros. Withdraw Bitcoin / Euros.\n\nBitcoin custody is enabled for Businesses, unlike consumer products.\n"
+    },
+    {
+      "name": "Manage Bank Beneficiary",
+      "description": "APIs to add new Bank beneficiaries to the Euro account withdrawals."
+    },
+    {
+      "name": "Onramp",
+      "description": "APIs for buying Bitcoin with Euros through various payment methods including Lightning and on-chain transfers."
+    },
+    {
+      "name": "SWAP Currency",
+      "description": "This is an API only for Business accounts. We enable Bitcoin custody. APIs allow you to instantly swap between Bitcoin \u2194 Euros."
+    }
+  ]
+}

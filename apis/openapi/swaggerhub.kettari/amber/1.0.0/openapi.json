@@ -1,0 +1,2221 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "Client area API for web- and telegram-based applications",
+    "version": "1.0.0",
+    "title": "Amber REST API schema ",
+    "contact": {
+      "email": "ant@kaula.ru"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/kettari/Amber/1.0.0/swagger.json"
+  },
+  "tags": [
+    {
+      "name": "authentication",
+      "description": "Authentication methods"
+    },
+    {
+      "name": "profile",
+      "description": "User profile-related methods"
+    },
+    {
+      "name": "messages",
+      "description": "Messages methods"
+    },
+    {
+      "name": "tickets",
+      "description": "Tickets methods"
+    },
+    {
+      "name": "subscriptions",
+      "description": "Subscriptions methods"
+    },
+    {
+      "name": "cards",
+      "description": "Cards methods"
+    },
+    {
+      "name": "products",
+      "description": "Products available to buy"
+    },
+    {
+      "name": "orders",
+      "description": "Orders methods"
+    }
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/account/authentication": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Checks if user is authenticated",
+        "description": "Checks if user is authenticated. \n\nAlways returns `sessionKey` in the cookie AND JSON reply regardles of status of authentication. If `sessionKey` was not sent with this request, method creates it and sends the cookie in the response.\n",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Result of check. Always returns `sessionKey` in the cookie and JSON reply regardless of status of authentication.\n",
+            "schema": {
+              "type": "object",
+              "required": [
+                "authenticated"
+              ],
+              "properties": {
+                "authenticated": {
+                  "type": "boolean",
+                  "example": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Authenticates user",
+        "description": "Assigns `sessionKey` to the user by `phone` in the database if `code` or `serviceKey` is correct. Any subsequent requests to secured methods will check `sessionKey` and authenticate request.\n\nSession key SHOULD be sent in the cookie with the request. If you don't have `sessionKey` at this point, check GET method.\n\nThis method also tries to link user with the Tallanto record by phone. No exceptions are thrown, status is stored to the user entity in the database.\n",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string. Should be provided in the cookie (see GET method)."
+          },
+          {
+            "in": "body",
+            "name": "authentication",
+            "description": "Either `code` or `serviceKey` SHOULD be provided in the request.           `code` is entered by the user in a web form (see **/account/code**). \n\n`serviceKey` is used to authenticate requests from _our_ services and is configured in the requestor's settings.\n",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Account"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "User authenticated.\n"
+          },
+          "400": {
+            "description": "Validation violation.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "User with this phone not found.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/account/registration": {
+      "post": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Registrers user account",
+        "description": "Registers user account with the phone number provided in the request.\n\nAssigns `sessionKey` to the user by `phone` in the database if `code` or `serviceKey` is correct. Any subsequent requests to secured methods will check `sessionKey` and authenticate request.\n\nSession key SHOULD be sent in the cookie with the request. If you don't have `sessionKey` at this point, check GET method.\n\nThis method also tries to link user with the Tallanto record by phone. No exceptions are thrown, status is stored to the user entity in the database.\n",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string. Should be provided in the cookie (see GET method)."
+          },
+          {
+            "in": "body",
+            "name": "authentication",
+            "description": "Either `code` or `serviceKey` SHOULD be provided in the request.           `code` is entered by the user in a web form (see **/account/code**). \n\n`serviceKey` is used to authenticate requests from _our_ services and is configured in the requestor's settings.\n",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Account"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "User registered.\nUser is authenticated after this operation.\n"
+          },
+          "400": {
+            "description": "Validation violation.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "User with this phone already exists.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/account/code": {
+      "post": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Initiates callback to user's phone",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "phone",
+            "required": true,
+            "type": "string",
+            "description": "Phone number to make a call to.\n"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Callback initiated successfully.\n"
+          },
+          "400": {
+            "description": "Validation failed.  May be one of the following (or something else):\n* Invalid phone\n"
+          },
+          "429": {
+            "description": "Client sends too many requests, please calm down.\n\nRequests are allowed every 60 seconds. So please wait 61 seconds to be sure you wouldn't get this response accidentally.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server or service error. May be one of the following (or something else):\n* InsufficientFundsException\n* IpAddressBlockedException\n* DeliveryException\n* SmsCenterException\n\nAll of them are bad and there is nothing you can do, just show something pleasant to the user.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "502": {
+            "description": "Upstream server died. Apparently client should repeat the request.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Returns current user profile",
+        "description": "Returns current user profile, including first and last names and other information known to server\n",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "schema": {
+              "$ref": "#/definitions/Profile"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "User is not found.\n\nThis might happen if Tallanto contact is not linked with the user account. Check the POST method.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Updates current user profile",
+        "description": "Updates current user profile, including first and last name and other information.\n\nUnable to update following properties using this method. Trying to change them will produce a HTTP 409 error:\n  - tallantoContactId\n  - tallantoStatus\n  - phone\n",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "body",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "$ref": "#/definitions/Profile"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile updated",
+            "schema": {
+              "$ref": "#/definitions/Profile"
+            }
+          },
+          "400": {
+            "description": "Validation violation",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Unable to change the phone, use special method for this operation",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/me/email": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Sends email confirmation message",
+        "description": "Sends email confirmation message to the email address from the user entity.\n",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Email sent."
+          },
+          "400": {
+            "description": "Validation violation",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Confirms email address",
+        "description": "Confirms email address of the user.\n",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "body",
+            "name": "keyParameter",
+            "required": true,
+            "description": "Confirmation key",
+            "schema": {
+              "type": "object",
+              "required": [
+                "key"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "example": "dhfjritop2pdjf9",
+                  "pattern": "^[0-9a-z]{15}$"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Email confirmed."
+          },
+          "400": {
+            "description": "Validation violation",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Key is not found.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Email for confirmation is different from address in the user's profile.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/messages": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Returns current user messages",
+        "description": "Returns current user messages",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "type": "string",
+            "description": "Filter messages by uread status: `read`, `unread`.\n* `read` \u2014 stands for read messages;\n* `unread` \u2014 stands for unread messages.\nExamples: \n* filter=[unread] returns only unread messages.\n* filter=[unread,read] returns unread AND read mesages.\n* filter=[] returns no messages.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User messages",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Message"
+              }
+            }
+          },
+          "204": {
+            "description": "No messages found"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/messages/{messageId}": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Returns specific message",
+        "description": "Returns specific message by messageId",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "description": "Numeric ID of the message to get.",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The message",
+            "schema": {
+              "$ref": "#/definitions/Message"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Access forbidden, message doesn't belong to this user",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "messages"
+        ],
+        "summary": "Updates message read status",
+        "description": "Mark message *read*.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "description": "Numeric ID of the message to update",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The message",
+            "schema": {
+              "$ref": "#/definitions/Message"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Access forbidden, message doesn't belong to this user",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Message is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/tickets": {
+      "get": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "Returns current user tickets",
+        "description": "Returns current user tickets",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "query",
+            "name": "expiring",
+            "required": false,
+            "type": "boolean",
+            "description": "If true, return only expiring tickets (e.g. those will expires in 7 days)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User tickets",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Ticket"
+              }
+            }
+          },
+          "204": {
+            "description": "No tickets found"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/tickets/{ticketId}": {
+      "get": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "Returns specific ticket",
+        "description": "Returns specific ticket by ticketId",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "ticketId",
+            "in": "path",
+            "description": "ID of the ticket to get.",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ticket",
+            "schema": {
+              "$ref": "#/definitions/Ticket"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "The credentials indicate a system-known user, but the user is not allowed to perform the requested operation.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Ticket is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/subscriptions": {
+      "get": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Returns current user subscriptions",
+        "description": "Returns current user subscriptions",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "type": "string",
+            "description": "Filter subscriptions by group status: `active`, `inactive`.\n* `active` \u2014 stands for 'Active', 'PastDue'\n* `inactive` \u2014 stands for 'Cancelled', 'Rejected', 'Expired'.\nExamples: \n* filter=[inactive] returns only inactive subscriptions.\n* filter=[inactive,active] returns inactive AND active subscriptions.\n* filter=[] returns no subscriptions.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User's subscriptions",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Subscription"
+              }
+            }
+          },
+          "204": {
+            "description": "No subscriptions found"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/subscriptions/{subscriptionId}": {
+      "get": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Returns specific subscription",
+        "description": "Returns specific subscription by subscriptionId",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "subscriptionId",
+            "in": "path",
+            "description": "ID of the subscription to get.",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The subscription",
+            "schema": {
+              "$ref": "#/definitions/Subscription"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "The credentials indicate a system-known user, but the user is not allowed to perform the requested operation.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Suscription is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Cancels specific subscription",
+        "description": "Cancels specific subscription by subscriptionId",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "subscriptionId",
+            "in": "path",
+            "description": "ID of the subscription to get.",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The subscription to cancel.\n\nWe return HTTP 204 because cancellation is asynchronous -- we make a request to CloudPayments API and it makes webhook call with a Recurrent Notification. At this point we can't tell anything about subscription status.\n"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "The credentials indicate a system-known user, but the user is not allowed to perform the requested operation.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Suscription is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/subscriptions/{subscriptionId}/payments": {
+      "get": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Returns payments for the subscription",
+        "description": "Returns payments list for the specific subscription by subscriptionId",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "subscriptionId",
+            "in": "path",
+            "description": "ID of the subscription to get.",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payments list",
+            "schema": {
+              "$ref": "#/definitions/SubscriptionPayments"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "The credentials indicate a system-known user, but the user is not allowed to perform the requested operation.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Suscription is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/cards": {
+      "get": {
+        "tags": [
+          "cards"
+        ],
+        "summary": "Returns current user banking cards",
+        "description": "Returns current user banking cards. User must check a checkbox when making a payment to save the card.\n\nWe do not store banking card numbers or CVV. Just partial information and special token that can be used for recurrent payments.\n",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "type": "string",
+            "description": "Filter cards by card status: `active`, `inactive`.\n* `active` \u2014 stands for active cards;\n* `inactive` \u2014 stands for inactive (expired) cards.\nExamples: \n* filter=[inactive] returns only inactive cards.\n* filter=[inactive,active] returns inactive AND active cards.\n* filter=[] returns no cards.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User's banking cards",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Card"
+              }
+            }
+          },
+          "204": {
+            "description": "No cards found"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/cards/{cardId}": {
+      "get": {
+        "tags": [
+          "cards"
+        ],
+        "summary": "Returns specific banking card",
+        "description": "Returns specific card by cardId",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "cardId",
+            "in": "path",
+            "description": "ID of the card to get.",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The card",
+            "schema": {
+              "$ref": "#/definitions/Card"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "The credentials indicate a system-known user, but the user is not allowed to perform the requested operation.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Card is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "cards"
+        ],
+        "summary": "Deletes specific banking card",
+        "description": "Deletes specific card by cardId",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "cardId",
+            "in": "path",
+            "description": "ID of the card to delete.",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "\u0421ard deleted"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "The credentials indicate a system-known user, but the user is not allowed to perform the requested operation.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Card is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Products to buy",
+        "description": "Returns list of products to buy",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available products",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Product"
+              }
+            }
+          },
+          "204": {
+            "description": "No products found"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/products/{productId}": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Product details",
+        "description": "Product details",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "productId",
+            "in": "path",
+            "description": "ID or handle of the product to get.",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The product",
+            "schema": {
+              "$ref": "#/definitions/Product"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Product is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/products/{productId}/plans": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Plans of the product",
+        "description": "List of financial plans this product can be bought with.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "productId",
+            "in": "path",
+            "description": "ID or handle of the product to get its plans.",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available plans",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Plan"
+              }
+            }
+          },
+          "204": {
+            "description": "No plans found"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/products/{productId}/discounts": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Discounts of the product",
+        "description": "List of discounts for this product.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "name": "productId",
+            "in": "path",
+            "description": "ID or handle of the product to get its discounts.",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available discounts",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Discount"
+              }
+            }
+          },
+          "204": {
+            "description": "No discounts found"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/orders": {
+      "get": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Returns orders",
+        "description": "Returns orders of the current user",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orders of the current user",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Order"
+              }
+            }
+          },
+          "204": {
+            "description": "No orders found"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Creates order",
+        "description": "Creates and returns order",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "body",
+            "name": "orderParameter",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrderParameter"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Order that was created",
+            "schema": {
+              "$ref": "#/definitions/Order"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Product or plan not found.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Returns the order",
+        "description": "Returns specific order of the current user",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order of the current user",
+            "schema": {
+              "$ref": "#/definitions/Order"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "The credentials indicate a system-known user, but the user is not allowed to perform the requested operation.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Order is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/orders/{orderId}/pay": {
+      "post": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Pays the order",
+        "description": "Pay the order using token of the card.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "in": "body",
+            "name": "paymentInfo",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "cardId"
+              ],
+              "properties": {
+                "cardId": {
+                  "type": "integer",
+                  "example": 8,
+                  "description": "ID of the card to use for payment."
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Payment successful. Check status of the order.\n"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "The credentials indicate a system-known user, but the user is not allowed to perform the requested operation.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Order or card is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Order status should be 'new' but is '(other)', unable to process",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "422": {
+            "description": "Payment provider failed to charge the card.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "CloudPayments API exception occurred.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/banners": {
+      "get": {
+        "tags": [
+          "banners"
+        ],
+        "summary": "Above-content messages",
+        "description": "Returns list of banners for the current user.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Banners for the current user.\nIf `id` is null, it's a special banner that can't be hide. For example, \"Confirm your email\".\n",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Banner"
+              }
+            }
+          },
+          "204": {
+            "description": "No banners found"
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    },
+    "/banners/{bannerId}": {
+      "get": {
+        "tags": [
+          "banners"
+        ],
+        "summary": "Specific above-content message",
+        "description": "Returns specific banner for the current user.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "path",
+            "name": "bannerId",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Banner of the current user",
+            "schema": {
+              "$ref": "#/definitions/Banner"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "The credentials indicate a system-known user, but the user is not allowed to perform the requested operation.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Banner is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "banners"
+        ],
+        "summary": "Hide specific above-content message",
+        "description": "hides specific banner for the current user.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "sessionKey",
+            "required": true,
+            "type": "string",
+            "description": "Session key is a 40-character alphanumeric string"
+          },
+          {
+            "in": "path",
+            "name": "bannerId",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Banner of the current user",
+            "schema": {
+              "$ref": "#/definitions/Banner"
+            }
+          },
+          "401": {
+            "description": "No credentials are provided, or the provided credentials are refused.",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "The credentials indicate a system-known user, but the user is not allowed to perform the requested operation.\n",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Banner is not found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "myCookie": []
+          }
+        ]
+      }
+    }
+  },
+  "securityDefinitions": {
+    "myCookie": {
+      "type": "apiKey",
+      "name": "sessionKey",
+      "in": "header"
+    }
+  },
+  "definitions": {
+    "ErrorResponse": {
+      "type": "object",
+      "required": [
+        "message",
+        "status",
+        "type"
+      ],
+      "properties": {
+        "status": {
+          "type": "integer",
+          "description": "The original response code of the response"
+        },
+        "type": {
+          "type": "string",
+          "description": "An error type for classification of the error"
+        },
+        "message": {
+          "type": "string",
+          "description": "A message describing the problem in relation to the error type in human-readable form"
+        },
+        "moreInfo": {
+          "type": "string",
+          "description": "A link to get more information on that kind of error type"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ErrorDetailsItem"
+          }
+        }
+      }
+    },
+    "ErrorDetailsItem": {
+      "type": "object",
+      "required": [
+        "field",
+        "message",
+        "type"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "A bean notation expression specifying the element in the request data causing the error, such as \"code\". This can be empty if the violation is not field-specific."
+        },
+        "type": {
+          "type": "string",
+          "description": "An error type for classification of the detailed error. The type must be a sub-type of the type specified in the common error payload."
+        },
+        "message": {
+          "type": "string",
+          "description": "A message that describes the problem that is more specific to the sub-type."
+        },
+        "moreInfo": {
+          "type": "string",
+          "description": "A link to information related to the sub-error type."
+        }
+      }
+    },
+    "Account": {
+      "type": "object",
+      "required": [
+        "phone"
+      ],
+      "properties": {
+        "phone": {
+          "type": "string",
+          "example": "79681234567",
+          "description": "User's phone",
+          "pattern": "^\\d{11,30}$"
+        },
+        "code": {
+          "type": "string",
+          "description": "Code entered by the user in the login form",
+          "pattern": "^\\d{4}$"
+        },
+        "serviceKey": {
+          "type": "string",
+          "description": "Private token which is known to Amber to authenticate requesting service itself",
+          "pattern": "^[a-f0-9]{40}$"
+        }
+      }
+    },
+    "Profile": {
+      "type": "object",
+      "required": [
+        "firstName",
+        "phone"
+      ],
+      "properties": {
+        "tallantoContactId": {
+          "type": "string",
+          "description": "Tallanto contact ID",
+          "example": "1a761863-9ba7-0220-0890-5351681bc9f7"
+        },
+        "tallantoStatus": {
+          "type": "string",
+          "example": "linked",
+          "description": "Tallanto linking status. Can be: \"linked\", \"not_found\" or \"multiple\"\n"
+        },
+        "firstName": {
+          "type": "string",
+          "example": "John"
+        },
+        "lastName": {
+          "type": "string",
+          "example": "Doe"
+        },
+        "phone": {
+          "type": "string",
+          "example": "79681234567",
+          "pattern": "^\\d{11,30}$"
+        },
+        "email": {
+          "type": "string",
+          "example": "john@doe.com"
+        },
+        "emailConfirmed": {
+          "type": "boolean",
+          "example": true
+        },
+        "birthDate": {
+          "type": "string",
+          "example": "1982-12-04",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      }
+    },
+    "Message": {
+      "type": "object",
+      "required": [
+        "id",
+        "unread"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "example": 24
+        },
+        "dateCreated": {
+          "type": "string",
+          "example": "1982-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "dateUpdated": {
+          "type": "string",
+          "example": "1982-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "unread": {
+          "type": "boolean",
+          "example": true
+        },
+        "subject": {
+          "type": "string",
+          "example": "Transaction 19237 failed"
+        },
+        "body": {
+          "type": "string",
+          "example": "Long HTML-enabled text with detailed description"
+        }
+      }
+    },
+    "Ticket": {
+      "type": "object",
+      "required": [
+        "dateActivated",
+        "dateExpires",
+        "datePurchased",
+        "id",
+        "name",
+        "price",
+        "subscriptionId",
+        "visitsLeft",
+        "visitsTotal"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "example": 542
+        },
+        "tallantoTicketId": {
+          "type": "string",
+          "example": "acfd02d5-131b-0253-c9bf-58e0ee6bdc9a",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "name": {
+          "type": "string",
+          "example": "\u041b\u0423\u0411 \u0411\u0435\u0437\u043b\u0438\u043c\u0438\u0442\u043d\u044b\u0439 12 \u043c\u0435\u0441\u044f\u0446\u0435\u0432"
+        },
+        "price": {
+          "type": "number",
+          "example": 36900
+        },
+        "datePurchased": {
+          "type": "string",
+          "example": "1982-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "dateActivated": {
+          "type": "string",
+          "example": "1982-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "dateExpires": {
+          "type": "string",
+          "example": "1982-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "visitsTotal": {
+          "type": "string",
+          "example": "unlimited"
+        },
+        "visitsLeft": {
+          "type": "integer",
+          "example": 25
+        },
+        "subscriptionId": {
+          "type": "integer",
+          "example": 103
+        }
+      }
+    },
+    "Subscription": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "example": 542
+        },
+        "status": {
+          "type": "string",
+          "example": "Active",
+          "pattern": "^(Active|PastDue|Cancelled|Rejected|Expired)$",
+          "description": "Status of the subscription:\n- *Active* -- immidiately after creation and after each successful payment.\n- *PastDue* -- after one or two consecutive failed payments.\n- *Cancelled* -- after subscription cancelled by request.\n- *Rejected* -- after three consecutive failed payments.\n- *Expired* -- after all periods were paid, if applicable.\n"
+        },
+        "firstPaymentAmount": {
+          "type": "number",
+          "example": 36900
+        },
+        "monthlyPaymentAmount": {
+          "type": "number",
+          "example": 1369
+        },
+        "currency": {
+          "type": "string",
+          "example": "RUB"
+        },
+        "startDate": {
+          "type": "string",
+          "example": "2017-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "description": "Date and time of the first payment\n"
+        },
+        "lastTransactionDate": {
+          "type": "string",
+          "example": "2017-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "nextTransactionDate": {
+          "type": "string",
+          "example": "2017-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "successfulTransactionsNumber": {
+          "type": "number",
+          "example": 2
+        },
+        "failedTransactionsNumber": {
+          "type": "number",
+          "example": 0
+        },
+        "maxPeriods": {
+          "type": "number",
+          "example": 11,
+          "description": "Total number of payment periods. Period equals 1 month.\n"
+        },
+        "dateCreated": {
+          "type": "string",
+          "example": "2017-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "dateExpires": {
+          "type": "string",
+          "example": "2017-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "publicNumber": {
+          "type": "string",
+          "example": "123-456789",
+          "pattern": "^\\d{3}-\\d{6}$",
+          "description": "Unique subscription number to show to the user\n"
+        }
+      }
+    },
+    "Card": {
+      "type": "object",
+      "required": [
+        "id",
+        "cardFirstSix",
+        "cardLastFour",
+        "cardType",
+        "cardExpDate",
+        "isDefault"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "example": 542
+        },
+        "cardFirstSix": {
+          "type": "number",
+          "example": 411111
+        },
+        "cardLastFour": {
+          "type": "number",
+          "example": 1111
+        },
+        "cardType": {
+          "type": "string",
+          "example": "Visa"
+        },
+        "cardExpDate": {
+          "type": "string",
+          "example": "12/18",
+          "pattern": "^\\d{2}\\/\\d{2}$",
+          "description": "Card expiration date MM/YY\n"
+        },
+        "isDefault": {
+          "type": "boolean",
+          "example": false,
+          "description": "Is this card selected as default by the user?\n"
+        }
+      }
+    },
+    "Product": {
+      "type": "object",
+      "required": [
+        "id",
+        "handle"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "example": 542
+        },
+        "handle": {
+          "type": "string",
+          "example": "yoga_full_12",
+          "description": "Symbolic handle of this product. Useful for 'hard-coding' in the templates \u2014 IDs may change, but the handle will always return correct product.\n"
+        },
+        "title": {
+          "type": "string",
+          "example": "\u0411\u0435\u0437\u043b\u0438\u043c\u0438\u0442\u043d\u044b\u0439 12 \u043c\u0435\u0441\u044f\u0446\u0435\u0432"
+        },
+        "type": {
+          "type": "string",
+          "example": "yoga_group"
+        },
+        "basePrice": {
+          "type": "number",
+          "example": 4782.45
+        },
+        "currency": {
+          "type": "string",
+          "example": "RUB"
+        }
+      }
+    },
+    "Plan": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "example": 542
+        },
+        "firstPaymentAmount": {
+          "type": "number",
+          "example": 9666.67
+        },
+        "monthlyPaymentAmount": {
+          "type": "number",
+          "example": 1625.76
+        },
+        "recurrentPaymentsCount": {
+          "type": "number",
+          "example": 11
+        }
+      }
+    },
+    "Discount": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "example": 542
+        },
+        "handle": {
+          "type": "string",
+          "example": "prolongation",
+          "description": "Unique literal handler for this dicount\n"
+        },
+        "title": {
+          "type": "string",
+          "example": "\u041d\u0435\u043f\u0440\u0435\u0440\u044b\u0432\u043d\u043e\u0435 \u043f\u0440\u043e\u0434\u043b\u0435\u043d\u0438\u0435 \u0430\u0431\u043e\u043d\u0435\u043c\u0435\u043d\u0442\u0430"
+        },
+        "inapplicableText": {
+          "type": "string",
+          "example": "\u0421\u043a\u0438\u0434\u043a\u0438 \u0437\u0430 \u043d\u0435\u043f\u0440\u0435\u0440\u044b\u0432\u043d\u043e\u0435 \u043f\u0440\u043e\u0434\u043b\u0435\u043d\u0438\u0435 \u043d\u0435\u0442. \u041d\u0443\u0436\u0435\u043d \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u044e\u0449\u0438\u0439 \u0430\u0431\u043e\u043d\u0435\u043c\u0435\u043d\u0442."
+        },
+        "kind": {
+          "type": "string",
+          "example": "relative",
+          "description": "Relative or absolute discount. Relative is a percent of price, absolute -- fixed amount.\n"
+        },
+        "productType": {
+          "type": "string",
+          "example": "yoga_group",
+          "description": "Type of product: yoga group, seminar, etc.\n"
+        },
+        "amount": {
+          "type": "number",
+          "example": 5,
+          "description": "Value of the discount. If kind is \"relative\" then \"5\" stands for 5%.\n"
+        },
+        "isApplicable": {
+          "type": "boolean",
+          "example": true,
+          "description": "Is this discount applicable?\n"
+        }
+      }
+    },
+    "OrderParameter": {
+      "type": "object",
+      "required": [
+        "planId",
+        "saveCard"
+      ],
+      "properties": {
+        "planId": {
+          "type": "integer",
+          "example": 130,
+          "description": "ID of the plan"
+        },
+        "saveCard": {
+          "type": "boolean",
+          "example": false,
+          "description": "Save card token for future payments or not"
+        }
+      }
+    },
+    "Order": {
+      "type": "object",
+      "required": [
+        "id",
+        "invoiceId",
+        "status",
+        "statusDescription",
+        "dateCreated",
+        "dateUpdated",
+        "firstPaymentAmount",
+        "monthlyPaymentAmount",
+        "recurrentPaymentsCount",
+        "currency",
+        "productTitle",
+        "planId"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "example": 130,
+          "description": "ID of the order"
+        },
+        "invoiceId": {
+          "type": "string",
+          "pattern": "^\\d{8}\\-\\d{4}-[a-z0-9]{5}$",
+          "example": "20170912-1813-q7h68",
+          "description": "Unique invoice ID of this order"
+        },
+        "status": {
+          "type": "string",
+          "example": "new",
+          "description": "Status of the order: new, paid, cancelled or error\n"
+        },
+        "statusDescription": {
+          "type": "string",
+          "description": "Description of the error or additional information about the status\n"
+        },
+        "dateCreated": {
+          "type": "string",
+          "example": "1982-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "dateUpdated": {
+          "type": "string",
+          "example": "1982-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "firstPaymentAmount": {
+          "type": "number",
+          "example": 9666.67
+        },
+        "monthlyPaymentAmount": {
+          "type": "number",
+          "example": 1625.76
+        },
+        "recurrentPaymentsCount": {
+          "type": "number",
+          "example": 11
+        },
+        "currency": {
+          "type": "string",
+          "example": "RUB"
+        },
+        "productTitle": {
+          "type": "string",
+          "example": "\u0411\u0435\u0437\u043b\u0438\u043c\u0438\u0442\u043d\u044b\u0439 12 \u043c\u0435\u0441\u044f\u0446\u0435\u0432"
+        },
+        "planId": {
+          "type": "integer",
+          "example": 3,
+          "description": "ID of the plan used to created this order\n"
+        }
+      }
+    },
+    "Banner": {
+      "type": "object",
+      "required": [
+        "id",
+        "text",
+        "severity"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "example": 130,
+          "description": "ID of the banner"
+        },
+        "text": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "integer",
+          "description": "Severity:\n* 0 = INFO\n* 1 = WARNING\n"
+        }
+      }
+    },
+    "SubscriptionPayments": {
+      "type": "object",
+      "required": [
+        "date",
+        "amount",
+        "status"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "example": "1982-12-04T14:21:02Z",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        },
+        "amount": {
+          "type": "number",
+          "example": 1872.12
+        },
+        "status": {
+          "type": "string",
+          "example": "Completed",
+          "description": "Payment status. Can be:\n* `AwaitingAuthentication` -- \u00ab\u041e\u0436\u0438\u0434\u0430\u0435\u0442 \u0430\u0443\u0442\u0435\u043d\u0442\u0438\u0444\u0438\u043a\u0430\u0446\u0438\u0438\u00bb\n* `Authorized` -- \u00ab\u0410\u0432\u0442\u043e\u0440\u0438\u0437\u043e\u0432\u0430\u043d\u0430\u00bb\n* `Completed` -- \u00ab\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430\u00bb\n* `Cancelled` -- \u00ab\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u0430\u00bb\n* `Declined` -- \u00ab\u041e\u0442\u043a\u043b\u043e\u043d\u0435\u043d\u0430\u00bb\n\nSee https://cloudpayments.ru/Docs/Directory#statuses for details."
+        }
+      }
+    }
+  }
+}

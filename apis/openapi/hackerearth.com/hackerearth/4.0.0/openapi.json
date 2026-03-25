@@ -1,0 +1,380 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "HackerEarth Code Evaluation API",
+    "description": "HackerEarth API v4 for code compilation and execution. Submit source code in 30+ programming languages and retrieve execution results including output, runtime, memory usage, and compilation status.",
+    "version": "4.0.0",
+    "contact": {
+      "name": "HackerEarth",
+      "url": "https://www.hackerearth.com"
+    },
+    "x-jentic-source-url": "https://www.hackerearth.com/docs/wiki/developers/v4/"
+  },
+  "servers": [
+    {
+      "url": "https://api.hackerearth.com/v4/partner",
+      "description": "HackerEarth API v4 Production"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Code Evaluation",
+      "description": "Submit and evaluate code"
+    }
+  ],
+  "security": [
+    {
+      "clientSecret": []
+    }
+  ],
+  "paths": {
+    "/code-evaluation/submissions/": {
+      "post": {
+        "tags": ["Code Evaluation"],
+        "summary": "Submit code for evaluation",
+        "description": "Submit source code for compilation and execution. Returns a submission ID that can be used to poll for results. Optionally provide a callback URL for webhook notifications.",
+        "operationId": "submitCode",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Submission queued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing required attribute or invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or unregistered client secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API usage quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuotaError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/code-evaluation/submissions/{id}/": {
+      "get": {
+        "tags": ["Code Evaluation"],
+        "summary": "Get submission status",
+        "description": "Retrieve the current status and results of a code evaluation submission. Poll this endpoint until request_status.code is REQUEST_COMPLETED or REQUEST_FAILED.",
+        "operationId": "getSubmissionStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The he_id value from the submission response"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Submission status and results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid client secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Submission not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "clientSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "client-secret",
+        "description": "Unique client secret obtained after registration at https://www.hackerearth.com/api/register/"
+      }
+    },
+    "schemas": {
+      "SubmissionRequest": {
+        "type": "object",
+        "required": ["lang", "source"],
+        "properties": {
+          "lang": {
+            "type": "string",
+            "description": "Programming language identifier",
+            "enum": [
+              "C", "CPP14", "CPP17", "JAVA8", "JAVA14",
+              "PYTHON", "PYTHON3", "PYTHON3_8",
+              "JAVASCRIPT_NODE", "RUBY", "GO", "RUST",
+              "PHP", "CSHARP", "KOTLIN", "SWIFT",
+              "SCALA", "BASH", "OBJECTIVEC", "MYSQL",
+              "R", "HASKELL", "CLOJURE", "PERL",
+              "ERLANG", "LUA", "FSHARP", "ELIXIR",
+              "TYPESCRIPT"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "description": "Source code to execute"
+          },
+          "input": {
+            "type": "string",
+            "description": "Program input data (stdin)"
+          },
+          "memory_limit": {
+            "type": "integer",
+            "description": "Maximum memory in KB. Default: 262144 (256 MB)",
+            "default": 262144
+          },
+          "time_limit": {
+            "type": "integer",
+            "description": "Maximum execution time in seconds. Default: 5",
+            "default": 5
+          },
+          "context": {
+            "type": "string",
+            "description": "Client context data returned in response. Max 1024 characters.",
+            "maxLength": 1024
+          },
+          "callback": {
+            "type": "string",
+            "format": "uri",
+            "description": "Webhook URL for result notifications. Supports max 5 redirects."
+          }
+        }
+      },
+      "SubmissionResponse": {
+        "type": "object",
+        "properties": {
+          "request_status": {
+            "$ref": "#/components/schemas/RequestStatus"
+          },
+          "he_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique submission identifier"
+          },
+          "result": {
+            "$ref": "#/components/schemas/Result"
+          },
+          "context": {
+            "type": "string",
+            "description": "Client context echoed back"
+          },
+          "status_update_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to poll for status updates"
+          }
+        }
+      },
+      "SubmissionStatusResponse": {
+        "type": "object",
+        "properties": {
+          "request_status": {
+            "$ref": "#/components/schemas/RequestStatus"
+          },
+          "errors": {
+            "type": "object"
+          },
+          "he_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status_update_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "context": {
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/CompletedResult"
+          }
+        }
+      },
+      "RequestStatus": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Human-readable status message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable status code",
+            "enum": [
+              "REQUEST_INITIATED",
+              "REQUEST_QUEUED",
+              "CODE_COMPILED",
+              "REQUEST_COMPLETED",
+              "REQUEST_FAILED"
+            ]
+          }
+        }
+      },
+      "Result": {
+        "type": "object",
+        "properties": {
+          "run_status": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Execution status",
+                "enum": ["NA", "AC", "MLE", "TLE", "RE"]
+              }
+            }
+          },
+          "compile_status": {
+            "type": "string",
+            "description": "Compilation status message"
+          }
+        }
+      },
+      "CompletedResult": {
+        "type": "object",
+        "properties": {
+          "run_status": {
+            "type": "object",
+            "properties": {
+              "memory_used": {
+                "type": "string",
+                "description": "Memory used in KB"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["AC", "MLE", "TLE", "RE"],
+                "description": "Execution status: AC=Accepted, MLE=Memory Limit Exceeded, TLE=Time Limit Exceeded, RE=Runtime Error"
+              },
+              "time_used": {
+                "type": "string",
+                "description": "Execution time in seconds"
+              },
+              "signal": {
+                "type": "string",
+                "enum": ["OTHER", "SIGSEGV", "SIGFPE", "SIGXFSZ", "SIGBUS", "SIGABRT", "NZEC"],
+                "description": "Signal type for runtime errors"
+              },
+              "exit_code": {
+                "type": "string",
+                "description": "Process exit code"
+              },
+              "status_detail": {
+                "type": "string",
+                "description": "Detailed status information"
+              },
+              "stderr": {
+                "type": "string",
+                "description": "Standard error output"
+              },
+              "output": {
+                "type": "string",
+                "format": "uri",
+                "description": "URL to download output"
+              },
+              "request_OK": {
+                "type": "string"
+              }
+            }
+          },
+          "compile_status": {
+            "type": "string",
+            "description": "Compilation result: OK or error message"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Error message with error type prefix"
+          },
+          "errors": {
+            "type": "object",
+            "description": "Additional error details"
+          }
+        }
+      },
+      "QuotaError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "QuotaExceededError message"
+          },
+          "errors": {
+            "type": "object",
+            "properties": {
+              "quota": {
+                "type": "integer",
+                "description": "API usage quota limit"
+              },
+              "current_count": {
+                "type": "integer",
+                "description": "Current API usage count"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

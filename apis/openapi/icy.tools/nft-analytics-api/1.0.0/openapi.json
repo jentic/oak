@@ -1,0 +1,290 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "icy.tools NFT Analytics API",
+    "description": "icy.tools provides NFT analytics and market data via a GraphQL API. The API offers access to NFT collection data, trending collections, wallet analytics, and token-level data across Ethereum and other EVM chains. Note: icy.tools was acquired by QuickNode and the API has been migrated. The original developer portal at developers.icy.tools now redirects to QuickNode.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "icy.tools (now QuickNode)",
+      "url": "https://developers.icy.tools/"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://graphql.icy.tools",
+      "description": "icy.tools GraphQL API endpoint"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/graphql": {
+      "post": {
+        "summary": "Execute GraphQL Query",
+        "description": "Execute a GraphQL query against the icy.tools NFT analytics API. Supports queries for trending collections, collection stats, NFT sales, wallet portfolios, and token metadata.",
+        "operationId": "executeGraphQLQuery",
+        "tags": ["GraphQL"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRequest"
+              },
+              "examples": {
+                "trendingCollections": {
+                  "summary": "Get trending NFT collections",
+                  "value": {
+                    "query": "query TrendingCollections($first: Int, $orderBy: TrendingCollectionsOrderBy) { trendingCollections(first: $first, orderBy: $orderBy) { edges { node { address name slug stats { totalSales volume floor owners } } } } }",
+                    "variables": {
+                      "first": 10,
+                      "orderBy": "SALES"
+                    }
+                  }
+                },
+                "collectionByAddress": {
+                  "summary": "Get collection details by contract address",
+                  "value": {
+                    "query": "query Collection($address: String!) { contract(address: $address) { address name symbol stats { totalSales volume floor average owners } tokens(first: 10) { edges { node { tokenId name images { url } } } } } }",
+                    "variables": {
+                      "address": "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D"
+                    }
+                  }
+                },
+                "walletNFTs": {
+                  "summary": "Get NFTs owned by a wallet",
+                  "value": {
+                    "query": "query WalletNFTs($address: String!, $first: Int) { wallet(address: $address) { address ensName tokens(first: $first) { edges { node { tokenId contract { address name } images { url } } } } } }",
+                    "variables": {
+                      "address": "0x...",
+                      "first": 20
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "GraphQL response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphQLResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid GraphQL query"
+          },
+          "401": {
+            "description": "Invalid or missing API key"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "icy.tools API key obtained from the developer portal"
+      }
+    },
+    "schemas": {
+      "GraphQLRequest": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "GraphQL query string"
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Variables for the GraphQL query"
+          },
+          "operationName": {
+            "type": "string",
+            "description": "Name of the operation to execute if query contains multiple operations"
+          }
+        }
+      },
+      "GraphQLResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Query result data"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphQLError"
+            },
+            "description": "Errors encountered during query execution"
+          }
+        }
+      },
+      "GraphQLError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line": {
+                  "type": "integer"
+                },
+                "column": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "extensions": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "TrendingCollection": {
+        "type": "object",
+        "description": "Represents a trending NFT collection",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Contract address"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/CollectionStats"
+          }
+        }
+      },
+      "CollectionStats": {
+        "type": "object",
+        "description": "Statistics for an NFT collection",
+        "properties": {
+          "totalSales": {
+            "type": "integer"
+          },
+          "volume": {
+            "type": "number",
+            "format": "double",
+            "description": "Total volume in ETH"
+          },
+          "floor": {
+            "type": "number",
+            "format": "double",
+            "description": "Floor price in ETH"
+          },
+          "average": {
+            "type": "number",
+            "format": "double",
+            "description": "Average sale price in ETH"
+          },
+          "owners": {
+            "type": "integer",
+            "description": "Number of unique owners"
+          }
+        }
+      },
+      "NFTToken": {
+        "type": "object",
+        "description": "Represents an individual NFT token",
+        "properties": {
+          "tokenId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "contract": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            }
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "traitType": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Wallet": {
+        "type": "object",
+        "description": "Represents a wallet and its NFT holdings",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "ensName": {
+            "type": "string",
+            "description": "ENS domain name if available"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {"name": "GraphQL", "description": "GraphQL API endpoint for NFT analytics queries"}
+  ]
+}

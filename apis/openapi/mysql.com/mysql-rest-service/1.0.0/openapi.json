@@ -1,0 +1,759 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MySQL REST Service (MRS) API",
+    "description": "The MySQL REST Service (MRS) provides a RESTful interface to MySQL databases. It exposes database tables, views, and stored procedures as REST endpoints with CRUD operations, flexible querying (filtering, pagination, sorting), optimistic concurrency control via ETags, and multiple authentication methods including MySQL Internal, SCRAM, and OAuth2.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Oracle / MySQL",
+      "url": "https://dev.mysql.com/doc/dev/mysql-rest-service/latest/"
+    },
+    "license": {
+      "name": "Oracle Proprietary",
+      "url": "https://www.mysql.com/about/legal/"
+    }
+  },
+  "externalDocs": {
+    "description": "MySQL REST Service Reference Manual",
+    "url": "https://dev.mysql.com/doc/dev/mysql-rest-service/latest/"
+  },
+  "servers": [
+    {
+      "url": "https://{host}:{port}/{serviceName}",
+      "description": "MySQL REST Service endpoint",
+      "variables": {
+        "host": {
+          "default": "localhost",
+          "description": "MySQL Router host address"
+        },
+        "port": {
+          "default": "8443",
+          "description": "MySQL Router HTTPS port"
+        },
+        "serviceName": {
+          "default": "myService",
+          "description": "The name of the REST service as configured in MRS"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    },
+    {
+      "cookieAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "CRUD",
+      "description": "Create, Read, Update, and Delete operations on REST data mapping views"
+    },
+    {
+      "name": "Procedures",
+      "description": "Execute stored procedures and functions via REST"
+    },
+    {
+      "name": "Authentication",
+      "description": "Authentication and session management endpoints"
+    },
+    {
+      "name": "Static Content",
+      "description": "Serve static content files (HTML, CSS, JS, images)"
+    }
+  ],
+  "paths": {
+    "/{schema}/{object}": {
+      "get": {
+        "tags": ["CRUD"],
+        "summary": "List documents",
+        "description": "Retrieve a collection of documents from a REST data mapping view. Supports filtering, field selection, pagination, and sorting via query parameters.",
+        "operationId": "listDocuments",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SchemaPath"
+          },
+          {
+            "$ref": "#/components/parameters/ObjectPath"
+          },
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Comma-separated list of fields to include in the response.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "city,cityId"
+          },
+          {
+            "name": "where",
+            "in": "query",
+            "description": "JSON filter expression. Supports operators: $like, $gt, $lt, $gte, $lte, $eq, $ne.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "{\"city\":{\"$like\":\"NE%\"}}"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "example": 10
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of items to skip for pagination.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "example": 0
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "description": "Sort expression, e.g. 'city ASC' or 'cityId DESC'.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "city ASC"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of documents matching the query.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Document"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["CRUD"],
+        "summary": "Create a document",
+        "description": "Create a new document in the specified REST data mapping view. Requires INSERT/CREATE CRUD operation privilege.",
+        "operationId": "createDocument",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SchemaPath"
+          },
+          {
+            "$ref": "#/components/parameters/ObjectPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Document created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/{schema}/{object}/{id}": {
+      "get": {
+        "tags": ["CRUD"],
+        "summary": "Get a document by ID",
+        "description": "Retrieve a single document by its primary key. For composite primary keys, separate values with commas (e.g. '1,2').",
+        "operationId": "getDocument",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SchemaPath"
+          },
+          {
+            "$ref": "#/components/parameters/ObjectPath"
+          },
+          {
+            "$ref": "#/components/parameters/DocumentId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "tags": ["CRUD"],
+        "summary": "Update a document",
+        "description": "Update an existing document by its primary key. Include the _metadata.etag field in the request body for optimistic concurrency control. Returns 412 if the ETag does not match.",
+        "operationId": "updateDocument",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SchemaPath"
+          },
+          {
+            "$ref": "#/components/parameters/ObjectPath"
+          },
+          {
+            "$ref": "#/components/parameters/DocumentId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentWithEtag"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Document updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "412": {
+            "description": "Precondition Failed. The ETag does not match, indicating the resource was modified by another request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["CRUD"],
+        "summary": "Delete a document",
+        "description": "Delete a document by its primary key. Requires DELETE CRUD operation privilege.",
+        "operationId": "deleteDocument",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SchemaPath"
+          },
+          {
+            "$ref": "#/components/parameters/ObjectPath"
+          },
+          {
+            "$ref": "#/components/parameters/DocumentId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Document deleted successfully."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/{schema}/{procedure}": {
+      "post": {
+        "tags": ["Procedures"],
+        "summary": "Execute a stored procedure",
+        "description": "Execute a stored procedure or function exposed via the REST service. Pass input parameters in the request body and receive output parameters and result sets in the response.",
+        "operationId": "executeProcedure",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SchemaPath"
+          },
+          {
+            "name": "procedure",
+            "in": "path",
+            "required": true,
+            "description": "The REST procedure name.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Input parameters for the stored procedure. Keys are the parameter names defined in the REST procedure mapping.",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Procedure executed successfully. Response includes output parameters and result sets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcedureResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/authentication/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Authenticate user",
+        "description": "Authenticate a user using MRS internal authentication, MySQL Internal authentication, or initiate an OAuth2 flow. For OAuth2, specify the authApp and sessionType query parameters.",
+        "operationId": "login",
+        "security": [],
+        "parameters": [
+          {
+            "name": "authApp",
+            "in": "query",
+            "description": "Name of the OAuth2 authentication app (e.g. 'Google', 'Facebook', 'OCI'). Required for OAuth2 flows.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionType",
+            "in": "query",
+            "description": "Session type for OAuth2 authentication.",
+            "schema": {
+              "type": "string",
+              "enum": ["bearer", "cookie"]
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Credentials for MRS or MySQL Internal authentication. Not required for OAuth2 redirect flows.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful. Returns a session token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirect to OAuth2 provider for authentication."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/authentication/logout": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Logout",
+        "description": "End the current user session and invalidate the authentication token.",
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "Logout successful."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/{contentPath}": {
+      "get": {
+        "tags": ["Static Content"],
+        "summary": "Serve static content",
+        "description": "Retrieve static content files (HTML, CSS, JavaScript, images) served by the MRS service. Used for hosting Progressive Web Apps (PWAs) and other static assets.",
+        "operationId": "getStaticContent",
+        "security": [],
+        "parameters": [
+          {
+            "name": "contentPath",
+            "in": "path",
+            "required": true,
+            "description": "Path to the static content file.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "index.html"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Static content file returned. Content-Type varies based on the file type.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/css": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Bearer token obtained via the /authentication/login endpoint. Supports MRS, MySQL Internal, and OAuth2 authentication."
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session",
+        "description": "Session cookie set during OAuth2 authentication with sessionType=cookie."
+      }
+    },
+    "parameters": {
+      "SchemaPath": {
+        "name": "schema",
+        "in": "path",
+        "required": true,
+        "description": "The REST schema name (maps to a MySQL database schema).",
+        "schema": {
+          "type": "string"
+        },
+        "example": "sakila"
+      },
+      "ObjectPath": {
+        "name": "object",
+        "in": "path",
+        "required": true,
+        "description": "The REST object name (maps to a table, view, or procedure).",
+        "schema": {
+          "type": "string"
+        },
+        "example": "city"
+      },
+      "DocumentId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "The document primary key value. For composite keys, separate values with commas (e.g. '1,2').",
+        "schema": {
+          "type": "string"
+        },
+        "example": "1"
+      }
+    },
+    "schemas": {
+      "Document": {
+        "type": "object",
+        "description": "A document returned from a REST data mapping view. Properties are dynamic and depend on the table/view columns exposed.",
+        "properties": {
+          "links": {
+            "type": "array",
+            "description": "HATEOAS links for the document.",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            }
+          },
+          "_metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "additionalProperties": true
+      },
+      "DocumentInput": {
+        "type": "object",
+        "description": "Input data for creating a new document. Properties depend on the target table/view column mappings.",
+        "additionalProperties": true
+      },
+      "DocumentWithEtag": {
+        "type": "object",
+        "description": "Document data including the _metadata.etag field for optimistic concurrency control on updates.",
+        "properties": {
+          "_metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Metadata": {
+        "type": "object",
+        "description": "Document metadata including the ETag for optimistic concurrency control.",
+        "properties": {
+          "etag": {
+            "type": "string",
+            "description": "SHA256 hash of the row data. Used for optimistic concurrency control on updates.",
+            "example": "FFA2187AD4B98DF48EC40B3E807E0561A71D02C2F4F5A3B953AA6CB6E41CAD16"
+          }
+        }
+      },
+      "Link": {
+        "type": "object",
+        "description": "A HATEOAS link.",
+        "properties": {
+          "rel": {
+            "type": "string",
+            "description": "Link relation type.",
+            "example": "self"
+          },
+          "href": {
+            "type": "string",
+            "description": "Link URL.",
+            "example": "/myService/sakila/city/1"
+          }
+        }
+      },
+      "ProcedureResult": {
+        "type": "object",
+        "description": "Result from executing a stored procedure. Contains output parameters as top-level fields and a result array for result sets.",
+        "properties": {
+          "result": {
+            "type": "array",
+            "description": "Result set rows returned by the procedure.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "LoginRequest": {
+        "type": "object",
+        "description": "Credentials for MRS or MySQL Internal authentication.",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "Username, optionally with @authApp suffix.",
+            "example": "user@myAuthApp"
+          },
+          "password": {
+            "type": "string",
+            "description": "User password.",
+            "format": "password"
+          }
+        },
+        "required": ["username", "password"]
+      },
+      "LoginResponse": {
+        "type": "object",
+        "description": "Successful authentication response containing a session token.",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "JWT session token to use as Bearer token in subsequent requests."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Token expiration timestamp."
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "description": "Error response.",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message describing what went wrong."
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad Request. The request was malformed or contained invalid parameters.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized. Authentication is required or the provided credentials are invalid.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Forbidden. The authenticated user does not have sufficient privileges for this operation.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Not Found. The requested resource does not exist.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Internal Server Error. An unexpected error occurred on the server.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

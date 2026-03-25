@@ -1,0 +1,1714 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "BOSS Location Management API",
+    "version": "1.3.0",
+    "description": "Manage locations and disposal for the Back of Store System, including available\ndisposal, recycling, and donation options.\n\nUnless otherwise noted, the following limits apply to fields in URL path\nand query params:\n- Date/time strings must be provided in ISO 8601 format. All values converted to\n  UTC, no time zone info will be retained.\n- All string fields, path and query parameters are limited to 127 characters or\n  fewer\n- All UUIDs are UUIDv4. These will be generated initially by SmarterX, and used in\n  subsequent requests to identify options.\n\n# General Features\n\nEndpoints that return a list of resources will include pagination info in the\nresponse body, and paging may be controlled with query parameters. These endpoints\nwill also typically include query parameters to filter the list of items by name,\ndescription, location or other fields.\n\nFor items that support DELETE operations, these are considered \"soft deletes\" which\nwill prevent the item from being returned in GET requests, but will not remove it\nfrom the database. The items may be restored by performing a PATCH with the body\n`{\"discarded\": false}`.\n\n# Location Management\n\nThe following use cases are supported:\n- Creating new locations\n- Updating existing locations\n- Removing locations\n- Retrieving one or more locations, with optional parameters to filter by name,\n  description or location\n- Enabling or disabling single or multiple disposal options at a location\n\n*Note*: API users are responsible for enforcing validity of options for a \nlocation. For example, assigning a State Toxic disposal option for a \nlocation in a state that does not have state-level regulations may result\nin undesirable recommendation results.\n\n# Option Management\n\nThe following use cases are supported:\n- Updating existing option names and descriptions\n- Retrieving one or more options, with optional parameters to filter by name,\n  description, or category\n- Enabling or disabling an option for multiple locations\n- Removing options (soft delete)\n\nWith the exception of Donation Partners, new options must be created by \nSmarterX, since they often require new rule sets and other configuration\nbehind the scenes to ensure proper bin results. Our future roadmap includes\nself-service rule writing for retail customers via Smarter-1, but this is\nout of scope for v1 of Location Management.\n\n# Donation Option Management\n\nThe following use cases are supported:\n- Creating new donation options\n- Updating existing donation options (names, descriptions, tax IDs, POC info, etc.)\n- Retrieving one or more donation options, with optional parameters to filter by name,\n  description, or location\n- Removing donation options (soft delete)\n\nDonation options contain additional fields for linking to MealConnect, and for\nstoring contact info and other details about the donation partner.",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/SmarterSorting/boss-location-management/1.3.0/swagger.json"
+  },
+  "servers": [
+    {
+      "url": "https://api-staging.smartersorting.com/v1",
+      "description": "Test Environment"
+    }
+  ],
+  "paths": {
+    "/boss/locations": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/page_size"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/name"
+          },
+          {
+            "$ref": "#/components/parameters/description"
+          },
+          {
+            "$ref": "#/components/parameters/street_address"
+          },
+          {
+            "$ref": "#/components/parameters/city"
+          },
+          {
+            "$ref": "#/components/parameters/state"
+          },
+          {
+            "$ref": "#/components/parameters/zip"
+          },
+          {
+            "$ref": "#/components/parameters/discarded"
+          }
+        ],
+        "summary": "Get locations for a customer",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Locations"
+          }
+        },
+        "operationId": "get-locations",
+        "description": "Get locations"
+      },
+      "post": {
+        "description": "Create a new location",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/New-Location"
+        },
+        "summary": "Create a new location",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Location"
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidPost"
+          }
+        },
+        "operationId": "create-location"
+      }
+    },
+    "/boss/locations/{location_name}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/location_name"
+        }
+      ],
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/options"
+          }
+        ],
+        "summary": "Get a single location",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Location"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "get-location",
+        "description": "Get a details for a single location"
+      },
+      "patch": {
+        "description": "Update a location",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Location-Update"
+        },
+        "summary": "Update a location",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Location"
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidPost"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "update-location"
+      },
+      "put": {
+        "description": "Update a location (replaces location info)",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/New-Location"
+        },
+        "summary": "Update a location",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Location"
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidPost"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "replace-location"
+      },
+      "delete": {
+        "summary": "Soft-delete a location",
+        "description": "Soft-delete a location. This will prevent the location from being returned\nin GET requests, but will not remove it from the database. The location may\nbe restored by performing a PATCH with the body `{\"discarded\": false}`.",
+        "responses": {
+          "204": {
+            "description": "No content"
+          }
+        },
+        "operationId": "delete-location"
+      }
+    },
+    "/boss/locations/{location_name}/options": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/location_name"
+        }
+      ],
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/page_size"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/name"
+          },
+          {
+            "$ref": "#/components/parameters/description"
+          },
+          {
+            "$ref": "#/components/parameters/category"
+          }
+        ],
+        "summary": "Get enabled options for a location",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Options"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "get-location-options",
+        "description": "Gets all binning options enabled available at a particular location.\nReturns 404 if the location isn't found."
+      }
+    },
+    "/boss/locations/{location_name}/options/enabled": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/location_name"
+        }
+      ],
+      "put": {
+        "summary": "Enable only specified options at a location",
+        "description": "Enable multiple options at a location. Any options not included in the request body\nwill be disabled. If the response is not a 204 (e.g. 400, 404), no options will be\nmodified.",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Option-Ids"
+        },
+        "responses": {
+          "204": {
+            "description": "The changes were successful"
+          },
+          "400": {
+            "$ref": "#/components/responses/IdListError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "enable-only-options-at-location"
+      },
+      "patch": {
+        "summary": "Enable several options at a location",
+        "description": "Enable options at a location. Any options not included will not be modified.\nIf the response is not a 204 (e.g. 400, 404), no options will be modified.",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Option-Ids"
+        },
+        "responses": {
+          "204": {
+            "description": "The changes were successful"
+          },
+          "400": {
+            "$ref": "#/components/responses/IdListError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "enable-options-at-location"
+      }
+    },
+    "/boss/locations/{location_name}/options/disabled": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/location_name"
+        }
+      ],
+      "patch": {
+        "summary": "Disable several options at a location",
+        "description": "Disable several options at a location. Any options not included will not be modified.\nIf the response is not a 204 (e.g. 400, 404), no options will be modified.",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Option-Ids"
+        },
+        "responses": {
+          "204": {
+            "description": "The changes were successful"
+          },
+          "400": {
+            "$ref": "#/components/responses/IdListError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "disable-options-at-location"
+      }
+    },
+    "/boss/locations/{location_name}/options/{option_id}/enabled": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/location_name"
+        },
+        {
+          "$ref": "#/components/parameters/option_id"
+        }
+      ],
+      "get": {
+        "summary": "Get whether an option is enabled at a location",
+        "description": "Gets whether an option is enabled at a particular location. Returns 404 if\nthe location or option isn't found.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Enabled"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "get-option-enabled-at-location"
+      },
+      "put": {
+        "summary": "Enable an option at a location",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Enabled"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "enable-option-at-location"
+      },
+      "delete": {
+        "summary": "Disable an option at a location",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Enabled"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "disable-option-at-location"
+      }
+    },
+    "/boss/options": {
+      "get": {
+        "summary": "Get all options",
+        "description": "Gets all binning options available to a customer. This includes options\nthat are not enabled at any location.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/page_size"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/name"
+          },
+          {
+            "$ref": "#/components/parameters/description"
+          },
+          {
+            "$ref": "#/components/parameters/category"
+          },
+          {
+            "$ref": "#/components/parameters/discarded"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Options"
+          }
+        },
+        "operationId": "get-options"
+      }
+    },
+    "/boss/options/{option_id}": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/option_id"
+          }
+        ],
+        "summary": "Get a single option",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Option"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "get-option",
+        "description": "Get a details for a single option"
+      },
+      "patch": {
+        "description": "Update an option",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/option_id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Option-Update"
+        },
+        "summary": "Update an option",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Option"
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidPost"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "update-option"
+      }
+    },
+    "/boss/options/{option_id}/locations": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/option_id"
+          },
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/page_size"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/name"
+          },
+          {
+            "$ref": "#/components/parameters/description"
+          },
+          {
+            "$ref": "#/components/parameters/street_address"
+          },
+          {
+            "$ref": "#/components/parameters/city"
+          },
+          {
+            "$ref": "#/components/parameters/state"
+          },
+          {
+            "$ref": "#/components/parameters/zip"
+          },
+          {
+            "$ref": "#/components/parameters/discarded"
+          }
+        ],
+        "summary": "Get locations for an option",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Locations"
+          }
+        },
+        "operationId": "get-option-locations",
+        "description": "Gets all locations where a particular option is enabled. Returns 404 if the\noption isn't found."
+      }
+    },
+    "/boss/options/{option_id}/locations/enabled": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/option_id"
+        }
+      ],
+      "put": {
+        "description": "Enable an option at multiple locations. Any locations not included\nin the request body will have the option disabled. If the response \nis not a 204 (e.g. 400, 404), no locations will be modified.",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Location-Names"
+        },
+        "summary": "Enable an option only at specified locations",
+        "responses": {
+          "204": {
+            "description": "The changes were successful"
+          },
+          "400": {
+            "$ref": "#/components/responses/IdListError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "enable-option-at-only-locations"
+      },
+      "patch": {
+        "description": "Enable an option at multiple locations. Any locations not included\nwill not be modified. If the response is not a 204 (e.g. 400, 404),\nno locations will be modified.",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Location-Names"
+        },
+        "summary": "Enable an option at multiple locations",
+        "responses": {
+          "204": {
+            "description": "The changes were successful"
+          },
+          "400": {
+            "$ref": "#/components/responses/IdListError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "enable-option-at-locations"
+      }
+    },
+    "/boss/options/{option_id}/locations/disabled": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/option_id"
+        }
+      ],
+      "patch": {
+        "description": "Disable an option at multiple locations. Any locations not included\nwill not be modified. If the response is not a 204 (e.g. 400, 404),\nno locations will be modified.",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Location-Names"
+        },
+        "summary": "Disable an option at multiple locations",
+        "responses": {
+          "204": {
+            "description": "The changes were successful"
+          },
+          "400": {
+            "$ref": "#/components/responses/IdListError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "disable-option-at-locations"
+      }
+    },
+    "/boss/donation_options": {
+      "get": {
+        "summary": "Get all donation options",
+        "description": "Gets all donation options available to a customer. This includes options\nthat are not enabled at any location.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/page_size"
+          },
+          {
+            "$ref": "#/components/parameters/order"
+          },
+          {
+            "$ref": "#/components/parameters/name"
+          },
+          {
+            "$ref": "#/components/parameters/description"
+          },
+          {
+            "$ref": "#/components/parameters/street_address"
+          },
+          {
+            "$ref": "#/components/parameters/city"
+          },
+          {
+            "$ref": "#/components/parameters/state"
+          },
+          {
+            "$ref": "#/components/parameters/zip"
+          },
+          {
+            "$ref": "#/components/parameters/discarded"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Options"
+          }
+        },
+        "operationId": "get-donation-options"
+      },
+      "post": {
+        "description": "Create a new donation option",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/New-Donation-Option"
+        },
+        "summary": "Create a new donation option",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DonationOption"
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidPost"
+          }
+        },
+        "operationId": "create-donation-option"
+      }
+    },
+    "/boss/donation_options/{option_id}": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/option_id"
+          }
+        ],
+        "summary": "Get a single donation option",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DonationOption"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "get-donation-option",
+        "description": "Get a details for a single donation option"
+      },
+      "patch": {
+        "description": "Update a donation option",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/option_id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Donation-Option-Update"
+        },
+        "summary": "Update a donation option",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DonationOption"
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidPost"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "update-donation-option"
+      },
+      "put": {
+        "description": "Update a donation option (replaces option info)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/option_id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/New-Donation-Option"
+        },
+        "summary": "Update a donation option",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DonationOption"
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidPost"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "replace-donation-option"
+      },
+      "delete": {
+        "summary": "Soft-delete a donation option",
+        "description": "Soft-delete a donation option. This will prevent the option from being returned\nin GET requests, but will not remove it from the database. The option may\nbe restored by performing a PATCH with the body `{\"discarded\": false}`.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/option_id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          }
+        },
+        "operationId": "delete-donation-option"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "category": {
+        "type": "string",
+        "enum": [
+          "disposal",
+          "donation",
+          "organics",
+          "recycle",
+          "vendor_managed"
+        ]
+      },
+      "Pagination": {
+        "description": "Pagination info for a list of resources. Pages start at 1 (1-indexed).",
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "total_pages": {
+            "type": "integer"
+          },
+          "total_results": {
+            "type": "integer"
+          }
+        },
+        "example": {
+          "page": 2,
+          "total_pages": 3,
+          "total_results": 31
+        }
+      },
+      "Restore-Discarded": {
+        "description": "Data to restore a discarded resource. This is used to perform a PATCH to\nrestore a discarded location or option.",
+        "type": "object",
+        "properties": {
+          "discarded": {
+            "type": "boolean"
+          }
+        },
+        "example": {
+          "discarded": false
+        }
+      },
+      "Error-Messages": {
+        "description": "A list of error messages. This is returned in the body of a 400 response\nif the request is invalid, or a 404 response.",
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Timestamps": {
+        "description": "Timestamps for a resource. These are generated by SmarterX, and will be\nignored if provided in a POST/PUT/PATCH requests.",
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Location-Update": {
+        "description": "Data for a single location, e.g. a physical store. These are the fields\nrequired to perform a PATCH to update an existing location.",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "street_address": {
+            "type": "string"
+          },
+          "zip": {
+            "type": "string",
+            "description": "Zip or postal code for the location. US zip codes must be a valid\n5-digit code, e.g. \"98039\" and Canadian postal codes must be a \nvalid 6-character e.g. \"V6B 1A1\"."
+          },
+          "country": {
+            "type": "string",
+            "default": "US",
+            "description": "Country code for the location, in ISO 3166 alpha-2 format. Currently only US\nand CA are supported. If not provided, defaults to \"US\"",
+            "enum": [
+              "US",
+              "CA"
+            ]
+          },
+          "mealconnect_id": {
+            "description": "ID of the location in the MealConnect API. This is used to link this location\nto the correct DonorLocation in MealConnect. New locations *must* be created *in\nadvance* by Feeding America. This field may be left null for locations that\ndon't participate in MealConnect.",
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "example": {
+          "name": "austin-TX-681",
+          "description": "Free-form description",
+          "state": "TX",
+          "city": "Austin",
+          "street_address": "10401 RESEARCH BLVD",
+          "zip": "73301"
+        }
+      },
+      "Location": {
+        "description": "Data for a single location, e.g. a physical store",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Location-Update"
+          },
+          {
+            "$ref": "#/components/schemas/Timestamps"
+          }
+        ],
+        "example": {
+          "name": "austin-TX-681",
+          "description": "Free-form description",
+          "state": "TX",
+          "city": "Austin",
+          "street_address": "10401 RESEARCH BLVD",
+          "zip": "73301",
+          "created_at": "2022-09-01T10:40:49Z",
+          "updated_at": "2022-09-01T10:40:49Z"
+        }
+      },
+      "New-Location": {
+        "description": "Data for a single location, e.g. a physical store. These are the fields\nrequired to POST a new location, or PUT updated location info.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Location-Update"
+          }
+        ],
+        "required": [
+          "city",
+          "description",
+          "name",
+          "state",
+          "street_address",
+          "zip"
+        ]
+      },
+      "Option-Update": {
+        "description": "Data to PATCH (partially update) a single sorting option. May provide\nall or a subset of fields to update.",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "name": "Acids",
+          "description": "Bin for acids"
+        }
+      },
+      "Option": {
+        "type": "object",
+        "description": "Data for a single sorting option",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Option-Update"
+          },
+          {
+            "$ref": "#/components/schemas/Timestamps"
+          }
+        ],
+        "properties": {
+          "option_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "$ref": "#/components/schemas/category"
+          }
+        },
+        "example": {
+          "option_id": "ba557576-d796-4351-9852-025214d0c627",
+          "name": "Acids",
+          "description": "Bin for acids",
+          "category": "disposal",
+          "created_at": "2022-09-01T10:40:49Z",
+          "updated_at": "2022-09-01T10:40:49Z"
+        }
+      },
+      "Donation-Option-Base": {
+        "description": "Additional info added to donation options (`\"category\": \"donation\"`)",
+        "properties": {
+          "street_address": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "zip": {
+            "type": "string",
+            "description": "Zip or postal code for the location. US zip codes must be a valid\n5-digit code, e.g. \"98039\" and Canadian postal codes must be a \nvalid 6-character e.g. \"V6B 1A1\"."
+          },
+          "country": {
+            "type": "string",
+            "default": "US",
+            "description": "Country code for the location, in ISO 3166 alpha-2 format. Currently only US\nand CA are supported. If not provided, defaults to \"US\"",
+            "enum": [
+              "US",
+              "CA"
+            ]
+          },
+          "tax_id": {
+            "type": "string"
+          },
+          "mealconnect": {
+            "description": "Whether to link this option to MealConnect. Donations that use this option,\nand are reported to the BOSS reporting API, will be reported to Feeding America\nvia the MealConnect API, and pickup will be coordinated with local food banks.",
+            "type": "boolean",
+            "default": false
+          },
+          "poc_name": {
+            "description": "Name of the point of contact at the donation location. This is used to\ncoordinate pickups with local food banks.",
+            "type": "string",
+            "nullable": true
+          },
+          "poc_email": {
+            "description": "Email of the point of contact at the donation location. This is used to\ncoordinate pickups with local food banks.",
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "poc_phone": {
+            "description": "Phone number of the point of contact at the donation location. This is used to\ncoordinate pickups with local food banks.",
+            "type": "string",
+            "format": "phone",
+            "nullable": true
+          }
+        }
+      },
+      "Donation-Option-Update": {
+        "description": "Data to PATCH (partially update) a single donation option. May provide\nall or a subset of fields for update.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Option-Update"
+          },
+          {
+            "$ref": "#/components/schemas/Donation-Option-Base"
+          }
+        ],
+        "example": {
+          "name": "Food bank #1",
+          "description": "Austin area food bank",
+          "tax_id": "11-2345678",
+          "state": "TX",
+          "city": "Austin",
+          "street_address": "12345 WEST BLVD",
+          "zip": "73301",
+          "mealconnect": true,
+          "poc_name": "John Doe",
+          "poc_email": "jdoe@example.org",
+          "poc_phone": "512-555-1234"
+        }
+      },
+      "Donation-Option": {
+        "description": "Data for a single donation option. These are the fields returned by GET\nrequests for donation options.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Option"
+          },
+          {
+            "$ref": "#/components/schemas/Donation-Option-Base"
+          }
+        ],
+        "example": {
+          "option_id": "138f5622-3322-44af-b644-f4d4c71b164b",
+          "name": "Food bank #1",
+          "description": "Austin area food bank",
+          "tax_id": "11-2345678",
+          "state": "TX",
+          "city": "Austin",
+          "street_address": "12345 WEST BLVD",
+          "zip": "73301",
+          "mealconnect": true,
+          "created_at": "2022-09-01T10:40:49Z",
+          "updated_at": "2022-09-01T10:40:49Z",
+          "poc_name": "John Doe",
+          "poc_email": "jdoe@example.org",
+          "poc_phone": "512-555-1234"
+        }
+      },
+      "New-Donation-Option": {
+        "description": "Data for a single donation option. These are the fields required to create a\nnew donation option, or perform a PUT to update an existing donation option.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Donation-Option-Update"
+          }
+        ],
+        "required": [
+          "description",
+          "name"
+        ],
+        "example": {
+          "name": "Food bank #1",
+          "description": "Austin area food bank",
+          "tax_id": "11-2345678",
+          "state": "TX",
+          "city": "Austin",
+          "street_address": "12345 WEST BLVD",
+          "zip": "73301",
+          "mealconnect": true,
+          "poc_name": "John Doe",
+          "poc_email": "jdoe@example.org",
+          "poc_phone": "512-555-1234"
+        }
+      }
+    },
+    "securitySchemes": {
+      "x-api-key": {
+        "name": "x-api-key",
+        "type": "apiKey",
+        "in": "header",
+        "description": ""
+      }
+    },
+    "requestBodies": {
+      "Location-Update": {
+        "description": "Data for a single location, e.g. a physical store. These are the fields\nrequired to perform a PATCH to update an existing location.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Location-Update"
+                },
+                {
+                  "$ref": "#/components/schemas/Restore-Discarded"
+                }
+              ]
+            },
+            "examples": {
+              "Partial location update": {
+                "value": {
+                  "description": "Free-form description",
+                  "street_address": "10401 RESEARCH BLVD",
+                  "zip": "73301"
+                }
+              },
+              "Full location update": {
+                "value": {
+                  "name": "austin-TX-681",
+                  "description": "Free-form description",
+                  "state": "TX",
+                  "city": "Austin",
+                  "street_address": "10401 RESEARCH BLVD",
+                  "zip": "73301"
+                }
+              },
+              "Restore discarded": {
+                "value": {
+                  "discarded": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "New-Location": {
+        "description": "Data for a single location, e.g. a physical store. These are the fields\nrequired to POST a new location, or PUT updated location info.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/New-Location"
+            },
+            "examples": {
+              "US Location": {
+                "value": {
+                  "name": "austin-TX-681",
+                  "description": "Free-form description",
+                  "state": "TX",
+                  "city": "Austin",
+                  "street_address": "10401 RESEARCH BLVD",
+                  "zip": "73301"
+                }
+              },
+              "Canadian Location": {
+                "value": {
+                  "name": "vancouver-BC-123",
+                  "description": "Free-form description",
+                  "state": "BC",
+                  "city": "Vancouver",
+                  "street_address": "1234 MAIN ST",
+                  "zip": "V6B 1A1",
+                  "country": "CA"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Option-Update": {
+        "description": "Data to PATCH (partially update) a single sorting option. Only name/description\nupdates are accepted.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Option-Update"
+                },
+                {
+                  "$ref": "#/components/schemas/Restore-Discarded"
+                }
+              ]
+            },
+            "examples": {
+              "Partial option update": {
+                "value": {
+                  "description": "Bin for acids"
+                }
+              },
+              "Full option update": {
+                "value": {
+                  "name": "Acids",
+                  "description": "Bin for acids"
+                }
+              },
+              "Restore discarded": {
+                "value": {
+                  "discarded": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "Donation-Option-Update": {
+        "description": "Data to PATCH (partially update) a single donation option. May provide\nall or a subset of fields for update.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Donation-Option-Update"
+                },
+                {
+                  "$ref": "#/components/schemas/Restore-Discarded"
+                }
+              ]
+            },
+            "examples": {
+              "Partial donation option update": {
+                "value": {
+                  "description": "Austin area food bank",
+                  "tax_id": "11-2345678",
+                  "street_address": "12345 WEST BLVD",
+                  "poc_name": "John Doe"
+                }
+              },
+              "Full donation option update": {
+                "value": {
+                  "name": "Food bank #1",
+                  "description": "Austin area food bank",
+                  "tax_id": "11-2345678",
+                  "state": "TX",
+                  "city": "Austin",
+                  "street_address": "12345 WEST BLVD",
+                  "zip": "73301",
+                  "mealconnect": true,
+                  "poc_name": "John Doe",
+                  "poc_email": "jdoe@example.org",
+                  "poc_phone": "512-555-1234"
+                }
+              },
+              "Canadian donation option update": {
+                "value": {
+                  "name": "Food bank #1",
+                  "description": "Vancouver area food bank",
+                  "tax_id": "11-2345678",
+                  "state": "BC",
+                  "city": "Vancouver",
+                  "street_address": "12345 WEST BLVD",
+                  "zip": "V6B 1A1",
+                  "country": "CA",
+                  "mealconnect": true,
+                  "poc_name": "John Doe",
+                  "poc_email": "jdoe@example.org",
+                  "poc_phone": "512-555-1234"
+                }
+              },
+              "Restore discarded": {
+                "value": {
+                  "discarded": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "New-Donation-Option": {
+        "description": "Data for a single donation option. These are the fields required to create a\nnew donation option, or perform a PUT to update an existing donation option.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/New-Donation-Option"
+            },
+            "examples": {
+              "New donation option": {
+                "value": {
+                  "name": "Food bank #1",
+                  "description": "Austin area food bank",
+                  "tax_id": "11-2345678",
+                  "state": "TX",
+                  "city": "Austin",
+                  "street_address": "12345 WEST BLVD",
+                  "zip": "73301",
+                  "mealconnect": true,
+                  "poc_name": "John Doe",
+                  "poc_email": "jdoe@example.org",
+                  "poc_phone": "512-555-1234"
+                }
+              },
+              "New Canadian donation option": {
+                "value": {
+                  "name": "Food bank #1",
+                  "description": "Vancouver area food bank",
+                  "tax_id": "11-2345678",
+                  "state": "BC",
+                  "city": "Vancouver",
+                  "street_address": "12345 WEST BLVD",
+                  "zip": "V6B 1A1",
+                  "mealconnect": true,
+                  "country": "CA",
+                  "poc_name": "John Doe",
+                  "poc_email": "jdoe@example.org",
+                  "poc_phone": "512-555-1234"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Location-Names": {
+        "description": "List of location names, used when bulk-enabling or disabling an option for multiple\nlocations.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "location_names": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Option-Ids": {
+        "description": "List of option_ids, used when bulk-enabling or disabling options at a single location.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "option_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "NotFound": {
+        "description": "Returned in the body of a 404 response if a customer, location or option doesn't exist. The message will explain which one wasn't found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error-Messages"
+            },
+            "examples": {
+              "Location not found": {
+                "value": {
+                  "error_messages": [
+                    "location not found"
+                  ]
+                }
+              },
+              "Option not found": {
+                "value": {
+                  "error_messages": [
+                    "option not found"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "InvalidPost": {
+        "description": "Returned in the body of a 400 response if the request is invalid. The\nmessages will explain what's wrong with the request.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error-Messages"
+            },
+            "examples": {
+              "Missing required field": {
+                "value": {
+                  "error_messages": [
+                    "name is required"
+                  ]
+                }
+              },
+              "Invalid field": {
+                "value": {
+                  "error_messages": [
+                    "name must be a string"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "IdListError": {
+        "description": "If a request contains multiple location_names or option_ids, and there's a problem\none or more of the IDs, this will be returned in the body of a 400 response, along\nwith messages explaining what's wrong with the request. Errors might include:\n  \n  - Invalid types (e.g. a location_name that's not a string)\n  - Invalid UUIDs (e.g. an option_id that's not a UUIDv4)\n  - Unknown locations (e.g. a location_name that doesn't exist)\n  - Unknown options (e.g. an option_id that doesn't exist)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error-Messages"
+            },
+            "examples": {
+              "Location errors": {
+                "value": {
+                  "error_messages": [
+                    "location[3]: austin-TX-681 not found",
+                    "location[8]: not a string"
+                  ]
+                }
+              },
+              "Unknown option": {
+                "value": {
+                  "error_messages": [
+                    "option[2]: aca461e5-0835-40d2-ac33-3b71d16405b0 not found",
+                    "option[5]: not a UUIDv4 string"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "Enabled": {
+        "description": "Whether an option is enabled at a location",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "example": {
+                "enabled": true
+              }
+            }
+          }
+        }
+      },
+      "Location": {
+        "description": "Single location response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Location"
+            },
+            "examples": {
+              "An Austin store": {
+                "value": {
+                  "name": "austin-TX-681",
+                  "description": "Free-form description",
+                  "state": "TX",
+                  "city": "Austin",
+                  "street_address": "10401 RESEARCH BLVD",
+                  "zip": "73301",
+                  "country": "US",
+                  "created_at": "2022-09-01T10:40:49Z",
+                  "updated_at": "2022-09-01T10:40:49Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Locations": {
+        "description": "List of locations response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "locations": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Location"
+                  }
+                },
+                "pagination": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            },
+            "examples": {
+              "Locations": {
+                "value": {
+                  "locations": [
+                    {
+                      "name": "austin-TX-681",
+                      "description": "Free-form description",
+                      "state": "TX",
+                      "city": "Austin",
+                      "street_address": "10401 RESEARCH BLVD",
+                      "zip": "73301",
+                      "country": "US",
+                      "created_at": "2022-09-01T10:40:49Z",
+                      "updated_at": "2022-09-01T10:40:49Z"
+                    }
+                  ],
+                  "pagination": {
+                    "page": 1,
+                    "total_pages": 1,
+                    "total_results": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Option": {
+        "description": "Single option response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Donation-Option"
+                },
+                {
+                  "$ref": "#/components/schemas/Option"
+                }
+              ]
+            },
+            "examples": {
+              "A disposal option": {
+                "value": {
+                  "option_id": "68924fb4-d973-4354-8034-9b794fd6b483",
+                  "name": "Corrosive",
+                  "category": "disposal",
+                  "description": "RCRA D002",
+                  "created_at": "2022-11-08T16:30:40.372Z",
+                  "updated_at": "2022-11-08T16:30:40.372Z"
+                }
+              },
+              "A donation option": {
+                "value": {
+                  "option_id": "23b25034-1ff7-471a-a167-40eca3831303",
+                  "name": "Local Charity",
+                  "category": "donation",
+                  "description": "Donation Partner",
+                  "street_address": "12345 WEST BLVD",
+                  "city": "Austin",
+                  "state": "TX",
+                  "zip": "73301",
+                  "country": "US",
+                  "tax_id": "11-2345678",
+                  "created_at": "2022-11-08T16:33:57.820Z",
+                  "updated_at": "2022-11-08T16:33:57.820Z",
+                  "mealconnect": true,
+                  "poc_name": "John Doe",
+                  "poc_email": "jdoe@example.org",
+                  "poc_phone": "512-555-1234"
+                }
+              }
+            }
+          }
+        }
+      },
+      "DonationOption": {
+        "description": "Single donation option response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Donation-Option"
+            },
+            "examples": {
+              "A donation option": {
+                "value": {
+                  "option_id": "23b25034-1ff7-471a-a167-40eca3831303",
+                  "name": "Local Charity",
+                  "category": "donation",
+                  "description": "Donation Partner",
+                  "street_address": "12345 WEST BLVD",
+                  "city": "Austin",
+                  "state": "TX",
+                  "zip": "73301",
+                  "country": "US",
+                  "tax_id": "11-2345678",
+                  "created_at": "2022-11-08T16:33:57.820Z",
+                  "updated_at": "2022-11-08T16:33:57.820Z",
+                  "mealconnect": true,
+                  "poc_name": "John Doe",
+                  "poc_email": "jdoe@example.org",
+                  "poc_phone": "512-555-1234"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Options": {
+        "description": "List of options response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Option"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Donation-Option"
+                      }
+                    ]
+                  }
+                },
+                "pagination": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            },
+            "examples": {
+              "Options": {
+                "value": {
+                  "options": [
+                    {
+                      "option_id": "68924fb4-d973-4354-8034-9b794fd6b483",
+                      "name": "Corrosive",
+                      "category": "disposal",
+                      "description": "RCRA D002",
+                      "created_at": "2022-11-08T16:30:40.372Z",
+                      "updated_at": "2022-11-08T16:30:40.372Z"
+                    },
+                    {
+                      "option_id": "23b25034-1ff7-471a-a167-40eca3831303",
+                      "name": "Local Charity",
+                      "category": "donation",
+                      "description": "Donation Partner",
+                      "street_address": "12345 WEST BLVD",
+                      "city": "Austin",
+                      "state": "TX",
+                      "zip": "73301",
+                      "country": "US",
+                      "tax_id": "11-2345678",
+                      "mealconnect": true,
+                      "poc_name": "John Doe",
+                      "poc_email": "jdoe@example.org",
+                      "poc_phone": "512-555-1234",
+                      "created_at": "2022-11-08T16:33:57.820Z",
+                      "updated_at": "2022-11-08T16:33:57.820Z"
+                    }
+                  ],
+                  "pagination": {
+                    "page": 1,
+                    "total_pages": 1,
+                    "total_results": 2
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "location_name": {
+        "name": "location_name",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Customer provided, unique name for a location. This location name must be\npreviously registered with SmarterX."
+      },
+      "option_id": {
+        "name": "option_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "description": "UUID of the option. This option must be previously registered with\nSmarterX."
+      },
+      "street_address": {
+        "name": "street_address",
+        "description": "Search using street address. Wildcards (`*`) are supported.",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "city": {
+        "name": "city",
+        "description": "Search using city. Wildcards (`*`) are supported.",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "state": {
+        "name": "state",
+        "description": "Search using state. Use commas or spaces to separate multiple states in\na list, the search will return locations in any of the listed states.",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "zip": {
+        "name": "zip",
+        "description": "Search using zip. Use commas or spaces to separate multiple zip codes\nin a list, the search will return locations in any of the listed zip\ncodes.",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "name": {
+        "name": "name",
+        "description": "Search using name. Wildcards (`*`) are supported.",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "description": {
+        "name": "description",
+        "description": "Search using description. Wildcards (`*`) are supported.",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "category": {
+        "name": "category",
+        "description": "Search using category. Must use one of the allowed values.",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/category"
+        }
+      },
+      "order": {
+        "name": "order",
+        "description": "Sort results by the specified field, in the given direction (`<field>_<direction>`).",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "name_asc",
+            "name_desc",
+            "category_asc",
+            "category_desc",
+            "state_asc",
+            "state_desc",
+            "street_address_asc",
+            "street_address_desc",
+            "city_asc",
+            "city_desc",
+            "zip_asc",
+            "zip_desc",
+            "created_asc",
+            "created_desc",
+            "updated_asc",
+            "updated_desc"
+          ]
+        }
+      },
+      "page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "page_size": {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 100
+        }
+      },
+      "options": {
+        "name": "options",
+        "description": "Whether to include options in the response. If false, only location info\nwill be returned.",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "discarded": {
+        "name": "discarded",
+        "description": "Whether to include discarded locations in the response. If false, only\nnon-discarded locations will be returned.",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "x-api-key": []
+    }
+  ]
+}

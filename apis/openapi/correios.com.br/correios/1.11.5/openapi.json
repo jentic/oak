@@ -1,0 +1,1268 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Correios Web Services API",
+    "description": "Integration API for Brazil's postal service (Correios). Provides services for price calculation, delivery time estimates, CEP (postal code) lookup, shipment tracking, and shipment preparation.",
+    "version": "1.11.5",
+    "contact": {
+      "name": "Correios",
+      "url": "https://www.correios.com.br"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://cws.correios.com.br",
+      "description": "Production"
+    },
+    {
+      "url": "https://cwshom.correios.com.br",
+      "description": "Homologation (Testing)"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/token/v1/autentica": {
+      "post": {
+        "operationId": "authenticate",
+        "summary": "Authenticate",
+        "description": "Generate an authentication token for accessing Correios APIs. Uses Basic Auth with username and access code.",
+        "tags": ["Authentication"],
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "numero": {
+                    "type": "string",
+                    "description": "Contract number or postage card number."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Token generated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed."
+          }
+        }
+      }
+    },
+    "/token/v1/autentica/cartaopostagem": {
+      "post": {
+        "operationId": "authenticateByPostageCard",
+        "summary": "Authenticate by Postage Card",
+        "description": "Generate an authentication token using a postage card number.",
+        "tags": ["Authentication"],
+        "security": [
+          {
+            "BasicAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["numero"],
+                "properties": {
+                  "numero": {
+                    "type": "string",
+                    "description": "Postage card number."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Token generated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed."
+          }
+        }
+      }
+    },
+    "/cep/v2/enderecos/{cep}": {
+      "get": {
+        "operationId": "getAddressByCep",
+        "summary": "Get Address by CEP",
+        "description": "Look up address information for a Brazilian postal code (CEP).",
+        "tags": ["CEP"],
+        "parameters": [
+          {
+            "name": "cep",
+            "in": "path",
+            "required": true,
+            "description": "Brazilian postal code (CEP), 8 digits.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{8}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Address found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Address"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid CEP format."
+          },
+          "404": {
+            "description": "CEP not found."
+          }
+        }
+      }
+    },
+    "/preco/v1/nacional": {
+      "post": {
+        "operationId": "calculateNationalPrice",
+        "summary": "Calculate National Shipping Price",
+        "description": "Calculate the price for national shipping based on origin, destination, dimensions, and service type.",
+        "tags": ["Price"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Price calculated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PriceResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters."
+          }
+        }
+      }
+    },
+    "/prazo/v1/nacional": {
+      "post": {
+        "operationId": "calculateNationalDeliveryTime",
+        "summary": "Calculate National Delivery Time",
+        "description": "Calculate the estimated delivery time for national shipments.",
+        "tags": ["Delivery Time"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryTimeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delivery time calculated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeliveryTimeResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters."
+          }
+        }
+      }
+    },
+    "/prazo/v1/nacional/{coServico}/{cepOrigem}/{cepDestino}": {
+      "get": {
+        "operationId": "getDeliveryTimeByParams",
+        "summary": "Get Delivery Time by Parameters",
+        "description": "Get delivery time estimate using path parameters for service code, origin, and destination CEPs.",
+        "tags": ["Delivery Time"],
+        "parameters": [
+          {
+            "name": "coServico",
+            "in": "path",
+            "required": true,
+            "description": "Correios service code (e.g., 04014 for SEDEX, 04510 for PAC).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cepOrigem",
+            "in": "path",
+            "required": true,
+            "description": "Origin CEP (8 digits).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{8}$"
+            }
+          },
+          {
+            "name": "cepDestino",
+            "in": "path",
+            "required": true,
+            "description": "Destination CEP (8 digits).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{8}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delivery time retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryTimeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rastro/v1/objetos/{codigoObjeto}": {
+      "get": {
+        "operationId": "trackObject",
+        "summary": "Track Shipment",
+        "description": "Track a shipment by its tracking code.",
+        "tags": ["Tracking"],
+        "parameters": [
+          {
+            "name": "codigoObjeto",
+            "in": "path",
+            "required": true,
+            "description": "Tracking code of the object.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resultado",
+            "in": "query",
+            "description": "Result type: T for all events, U for last event only.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["T", "U"],
+              "default": "T"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tracking information retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Object not found."
+          }
+        }
+      }
+    },
+    "/rastro/v1/objetos": {
+      "get": {
+        "operationId": "trackMultipleObjects",
+        "summary": "Track Multiple Shipments",
+        "description": "Track multiple shipments by their tracking codes.",
+        "tags": ["Tracking"],
+        "parameters": [
+          {
+            "name": "codigosObjetos",
+            "in": "query",
+            "required": true,
+            "description": "Comma-separated list of tracking codes.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resultado",
+            "in": "query",
+            "description": "Result type: T for all events, U for last event only.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["T", "U"],
+              "default": "T"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tracking information retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrackingResult"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prepostagem/v1/prepostagens": {
+      "post": {
+        "operationId": "createPrePostage",
+        "summary": "Create Pre-Postage",
+        "description": "Create a pre-postage entry to prepare a shipment for posting.",
+        "tags": ["Pre-Postage"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrePostageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pre-postage created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrePostageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request."
+          }
+        }
+      },
+      "get": {
+        "operationId": "listPrePostages",
+        "summary": "List Pre-Postages",
+        "description": "List pre-postage entries.",
+        "tags": ["Pre-Postage"],
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "description": "Page number.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "description": "Page size.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pre-postages listed successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "itens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PrePostageResponse"
+                      }
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "description": "Current page."
+                    },
+                    "tamanho": {
+                      "type": "integer",
+                      "description": "Page size."
+                    },
+                    "totalItens": {
+                      "type": "integer",
+                      "description": "Total number of items."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prepostagem/v1/prepostagens/{idPrePostagem}": {
+      "get": {
+        "operationId": "getPrePostage",
+        "summary": "Get Pre-Postage",
+        "description": "Retrieve a specific pre-postage entry by ID.",
+        "tags": ["Pre-Postage"],
+        "parameters": [
+          {
+            "name": "idPrePostagem",
+            "in": "path",
+            "required": true,
+            "description": "Pre-postage identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pre-postage retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrePostageResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Pre-postage not found."
+          }
+        }
+      },
+      "delete": {
+        "operationId": "cancelPrePostage",
+        "summary": "Cancel Pre-Postage",
+        "description": "Cancel a pre-postage entry.",
+        "tags": ["Pre-Postage"],
+        "parameters": [
+          {
+            "name": "idPrePostagem",
+            "in": "path",
+            "required": true,
+            "description": "Pre-postage identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pre-postage cancelled successfully."
+          },
+          "404": {
+            "description": "Pre-postage not found."
+          }
+        }
+      }
+    },
+    "/prepostagem/v1/prepostagens/{idPrePostagem}/rotulo": {
+      "get": {
+        "operationId": "getShippingLabel",
+        "summary": "Get Shipping Label",
+        "description": "Generate and retrieve the shipping label for a pre-postage entry.",
+        "tags": ["Pre-Postage"],
+        "parameters": [
+          {
+            "name": "idPrePostagem",
+            "in": "path",
+            "required": true,
+            "description": "Pre-postage identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shipping label generated successfully.",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Pre-postage not found."
+          }
+        }
+      }
+    },
+    "/meucontrato/v1/empresas/{cnpj}/contratos/{contrato}": {
+      "get": {
+        "operationId": "getContract",
+        "summary": "Get Contract Details",
+        "description": "Retrieve contract details for a company.",
+        "tags": ["Contract"],
+        "parameters": [
+          {
+            "name": "cnpj",
+            "in": "path",
+            "required": true,
+            "description": "Company CNPJ number.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contrato",
+            "in": "path",
+            "required": true,
+            "description": "Contract number.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contract details retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contract"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contract not found."
+          }
+        }
+      }
+    },
+    "/meucontrato/v1/empresas/{cnpj}/contratos/{contrato}/cartoes-postagem": {
+      "get": {
+        "operationId": "getPostageCards",
+        "summary": "Get Postage Cards",
+        "description": "List postage cards associated with a contract.",
+        "tags": ["Contract"],
+        "parameters": [
+          {
+            "name": "cnpj",
+            "in": "path",
+            "required": true,
+            "description": "Company CNPJ number.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contrato",
+            "in": "path",
+            "required": true,
+            "description": "Contract number.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Postage cards retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostageCard"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BasicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Basic authentication using username (user or CNPJ) and access code (API key)."
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Bearer token obtained from the authentication endpoint."
+      }
+    },
+    "schemas": {
+      "AuthToken": {
+        "type": "object",
+        "properties": {
+          "ambiente": {
+            "type": "string",
+            "description": "Environment (PRODUCAO or HOMOLOGACAO)."
+          },
+          "id": {
+            "type": "string",
+            "description": "User identifier."
+          },
+          "ip": {
+            "type": "string",
+            "description": "Client IP address."
+          },
+          "perfil": {
+            "type": "string",
+            "description": "User profile."
+          },
+          "cnpj": {
+            "type": "string",
+            "description": "CNPJ number."
+          },
+          "cartaoPostagem": {
+            "type": "object",
+            "properties": {
+              "numero": {
+                "type": "string",
+                "description": "Postage card number."
+              },
+              "contrato": {
+                "type": "string",
+                "description": "Contract number."
+              },
+              "dr": {
+                "type": "integer",
+                "description": "Regional directorate."
+              }
+            }
+          },
+          "token": {
+            "type": "string",
+            "description": "JWT authentication token."
+          },
+          "emissao": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Token issuance timestamp."
+          },
+          "expiraEm": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Token expiration timestamp."
+          }
+        }
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "cep": {
+            "type": "string",
+            "description": "Postal code (CEP)."
+          },
+          "uf": {
+            "type": "string",
+            "description": "State abbreviation (UF)."
+          },
+          "localidade": {
+            "type": "string",
+            "description": "City name."
+          },
+          "logradouro": {
+            "type": "string",
+            "description": "Street name."
+          },
+          "complemento": {
+            "type": "string",
+            "description": "Address complement."
+          },
+          "bairro": {
+            "type": "string",
+            "description": "Neighborhood."
+          },
+          "ibge": {
+            "type": "string",
+            "description": "IBGE city code."
+          },
+          "gia": {
+            "type": "string",
+            "description": "GIA code."
+          },
+          "tipoLogradouro": {
+            "type": "string",
+            "description": "Type of street (Rua, Avenida, etc.)."
+          },
+          "nomeLogradouro": {
+            "type": "string",
+            "description": "Street name without type prefix."
+          }
+        }
+      },
+      "PriceRequest": {
+        "type": "object",
+        "required": ["cepOrigem", "cepDestino", "servicos"],
+        "properties": {
+          "cepOrigem": {
+            "type": "string",
+            "description": "Origin CEP (8 digits)."
+          },
+          "cepDestino": {
+            "type": "string",
+            "description": "Destination CEP (8 digits)."
+          },
+          "servicos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["coServico"],
+              "properties": {
+                "coServico": {
+                  "type": "string",
+                  "description": "Service code (e.g., 04014 for SEDEX, 04510 for PAC)."
+                },
+                "peso": {
+                  "type": "number",
+                  "description": "Weight in kilograms."
+                },
+                "formato": {
+                  "type": "integer",
+                  "description": "Package format (1=box, 2=roll, 3=envelope)."
+                },
+                "comprimento": {
+                  "type": "number",
+                  "description": "Length in centimeters."
+                },
+                "altura": {
+                  "type": "number",
+                  "description": "Height in centimeters."
+                },
+                "largura": {
+                  "type": "number",
+                  "description": "Width in centimeters."
+                },
+                "diametro": {
+                  "type": "number",
+                  "description": "Diameter in centimeters (for rolls)."
+                },
+                "valorDeclarado": {
+                  "type": "number",
+                  "description": "Declared value in BRL."
+                },
+                "avisoRecebimento": {
+                  "type": "boolean",
+                  "description": "Whether to include return receipt (AR)."
+                },
+                "maoPropria": {
+                  "type": "boolean",
+                  "description": "Whether to require personal delivery."
+                }
+              }
+            }
+          }
+        }
+      },
+      "PriceResponse": {
+        "type": "object",
+        "properties": {
+          "coServico": {
+            "type": "string",
+            "description": "Service code."
+          },
+          "valor": {
+            "type": "number",
+            "description": "Total price in BRL."
+          },
+          "prazoEntrega": {
+            "type": "integer",
+            "description": "Estimated delivery days."
+          },
+          "valorSemAdicionais": {
+            "type": "number",
+            "description": "Base price without additional services."
+          },
+          "valorMaoPropria": {
+            "type": "number",
+            "description": "Personal delivery surcharge."
+          },
+          "valorAvisoRecebimento": {
+            "type": "number",
+            "description": "Return receipt surcharge."
+          },
+          "valorValorDeclarado": {
+            "type": "number",
+            "description": "Declared value insurance surcharge."
+          },
+          "erro": {
+            "type": "string",
+            "description": "Error code if applicable."
+          },
+          "msgErro": {
+            "type": "string",
+            "description": "Error message if applicable."
+          }
+        }
+      },
+      "DeliveryTimeRequest": {
+        "type": "object",
+        "required": ["cepOrigem", "cepDestino", "servicos"],
+        "properties": {
+          "cepOrigem": {
+            "type": "string",
+            "description": "Origin CEP (8 digits)."
+          },
+          "cepDestino": {
+            "type": "string",
+            "description": "Destination CEP (8 digits)."
+          },
+          "servicos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["coServico"],
+              "properties": {
+                "coServico": {
+                  "type": "string",
+                  "description": "Service code."
+                }
+              }
+            }
+          }
+        }
+      },
+      "DeliveryTimeResponse": {
+        "type": "object",
+        "properties": {
+          "coServico": {
+            "type": "string",
+            "description": "Service code."
+          },
+          "prazoEntrega": {
+            "type": "integer",
+            "description": "Delivery time in business days."
+          },
+          "dataMaxima": {
+            "type": "string",
+            "format": "date",
+            "description": "Maximum delivery date."
+          },
+          "entregaSabado": {
+            "type": "boolean",
+            "description": "Whether Saturday delivery is available."
+          },
+          "entregaDomiciliar": {
+            "type": "boolean",
+            "description": "Whether home delivery is available."
+          },
+          "erro": {
+            "type": "string",
+            "description": "Error code if applicable."
+          },
+          "msgErro": {
+            "type": "string",
+            "description": "Error message if applicable."
+          }
+        }
+      },
+      "TrackingResult": {
+        "type": "object",
+        "properties": {
+          "codObjeto": {
+            "type": "string",
+            "description": "Tracking code."
+          },
+          "tipoPostal": {
+            "type": "object",
+            "properties": {
+              "sigla": {
+                "type": "string",
+                "description": "Service type abbreviation."
+              },
+              "descricao": {
+                "type": "string",
+                "description": "Service type description."
+              },
+              "categoria": {
+                "type": "string",
+                "description": "Service category."
+              }
+            }
+          },
+          "dtPrevista": {
+            "type": "string",
+            "format": "date",
+            "description": "Expected delivery date."
+          },
+          "eventos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackingEvent"
+            },
+            "description": "Tracking events."
+          }
+        }
+      },
+      "TrackingEvent": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "description": "Event code."
+          },
+          "tipo": {
+            "type": "string",
+            "description": "Event type."
+          },
+          "dtHrCriado": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Event timestamp."
+          },
+          "descricao": {
+            "type": "string",
+            "description": "Event description."
+          },
+          "unidade": {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "description": "Unit type."
+              },
+              "endereco": {
+                "type": "object",
+                "properties": {
+                  "cidade": {
+                    "type": "string",
+                    "description": "City."
+                  },
+                  "uf": {
+                    "type": "string",
+                    "description": "State."
+                  }
+                }
+              }
+            }
+          },
+          "unidadeDestino": {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "description": "Destination unit type."
+              },
+              "endereco": {
+                "type": "object",
+                "properties": {
+                  "cidade": {
+                    "type": "string",
+                    "description": "City."
+                  },
+                  "uf": {
+                    "type": "string",
+                    "description": "State."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "PrePostageRequest": {
+        "type": "object",
+        "required": ["remetente", "destinatario", "servico"],
+        "properties": {
+          "remetente": {
+            "$ref": "#/components/schemas/Participant",
+            "description": "Sender information."
+          },
+          "destinatario": {
+            "$ref": "#/components/schemas/Participant",
+            "description": "Recipient information."
+          },
+          "servico": {
+            "type": "object",
+            "required": ["coServico"],
+            "properties": {
+              "coServico": {
+                "type": "string",
+                "description": "Service code."
+              },
+              "avisoRecebimento": {
+                "type": "boolean",
+                "description": "Whether to include return receipt."
+              },
+              "maoPropria": {
+                "type": "boolean",
+                "description": "Whether to require personal delivery."
+              },
+              "valorDeclarado": {
+                "type": "number",
+                "description": "Declared value in BRL."
+              }
+            }
+          },
+          "peso": {
+            "type": "number",
+            "description": "Weight in grams."
+          },
+          "formato": {
+            "type": "integer",
+            "description": "Package format."
+          },
+          "comprimento": {
+            "type": "number",
+            "description": "Length in centimeters."
+          },
+          "altura": {
+            "type": "number",
+            "description": "Height in centimeters."
+          },
+          "largura": {
+            "type": "number",
+            "description": "Width in centimeters."
+          },
+          "itensDeclaracaoConteudo": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "conteudo": {
+                  "type": "string",
+                  "description": "Content description."
+                },
+                "quantidade": {
+                  "type": "integer",
+                  "description": "Quantity."
+                },
+                "valor": {
+                  "type": "number",
+                  "description": "Item value in BRL."
+                }
+              }
+            }
+          }
+        }
+      },
+      "PrePostageResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Pre-postage identifier."
+          },
+          "codigoObjeto": {
+            "type": "string",
+            "description": "Tracking code assigned."
+          },
+          "status": {
+            "type": "string",
+            "description": "Pre-postage status."
+          },
+          "remetente": {
+            "$ref": "#/components/schemas/Participant"
+          },
+          "destinatario": {
+            "$ref": "#/components/schemas/Participant"
+          },
+          "servico": {
+            "type": "object",
+            "properties": {
+              "coServico": {
+                "type": "string"
+              },
+              "nomeServico": {
+                "type": "string"
+              }
+            }
+          },
+          "peso": {
+            "type": "number",
+            "description": "Weight in grams."
+          },
+          "dataCriacao": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp."
+          }
+        }
+      },
+      "Participant": {
+        "type": "object",
+        "required": ["nome", "cep"],
+        "properties": {
+          "nome": {
+            "type": "string",
+            "description": "Name."
+          },
+          "cpfCnpj": {
+            "type": "string",
+            "description": "CPF or CNPJ number."
+          },
+          "telefone": {
+            "type": "string",
+            "description": "Phone number."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address."
+          },
+          "logradouro": {
+            "type": "string",
+            "description": "Street address."
+          },
+          "numero": {
+            "type": "string",
+            "description": "Address number."
+          },
+          "complemento": {
+            "type": "string",
+            "description": "Address complement."
+          },
+          "bairro": {
+            "type": "string",
+            "description": "Neighborhood."
+          },
+          "cidade": {
+            "type": "string",
+            "description": "City."
+          },
+          "uf": {
+            "type": "string",
+            "description": "State abbreviation."
+          },
+          "cep": {
+            "type": "string",
+            "description": "Postal code (CEP)."
+          }
+        }
+      },
+      "Contract": {
+        "type": "object",
+        "properties": {
+          "nuContrato": {
+            "type": "string",
+            "description": "Contract number."
+          },
+          "cnpj": {
+            "type": "string",
+            "description": "Company CNPJ."
+          },
+          "status": {
+            "type": "string",
+            "description": "Contract status."
+          },
+          "dtInicio": {
+            "type": "string",
+            "format": "date",
+            "description": "Contract start date."
+          },
+          "dtFim": {
+            "type": "string",
+            "format": "date",
+            "description": "Contract end date."
+          },
+          "cartoesPostagem": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostageCard"
+            }
+          }
+        }
+      },
+      "PostageCard": {
+        "type": "object",
+        "properties": {
+          "numero": {
+            "type": "string",
+            "description": "Postage card number."
+          },
+          "contrato": {
+            "type": "string",
+            "description": "Associated contract number."
+          },
+          "dr": {
+            "type": "integer",
+            "description": "Regional directorate."
+          },
+          "status": {
+            "type": "string",
+            "description": "Card status."
+          },
+          "servicos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "codigo": {
+                  "type": "string",
+                  "description": "Service code."
+                },
+                "descricao": {
+                  "type": "string",
+                  "description": "Service description."
+                }
+              }
+            },
+            "description": "Available services for this card."
+          }
+        }
+      }
+    }
+  }
+}

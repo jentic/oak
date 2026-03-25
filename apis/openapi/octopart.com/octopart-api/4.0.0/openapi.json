@@ -1,0 +1,911 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Octopart API",
+    "description": "Electronic part data API for manufacturing, design, and sourcing. Octopart provides a GraphQL API (v4) for searching and retrieving electronic component data including parts, categories, sellers, pricing, datasheets, and specifications.",
+    "version": "4.0.0",
+    "contact": {
+      "name": "Octopart",
+      "url": "https://octopart.com"
+    },
+    "x-jentic-source-url": "https://octopart.com/api/v4/reference"
+  },
+  "servers": [
+    {
+      "url": "https://octopart.com/api/v4",
+      "description": "Octopart API v4 Production Server"
+    }
+  ],
+  "security": [
+    {
+      "apiKeyQuery": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Search",
+      "description": "Search for electronic parts and components"
+    },
+    {
+      "name": "Parts",
+      "description": "Retrieve detailed part information"
+    },
+    {
+      "name": "Categories",
+      "description": "Browse and search part categories"
+    },
+    {
+      "name": "Sellers",
+      "description": "Seller and distributor information"
+    },
+    {
+      "name": "Brands",
+      "description": "Manufacturer brand information"
+    }
+  ],
+  "paths": {
+    "/endpoint": {
+      "post": {
+        "operationId": "graphqlQuery",
+        "summary": "Execute GraphQL Query",
+        "description": "Execute a GraphQL query against the Octopart API v4. Supports queries for parts search, part details, categories, sellers, brands, and more.",
+        "tags": ["Search", "Parts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRequest"
+              },
+              "examples": {
+                "searchParts": {
+                  "summary": "Search for parts by keyword",
+                  "value": {
+                    "query": "query { search(q: \"ESP32\", limit: 10) { hits total results { part { id name mpn manufacturer { name } short_description best_image { url } median_price_1000 { price currency } specs { attribute { name } display_value } } } } }",
+                    "variables": {}
+                  }
+                },
+                "partDetails": {
+                  "summary": "Get part details by MPN",
+                  "value": {
+                    "query": "query ($mpn: String!) { search(q: $mpn, limit: 1) { results { part { id name mpn manufacturer { name } descriptions { text } datasheets { url } specs { attribute { name shortname units } display_value } sellers { company { name homepage_url } offers { sku moq prices { quantity price currency } stock_level factory_lead_days } } } } } }",
+                    "variables": {
+                      "mpn": "ATmega328P"
+                    }
+                  }
+                },
+                "categorySearch": {
+                  "summary": "Browse categories",
+                  "value": {
+                    "query": "query { categories(ids: [\"1\"], include_ancestors: true) { id name parent_id path num_parts children { id name num_parts } } }",
+                    "variables": {}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful GraphQL response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphQLResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid GraphQL query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rest/v1/parts/search": {
+      "get": {
+        "operationId": "searchParts",
+        "summary": "Search Parts",
+        "description": "Search for electronic parts by keyword, MPN, or other criteria. Returns matching parts with pricing, availability, and specification data.",
+        "tags": ["Search"],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search query string (part number, keyword, or description)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "description": "Result offset for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of results to return",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "sortby",
+            "in": "query",
+            "description": "Sort order for results",
+            "schema": {
+              "type": "string",
+              "enum": ["score", "avg_price", "median_price_1000"]
+            }
+          },
+          {
+            "name": "filter[fields][manufacturer.name][]",
+            "in": "query",
+            "description": "Filter by manufacturer name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter[fields][category.id][]",
+            "in": "query",
+            "description": "Filter by category ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful search response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartsSearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rest/v1/parts/{id}": {
+      "get": {
+        "operationId": "getPartById",
+        "summary": "Get Part Details",
+        "description": "Retrieve detailed information about a specific electronic part by its Octopart ID.",
+        "tags": ["Parts"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Octopart part ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include[]",
+            "in": "query",
+            "description": "Additional data to include",
+            "schema": {
+              "type": "string",
+              "enum": ["specs", "descriptions", "datasheets", "imagesets", "compliance", "sellers"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Part details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Part not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rest/v1/parts/match": {
+      "post": {
+        "operationId": "matchParts",
+        "summary": "Match Parts by MPN",
+        "description": "Match electronic parts by manufacturer part number (MPN) and optional manufacturer name. Supports batch matching of multiple parts.",
+        "tags": ["Parts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Match results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rest/v1/categories": {
+      "get": {
+        "operationId": "getCategories",
+        "summary": "Get Categories",
+        "description": "Retrieve electronic part categories. Can be used to browse the category tree.",
+        "tags": ["Categories"],
+        "parameters": [
+          {
+            "name": "id[]",
+            "in": "query",
+            "description": "Category IDs to retrieve",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "description": "Filter by parent category ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Categories list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rest/v1/sellers": {
+      "get": {
+        "operationId": "getSellers",
+        "summary": "Get Sellers",
+        "description": "Retrieve information about authorized sellers and distributors.",
+        "tags": ["Sellers"],
+        "parameters": [
+          {
+            "name": "id[]",
+            "in": "query",
+            "description": "Seller IDs to retrieve",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sellers list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellersResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rest/v1/brands": {
+      "get": {
+        "operationId": "getBrands",
+        "summary": "Get Brands",
+        "description": "Retrieve manufacturer brand information.",
+        "tags": ["Brands"],
+        "parameters": [
+          {
+            "name": "id[]",
+            "in": "query",
+            "description": "Brand IDs to retrieve",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Brands list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "apikey",
+        "description": "API key passed as a query parameter"
+      },
+      "apiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "API key passed in the Authorization header as 'Token <apikey>'"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "locations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "line": { "type": "integer" },
+                      "column": { "type": "integer" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "GraphQLRequest": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "GraphQL query string"
+          },
+          "variables": {
+            "type": "object",
+            "description": "Variables for the GraphQL query",
+            "additionalProperties": true
+          },
+          "operationName": {
+            "type": "string",
+            "description": "Name of the operation to execute"
+          }
+        }
+      },
+      "GraphQLResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Query result data",
+            "additionalProperties": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message": { "type": "string" },
+                "locations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "line": { "type": "integer" },
+                      "column": { "type": "integer" }
+                    }
+                  }
+                },
+                "path": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "PartsSearchResponse": {
+        "type": "object",
+        "properties": {
+          "hits": {
+            "type": "integer",
+            "description": "Total number of matching results"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchResult"
+            }
+          }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "part": {
+            "$ref": "#/components/schemas/Part"
+          },
+          "score": {
+            "type": "number",
+            "description": "Relevance score"
+          }
+        }
+      },
+      "Part": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Octopart part ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Part name"
+          },
+          "mpn": {
+            "type": "string",
+            "description": "Manufacturer part number"
+          },
+          "manufacturer": {
+            "$ref": "#/components/schemas/Manufacturer"
+          },
+          "short_description": {
+            "type": "string",
+            "description": "Brief part description"
+          },
+          "descriptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Description"
+            }
+          },
+          "datasheets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Datasheet"
+            }
+          },
+          "specs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Spec"
+            }
+          },
+          "sellers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SellerOffer"
+            }
+          },
+          "best_image": {
+            "$ref": "#/components/schemas/Image"
+          },
+          "median_price_1000": {
+            "$ref": "#/components/schemas/Price"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "series": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" }
+            }
+          }
+        }
+      },
+      "Manufacturer": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "homepage_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "Description": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      },
+      "Datasheet": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "source": { "type": "string" },
+          "mime_type": { "type": "string" }
+        }
+      },
+      "Spec": {
+        "type": "object",
+        "properties": {
+          "attribute": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "shortname": { "type": "string" },
+              "units": { "type": "string" }
+            }
+          },
+          "display_value": { "type": "string" },
+          "value": { "type": "string" },
+          "min_value": { "type": "string" },
+          "max_value": { "type": "string" }
+        }
+      },
+      "SellerOffer": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "homepage_url": { "type": "string", "format": "uri" },
+              "is_authorized": { "type": "boolean" }
+            }
+          },
+          "offers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Offer"
+            }
+          }
+        }
+      },
+      "Offer": {
+        "type": "object",
+        "properties": {
+          "sku": { "type": "string" },
+          "moq": { "type": "integer" },
+          "stock_level": { "type": "integer" },
+          "factory_lead_days": { "type": "integer" },
+          "in_stock_quantity": { "type": "integer" },
+          "on_order_quantity": { "type": "integer" },
+          "prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceBreak"
+            }
+          },
+          "product_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "PriceBreak": {
+        "type": "object",
+        "properties": {
+          "quantity": { "type": "integer" },
+          "price": { "type": "number" },
+          "currency": { "type": "string" }
+        }
+      },
+      "Price": {
+        "type": "object",
+        "properties": {
+          "price": { "type": "number" },
+          "currency": { "type": "string" }
+        }
+      },
+      "Image": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "credit_string": { "type": "string" },
+          "credit_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "parent_id": { "type": "string" },
+          "path": { "type": "string" },
+          "num_parts": { "type": "integer" },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
+          }
+        }
+      },
+      "CategoriesResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
+          }
+        }
+      },
+      "SellersResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "homepage_url": { "type": "string", "format": "uri" },
+                "is_authorized": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      },
+      "BrandsResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Manufacturer"
+            }
+          }
+        }
+      },
+      "MatchRequest": {
+        "type": "object",
+        "required": ["queries"],
+        "properties": {
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["mpn"],
+              "properties": {
+                "mpn": {
+                  "type": "string",
+                  "description": "Manufacturer part number"
+                },
+                "manufacturer": {
+                  "type": "string",
+                  "description": "Manufacturer name"
+                },
+                "sku": {
+                  "type": "string",
+                  "description": "Seller SKU"
+                },
+                "seller": {
+                  "type": "string",
+                  "description": "Seller name"
+                }
+              }
+            }
+          }
+        }
+      },
+      "MatchResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hits": { "type": "integer" },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Part"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

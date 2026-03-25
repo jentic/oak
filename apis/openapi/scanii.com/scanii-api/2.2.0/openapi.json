@@ -1,0 +1,298 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Scanii API",
+    "description": "Scanii is a content analysis and malware detection API. It provides file scanning capabilities to identify threats, malware, and unwanted content. Supports synchronous and asynchronous file analysis, remote file fetching, and temporary authentication tokens.",
+    "version": "2.2.0",
+    "contact": {
+      "name": "Scanii Support",
+      "email": "support@uvasoftware.com",
+      "url": "https://docs.scanii.com"
+    }
+  },
+  "servers": [
+    {"url": "https://api-us1.scanii.com", "description": "US East (Virginia)"},
+    {"url": "https://api-eu1.scanii.com", "description": "EU (Dublin, Ireland)"},
+    {"url": "https://api-eu2.scanii.com", "description": "EU (London, UK)"},
+    {"url": "https://api-ap1.scanii.com", "description": "APAC (Sydney, Australia)"},
+    {"url": "https://api-ap2.scanii.com", "description": "APAC (Singapore)"},
+    {"url": "https://api-ca1.scanii.com", "description": "Canada (Montreal)"}
+  ],
+  "security": [
+    {"basicAuth": []}
+  ],
+  "paths": {
+    "/v2.2/ping": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Ping the API",
+        "description": "Verify API credentials and connectivity.",
+        "operationId": "ping",
+        "responses": {
+          "200": {
+            "description": "Successful ping response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {"type": "string", "example": "pong"},
+                    "key": {"type": "string", "description": "The API key used for authentication"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized - invalid credentials"}
+        }
+      }
+    },
+    "/v2.2/files": {
+      "post": {
+        "tags": ["Files"],
+        "summary": "Analyze a file synchronously",
+        "description": "Submit a file for synchronous content analysis. The response will contain the analysis results including any findings.",
+        "operationId": "analyzeFile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The file to analyze"
+                  },
+                  "metadata[key]": {
+                    "type": "string",
+                    "description": "Custom metadata key-value pairs to attach to the analysis"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "File analysis complete",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/FileAnalysisResult"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized"},
+          "413": {"description": "File too large"}
+        }
+      }
+    },
+    "/v2.2/files/async": {
+      "post": {
+        "tags": ["Files"],
+        "summary": "Analyze a file asynchronously",
+        "description": "Submit a file for asynchronous content analysis. Results will be delivered to the specified callback URL.",
+        "operationId": "analyzeFileAsync",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The file to analyze"
+                  },
+                  "callback": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Webhook URL to receive analysis results"
+                  },
+                  "metadata[key]": {
+                    "type": "string",
+                    "description": "Custom metadata key-value pairs"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "File accepted for processing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "string", "description": "Unique file analysis identifier"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/v2.2/files/fetch": {
+      "post": {
+        "tags": ["Files"],
+        "summary": "Analyze a remote file",
+        "description": "Submit a remote URL for content analysis. The file will be fetched and analyzed asynchronously. Results are delivered via callback.",
+        "operationId": "fetchAndAnalyzeFile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["location"],
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL of the remote file to analyze (supports signed S3 URLs)"
+                  },
+                  "callback": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Webhook URL to receive analysis results"
+                  },
+                  "metadata[key]": {
+                    "type": "string",
+                    "description": "Custom metadata key-value pairs"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Remote file accepted for processing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "string", "description": "Unique file analysis identifier"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    },
+    "/v2.2/files/{id}": {
+      "get": {
+        "tags": ["Files"],
+        "summary": "Retrieve file analysis results",
+        "description": "Get the analysis results for a previously submitted file.",
+        "operationId": "getFileResults",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"},
+            "description": "The unique file analysis identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File analysis results",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/FileAnalysisResult"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized"},
+          "404": {"description": "Analysis not found"}
+        }
+      }
+    },
+    "/v2.2/auth/tokens": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Create a temporary auth token",
+        "description": "Create a temporary authentication token that can be used for client-side file submissions.",
+        "operationId": "createAuthToken",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["timeout"],
+                "properties": {
+                  "timeout": {
+                    "type": "integer",
+                    "description": "Token lifetime in seconds"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Token created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "string", "description": "Token identifier"},
+                    "creation_date": {"type": "string", "format": "date-time"},
+                    "expiration_date": {"type": "string", "format": "date-time"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Unauthorized"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "HTTP Basic Auth using API key as both username and password"
+      }
+    },
+    "schemas": {
+      "FileAnalysisResult": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "Unique analysis identifier"},
+          "checksum": {"type": "string", "description": "SHA1 hash of the file"},
+          "content_length": {"type": "integer", "description": "File size in bytes"},
+          "findings": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "List of threat identifiers found in the file"
+          },
+          "creation_date": {"type": "string", "format": "date-time", "description": "ISO 8601 timestamp of analysis"},
+          "content_type": {"type": "string", "description": "MIME type of the file"},
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "description": "Custom metadata attached to the analysis"
+          }
+        }
+      }
+    }
+  }
+}

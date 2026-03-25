@@ -1,0 +1,1045 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Fireflies.ai GraphQL API",
+    "description": "The Fireflies.ai API is a GraphQL-based interface that provides access to meeting transcripts, users, channels, AI-powered conversation threads (AskFred), analytics, audio/video uploads, and more. All operations are performed via a single POST endpoint at /graphql.",
+    "version": "2.23.1",
+    "contact": {
+      "name": "Fireflies.ai",
+      "url": "https://fireflies.ai"
+    },
+    "x-logo": {
+      "url": "https://fireflies.ai/favicon.ico"
+    }
+  },
+  "externalDocs": {
+    "description": "Fireflies.ai API Documentation",
+    "url": "https://docs.fireflies.ai/"
+  },
+  "servers": [
+    {
+      "url": "https://api.fireflies.ai",
+      "description": "Fireflies.ai Production API"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/graphql": {
+      "post": {
+        "operationId": "graphqlRequest",
+        "summary": "Execute a GraphQL query or mutation",
+        "description": "Single endpoint for all Fireflies.ai GraphQL operations including queries for transcripts, users, channels, analytics, and mutations for managing meetings, uploads, AskFred threads, and more.",
+        "tags": [
+          "GraphQL"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRequest"
+              },
+              "examples": {
+                "listUsers": {
+                  "summary": "List all users",
+                  "value": {
+                    "query": "{ users { name user_id } }"
+                  }
+                },
+                "getTranscript": {
+                  "summary": "Get a specific transcript",
+                  "value": {
+                    "query": "query Transcript($id: String!) { transcript(id: $id) { id title organizer_email sentences { text speaker_name } } }",
+                    "variables": {
+                      "id": "transcript-id-here"
+                    }
+                  }
+                },
+                "listTranscripts": {
+                  "summary": "List transcripts with filters",
+                  "value": {
+                    "query": "query Transcripts($mine: Boolean, $fromDate: String, $toDate: String) { transcripts(mine: $mine, fromDate: $fromDate, toDate: $toDate) { id title organizer_email } }",
+                    "variables": {
+                      "mine": true,
+                      "fromDate": "2024-01-01",
+                      "toDate": "2024-12-31"
+                    }
+                  }
+                },
+                "addBotToMeeting": {
+                  "summary": "Add Fireflies bot to a live meeting",
+                  "value": {
+                    "query": "mutation AddToLiveMeeting($meeting_link: String!, $title: String, $duration: Int) { addToLiveMeeting(meeting_link: $meeting_link, title: $title, duration: $duration) }",
+                    "variables": {
+                      "meeting_link": "https://meet.google.com/abc-defg-hij",
+                      "title": "Team Standup",
+                      "duration": 60
+                    }
+                  }
+                },
+                "uploadAudio": {
+                  "summary": "Upload audio for transcription",
+                  "value": {
+                    "query": "mutation UploadAudio($audio_url: String!, $title: String) { uploadAudio(audio_url: $audio_url, title: $title) { success title message } }",
+                    "variables": {
+                      "audio_url": "https://example.com/recording.mp3",
+                      "title": "Q4 Planning Meeting"
+                    }
+                  }
+                },
+                "createAskFredThread": {
+                  "summary": "Start an AskFred conversation about meetings",
+                  "value": {
+                    "query": "mutation CreateAskFredThread($input: CreateAskFredThreadInput!) { createAskFredThread(input: $input) { thread_id answer } }",
+                    "variables": {
+                      "input": {
+                        "question": "What were the action items from last week's meetings?"
+                      }
+                    }
+                  }
+                },
+                "deleteTranscript": {
+                  "summary": "Delete a transcript",
+                  "value": {
+                    "query": "mutation DeleteTranscript($id: String!) { deleteTranscript(id: $id) }",
+                    "variables": {
+                      "id": "transcript-id-here"
+                    }
+                  }
+                },
+                "getAnalytics": {
+                  "summary": "Get meeting analytics",
+                  "value": {
+                    "query": "{ analytics { team_analytics { total_meetings total_duration } } }"
+                  }
+                },
+                "listChannels": {
+                  "summary": "List channels",
+                  "value": {
+                    "query": "query Channels($mine: Boolean) { channels(mine: $mine) { id title is_private created_at } }",
+                    "variables": {
+                      "mine": true
+                    }
+                  }
+                },
+                "shareMeeting": {
+                  "summary": "Share a meeting with email recipients",
+                  "value": {
+                    "query": "mutation ShareMeeting($input: ShareMeetingInput!) { shareMeeting(input: $input) { success } }",
+                    "variables": {
+                      "input": {
+                        "transcript_id": "transcript-id-here",
+                        "emails": [
+                          "colleague@example.com"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful GraphQL response. The response contains a `data` field with the requested information, and optionally an `errors` field if any issues occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphQLResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing Bearer token."
+          },
+          "429": {
+            "description": "Rate limit exceeded. Certain mutations have specific rate limits (e.g., addToLiveMeeting: 3 requests per 20 minutes, deleteTranscript: 10 requests per minute)."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key obtained from app.fireflies.ai > Integrations > Fireflies API. Pass as Bearer token in the Authorization header."
+      }
+    },
+    "schemas": {
+      "GraphQLRequest": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The GraphQL query or mutation string."
+          },
+          "variables": {
+            "type": "object",
+            "description": "Variables for the GraphQL operation.",
+            "additionalProperties": true
+          },
+          "operationName": {
+            "type": "string",
+            "description": "The name of the operation to execute, if the query contains multiple operations."
+          }
+        }
+      },
+      "GraphQLResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "nullable": true,
+            "description": "The data returned by the GraphQL operation.",
+            "additionalProperties": true
+          },
+          "errors": {
+            "type": "array",
+            "description": "Errors encountered during the GraphQL operation.",
+            "items": {
+              "$ref": "#/components/schemas/GraphQLError"
+            }
+          }
+        }
+      },
+      "GraphQLError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "A human-readable error message."
+          },
+          "locations": {
+            "type": "array",
+            "description": "Locations in the query where the error occurred.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line": {
+                  "type": "integer"
+                },
+                "column": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "path": {
+            "type": "array",
+            "description": "The path to the field that caused the error.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "extensions": {
+            "type": "object",
+            "description": "Additional error information.",
+            "additionalProperties": true
+          }
+        }
+      },
+      "Transcript": {
+        "type": "object",
+        "description": "A meeting transcript record.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the transcript."
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the meeting."
+          },
+          "organizer_email": {
+            "type": "string",
+            "description": "Email of the meeting organizer."
+          },
+          "participant_email": {
+            "type": "array",
+            "description": "Email addresses of meeting participants.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "speakers": {
+            "type": "array",
+            "description": "List of speakers in the meeting.",
+            "items": {
+              "$ref": "#/components/schemas/Speaker"
+            }
+          },
+          "sentences": {
+            "type": "array",
+            "description": "Transcript sentences.",
+            "items": {
+              "$ref": "#/components/schemas/Sentence"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "audio_url": {
+            "type": "string",
+            "description": "URL to the audio recording."
+          },
+          "video_url": {
+            "type": "string",
+            "description": "URL to the video recording."
+          },
+          "meeting_link": {
+            "type": "string",
+            "description": "Original meeting link."
+          },
+          "channels": {
+            "type": "array",
+            "description": "Channels the transcript belongs to.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "workspace_users": {
+            "type": "array",
+            "description": "Workspace users with access to this transcript.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shared_with": {
+            "type": "array",
+            "description": "Users the transcript has been shared with.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "meeting_attendance": {
+            "type": "array",
+            "description": "Attendance records for the meeting.",
+            "items": {
+              "$ref": "#/components/schemas/MeetingAttendance"
+            }
+          },
+          "is_live": {
+            "type": "boolean",
+            "description": "Whether the meeting is currently live."
+          },
+          "cal_id": {
+            "type": "string",
+            "description": "Calendar event ID."
+          },
+          "calendar_type": {
+            "type": "string",
+            "description": "Type of calendar (e.g., Google, Outlook)."
+          },
+          "analytics": {
+            "type": "object",
+            "description": "Analytics data for this transcript.",
+            "additionalProperties": true
+          }
+        }
+      },
+      "Speaker": {
+        "type": "object",
+        "description": "A speaker in a meeting.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "Speaker's name."
+          }
+        }
+      },
+      "Sentence": {
+        "type": "object",
+        "description": "A sentence from the transcript.",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The transcribed text."
+          },
+          "speaker_name": {
+            "type": "string",
+            "description": "Name of the speaker."
+          },
+          "start_time": {
+            "type": "number",
+            "description": "Start time in seconds."
+          },
+          "end_time": {
+            "type": "number",
+            "description": "End time in seconds."
+          }
+        }
+      },
+      "Summary": {
+        "type": "object",
+        "description": "AI-generated meeting summary.",
+        "properties": {
+          "overview": {
+            "type": "string",
+            "description": "Brief overview of the meeting."
+          },
+          "action_items": {
+            "type": "array",
+            "description": "Action items identified in the meeting.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "keywords": {
+            "type": "array",
+            "description": "Keywords extracted from the meeting.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "MeetingAttendance": {
+        "type": "object",
+        "description": "Attendance record for a meeting participant.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Participant name."
+          },
+          "join_time": {
+            "type": "string",
+            "description": "Time the participant joined."
+          },
+          "leave_time": {
+            "type": "string",
+            "description": "Time the participant left."
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "description": "A Fireflies user.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "User's display name."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "Unique user identifier."
+          },
+          "integrations": {
+            "type": "object",
+            "description": "User's connected integrations.",
+            "additionalProperties": true
+          },
+          "user_groups": {
+            "type": "array",
+            "description": "Groups the user belongs to.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "is_calendar_in_sync": {
+            "type": "boolean",
+            "description": "Whether the user's calendar is synced."
+          }
+        }
+      },
+      "Channel": {
+        "type": "object",
+        "description": "A channel for organizing meetings.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique channel identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "Channel title."
+          },
+          "is_private": {
+            "type": "boolean",
+            "description": "Whether the channel is private."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Channel creation timestamp."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "Last update timestamp."
+          },
+          "created_by": {
+            "type": "string",
+            "description": "User who created the channel."
+          },
+          "members": {
+            "type": "array",
+            "description": "Channel members.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ActiveMeeting": {
+        "type": "object",
+        "description": "A currently active meeting.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Meeting identifier."
+          },
+          "state": {
+            "type": "string",
+            "description": "Current meeting state.",
+            "enum": [
+              "active",
+              "paused"
+            ]
+          }
+        }
+      },
+      "AskFredThread": {
+        "type": "object",
+        "description": "An AskFred AI conversation thread.",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "description": "Unique thread identifier."
+          },
+          "messages": {
+            "type": "array",
+            "description": "Messages in the conversation thread.",
+            "items": {
+              "$ref": "#/components/schemas/AskFredMessage"
+            }
+          }
+        }
+      },
+      "AskFredThreadSummary": {
+        "type": "object",
+        "description": "Summary of an AskFred conversation thread.",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "description": "Unique thread identifier."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Brief summary of the thread."
+          }
+        }
+      },
+      "AskFredMessage": {
+        "type": "object",
+        "description": "A message in an AskFred conversation.",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "Message role (user or assistant).",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content."
+          }
+        }
+      },
+      "AskFredResponse": {
+        "type": "object",
+        "description": "Response from an AskFred operation.",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "description": "Thread identifier."
+          },
+          "answer": {
+            "type": "string",
+            "description": "AI-generated answer."
+          }
+        }
+      },
+      "Bite": {
+        "type": "object",
+        "description": "An AI App Output (Bite) record.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique bite identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "Bite title."
+          },
+          "content": {
+            "type": "string",
+            "description": "Bite content."
+          }
+        }
+      },
+      "App": {
+        "type": "object",
+        "description": "An AI App definition.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique app identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "App name."
+          }
+        }
+      },
+      "Analytics": {
+        "type": "object",
+        "description": "Meeting analytics data.",
+        "properties": {
+          "team_analytics": {
+            "type": "object",
+            "description": "Team-level analytics.",
+            "properties": {
+              "total_meetings": {
+                "type": "integer",
+                "description": "Total number of meetings."
+              },
+              "total_duration": {
+                "type": "number",
+                "description": "Total duration of all meetings."
+              }
+            }
+          }
+        }
+      },
+      "UserGroup": {
+        "type": "object",
+        "description": "A user group.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Group identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "Group name."
+          },
+          "members": {
+            "type": "array",
+            "description": "Group members.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AudioUpload": {
+        "type": "object",
+        "description": "Response from an audio upload operation.",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the upload was successful."
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the uploaded audio."
+          },
+          "message": {
+            "type": "string",
+            "description": "Status message."
+          }
+        }
+      },
+      "UploadUrlResponse": {
+        "type": "object",
+        "description": "Response containing a pre-signed upload URL.",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Pre-signed URL for uploading."
+          },
+          "key": {
+            "type": "string",
+            "description": "Upload key for confirmation."
+          }
+        }
+      },
+      "ConfirmUploadResponse": {
+        "type": "object",
+        "description": "Response from confirming an upload.",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the confirmation was successful."
+          },
+          "transcript_id": {
+            "type": "string",
+            "description": "ID of the transcript being generated."
+          }
+        }
+      },
+      "ShareMeetingResponse": {
+        "type": "object",
+        "description": "Response from sharing a meeting.",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the sharing was successful."
+          }
+        }
+      }
+    }
+  },
+  "x-graphql-schema": {
+    "description": "This API uses GraphQL. The schemas below describe the available queries and mutations. All operations are sent as POST requests to /graphql with a JSON body containing 'query' and optional 'variables' fields.",
+    "queries": {
+      "users": {
+        "description": "List all users in the workspace.",
+        "returnType": "[User]"
+      },
+      "transcripts": {
+        "description": "Query transcripts with filtering and text search.",
+        "arguments": {
+          "organizers": {
+            "type": "[String]",
+            "description": "Filter by organizer emails."
+          },
+          "participants": {
+            "type": "[String]",
+            "description": "Filter by participant emails."
+          },
+          "channel_id": {
+            "type": "String",
+            "description": "Filter by channel ID."
+          },
+          "fromDate": {
+            "type": "String",
+            "description": "Start date filter (ISO 8601)."
+          },
+          "toDate": {
+            "type": "String",
+            "description": "End date filter (ISO 8601)."
+          },
+          "keyword": {
+            "type": "String",
+            "description": "Search keyword."
+          },
+          "scope": {
+            "type": "String",
+            "description": "Search scope."
+          },
+          "user_id": {
+            "type": "String",
+            "description": "Filter by user ID."
+          },
+          "mine": {
+            "type": "Boolean",
+            "description": "Only return the authenticated user's transcripts."
+          }
+        },
+        "returnType": "[Transcript]"
+      },
+      "transcript": {
+        "description": "Retrieve a specific transcript by ID.",
+        "arguments": {
+          "id": {
+            "type": "String!",
+            "description": "Transcript ID."
+          }
+        },
+        "returnType": "Transcript"
+      },
+      "channels": {
+        "description": "Fetch all channels accessible to the user.",
+        "arguments": {
+          "mine": {
+            "type": "Boolean",
+            "description": "Only return channels the user belongs to."
+          }
+        },
+        "returnType": "[Channel]"
+      },
+      "channel": {
+        "description": "Fetch a single channel by ID.",
+        "arguments": {
+          "id": {
+            "type": "String!",
+            "description": "Channel ID."
+          }
+        },
+        "returnType": "Channel"
+      },
+      "active_meetings": {
+        "description": "Retrieve meetings currently in progress.",
+        "arguments": {
+          "states": {
+            "type": "[MeetingState]",
+            "description": "Filter by meeting state (active, paused)."
+          }
+        },
+        "returnType": "[ActiveMeeting]"
+      },
+      "analytics": {
+        "description": "Query team and user analytics for meetings.",
+        "returnType": "Analytics"
+      },
+      "askfred_threads": {
+        "description": "List all AskFred conversation threads with summary information.",
+        "returnType": "[AskFredThreadSummary]"
+      },
+      "askfred_thread": {
+        "description": "Retrieve a specific AskFred thread with full message history.",
+        "arguments": {
+          "thread_id": {
+            "type": "String!",
+            "description": "Thread ID."
+          }
+        },
+        "returnType": "AskFredThread"
+      },
+      "bites": {
+        "description": "Query AI App Outputs.",
+        "arguments": {
+          "skip": {
+            "type": "Int",
+            "description": "Number of records to skip (0-5000)."
+          }
+        },
+        "returnType": "[Bite]"
+      },
+      "bite": {
+        "description": "Retrieve a specific AI App Output.",
+        "arguments": {
+          "id": {
+            "type": "String!",
+            "description": "Bite ID."
+          }
+        },
+        "returnType": "Bite"
+      },
+      "user_groups": {
+        "description": "Fetch user groups with optional filter.",
+        "arguments": {
+          "mine": {
+            "type": "Boolean",
+            "description": "Only return groups the user belongs to."
+          }
+        },
+        "returnType": "[UserGroup]"
+      },
+      "apps": {
+        "description": "Fetch AI App definitions.",
+        "returnType": "[App]"
+      }
+    },
+    "mutations": {
+      "addToLiveMeeting": {
+        "description": "Add the Fireflies bot to a live meeting. Rate limit: 3 requests per 20 minutes.",
+        "arguments": {
+          "meeting_link": {
+            "type": "String!",
+            "description": "URL of the meeting to join."
+          },
+          "title": {
+            "type": "String",
+            "description": "Meeting title (max 256 characters)."
+          },
+          "meeting_password": {
+            "type": "String",
+            "description": "Meeting password if required (max 32 characters)."
+          },
+          "duration": {
+            "type": "Int",
+            "description": "Expected meeting duration in minutes (15-120)."
+          },
+          "language": {
+            "type": "String",
+            "description": "Language for transcription."
+          },
+          "attendees": {
+            "type": "[AttendeeInput]",
+            "description": "List of meeting attendees."
+          }
+        },
+        "returnType": "Boolean"
+      },
+      "uploadAudio": {
+        "description": "Upload audio or video from a URL for transcription.",
+        "arguments": {
+          "audio_url": {
+            "type": "String!",
+            "description": "URL of the audio/video file."
+          },
+          "title": {
+            "type": "String",
+            "description": "Title for the transcript."
+          },
+          "custom_language": {
+            "type": "String",
+            "description": "Language for transcription."
+          },
+          "bypass_size_check": {
+            "type": "Boolean",
+            "description": "Bypass file size validation."
+          },
+          "client_reference_id": {
+            "type": "String",
+            "description": "Client reference ID (max 128 characters)."
+          }
+        },
+        "returnType": "AudioUpload"
+      },
+      "createUploadUrl": {
+        "description": "Generate a pre-signed URL for direct file upload.",
+        "arguments": {
+          "input": {
+            "type": "CreateUploadUrlInput!",
+            "description": "Upload URL creation parameters."
+          }
+        },
+        "returnType": "UploadUrlResponse"
+      },
+      "confirmUpload": {
+        "description": "Confirm an upload and trigger transcription.",
+        "arguments": {
+          "input": {
+            "type": "ConfirmUploadInput!",
+            "description": "Upload confirmation parameters."
+          }
+        },
+        "returnType": "ConfirmUploadResponse"
+      },
+      "deleteTranscript": {
+        "description": "Delete a transcript. Rate limit: 10 requests per minute.",
+        "arguments": {
+          "id": {
+            "type": "String!",
+            "description": "Transcript ID to delete."
+          }
+        },
+        "returnType": "Boolean"
+      },
+      "updateMeetingTitle": {
+        "description": "Update the title of a meeting transcript.",
+        "arguments": {
+          "input": {
+            "type": "UpdateMeetingTitleInput!",
+            "description": "Meeting title update parameters."
+          }
+        },
+        "returnType": "Boolean"
+      },
+      "updateMeetingPrivacy": {
+        "description": "Update privacy settings for a meeting transcript.",
+        "arguments": {
+          "input": {
+            "type": "UpdateMeetingPrivacyInput!",
+            "description": "Privacy update parameters."
+          }
+        },
+        "returnType": "Boolean"
+      },
+      "updateMeetingChannel": {
+        "description": "Set channel for 1-5 transcripts. Requires owner or admin privileges.",
+        "arguments": {
+          "input": {
+            "type": "UpdateMeetingChannelInput!",
+            "description": "Channel assignment parameters."
+          }
+        },
+        "returnType": "Boolean"
+      },
+      "shareMeeting": {
+        "description": "Share meetings with up to 100 email recipients.",
+        "arguments": {
+          "input": {
+            "type": "ShareMeetingInput!",
+            "description": "Meeting sharing parameters."
+          }
+        },
+        "returnType": "ShareMeetingResponse"
+      },
+      "revokeSharedMeetingAccess": {
+        "description": "Revoke a user's access to a shared meeting by email.",
+        "arguments": {
+          "input": {
+            "type": "RevokeSharedMeetingAccessInput!",
+            "description": "Access revocation parameters."
+          }
+        },
+        "returnType": "Boolean"
+      },
+      "setUserRole": {
+        "description": "Set a user's role in the workspace.",
+        "arguments": {
+          "user_id": {
+            "type": "String",
+            "description": "User ID."
+          },
+          "role": {
+            "type": "String",
+            "description": "Role to assign."
+          }
+        },
+        "returnType": "User"
+      },
+      "createAskFredThread": {
+        "description": "Start a new AskFred conversation about meetings. Requires AI credits.",
+        "arguments": {
+          "input": {
+            "type": "CreateAskFredThreadInput!",
+            "description": "Thread creation parameters."
+          }
+        },
+        "returnType": "AskFredResponse"
+      },
+      "continueAskFredThread": {
+        "description": "Add follow-up questions to an existing AskFred thread.",
+        "arguments": {
+          "input": {
+            "type": "ContinueAskFredThreadInput!",
+            "description": "Thread continuation parameters."
+          }
+        },
+        "returnType": "AskFredResponse"
+      },
+      "deleteAskFredThread": {
+        "description": "Remove an AskFred conversation thread.",
+        "arguments": {
+          "thread_id": {
+            "type": "String!",
+            "description": "Thread ID to delete."
+          }
+        },
+        "returnType": "Boolean"
+      },
+      "createBite": {
+        "description": "Programmatically create an AI App Output (Bite).",
+        "arguments": {
+          "input": {
+            "type": "CreateBiteInput!",
+            "description": "Bite creation parameters."
+          }
+        },
+        "returnType": "Bite"
+      }
+    }
+  }
+}

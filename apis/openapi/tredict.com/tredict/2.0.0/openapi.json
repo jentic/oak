@@ -1,0 +1,1231 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Tredict API",
+    "description": "Tredict is a training and fitness platform. The API allows you to get and set activities, health data, planned trainings, training plans, and more via OAuth2 authentication.",
+    "version": "2.0.0",
+    "contact": {
+      "url": "https://www.tredict.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://www.tredict.com",
+      "description": "Tredict Production Server"
+    }
+  ],
+  "security": [
+    {
+      "oauth2": ["activityRead"]
+    }
+  ],
+  "paths": {
+    "/authorization/": {
+      "get": {
+        "operationId": "authorize",
+        "summary": "OAuth2 Authorization",
+        "description": "Redirects the user to the Tredict authorization page. After authorization, the user is redirected to the callback URL with an authorization code.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "description": "Your application's client ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "URL-encoded state parameter for CSRF protection.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": false,
+            "description": "Custom redirect URI (must be registered).",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "required": false,
+            "description": "PKCE code challenge (Base64URL-encoded SHA-256 hash of code_verifier).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "required": false,
+            "description": "PKCE code challenge method. Only S256 is supported.",
+            "schema": {
+              "type": "string",
+              "enum": ["S256"]
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirects to the authorization page, then to the callback URL with code and state parameters."
+          }
+        },
+        "tags": ["OAuth2"]
+      }
+    },
+    "/user/oauth/v2/token": {
+      "post": {
+        "operationId": "getToken",
+        "summary": "Exchange authorization code or refresh token for access token",
+        "description": "Exchanges an authorization code or refresh token for an access token. Uses HTTP Basic authentication with client_id and client_secret, or client_id in body for PKCE flow.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["grant_type"],
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "enum": ["authorization_code", "refresh_token"],
+                    "description": "The type of grant being requested."
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "The authorization code (required for authorization_code grant)."
+                  },
+                  "refresh_token": {
+                    "type": "string",
+                    "description": "The refresh token (required for refresh_token grant)."
+                  },
+                  "code_verifier": {
+                    "type": "string",
+                    "description": "PKCE code verifier (required for PKCE flow)."
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "description": "Client ID (required for PKCE flow instead of Basic auth)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful token response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials."
+          }
+        },
+        "tags": ["OAuth2"]
+      },
+      "delete": {
+        "operationId": "deregister",
+        "summary": "Deregister / revoke tokens",
+        "description": "Invalidates the access token and refresh token, effectively deregistering the application for this user.",
+        "responses": {
+          "200": {
+            "description": "Tokens successfully revoked."
+          },
+          "401": {
+            "description": "Invalid or expired token."
+          }
+        },
+        "tags": ["OAuth2"]
+      }
+    },
+    "/api/oauth/v2/activityList": {
+      "get": {
+        "operationId": "getActivityList",
+        "summary": "List activities",
+        "description": "Returns a paginated list of user activities. Use _links for pagination navigation.",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "description": "Start date for filtering activities (YYYYMMDD format).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "description": "Number of activities per page (50-1000).",
+            "schema": {
+              "type": "integer",
+              "minimum": 50,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "extendedSummary",
+            "in": "query",
+            "required": false,
+            "description": "Include extended summary data.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of activities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          },
+          "403": {
+            "description": "Insufficient scope."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        },
+        "tags": ["Activities"]
+      }
+    },
+    "/api/oauth/v2/activity/{activityId}": {
+      "get": {
+        "operationId": "getActivity",
+        "summary": "Get activity details",
+        "description": "Returns detailed information for a specific activity, including summary and time-series data. All metrics are in metric units.",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "description": "The activity ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Activity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          },
+          "403": {
+            "description": "Insufficient scope."
+          },
+          "404": {
+            "description": "Activity not found."
+          }
+        },
+        "tags": ["Activities"]
+      }
+    },
+    "/api/oauth/v2/activity/update/{activityId}": {
+      "post": {
+        "operationId": "updateActivity",
+        "summary": "Update an activity",
+        "description": "Updates the title and/or notes of an existing activity.",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "description": "The activity ID to update.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "training": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "description": "The activity title."
+                      },
+                      "notes": {
+                        "type": "string",
+                        "description": "Notes for the activity."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Activity updated successfully."
+          },
+          "401": {
+            "description": "Unauthorized."
+          },
+          "403": {
+            "description": "Insufficient scope."
+          }
+        },
+        "security": [
+          {
+            "oauth2": ["activityWrite"]
+          }
+        ],
+        "tags": ["Activities"]
+      }
+    },
+    "/api/oauth/v2/activity/file/{activityId}": {
+      "get": {
+        "operationId": "getActivityFile",
+        "summary": "Download activity file",
+        "description": "Downloads the original activity file in .fit or .tcx format.",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "description": "The activity ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity file binary data.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          },
+          "404": {
+            "description": "Activity not found."
+          }
+        },
+        "tags": ["Activities"]
+      }
+    },
+    "/api/oauth/v2/activity/upload": {
+      "post": {
+        "operationId": "uploadActivity",
+        "summary": "Upload an activity file",
+        "description": "Uploads a .fit or .tcx activity file. Optionally set name and notes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The activity file (.fit or .tcx)."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Optional name for the activity."
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "description": "Optional notes (max 1024 characters)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "activityId": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        },
+        "security": [
+          {
+            "oauth2": ["activityWrite"]
+          }
+        ],
+        "tags": ["Activities"]
+      }
+    },
+    "/api/oauth/v2/plannedTrainingList": {
+      "get": {
+        "operationId": "getPlannedTrainingList",
+        "summary": "List planned trainings",
+        "description": "Returns a list of planned trainings within the specified date range.",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "description": "Start date (YYYYMMDD format).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "description": "End date (YYYYMMDD format).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sportType",
+            "in": "query",
+            "required": false,
+            "description": "Filter by sport type.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of planned trainings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlannedTraining"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "tags": ["Planned Trainings"]
+      }
+    },
+    "/api/oauth/v2/plannedTraining/file/json/{trainingId}": {
+      "get": {
+        "operationId": "getPlannedTrainingJson",
+        "summary": "Download planned training as JSON",
+        "description": "Downloads a planned training in JSON format following the Garmin Training API specification.",
+        "parameters": [
+          {
+            "name": "trainingId",
+            "in": "path",
+            "required": true,
+            "description": "The planned training ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "description": "Language for step descriptions.",
+            "schema": {
+              "type": "string",
+              "enum": ["en", "de"]
+            }
+          },
+          {
+            "name": "extraValues",
+            "in": "query",
+            "required": false,
+            "description": "Include extra values (0 or 1).",
+            "schema": {
+              "type": "integer",
+              "enum": [0, 1]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Planned training in JSON format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          },
+          "404": {
+            "description": "Training not found."
+          }
+        },
+        "tags": ["Planned Trainings"]
+      }
+    },
+    "/api/oauth/v2/plannedTraining/file/fit/{trainingId}": {
+      "get": {
+        "operationId": "getPlannedTrainingFit",
+        "summary": "Download planned training as FIT file",
+        "description": "Downloads a planned training as a binary .fit file.",
+        "parameters": [
+          {
+            "name": "trainingId",
+            "in": "path",
+            "required": true,
+            "description": "The planned training ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "description": "Language for step descriptions.",
+            "schema": {
+              "type": "string",
+              "enum": ["en", "de"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Planned training as binary FIT file.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          },
+          "404": {
+            "description": "Training not found."
+          }
+        },
+        "tags": ["Planned Trainings"]
+      }
+    },
+    "/api/oauth/v2/efforts": {
+      "get": {
+        "operationId": "getEfforts",
+        "summary": "Get training efforts",
+        "description": "Returns training effort data for a date range, keyed by date in YYYYMMDD format.",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "description": "Start date (YYYYMMDD format).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "description": "End date (YYYYMMDD format).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Training efforts data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trainingEfforts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object"
+                      },
+                      "description": "Efforts keyed by date (YYYYMMDD)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "tags": ["Health & Metrics"]
+      }
+    },
+    "/api/oauth/v2/bodyvalues": {
+      "get": {
+        "operationId": "getBodyValues",
+        "summary": "Get health data",
+        "description": "Returns body/health measurement values for the user.",
+        "responses": {
+          "200": {
+            "description": "Array of body value records.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BodyValue"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "security": [
+          {
+            "oauth2": ["bodyvaluesRead"]
+          }
+        ],
+        "tags": ["Health & Metrics"]
+      },
+      "post": {
+        "operationId": "uploadBodyValues",
+        "summary": "Upload health data",
+        "description": "Uploads body/health measurement values.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/BodyValueInput"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Body values uploaded successfully."
+          },
+          "400": {
+            "description": "Invalid data."
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "security": [
+          {
+            "oauth2": ["bodyvaluesWrite"]
+          }
+        ],
+        "tags": ["Health & Metrics"]
+      }
+    },
+    "/api/oauth/v2/capacity": {
+      "get": {
+        "operationId": "getCapacity",
+        "summary": "Get capacity values",
+        "description": "Returns capacity/performance values (FTP, hrMax, etc.) grouped by sport type.",
+        "parameters": [
+          {
+            "name": "sportType",
+            "in": "query",
+            "required": false,
+            "description": "Filter by sport type.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Capacity data by sport.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "security": [
+          {
+            "oauth2": ["bodyvaluesRead"]
+          }
+        ],
+        "tags": ["Health & Metrics"]
+      }
+    },
+    "/api/oauth/v2/hrv": {
+      "get": {
+        "operationId": "getHrv",
+        "summary": "Get HRV data",
+        "description": "Returns heart rate variability data for a date range, keyed by date (YYYYMMDD).",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "description": "Start date (YYYYMMDD format).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "description": "End date (YYYYMMDD format).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "HRV data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hrv": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "description": "HRV values keyed by date (YYYYMMDD), each a tuple."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "security": [
+          {
+            "oauth2": ["bodyvaluesRead"]
+          }
+        ],
+        "tags": ["Health & Metrics"]
+      }
+    },
+    "/api/oauth/v2/sleep": {
+      "get": {
+        "operationId": "getSleep",
+        "summary": "Get sleep data",
+        "description": "Returns sleep data for a date range, keyed by date (YYYYMMDD). Values are in seconds.",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "description": "Start date (YYYYMMDD format).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "description": "End date (YYYYMMDD format).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sleep data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sleep": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "description": "Sleep values keyed by date (YYYYMMDD), in seconds."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "security": [
+          {
+            "oauth2": ["bodyvaluesRead"]
+          }
+        ],
+        "tags": ["Health & Metrics"]
+      }
+    },
+    "/api/oauth/v2/zones": {
+      "get": {
+        "operationId": "getZones",
+        "summary": "Get training zones",
+        "description": "Returns user-defined training zones grouped by sport and metric type.",
+        "parameters": [
+          {
+            "name": "sportType",
+            "in": "query",
+            "required": false,
+            "description": "Filter by sport type.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Training zones data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "security": [
+          {
+            "oauth2": ["bodyvaluesRead"]
+          }
+        ],
+        "tags": ["Health & Metrics"]
+      }
+    },
+    "/api/oauth/v2/plan": {
+      "post": {
+        "operationId": "createPlan",
+        "summary": "Create a training plan",
+        "description": "Creates a new training plan with optional planned trainings.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Plan name."
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Plan description."
+                  },
+                  "sportType": {
+                    "type": "string",
+                    "description": "Sport type for the plan."
+                  },
+                  "planTrainings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    },
+                    "description": "Array of planned training objects."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plan created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "planId": {
+                      "type": "string",
+                      "description": "The ID of the created plan."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "security": [
+          {
+            "oauth2": ["activityWrite"]
+          }
+        ],
+        "tags": ["Training Plans"]
+      }
+    },
+    "/api/oauth/v2/plan/training": {
+      "post": {
+        "operationId": "addTrainingToPlan",
+        "summary": "Add training to a plan",
+        "description": "Adds a planned training to an existing training plan.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["planId", "planTraining"],
+                "properties": {
+                  "planId": {
+                    "type": "string",
+                    "description": "The plan ID to add the training to."
+                  },
+                  "planTraining": {
+                    "type": "object",
+                    "description": "The planned training object to add."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Training added to plan successfully."
+          },
+          "401": {
+            "description": "Unauthorized."
+          }
+        },
+        "security": [
+          {
+            "oauth2": ["activityWrite"]
+          }
+        ],
+        "tags": ["Training Plans"]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "oauth2": {
+        "type": "oauth2",
+        "description": "OAuth2 authentication with PKCE support.",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://www.tredict.com/authorization/",
+            "tokenUrl": "https://www.tredict.com/user/oauth/v2/token",
+            "scopes": {
+              "activityRead": "Download activities and planned trainings.",
+              "activityWrite": "Upload activities, create and manage training plans.",
+              "bodyvaluesRead": "Download health data, capacity, HRV, sleep, and zones.",
+              "bodyvaluesWrite": "Upload health/body measurement data."
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "The JWT access token."
+          },
+          "expires_at": {
+            "type": "integer",
+            "description": "Token expiration timestamp."
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "The refresh token for obtaining new access tokens."
+          }
+        }
+      },
+      "ActivityList": {
+        "type": "object",
+        "properties": {
+          "activities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivitySummary"
+            }
+          },
+          "_links": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "type": "string",
+                "description": "URL for the next page of results."
+              },
+              "prev": {
+                "type": "string",
+                "description": "URL for the previous page of results."
+              }
+            }
+          }
+        }
+      },
+      "ActivitySummary": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "type": "string",
+            "description": "Unique activity identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "Activity title."
+          },
+          "sportType": {
+            "type": "string",
+            "description": "Sport type of the activity."
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Activity start time."
+          },
+          "duration": {
+            "type": "number",
+            "description": "Activity duration in seconds."
+          },
+          "distance": {
+            "type": "number",
+            "description": "Activity distance in meters."
+          }
+        }
+      },
+      "Activity": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "type": "string",
+            "description": "Unique activity identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "Activity title."
+          },
+          "sportType": {
+            "type": "string",
+            "description": "Sport type."
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Activity start time."
+          },
+          "summary": {
+            "type": "object",
+            "description": "Activity summary metrics."
+          },
+          "timeSeries": {
+            "type": "object",
+            "description": "Time-series data with metric values."
+          }
+        }
+      },
+      "PlannedTraining": {
+        "type": "object",
+        "properties": {
+          "trainingId": {
+            "type": "string",
+            "description": "Planned training ID."
+          },
+          "title": {
+            "type": "string",
+            "description": "Training title."
+          },
+          "sportType": {
+            "type": "string",
+            "description": "Sport type."
+          },
+          "date": {
+            "type": "string",
+            "description": "Planned date (YYYYMMDD)."
+          }
+        }
+      },
+      "BodyValue": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix timestamp of the measurement."
+          },
+          "timezoneOffsetInSeconds": {
+            "type": "integer",
+            "description": "Timezone offset in seconds."
+          },
+          "weight": {
+            "type": "number",
+            "description": "Weight in kg."
+          },
+          "bodyFat": {
+            "type": "number",
+            "description": "Body fat percentage."
+          },
+          "restingHeartRate": {
+            "type": "integer",
+            "description": "Resting heart rate in bpm."
+          }
+        }
+      },
+      "BodyValueInput": {
+        "type": "object",
+        "required": ["timestamp", "timezoneOffsetInSeconds"],
+        "properties": {
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix timestamp of the measurement."
+          },
+          "timezoneOffsetInSeconds": {
+            "type": "integer",
+            "description": "Timezone offset in seconds."
+          },
+          "weight": {
+            "type": "number",
+            "description": "Weight in kg."
+          },
+          "bodyFat": {
+            "type": "number",
+            "description": "Body fat percentage."
+          },
+          "restingHeartRate": {
+            "type": "integer",
+            "description": "Resting heart rate in bpm."
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "OAuth2",
+      "description": "Authentication and token management endpoints."
+    },
+    {
+      "name": "Activities",
+      "description": "Activity data management - list, download, upload, and update activities."
+    },
+    {
+      "name": "Planned Trainings",
+      "description": "Planned training management and download."
+    },
+    {
+      "name": "Health & Metrics",
+      "description": "Health data, body values, HRV, sleep, capacity, training efforts, and zones."
+    },
+    {
+      "name": "Training Plans",
+      "description": "Training plan creation and management."
+    }
+  ]
+}

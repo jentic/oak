@@ -1,0 +1,665 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Expensify Integration Server API",
+    "version": "1.0.0",
+    "description": "The Expensify Integration Server API enables programmatic export of expense report data, card reconciliation, employee provisioning (advanced employee updater), and report downloading. All requests are form-encoded POSTs to a single endpoint. Rate limits: 5 requests per 10 seconds, 20 per 60 seconds.",
+    "x-jentic-source-url": "https://integrations.expensify.com/Integration-Server/doc/"
+  },
+  "servers": [
+    {
+      "url": "https://integrations.expensify.com",
+      "description": "Expensify Integration Server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Export",
+      "description": "Export expense report data"
+    },
+    {
+      "name": "Reconciliation",
+      "description": "Export card transaction reconciliation data"
+    },
+    {
+      "name": "Employee Updater",
+      "description": "Provision and update employees"
+    },
+    {
+      "name": "Download",
+      "description": "Download generated files"
+    }
+  ],
+  "paths": {
+    "/Integration-Server/ExpensifyIntegrations": {
+      "post": {
+        "operationId": "executeJob",
+        "summary": "Execute an Expensify integration job",
+        "description": "All Expensify API calls go through this single endpoint. The type of job is determined by the requestJobDescription JSON payload. Types include: file (report export), reconciliation, update (employee updater), download.",
+        "tags": [
+          "Export",
+          "Reconciliation",
+          "Employee Updater",
+          "Download"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "requestJobDescription"
+                ],
+                "properties": {
+                  "requestJobDescription": {
+                    "type": "string",
+                    "description": "JSON string containing the job description. Must include type, credentials (partnerUserID, partnerUserSecret), and job-specific inputSettings."
+                  },
+                  "template": {
+                    "type": "string",
+                    "description": "Freemarker template for formatting export output. Used with type=file and type=reconciliation."
+                  },
+                  "data": {
+                    "type": "string",
+                    "description": "JSON data payload. Used with type=update and dataSource=request for employee data."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response. Format varies by job type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ExportResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ReconciliationResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/EmployeeUpdateResponse"
+                    }
+                  ]
+                }
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "File download content for type=download"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Invalid input data (e.g. missing employee data)"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "integer"
+          },
+          "responseMessage": {
+            "type": "string"
+          }
+        }
+      },
+      "ExportJobDescription": {
+        "type": "object",
+        "required": [
+          "type",
+          "credentials",
+          "onReceive",
+          "inputSettings"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "file"
+            ]
+          },
+          "credentials": {
+            "$ref": "#/components/schemas/Credentials"
+          },
+          "onReceive": {
+            "type": "object",
+            "properties": {
+              "immediateResponse": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "returnRandomFileName"
+                  ]
+                }
+              }
+            }
+          },
+          "inputSettings": {
+            "$ref": "#/components/schemas/ExportInputSettings"
+          },
+          "outputSettings": {
+            "$ref": "#/components/schemas/OutputSettings"
+          },
+          "test": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "description": "If true, onFinish actions not executed"
+          },
+          "onFinish": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnFinishAction"
+            }
+          }
+        }
+      },
+      "Credentials": {
+        "type": "object",
+        "required": [
+          "partnerUserID",
+          "partnerUserSecret"
+        ],
+        "properties": {
+          "partnerUserID": {
+            "type": "string"
+          },
+          "partnerUserSecret": {
+            "type": "string"
+          },
+          "feedUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL for downloading employee data (type=update, dataSource=download)"
+          },
+          "feedUser": {
+            "type": "string"
+          },
+          "feedPassword": {
+            "type": "string"
+          },
+          "sftp": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "login": {
+                "type": "string"
+              },
+              "password": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              },
+              "filename": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ExportInputSettings": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "combinedReportData"
+            ]
+          },
+          "reportState": {
+            "type": "string",
+            "description": "Comma-separated: OPEN,SUBMITTED,APPROVED,REIMBURSED,ARCHIVED"
+          },
+          "limit": {
+            "type": "string",
+            "description": "Max number of reports"
+          },
+          "employeeEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "reportIDList": {
+                "type": "string"
+              },
+              "policyIDList": {
+                "type": "string"
+              },
+              "startDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "endDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "approvedAfter": {
+                "type": "string",
+                "format": "date"
+              },
+              "markedAsExported": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ReconciliationJobDescription": {
+        "type": "object",
+        "required": [
+          "type",
+          "credentials",
+          "inputSettings"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "reconciliation"
+            ]
+          },
+          "credentials": {
+            "$ref": "#/components/schemas/Credentials"
+          },
+          "inputSettings": {
+            "type": "object",
+            "required": [
+              "startDate",
+              "endDate",
+              "domain",
+              "type",
+              "async"
+            ],
+            "properties": {
+              "startDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "endDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "domain": {
+                "type": "string"
+              },
+              "feed": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Unreported",
+                  "All"
+                ]
+              },
+              "async": {
+                "type": "boolean"
+              }
+            }
+          },
+          "outputSettings": {
+            "$ref": "#/components/schemas/OutputSettings"
+          },
+          "onFinish": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnFinishAction"
+            }
+          }
+        }
+      },
+      "EmployeeUpdateJobDescription": {
+        "type": "object",
+        "required": [
+          "type",
+          "credentials",
+          "dataSource",
+          "inputSettings"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "update"
+            ]
+          },
+          "credentials": {
+            "$ref": "#/components/schemas/Credentials"
+          },
+          "dataSource": {
+            "type": "string",
+            "enum": [
+              "download",
+              "request",
+              "sftp"
+            ]
+          },
+          "inputSettings": {
+            "type": "object",
+            "required": [
+              "type",
+              "entity"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "employees"
+                ]
+              },
+              "entity": {
+                "type": "string",
+                "enum": [
+                  "generic"
+                ]
+              }
+            }
+          },
+          "dry-run": {
+            "type": "boolean",
+            "default": false
+          },
+          "onFinish": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnFinishAction"
+            }
+          },
+          "setEmployeePrimaryPolicy": {
+            "type": "string",
+            "enum": [
+              "none",
+              "new_employees",
+              "all_employees"
+            ],
+            "default": "none"
+          },
+          "shouldFixApprovalChains": {
+            "type": "boolean",
+            "default": true
+          },
+          "shouldSkipNotificationEmail": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "OutputSettings": {
+        "type": "object",
+        "properties": {
+          "fileExtension": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "xls",
+              "xlsx",
+              "txt",
+              "pdf",
+              "json",
+              "xml"
+            ]
+          },
+          "fileBasename": {
+            "type": "string"
+          },
+          "includeFullPageReceiptsPdf": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OnFinishAction": {
+        "type": "object",
+        "properties": {
+          "actionName": {
+            "type": "string",
+            "enum": [
+              "email",
+              "markAsExported",
+              "sftpUpload"
+            ]
+          },
+          "recipients": {
+            "type": "string",
+            "description": "Comma-separated emails (for email action)"
+          },
+          "message": {
+            "type": "string",
+            "description": "Email body (for email action)"
+          },
+          "label": {
+            "type": "string",
+            "description": "Export label (for markAsExported)"
+          },
+          "sftpData": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              },
+              "login": {
+                "type": "string"
+              },
+              "password": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "ExportResponse": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "integer"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "responseMessage": {
+            "type": "string"
+          }
+        }
+      },
+      "ReconciliationResponse": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "integer"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "responseMessage": {
+            "type": "string"
+          }
+        }
+      },
+      "EmployeeUpdateResponse": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "integer"
+          },
+          "dry-run": {
+            "type": "boolean"
+          },
+          "updatedEmployeesCount": {
+            "type": "integer"
+          },
+          "diff": {
+            "type": "object",
+            "properties": {
+              "diffToAdd": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "diffToRemove": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "securityGroupEmployeesMap": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "skippedEmployees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "EmployeeData": {
+        "type": "object",
+        "required": [
+          "employeeEmail",
+          "managerEmail",
+          "employeeID",
+          "policyID"
+        ],
+        "properties": {
+          "employeeEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "managerEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "employeeID": {
+            "type": "string"
+          },
+          "policyID": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "customField1": {
+            "type": "string"
+          },
+          "customField2": {
+            "type": "string"
+          },
+          "approvalLimit": {
+            "type": "integer"
+          },
+          "overLimitApprover": {
+            "type": "string",
+            "format": "email"
+          },
+          "isTerminated": {
+            "type": "boolean"
+          },
+          "workerStatus": {
+            "type": "string"
+          },
+          "additionalPolicyIDs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "domainGroupID": {
+            "type": "string"
+          },
+          "approvesTo": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "auditor",
+              "admin"
+            ]
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "partnerCredentials": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "partnerUserID",
+        "description": "Expensify uses partnerUserID and partnerUserSecret in the request body (requestJobDescription JSON). Credentials are embedded in the form POST payload."
+      }
+    }
+  }
+}

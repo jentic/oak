@@ -1,0 +1,1526 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FavQs API",
+    "description": "FavQs.com API provides access to a curated collection of quotes. Supports browsing, searching, favoriting, voting, and managing quotes with user accounts. Rate limited to 30 requests per 20-second interval.",
+    "version": "2.0.0",
+    "contact": {
+      "name": "FavQs",
+      "url": "https://favqs.com/api"
+    },
+    "x-jentic-source-url": "https://favqs.com/api"
+  },
+  "servers": [
+    {
+      "url": "https://favqs.com/api",
+      "description": "FavQs API v2 production server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "quotes",
+      "description": "Quote browsing, searching, and management"
+    },
+    {
+      "name": "users",
+      "description": "User registration and profile management"
+    },
+    {
+      "name": "sessions",
+      "description": "User session management"
+    },
+    {
+      "name": "activities",
+      "description": "Follow/unfollow and activity feeds"
+    },
+    {
+      "name": "typeahead",
+      "description": "Autocomplete suggestions"
+    }
+  ],
+  "paths": {
+    "/qotd": {
+      "get": {
+        "operationId": "getQuoteOfTheDay",
+        "summary": "Get Quote of the Day",
+        "description": "Returns the current Quote of the Day. No authentication required.",
+        "tags": ["quotes"],
+        "responses": {
+          "200": {
+            "description": "Quote of the Day",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteOfTheDay"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/quotes": {
+      "get": {
+        "operationId": "listQuotes",
+        "summary": "List quotes",
+        "description": "Retrieve a paginated list of quotes with optional filtering by keyword, tag, author, or other criteria.",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "description": "Search keyword to filter quotes",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filter type: tag, author, or user",
+            "schema": {
+              "type": "string",
+              "enum": ["tag", "author", "user"]
+            }
+          },
+          {
+            "name": "hidden",
+            "in": "query",
+            "description": "Include hidden quotes (requires user session)",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of quotes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteList"
+                }
+              }
+            },
+            "headers": {
+              "Rate-Limit-Remaining": {
+                "description": "Number of requests remaining in current window",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createQuote",
+        "summary": "Add a new quote",
+        "description": "Add a new quote. Requires user session token.",
+        "tags": ["quotes"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quote created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/quotes/{quote_id}": {
+      "get": {
+        "operationId": "getQuote",
+        "summary": "Get a specific quote",
+        "description": "Retrieve a single quote by its ID.",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateQuote",
+        "summary": "Update a quote",
+        "description": "Update a quote. Requires pro user session.",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quote updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteQuote",
+        "summary": "Delete a quote",
+        "description": "Delete a quote. Requires pro user session.",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/quotes/{quote_id}/fav": {
+      "put": {
+        "operationId": "favoriteQuote",
+        "summary": "Favorite a quote",
+        "description": "Mark a quote as a favorite.",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote favorited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/quotes/{quote_id}/unfav": {
+      "put": {
+        "operationId": "unfavoriteQuote",
+        "summary": "Unfavorite a quote",
+        "description": "Remove a quote from favorites.",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote unfavorited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/quotes/{quote_id}/upvote": {
+      "put": {
+        "operationId": "upvoteQuote",
+        "summary": "Upvote a quote",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote upvoted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/quotes/{quote_id}/downvote": {
+      "put": {
+        "operationId": "downvoteQuote",
+        "summary": "Downvote a quote",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote downvoted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/quotes/{quote_id}/clearvote": {
+      "put": {
+        "operationId": "clearVoteQuote",
+        "summary": "Clear vote on a quote",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vote cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/quotes/{quote_id}/tag": {
+      "put": {
+        "operationId": "tagQuote",
+        "summary": "Add personal tags to a quote",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "quote": {
+                    "type": "object",
+                    "properties": {
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tags added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/quotes/{quote_id}/hide": {
+      "put": {
+        "operationId": "hideQuote",
+        "summary": "Hide a quote",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote hidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/quotes/{quote_id}/unhide": {
+      "put": {
+        "operationId": "unhideQuote",
+        "summary": "Unhide a quote",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote unhidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/quotes/{quote_id}/publicize": {
+      "put": {
+        "operationId": "publicizeQuote",
+        "summary": "Make a quote public",
+        "description": "Make a private quote public. Requires pro user session.",
+        "tags": ["quotes"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/QuoteId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote made public",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/session": {
+      "post": {
+        "operationId": "createSession",
+        "summary": "Create a user session",
+        "description": "Authenticate a user and obtain a session token.",
+        "tags": ["sessions"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "destroySession",
+        "summary": "Destroy a user session",
+        "description": "Logout and invalidate the user session token.",
+        "tags": ["sessions"],
+        "responses": {
+          "200": {
+            "description": "Session destroyed"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/users": {
+      "post": {
+        "operationId": "createUser",
+        "summary": "Create a new user",
+        "description": "Register a new user account.",
+        "tags": ["users"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      }
+    },
+    "/users/{login}": {
+      "get": {
+        "operationId": "getUser",
+        "summary": "Get user profile",
+        "description": "Retrieve a user's profile by their login name.",
+        "tags": ["users"],
+        "parameters": [
+          {
+            "name": "login",
+            "in": "path",
+            "required": true,
+            "description": "User login name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateUser",
+        "summary": "Update user profile",
+        "description": "Update user details. Requires user session.",
+        "tags": ["users"],
+        "parameters": [
+          {
+            "name": "login",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/users/forgot_password": {
+      "post": {
+        "operationId": "forgotPassword",
+        "summary": "Request password reset",
+        "description": "Send a password reset email to the user.",
+        "tags": ["users"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user"],
+                "properties": {
+                  "user": {
+                    "type": "object",
+                    "required": ["email"],
+                    "properties": {
+                      "email": {
+                        "type": "string",
+                        "format": "email"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset email sent"
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      }
+    },
+    "/users/reset_password": {
+      "post": {
+        "operationId": "resetPassword",
+        "summary": "Reset password",
+        "description": "Complete the password reset process with a token from the reset email.",
+        "tags": ["users"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user"],
+                "properties": {
+                  "user": {
+                    "type": "object",
+                    "required": ["email", "reset_password_token", "password", "password_confirmation"],
+                    "properties": {
+                      "email": {
+                        "type": "string",
+                        "format": "email"
+                      },
+                      "reset_password_token": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      },
+                      "password_confirmation": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset successful"
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      }
+    },
+    "/activities/": {
+      "get": {
+        "operationId": "listActivities",
+        "summary": "Get activities",
+        "description": "Retrieve activity feed for a user, tag, or author.",
+        "tags": ["activities"],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Activity type filter",
+            "schema": {
+              "type": "string",
+              "enum": ["user", "tag", "author"]
+            }
+          },
+          {
+            "name": "login",
+            "in": "query",
+            "description": "User login for user-type activities",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "activities": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Activity"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "last_page": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      }
+    },
+    "/activities/{activity_id}": {
+      "delete": {
+        "operationId": "deleteActivity",
+        "summary": "Delete an activity",
+        "tags": ["activities"],
+        "parameters": [
+          {
+            "name": "activity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Activity deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/activities/follow/": {
+      "put": {
+        "operationId": "follow",
+        "summary": "Follow a user, tag, or author",
+        "tags": ["activities"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["user", "tag", "author"]
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "Login/tag name/author name to follow"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Followed successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/activities/unfollow/": {
+      "put": {
+        "operationId": "unfollow",
+        "summary": "Unfollow a user, tag, or author",
+        "tags": ["activities"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["user", "tag", "author"]
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unfollowed successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "appToken": [],
+            "userToken": []
+          }
+        ]
+      }
+    },
+    "/activities/followers/": {
+      "get": {
+        "operationId": "listFollowers",
+        "summary": "Get followers",
+        "tags": ["activities"],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["user", "tag", "author"]
+            }
+          },
+          {
+            "name": "login",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of followers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "login": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      }
+    },
+    "/activities/following/": {
+      "get": {
+        "operationId": "listFollowing",
+        "summary": "Get following list",
+        "tags": ["activities"],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["user", "tag", "author"]
+            }
+          },
+          {
+            "name": "login",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of followed entities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "login": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      }
+    },
+    "/typeahead": {
+      "get": {
+        "operationId": "typeahead",
+        "summary": "Get autocomplete suggestions",
+        "description": "Returns autocomplete suggestions for authors, tags, or users.",
+        "tags": ["typeahead"],
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "required": true,
+            "description": "Search text for suggestions",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Type of suggestions to return",
+            "schema": {
+              "type": "string",
+              "enum": ["author", "tag", "user"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Typeahead suggestions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appToken": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "QuoteId": {
+        "name": "quote_id",
+        "in": "path",
+        "required": true,
+        "description": "Unique quote identifier",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    },
+    "securitySchemes": {
+      "appToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Application token. Format: 'Token token=\"YOUR_APP_TOKEN\"'. Required for most endpoints."
+      },
+      "userToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "User-Token",
+        "description": "User session token obtained from POST /api/session. Required for write operations."
+      }
+    },
+    "schemas": {
+      "Quote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "dialogue": {
+            "type": "boolean"
+          },
+          "private": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "favorites_count": {
+            "type": "integer"
+          },
+          "upvotes_count": {
+            "type": "integer"
+          },
+          "downvotes_count": {
+            "type": "integer"
+          },
+          "author": {
+            "type": "string"
+          },
+          "author_permalink": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "description": "The quote text"
+          },
+          "user_details": {
+            "type": "object",
+            "properties": {
+              "favorite": {
+                "type": "boolean"
+              },
+              "upvote": {
+                "type": "boolean"
+              },
+              "downvote": {
+                "type": "boolean"
+              },
+              "hidden": {
+                "type": "boolean"
+              }
+            }
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "QuoteOfTheDay": {
+        "type": "object",
+        "properties": {
+          "qotd_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "quote": {
+            "$ref": "#/components/schemas/Quote"
+          }
+        }
+      },
+      "QuoteList": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "last_page": {
+            "type": "boolean"
+          },
+          "quotes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Quote"
+            }
+          }
+        }
+      },
+      "QuoteCreate": {
+        "type": "object",
+        "required": ["quote"],
+        "properties": {
+          "quote": {
+            "type": "object",
+            "required": ["author", "body"],
+            "properties": {
+              "author": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "User-Token": {
+            "type": "string",
+            "description": "Session token to use in User-Token header"
+          },
+          "login": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "SessionCreate": {
+        "type": "object",
+        "required": ["user"],
+        "properties": {
+          "user": {
+            "type": "object",
+            "required": ["login", "password"],
+            "properties": {
+              "login": {
+                "type": "string"
+              },
+              "password": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string"
+          },
+          "pic_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "public_favorites_count": {
+            "type": "integer"
+          },
+          "followers": {
+            "type": "integer"
+          },
+          "following": {
+            "type": "integer"
+          },
+          "pro": {
+            "type": "boolean"
+          },
+          "account_details": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email"
+              }
+            }
+          }
+        }
+      },
+      "UserCreate": {
+        "type": "object",
+        "required": ["user"],
+        "properties": {
+          "user": {
+            "type": "object",
+            "required": ["login", "email", "password"],
+            "properties": {
+              "login": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "password": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "UserUpdate": {
+        "type": "object",
+        "required": ["user"],
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "login": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "password": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Activity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error_code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication required or invalid token",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,446 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Buy-now, Pay-later  Eligibility API",
+    "description": "This OpenAPI description provides an example of endpoints controlling eligibility of products and customers for a buy-now, pay-later (BNPL) API. The multiple operations allow eCommerce platforms to facilitate eligibility checks on behalf of customers for various products.\n",
+    "version": "1.0.0",
+    "termsOfService": "http://swagger.io/terms/",
+    "contact": {
+      "email": "frank.kilcommins@smartbear.com"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/frank-kilcommins/BNPL-Eligibility-and-Auth/1.0.0/swagger.json"
+  },
+  "servers": [
+    {
+      "description": "SwaggerHub API Auto Mocking",
+      "url": "https://virtserver.swaggerhub.com/frank-kilcommins/BNPL-Eligibility-and-Auth/1.0.0"
+    },
+    {
+      "url": "/bnpl/v1",
+      "description": "Default BNPL instance"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Eligibility",
+      "description": "Allows a customer or product to be checked for eligibility"
+    },
+    {
+      "name": "Auth",
+      "description": "Simple authentication for example purposes"
+    },
+    {
+      "name": "Legal",
+      "description": "Legal requirements relating to Buy Now Pay Later products"
+    }
+  ],
+  "paths": {
+    "/auth": {
+      "get": {
+        "summary": "Get customer authorisation",
+        "description": "Used to initiate authentication of the End User and authorisation by the customer.\n\nMimics an OAuth 2.0 style redirect, but cutdown for the purpose of an example.\n",
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "getAuthorization",
+        "parameters": [
+          {
+            "name": "authorizationToken",
+            "in": "query",
+            "description": "Authorization token value elicited from loan initiation endpoint",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AuthorizationToken"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Instruction to redirect End User, based on validation of the authorisation token",
+            "headers": {
+              "Location": {
+                "description": "URL to which the customer is redirected",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/customers": {
+      "post": {
+        "summary": "Create a customer",
+        "description": "Create a customer for a BNPL loan if they are eligible for the loan in question.\n\nIf a customer is eligible a customer resource is created, a 201 returned, and the a link to the customer resource returned.\n\nIf the customer is not eligible a 200 is returned and a reason code indicating why the customer was rejected.\n",
+        "tags": [
+          "Eligibility"
+        ],
+        "operationId": "createCustomer",
+        "requestBody": {
+          "description": "The customer properties",
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/CustomerProperties"
+                  },
+                  {
+                    "description": "Terms and conditions have been reviewed and accepted",
+                    "type": "object",
+                    "required": [
+                      "termsAndConditionsAccepted"
+                    ],
+                    "properties": {
+                      "termsAndConditionsAccepted": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Customer is not eligible for BNPL loan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "reasonCode"
+                  ],
+                  "properties": {
+                    "reasonCode": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Customer resource has been created and can be linked to loan transaction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "customerId",
+                    "links"
+                  ],
+                  "properties": {
+                    "customerId": {
+                      "description": "Unique identifier for the newly created customer resource",
+                      "type": "string"
+                    },
+                    "links": {
+                      "type": "object",
+                      "required": [
+                        "self"
+                      ],
+                      "properties": {
+                        "self": {
+                          "description": "URL identifying this resource",
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/CustomerUri"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/products": {
+      "post": {
+        "summary": "Retrieve eligible products",
+        "description": "Retrieve the list of products that are eligible for a buy-now, pay-later loan.\n\nImplemented as a not particularly RESTful, RPC-style post operation for simplicity\n",
+        "tags": [
+          "Eligibility"
+        ],
+        "operationId": "findEligibleProducts",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "products"
+                ],
+                "properties": {
+                  "customer": {
+                    "description": "If the customer is already enrolled on the BNPL platform the customer URI can be supplied, which can be used to perform an upfront eligibility check",
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/CustomerUri"
+                      }
+                    ]
+                  },
+                  "products": {
+                    "$ref": "#/components/schemas/Products"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "List of eligible products with information for subsequent steps\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "productCodes"
+                  ],
+                  "properties": {
+                    "existingCustomerNotEligible": {
+                      "description": "Flag to indicate existing customer found and is eligible. Associated workflows will stop if this flag is returned",
+                      "type": "boolean"
+                    },
+                    "productCodes": {
+                      "description": "This list of product codes that are eligible for a BNPL loan. Allows merchant to render screen showing matching products. Array will be empty if customer not eligible",
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProductCode"
+                      }
+                    },
+                    "eligibilityCheckRequired": {
+                      "description": "Indicates whether the customer needs to be checked for eligibility. Required for new customers",
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "totalAmount": {
+                      "description": "The total loan value for the products that are eligible",
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/CurrencyAndAmount"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/terms-and-conditions": {
+      "get": {
+        "summary": "Retrieve the terms and conditions for BNPL products",
+        "description": "Retrieve the terms and conditions for BNPL products.\nFor the sake of this example:\n* There is one set of customer T&Cs.\n* There is one error response, defined using the `default` keyword.\n",
+        "tags": [
+          "Legal"
+        ],
+        "operationId": "getTermsAndConditions",
+        "responses": {
+          "200": {
+            "description": "The terms and conditions document as an array of `string` values",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "loanTransactionId": {
+        "name": "loanTransactionId",
+        "description": "Unique identifier for a given loan agreement",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/LoanTransactionId"
+        }
+      }
+    },
+    "responses": {
+      "ErrorResponse": {
+        "description": "The error response details, encoded in the ProblemDetails format (RFC9457)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "AuthorizationToken": {
+        "description": "An authorisation token used to tee up a customer for authentication and authorisation of the loan as required",
+        "type": "string",
+        "format": "uuid"
+      },
+      "CustomerProperties": {
+        "type": "object",
+        "required": [
+          "firstName",
+          "lastName",
+          "dateOfBirth",
+          "postalCode"
+        ],
+        "properties": {
+          "firstName": {
+            "description": "First name of customer",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 70
+          },
+          "lastName": {
+            "description": "Last name of customer",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 70
+          },
+          "dateOfBirth": {
+            "description": "Customer date of birth",
+            "type": "string",
+            "format": "date-time"
+          },
+          "postalCode": {
+            "description": "Zip code or postal code of customer",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 70
+          }
+        },
+        "additionalProperties": false
+      },
+      "CustomerUri": {
+        "description": "The URI that identifies the customer resource for the loan transaction",
+        "type": "string",
+        "format": "uri"
+      },
+      "LoanTransactionId": {
+        "description": "Type for unique loan identifier",
+        "type": "string"
+      },
+      "ProductCode": {
+        "description": "Product code for loan application. Required for eligibility check",
+        "type": "string"
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "description": "The problem type, expressed as a URI",
+            "type": "string"
+          },
+          "status": {
+            "description": "The HTTP return code generated by the server",
+            "type": "string",
+            "pattern": "^[1-5][0-9]{2}$"
+          },
+          "title": {
+            "description": "The title of the problem, designed to be consumed by humans",
+            "type": "string"
+          },
+          "detail": {
+            "description": "A verbose error message, designed to be consumed by humans",
+            "type": "string"
+          },
+          "instance": {
+            "description": "A URI that identifies a specific occurrence of the problem",
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "CurrencyAndAmount": {
+        "description": "Amount and currency code",
+        "type": "object",
+        "required": [
+          "currency",
+          "amount"
+        ],
+        "properties": {
+          "currency": {
+            "description": "Currency code",
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "amount": {
+            "description": "Amount",
+            "type": "number"
+          }
+        }
+      },
+      "Products": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": [
+            "productCode",
+            "netAmount"
+          ],
+          "properties": {
+            "merchantCategoryCode": {
+              "description": "Merchant category code of merchant. Only required for marketplace eCommerce platforms",
+              "type": "string",
+              "pattern": "^[0-9]{4}$"
+            },
+            "productCode": {
+              "$ref": "#/components/schemas/ProductCode"
+            },
+            "purchaseAmount": {
+              "description": "Product purchase amount and currency code",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/CurrencyAndAmount"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

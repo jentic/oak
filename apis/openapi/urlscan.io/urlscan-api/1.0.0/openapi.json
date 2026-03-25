@@ -1,0 +1,591 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "URLScan.io API",
+    "description": "URLScan.io provides a service to scan and analyze websites. Submit URLs for scanning, retrieve results including screenshots and DOM snapshots, and search through previously scanned sites.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "URLScan.io",
+      "url": "https://urlscan.io"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://urlscan.io/api/v1",
+      "description": "Production Server"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/scan/": {
+      "post": {
+        "operationId": "submitScan",
+        "summary": "Submit a URL for scanning",
+        "description": "Submit a URL to be scanned. The scan will be performed asynchronously and results can be retrieved using the result endpoint.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanSubmissionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "headers": {
+              "X-Rate-Limit-Remaining": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Number of requests remaining in the current window"
+              },
+              "X-Rate-Limit-Reset": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Timestamp when the rate limit resets"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/result/{uuid}/": {
+      "get": {
+        "operationId": "getResult",
+        "summary": "Get scan result",
+        "description": "Retrieve the result of a previously submitted scan. Returns 404 while the scan is still processing, and 410 if the scan has been deleted.",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID of the scan"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scan result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scan still processing or not found"
+          },
+          "410": {
+            "description": "Scan has been deleted"
+          }
+        }
+      }
+    },
+    "/search/": {
+      "get": {
+        "operationId": "searchScans",
+        "summary": "Search scans",
+        "description": "Search through previously scanned sites using ElasticSearch Query String syntax.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query using ElasticSearch Query String syntax"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "maximum": 10000
+            },
+            "description": "Number of results per page"
+          },
+          {
+            "name": "search_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Pagination token from previous search response"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/dom/{uuid}/": {
+      "get": {
+        "operationId": "getDom",
+        "summary": "Get DOM snapshot",
+        "description": "Retrieve the DOM snapshot of a previously scanned page.",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID of the scan"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DOM content",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scan not found or still processing"
+          }
+        }
+      }
+    },
+    "/screenshots/{uuid}.png": {
+      "get": {
+        "operationId": "getScreenshot",
+        "summary": "Get scan screenshot",
+        "description": "Retrieve the screenshot of a previously scanned page.",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "UUID of the scan"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Screenshot image",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Screenshot not found"
+          }
+        }
+      }
+    },
+    "/user/quotas/": {
+      "get": {
+        "operationId": "getUserQuotas",
+        "summary": "Get user quotas",
+        "description": "Retrieve current API usage quotas for the authenticated user.",
+        "responses": {
+          "200": {
+            "description": "User quota information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserQuotas"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/availableCountries/": {
+      "get": {
+        "operationId": "getAvailableCountries",
+        "summary": "Get available scan countries",
+        "description": "Retrieve list of available countries for scanning.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "List of available countries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "description": "ISO 3166-1 alpha-2 country code"
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Country name"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "API-Key",
+        "description": "API key for authentication. Create an account at urlscan.io to obtain one."
+      }
+    },
+    "schemas": {
+      "ScanRequest": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The URL to scan"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ],
+            "description": "Visibility of the scan result"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "description": "User-defined tags for the scan"
+          },
+          "customagent": {
+            "type": "string",
+            "description": "Override the User-Agent for the scan"
+          },
+          "referer": {
+            "type": "string",
+            "description": "Override the HTTP referer for the scan"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "2-letter ISO country code for scan location"
+          },
+          "overrideSafety": {
+            "type": "boolean",
+            "description": "Disable PII reclassification"
+          }
+        }
+      },
+      "ScanSubmissionResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "result": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to retrieve the scan result"
+          },
+          "api": {
+            "type": "string",
+            "format": "uri",
+            "description": "API URL to retrieve the scan result"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "useragent": {
+                "type": "string"
+              }
+            }
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "country": {
+            "type": "string"
+          }
+        }
+      },
+      "ScanResult": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Detailed scan data including requests, responses, cookies, and console messages"
+          },
+          "lists": {
+            "type": "object",
+            "description": "Aggregated lists of IPs, domains, URLs, etc."
+          },
+          "meta": {
+            "type": "object",
+            "description": "Metadata about the scan including processors used"
+          },
+          "page": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "domain": {
+                "type": "string"
+              },
+              "ip": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "server": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "status": {
+                "type": "integer"
+              }
+            }
+          },
+          "stats": {
+            "type": "object",
+            "description": "Statistics about the scan including resource counts and sizes"
+          },
+          "task": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "time": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "visibility": {
+                "type": "string"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "verdicts": {
+            "type": "object",
+            "description": "Verdicts from various engines about the scanned URL"
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "object",
+                  "properties": {
+                    "uuid": {
+                      "type": "string"
+                    },
+                    "time": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "visibility": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "page": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "domain": {
+                      "type": "string"
+                    },
+                    "ip": {
+                      "type": "string"
+                    },
+                    "server": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "stats": {
+                  "type": "object"
+                },
+                "sort": {
+                  "type": "array",
+                  "items": {}
+                }
+              }
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of matching results"
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UserQuotas": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "object",
+            "properties": {
+              "day": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer"
+                  },
+                  "used": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "submit": {
+            "type": "object",
+            "properties": {
+              "day": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer"
+                  },
+                  "used": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "retrieve": {
+            "type": "object",
+            "properties": {
+              "day": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer"
+                  },
+                  "used": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

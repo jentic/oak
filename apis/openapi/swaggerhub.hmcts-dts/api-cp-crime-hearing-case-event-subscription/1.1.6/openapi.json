@@ -1,0 +1,986 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Client Subscriptions API",
+    "description": "API for managing client subscriptions as standalone resources.",
+    "version": "1.1.6",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "contact": {
+      "name": "HMCTS API Marketplace",
+      "email": "no-reply@hmcts.com"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/HMCTS-DTS/api-cp-crime-hearing-case-event-subscription/1.1.6/swagger.json"
+  },
+  "servers": [
+    {
+      "url": "https://virtserver.swaggerhub.com/HMCTS-DTS/api-cp-crime-hearing-case-event-subscription/1.1.6"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Subscription"
+    },
+    {
+      "name": "Notification"
+    },
+    {
+      "name": "Internal"
+    }
+  ],
+  "paths": {
+    "/event-types": {
+      "get": {
+        "summary": "Get list of valid event types for subscription service",
+        "description": "Returns list of valid event types for subscription service",
+        "operationId": "GetEventTypes",
+        "tags": [
+          "Subscription"
+        ],
+        "responses": {
+          "200": {
+            "description": "Event types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventTypeResponse"
+                },
+                "examples": {
+                  "Event-Types Example": {
+                    "$ref": "#/components/examples/EventTypesResponse"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client-subscriptions": {
+      "post": {
+        "summary": "Create a new client subscription",
+        "description": "Creates a new client subscription with the specified callback URL. Events will be sent to the provided callback URL via callback.",
+        "operationId": "createClientSubscription",
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientSubscriptionRequest"
+              },
+              "examples": {
+                "createSubscription": {
+                  "$ref": "#/components/examples/createSubscriptionRequest"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subscription created successfully",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "createSubscription": {
+                    "$ref": "#/components/examples/createSubscriptionResponse"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ClientSubscription"
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "createSubscriptionError": {
+                    "$ref": "#/components/examples/createSubscriptionError"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          }
+        },
+        "callbacks": {
+          "onEvent": {
+            "{$request.body#/notificationEndpoint/callbackUrl}": {
+              "post": {
+                "description": "Event notification sent to the subscribed callback URL",
+                "parameters": [
+                  {
+                    "$ref": "#/components/parameters/XCorrelationId"
+                  },
+                  {
+                    "name": "X-Key-Id",
+                    "in": "header",
+                    "required": true,
+                    "description": "Identifier of the key used to sign this callback. Matches the keyId issued when the subscription was created.",
+                    "schema": {
+                      "type": "string",
+                      "example": "keyId_b41a48b7-a2a1-45f1-b562-1358f141ddb2"
+                    }
+                  },
+                  {
+                    "name": "X-Signature",
+                    "in": "header",
+                    "required": true,
+                    "description": "HMAC-SHA256 signature of the callback request using the subscription's shared secret. The secret is returned once at subscription creation.",
+                    "schema": {
+                      "type": "string",
+                      "example": "base64-encoded-signature"
+                    }
+                  }
+                ],
+                "requestBody": {
+                  "description": "Event payload containing defendant and case information",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/EventNotificationPayload"
+                      }
+                    }
+                  }
+                },
+                "responses": {
+                  "202": {
+                    "description": "Your server implementation should return this HTTP status code\nif the event was received successfully\n",
+                    "headers": {
+                      "X-Correlation-Id": {
+                        "$ref": "#/components/headers/XCorrelationId"
+                      }
+                    }
+                  },
+                  "400": {
+                    "description": "Bad request - the event payload was invalid"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client-subscriptions/{clientSubscriptionId}": {
+      "get": {
+        "summary": "Retrieve a client subscription by ID",
+        "description": "Returns the subscription matching the given clientSubscriptionId.",
+        "operationId": "getClientSubscription",
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "clientSubscriptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription object",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "getSubscriptionResponse": {
+                    "$ref": "#/components/examples/getSubscriptionResponse"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ClientSubscription"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "getSubscriptionError": {
+                    "$ref": "#/components/examples/getSubscriptionError"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "summary": "Strict update of a client subscription",
+        "description": "Caller must supply *all* updatable fields.",
+        "operationId": "updateClientSubscription",
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "clientSubscriptionId",
+            "in": "path",
+            "required": true,
+            "example": "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "examples": {
+                "updateSubscription": {
+                  "$ref": "#/components/examples/updateSubscription"
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/ClientSubscriptionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscription updated",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "updatedSubscriptionResponse": {
+                    "$ref": "#/components/examples/updatedSubscriptionResponse"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ClientSubscription"
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription not found",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a subscription by ID",
+        "description": "Deletes the subscription identified by clientSubscriptionId.",
+        "operationId": "deleteClientSubscription",
+        "tags": [
+          "Subscription"
+        ],
+        "parameters": [
+          {
+            "name": "clientSubscriptionId",
+            "in": "path",
+            "required": true,
+            "example": "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted successfully",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          },
+          "404": {
+            "description": "Subscription not found",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "post": {
+        "summary": "Create a client notification.",
+        "description": "Creates a client notification for given material id and event type",
+        "operationId": "createNotification",
+        "tags": [
+          "Internal"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventPayload"
+              },
+              "examples": {
+                "PCR": {
+                  "$ref": "#/components/examples/PCR"
+                },
+                "NowsCustodialSentence": {
+                  "$ref": "#/components/examples/NowsCustodialSentence"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "accepted",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client-subscriptions/{clientSubscriptionId}/documents/{documentId}": {
+      "get": {
+        "summary": "Retrieve PDF for the specified document id",
+        "description": "Returns the PDF previously published for the given documentId.",
+        "operationId": "getDocument",
+        "tags": [
+          "Notification"
+        ],
+        "parameters": [
+          {
+            "name": "clientSubscriptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Subscriber's client subscription identifier"
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Public document identifier assigned to the subscriber"
+          },
+          {
+            "$ref": "#/components/parameters/XCorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF document (binary)",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found or the client subscription is missing/inactive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/XCorrelationId"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "headers": {
+      "XCorrelationId": {
+        "description": "Correlation identifier for this request/response, used for end-to-end tracing.",
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "example": "bf931a90-3e3f-4e8e-a8e4-a4ca9ac07830"
+        }
+      }
+    },
+    "parameters": {
+      "XCorrelationId": {
+        "name": "X-Correlation-Id",
+        "in": "header",
+        "required": false,
+        "description": "Optional correlation identifier for end-to-end tracing.",
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "example": "d679fd61-061f-4440-9623-36280f0807b7"
+        }
+      }
+    },
+    "schemas": {
+      "EventType": {
+        "type": "string",
+        "description": "Possible values:\n  - PRISON_COURT_REGISTER_GENERATED\n  - WEE_Layout5\n  - NEE_DetentionOnRecommendationForDeportation\n  - OEE_MedicalRemandAdditionalDetails\n  - WEE_RemandAfterBailAppealByProsecutor\n  - WEE_CustodialSentence\n  - WEE_CustodialSentenceWitness\n  - WEE_CommittalToCrownCourtForConsiderationOfTheQuestionOfBailOnAChargeOfMurder\n  - WEE_CommittalToCrownCourtForSentence\n  - WEE_SendingToCrownCourtForTrial\n  - OEE_BailAppealEndOfCustody\n  - WEE_CommitmentPendingTransferToServiceCustody\n  - WEE_NonPaymentOfMoneyOwedCivilDebt\n  - WEE_CustodyWarrantOnDischargeOfExtraditionPendingAppeal\n  - WEE_CustodyWarrantOnDischargeOfExtraditionPendingAppealPart2\n  - WEE_CustodyWarrantOnExtradition\n  - WEE_CustodyWarrantOnExtraditionCategory2Territory\n  - WEE_CustodyWarrantOnExtraditionWithConsent\n  - WEE_CustodyWarrantOnExtraditionWithBailDirection\n  - WEE_CustodyWarrantOnExtraditionWithBailDirectionWithConsent\n  - WEE_CustodyWarrantOnExtraditionWithBailDirectionCategory2Territory\n  - WEE_CustodyWarrantSendingToSecretaryOfStateCategory2Territory\n  - WEE_CustodyWarrantSendingToSecretaryOfStateOnConsentCategory2Territory\n  - WEE_CustodyWarrantWithBailDirectionOnDischargeOfExtraditionPendingAppeal\n  - WEE_CustodyWarrantWithBailDirectionOnDischargeOfExtraditionPendingAppealPart2\n  - WEE_CustodyWarrantWithBailDirectionSendingToSecretaryOfStateCategory2Territory\n  - WEE_CustodyWarrantWithBailDirectionSendingToSecretaryOfStateOnConsentCategory2Territory\n  - WEE_ExtraditionRemandAfterBailAppealByProsecutor\n  - WEE_ExtraditionSupplementToCustodyWarrant\n  - OBE_TerminationOfFootballBanning\n  - OBE_ChangeOfFootballBanning\n  - NEE_FootballBanning\n  - WEE_Remand\n  - WXE_RemandWarrantYouthDetentionAccommodation\n  - OXE_DetentionAndTraining\n  - WEE_InjunctionDetention\n  - OPE_SupervisionOnBreachOfDetentionAndTraining\n  - WEE_CommittalToCrownCourtAuthorityToHoldInYouthDetentionAccommodation\n  - WEE_Detention\n  - WEE_DetentionInYouthDetentionAccommodationBreach\n  - WEE_SendingToCrownCourtAuthorityToHoldInYouthDetentionAccommodation\n"
+      },
+      "NotificationEndpoint": {
+        "type": "object",
+        "required": [
+          "callbackUrl"
+        ],
+        "properties": {
+          "callbackUrl": {
+            "type": "string",
+            "pattern": "^https://.*$",
+            "description": "The location where event data will be sent. Event notifications will be POSTed to this URL with EventNotificationPayload in the request body."
+          }
+        }
+      },
+      "EventTypeResponse": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventTypePayload"
+            }
+          }
+        }
+      },
+      "EventTypePayload": {
+        "type": "object",
+        "properties": {
+          "eventName": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          }
+        }
+      },
+      "ClientSubscriptionRequest": {
+        "type": "object",
+        "required": [
+          "notificationEndpoint",
+          "eventTypes"
+        ],
+        "properties": {
+          "notificationEndpoint": {
+            "$ref": "#/components/schemas/NotificationEndpoint"
+          },
+          "eventTypes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/EventType"
+            }
+          }
+        }
+      },
+      "ClientSubscription": {
+        "type": "object",
+        "required": [
+          "clientSubscriptionId",
+          "notificationEndpoint",
+          "eventTypes",
+          "createdAt"
+        ],
+        "properties": {
+          "clientSubscriptionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notificationEndpoint": {
+            "$ref": "#/components/schemas/NotificationEndpoint"
+          },
+          "eventTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventType"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": [
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "hmac": {
+            "$ref": "#/components/schemas/HmacCredentials"
+          }
+        }
+      },
+      "HmacCredentials": {
+        "type": "object",
+        "description": "HMAC credentials issued at subscription creation for signing outbound callbacks.",
+        "properties": {
+          "keyId": {
+            "type": "string",
+            "description": "Identifier for the shared secret used to sign outbound callbacks for this subscription",
+            "example": "keyId_b41a48b7-a2a1-45f1-b562-1358f141ddb2"
+          },
+          "secret": {
+            "type": "string",
+            "writeOnly": true,
+            "description": "Base64-encoded shared secret used to sign outbound callbacks for this subscription. Returned in the create subscription response. Not returned by subsequent GET operations.",
+            "example": "example-base64-encoded-secret"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error",
+          "message"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "EventPayload": {
+        "type": "object",
+        "description": "Payload representing a stored PCR document event with defendant and case details.",
+        "required": [
+          "eventId",
+          "materialId",
+          "eventType",
+          "timestamp",
+          "defendant"
+        ],
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the stored PCR document event"
+          },
+          "materialId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the stored PCR document"
+          },
+          "eventType": {
+            "type": "string",
+            "description": "Type of the event, e.g., PRISON_COURT_REGISTER_GENERATED",
+            "$ref": "#/components/schemas/EventType"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the event occurred"
+          },
+          "defendant": {
+            "type": "object",
+            "required": [
+              "masterDefendantId",
+              "name",
+              "dateOfBirth"
+            ],
+            "properties": {
+              "masterDefendantId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Unique identifier for the master defendant"
+              },
+              "name": {
+                "type": "string",
+                "description": "Full name of the defendant"
+              },
+              "dateOfBirth": {
+                "type": "string",
+                "format": "date",
+                "description": "Date of birth of the defendant"
+              },
+              "custodyEstablishmentDetails": {
+                "type": "object",
+                "description": "Details of the custody establishment",
+                "properties": {
+                  "emailAddress": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address of the prison"
+                  }
+                }
+              },
+              "cases": {
+                "type": "array",
+                "description": "List of cases associated with the defendant",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "urn"
+                  ],
+                  "properties": {
+                    "urn": {
+                      "type": "string",
+                      "description": "Case URN associated with the defendant"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "EventNotificationPayload": {
+        "type": "object",
+        "description": "Payload sent to the callback URL when an event occurs",
+        "required": [
+          "cases",
+          "masterDefendantId",
+          "defendantName",
+          "defendantDateOfBirth",
+          "documentId",
+          "documentGeneratedTimestamp",
+          "prisonEmailAddress"
+        ],
+        "properties": {
+          "cases": {
+            "type": "array",
+            "minItems": 1,
+            "description": "List of cases associated with the defendant",
+            "items": {
+              "type": "object",
+              "required": [
+                "urn"
+              ],
+              "properties": {
+                "urn": {
+                  "type": "string",
+                  "description": "Case URN associated with the defendant",
+                  "example": "CT981234123"
+                }
+              }
+            }
+          },
+          "masterDefendantId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the master defendant",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "defendantName": {
+            "type": "string",
+            "description": "Full name of the defendant",
+            "example": "John Doe"
+          },
+          "defendantDateOfBirth": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of birth of the defendant",
+            "example": "1990-05-15"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the document used by consumers while fetching it",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "documentGeneratedTimestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Document generation timestamp",
+            "example": "2024-01-15T10:30:00Z"
+          },
+          "prisonEmailAddress": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address of the prison",
+            "example": "prison@example.com"
+          }
+        }
+      }
+    },
+    "examples": {
+      "EventTypesResponse": {
+        "summary": "Example Event-Types response",
+        "value": {
+          "eventTypes": [
+            {
+              "eventName": "WEE_CustodialSentence",
+              "displayName": "Warrant for Custodial Sentence",
+              "category": "WARRANT"
+            }
+          ]
+        }
+      },
+      "createSubscriptionRequest": {
+        "summary": "Example subscription creation request",
+        "value": {
+          "notificationEndpoint": {
+            "callbackUrl": "https://client.example.com/events"
+          },
+          "eventTypes": [
+            "PRISON_COURT_REGISTER_GENERATED"
+          ]
+        }
+      },
+      "createSubscriptionResponse": {
+        "summary": "Example subscription creation response",
+        "value": {
+          "clientSubscriptionId": "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44",
+          "notificationEndpoint": {
+            "callbackUrl": "https://client.example.com/events"
+          },
+          "eventTypes": [
+            "PRISON_COURT_REGISTER_GENERATED"
+          ],
+          "hmac": {
+            "keyId": "keyId_b41a48b7-a2a1-45f1-b562-1358f141ddb2",
+            "secret": "example-base64-encoded-secret"
+          },
+          "createdAt": "2025-01-01T10:00:00Z",
+          "updatedAt": null
+        }
+      },
+      "createSubscriptionError": {
+        "summary": "Example subscription creation error response",
+        "value": {
+          "error": "invalid_request",
+          "message": "eventTypes must contain at least one value."
+        }
+      },
+      "getSubscriptionResponse": {
+        "summary": "Example GET subscription response",
+        "value": {
+          "clientSubscriptionId": "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44",
+          "notificationEndpoint": {
+            "callbackUrl": "https://client.example.com/events"
+          },
+          "eventTypes": [
+            "PRISON_COURT_REGISTER_GENERATED"
+          ],
+          "createdAt": "2025-01-01T10:00:00Z",
+          "updatedAt": "2025-01-05T17:30:00Z"
+        }
+      },
+      "getSubscriptionError": {
+        "summary": "Example GET subscription error response",
+        "value": {
+          "error": "not_found",
+          "message": "No subscription exists for ID aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44."
+        }
+      },
+      "updateSubscription": {
+        "summary": "Example update request",
+        "value": {
+          "notificationEndpoint": {
+            "callbackUrl": "https://client.example.com/new-hook"
+          },
+          "eventTypes": [
+            "PRISON_COURT_REGISTER_GENERATED"
+          ]
+        }
+      },
+      "updatedSubscriptionResponse": {
+        "summary": "Example update subscription response",
+        "value": {
+          "clientSubscriptionId": "aa12f3dd-4cc1-4da7-b9ea-552fa3b9bc44",
+          "notificationEndpoint": {
+            "callbackUrl": "https://client.example.com/new-hook"
+          },
+          "eventTypes": [
+            "PRISON_COURT_REGISTER_GENERATED"
+          ],
+          "createdAt": "2025-01-01T10:00:00Z",
+          "updatedAt": "2025-01-10T09:15:00Z"
+        }
+      },
+      "PCR": {
+        "summary": "Prison court register example",
+        "value": {
+          "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "materialId": "123e4567-e89b-12d3-a456-426614174000",
+          "eventType": "PRISON_COURT_REGISTER_GENERATED",
+          "timestamp": "2024-01-15T10:30:00Z",
+          "defendant": {
+            "masterDefendantId": "8b8f1c3a-9a41-4f0f-b8a0-1c23d9e8a111",
+            "name": "John Doe",
+            "dateOfBirth": "1990-05-15",
+            "custodyEstablishmentDetails": {
+              "emailAddress": "prison@moj.gov.uk"
+            },
+            "cases": [
+              {
+                "urn": "CT98KRYCAP"
+              },
+              {
+                "urn": "AB75123123"
+              }
+            ]
+          }
+        }
+      },
+      "NowsCustodialSentence": {
+        "summary": "Nows example",
+        "value": {
+          "eventId": "b37c7a93-4063-40e5-9b0a-0230a3cc2005",
+          "materialId": "297b5c16-0983-405c-9128-614554b1c4fe",
+          "eventType": "WEE_CustodialSentence",
+          "timestamp": "2025-02-15T10:40:00Z",
+          "defendant": {
+            "masterDefendantId": "8b8f1c3a-9a41-4f0f-b8a0-1c23d9e8a111",
+            "name": "John Doe",
+            "dateOfBirth": "1990-05-15",
+            "custodyEstablishmentDetails": {
+              "emailAddress": "prison@moj.gov.uk"
+            },
+            "cases": [
+              {
+                "urn": "CT98KRYCAP"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
