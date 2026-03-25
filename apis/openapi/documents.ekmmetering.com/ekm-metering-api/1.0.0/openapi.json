@@ -1,0 +1,355 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "EKM Metering API",
+    "version": "1.0.0",
+    "description": "The EKM Push API provides access to real-time and historical energy metering data from EKM Omnimeter smart meters and ioStack devices. The API is REST-based with JSON responses.\n\n**Base URL:** `https://api.ekmpush.com`\n\n**Authentication:** HTTP Basic Auth — provide your EKM Push API key as the username. No password required.\n\nThe API provides several sub-APIs:\n- **Realtime API** — latest 1,000 readings per meter\n- **Summary API (Legacy)** — 15-minute summarized data\n- **Summary V2 API** — Enhanced summary features\n- **Account API** — Account and device information\n- **Gateway Settings API** — Commands and settings for Push3 gateways\n- **Trigger API** — CRUD for Push3 gateway triggers",
+    "contact": {
+      "name": "EKM Metering Support",
+      "url": "https://www.ekmmetering.com/support"
+    },
+    "x-jentic-source-url": "http://documents.ekmmetering.com/api-docs"
+  },
+  "servers": [
+    {
+      "url": "https://api.ekmpush.com",
+      "description": "EKM Push API server"
+    },
+    {
+      "url": "https://summary.ekmpush.com",
+      "description": "EKM Summary API server (legacy)"
+    }
+  ],
+  "security": [
+    { "BasicAuth": [] }
+  ],
+  "tags": [
+    { "name": "realtime", "description": "Real-time meter data readings" },
+    { "name": "account", "description": "Account and device information" },
+    { "name": "triggers", "description": "Manage Push3 gateway triggers" }
+  ],
+  "paths": {
+    "/readmeter": {
+      "get": {
+        "operationId": "readMeter",
+        "tags": ["realtime"],
+        "summary": "Read meter data (Realtime API)",
+        "description": "Returns real-time meter readings. Returns up to the latest 1,000 reads per meter. If your device is read once per minute, data is available once per minute.",
+        "parameters": [
+          {
+            "name": "meters",
+            "in": "query",
+            "required": true,
+            "description": "Meter serial number(s), comma-separated",
+            "schema": { "type": "string" },
+            "example": "17507"
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "description": "Your EKM Push API key",
+            "schema": { "type": "string" },
+            "example": "MTAxMDoyMDIw"
+          },
+          {
+            "name": "fmt",
+            "in": "query",
+            "required": false,
+            "description": "Response format. Use 'json' for JSON output.",
+            "schema": { "type": "string", "enum": ["json", "html", "csv"], "default": "json" }
+          },
+          {
+            "name": "cnt",
+            "in": "query",
+            "required": false,
+            "description": "Number of reads to return (1-1000)",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 10 }
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "required": false,
+            "description": "Timezone for timestamps (e.g., America~Los_Angeles)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Meter readings",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReadMeterResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "401": {
+            "description": "Unauthorized - invalid API key",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/account": {
+      "get": {
+        "operationId": "getAccount",
+        "tags": ["account"],
+        "summary": "Get account information",
+        "description": "Returns information for the specified target: account, gateway, meter, or ioStack. You may use the EKM Push Key (full account access) or a Gateway Key (restricted to that gateway).",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "description": "EKM Push API key",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "target",
+            "in": "query",
+            "required": false,
+            "description": "Target type: account, gateway, meter, or iostack",
+            "schema": { "type": "string", "enum": ["account", "gateway", "meter", "iostack"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account information",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountResponse" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/triggers": {
+      "get": {
+        "operationId": "listTriggers",
+        "tags": ["triggers"],
+        "summary": "List triggers",
+        "description": "Returns all triggers configured on a Push3 gateway.",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "description": "EKM Push API key",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "gateway",
+            "in": "query",
+            "required": false,
+            "description": "Gateway serial number",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of triggers",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Trigger" } } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "post": {
+        "operationId": "createTrigger",
+        "tags": ["triggers"],
+        "summary": "Create trigger",
+        "description": "Creates a new trigger on a Push3 gateway. Triggers can send emails, fire webhooks, or control relays based on metered conditions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TriggerRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Trigger created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Trigger" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/triggers/{id}": {
+      "put": {
+        "operationId": "updateTrigger",
+        "tags": ["triggers"],
+        "summary": "Update trigger",
+        "description": "Updates an existing trigger on a Push3 gateway.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Trigger ID",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TriggerRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Trigger updated",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Trigger" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTrigger",
+        "tags": ["triggers"],
+        "summary": "Delete trigger",
+        "description": "Deletes a trigger from a Push3 gateway.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Trigger ID",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Trigger deleted" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BasicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Use your EKM Push API key as the username. No password required."
+      }
+    },
+    "schemas": {
+      "ReadMeterResponse": {
+        "type": "object",
+        "properties": {
+          "readmeter": {
+            "type": "object",
+            "properties": {
+              "Requested": { "type": "integer" },
+              "ReadSet": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/ReadSet" }
+              }
+            }
+          }
+        }
+      },
+      "ReadSet": {
+        "type": "object",
+        "properties": {
+          "Meter": { "type": "string" },
+          "Group": { "type": "integer" },
+          "Send_Interval": { "type": "integer" },
+          "Protocol": { "type": "string" },
+          "MAC_Addr": { "type": "string" },
+          "Tz_Offset_Sec": { "type": "integer" },
+          "Bad_Reads": { "type": "integer" },
+          "Good_Reads": { "type": "integer" },
+          "Credits": { "type": "integer" },
+          "Push_Version": { "type": "string" },
+          "ReadData": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ReadData" }
+          }
+        }
+      },
+      "ReadData": {
+        "type": "object",
+        "properties": {
+          "Good": { "type": "integer" },
+          "Date": { "type": "string", "format": "date" },
+          "Time": { "type": "string" },
+          "Time_Stamp_UTC_ms": { "type": "integer" },
+          "Firmware": { "type": "string" },
+          "Model": { "type": "string" },
+          "kWh_Tot": { "type": "string" },
+          "kWh_Tariff_1": { "type": "string" },
+          "kWh_Tariff_2": { "type": "string" },
+          "Rev_kWh_Tot": { "type": "string" },
+          "Rev_kWh_Tariff_1": { "type": "string" },
+          "Rev_kWh_Tariff_2": { "type": "string" },
+          "RMS_Volts_Ln_1": { "type": "string" },
+          "RMS_Volts_Ln_2": { "type": "string" },
+          "Amps_Ln_1": { "type": "string" },
+          "Amps_Ln_2": { "type": "string" },
+          "Power_Factor_Ln_1": { "type": "string" },
+          "Power_Factor_Ln_2": { "type": "string" },
+          "Power_Factor_Ln_3": { "type": "string" },
+          "RMS_Watts_Ln_1": { "type": "string" },
+          "RMS_Watts_Ln_2": { "type": "string" },
+          "RMS_Watts_Tot": { "type": "string" },
+          "RMS_Watts_Max_Demand": { "type": "string" },
+          "Max_Demand_Period": { "type": "string" },
+          "CT_Ratio": { "type": "string" },
+          "Meter_Status_Code": { "type": "string" }
+        }
+      },
+      "AccountResponse": {
+        "type": "object",
+        "properties": {
+          "account": { "type": "string" },
+          "gateways": { "type": "array", "items": { "type": "object" } },
+          "meters": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "Trigger": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["email", "webhook", "relay"] },
+          "condition": { "type": "string" },
+          "action": { "type": "string" },
+          "enabled": { "type": "boolean" }
+        }
+      },
+      "TriggerRequest": {
+        "type": "object",
+        "required": ["name", "type", "condition"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["email", "webhook", "relay"] },
+          "condition": { "type": "string" },
+          "action": { "type": "string" },
+          "enabled": { "type": "boolean" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "integer" },
+          "code": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}
