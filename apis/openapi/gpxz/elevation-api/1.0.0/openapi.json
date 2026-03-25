@@ -1,0 +1,1046 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "GPXZ Elevation API",
+    "description": "The GPXZ API provides worldwide elevation data via a REST API. It offers high-resolution elevation lookups for single points, multiple points, sampled paths, and 2D raster extracts. It also provides compatibility endpoints for Google Maps Elevation API and Open Topo Data API.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "GPXZ",
+      "url": "https://www.gpxz.io"
+    },
+    "termsOfService": "https://www.gpxz.io/terms"
+  },
+  "servers": [
+    {
+      "url": "https://api.gpxz.io/v1",
+      "description": "Global endpoint"
+    },
+    {
+      "url": "https://api-eu.gpxz.io/v1",
+      "description": "EU region endpoint"
+    }
+  ],
+  "security": [
+    {
+      "apiKeyHeader": []
+    },
+    {
+      "apiKeyQuery": []
+    }
+  ],
+  "paths": {
+    "/elevation/point": {
+      "get": {
+        "operationId": "getElevationPoint",
+        "summary": "Get elevation for a single point",
+        "description": "Retrieves elevation data for a single geographic coordinate. The API will never return null, Infinity, or NaN as an elevation value.",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "description": "Latitude in EPSG:4326 (WGS84) format.",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "lon",
+            "in": "query",
+            "required": true,
+            "description": "Longitude in EPSG:4326 (WGS84) format. Range: [-180, 180].",
+            "schema": {
+              "type": "number",
+              "format": "double",
+              "minimum": -180,
+              "maximum": 180
+            }
+          },
+          {
+            "name": "bathymetry",
+            "in": "query",
+            "required": false,
+            "description": "If true, returns negative elevation for ocean points. If false, returns 0. Default: false.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "interpolation",
+            "in": "query",
+            "required": false,
+            "description": "Algorithm for raster interpolation: nearest or bilinear. Default: bilinear.",
+            "schema": {
+              "type": "string",
+              "enum": ["nearest", "bilinear"],
+              "default": "bilinear"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful elevation lookup.",
+            "headers": {
+              "X-DATASET-VERSION": {
+                "description": "Version of the elevation dataset used.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "x-ratelimit-used": {
+                "description": "Number of requests used in the current rate limit window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "Maximum number of requests allowed in the current rate limit window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "Number of requests remaining in the current rate limit window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "Seconds until the rate limit resets.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ElevationPointResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded.",
+            "headers": {
+              "retry-after": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/elevation/points": {
+      "get": {
+        "operationId": "getElevationPoints",
+        "summary": "Get elevation for multiple points",
+        "description": "Retrieves elevation data for multiple geographic coordinates. Supports up to 512 points.",
+        "parameters": [
+          {
+            "name": "latlons",
+            "in": "query",
+            "required": false,
+            "description": "Latitude,longitude pairs separated by pipes (e.g., '46.66,14.03|46.60,14.15'). Max 512 points. Either this or polyline is required.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "polyline",
+            "in": "query",
+            "required": false,
+            "description": "Points encoded as polyline format. Either this or latlons is required.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bathymetry",
+            "in": "query",
+            "required": false,
+            "description": "If true, returns negative elevation for ocean points. If false, returns 0. Default: false.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "interpolation",
+            "in": "query",
+            "required": false,
+            "description": "Algorithm for raster interpolation: nearest or bilinear. Default: bilinear.",
+            "schema": {
+              "type": "string",
+              "enum": ["nearest", "bilinear"],
+              "default": "bilinear"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful elevation lookup for multiple points.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ElevationPointsResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postElevationPoints",
+        "summary": "Get elevation for multiple points (POST)",
+        "description": "Retrieves elevation data for multiple geographic coordinates via POST. Supports up to 512 points.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "latlons": {
+                    "type": "string",
+                    "description": "Latitude,longitude pairs separated by pipes. Max 512 points."
+                  },
+                  "polyline": {
+                    "type": "string",
+                    "description": "Points encoded as polyline format."
+                  },
+                  "bathymetry": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "If true, returns negative elevation for ocean points."
+                  },
+                  "interpolation": {
+                    "type": "string",
+                    "enum": ["nearest", "bilinear"],
+                    "default": "bilinear",
+                    "description": "Algorithm for raster interpolation."
+                  }
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "latlons": {
+                    "type": "string",
+                    "description": "Latitude,longitude pairs separated by pipes. Max 512 points."
+                  },
+                  "polyline": {
+                    "type": "string",
+                    "description": "Points encoded as polyline format."
+                  },
+                  "bathymetry": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "If true, returns negative elevation for ocean points."
+                  },
+                  "interpolation": {
+                    "type": "string",
+                    "enum": ["nearest", "bilinear"],
+                    "default": "bilinear",
+                    "description": "Algorithm for raster interpolation."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful elevation lookup for multiple points.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ElevationPointsResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/elevation/sample": {
+      "get": {
+        "operationId": "getElevationSample",
+        "summary": "Sample elevation along a path",
+        "description": "Returns elevation at evenly-spaced intervals along a route. Supports up to 5,000 input points and returns between 2 and 512 sampled points.",
+        "parameters": [
+          {
+            "name": "latlons",
+            "in": "query",
+            "required": false,
+            "description": "Path coordinates as latitude,longitude pairs separated by pipes. Max 5,000 points. Either this or polyline is required.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "polyline",
+            "in": "query",
+            "required": false,
+            "description": "Path encoded as polyline format. Either this or latlons is required.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "samples",
+            "in": "query",
+            "required": true,
+            "description": "Number of evenly-spaced points to return. Min: 2, Max: 512.",
+            "schema": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 512
+            }
+          },
+          {
+            "name": "bathymetry",
+            "in": "query",
+            "required": false,
+            "description": "If true, returns negative elevation for ocean points. If false, returns 0. Default: false.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "interpolation",
+            "in": "query",
+            "required": false,
+            "description": "Algorithm for raster interpolation: nearest or bilinear. Default: bilinear.",
+            "schema": {
+              "type": "string",
+              "enum": ["nearest", "bilinear"],
+              "default": "bilinear"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful elevation sampling along path.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ElevationPointsResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postElevationSample",
+        "summary": "Sample elevation along a path (POST)",
+        "description": "Returns elevation at evenly-spaced intervals along a route via POST.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["samples"],
+                "properties": {
+                  "latlons": {
+                    "type": "string",
+                    "description": "Path coordinates as latitude,longitude pairs separated by pipes. Max 5,000 points."
+                  },
+                  "polyline": {
+                    "type": "string",
+                    "description": "Path encoded as polyline format."
+                  },
+                  "samples": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 512,
+                    "description": "Number of evenly-spaced points to return."
+                  },
+                  "bathymetry": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "If true, returns negative elevation for ocean points."
+                  },
+                  "interpolation": {
+                    "type": "string",
+                    "enum": ["nearest", "bilinear"],
+                    "default": "bilinear",
+                    "description": "Algorithm for raster interpolation."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful elevation sampling along path.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ElevationPointsResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/elevation/hires-raster": {
+      "get": {
+        "operationId": "getHiresRaster",
+        "summary": "Get high-resolution 2D elevation raster",
+        "description": "Extracts a 2D raster of elevation data at up to 50cm resolution. Returns a Cloud-Optimized GeoTIFF. Maximum area: 10 km2, maximum aspect ratio: 1:100.",
+        "parameters": [
+          {
+            "name": "bbox_top",
+            "in": "query",
+            "required": true,
+            "description": "Northmost latitude of the requested area.",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "bbox_bottom",
+            "in": "query",
+            "required": true,
+            "description": "Southmost latitude of the requested area.",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "bbox_left",
+            "in": "query",
+            "required": true,
+            "description": "Westmost longitude of the requested area.",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "bbox_right",
+            "in": "query",
+            "required": true,
+            "description": "Eastmost longitude of the requested area.",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "res_m",
+            "in": "query",
+            "required": false,
+            "description": "Output resolution in metres (1-30) or 'best'. Default: 1.",
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30
+                },
+                {
+                  "type": "string",
+                  "enum": ["best"]
+                }
+              ],
+              "default": 1
+            }
+          },
+          {
+            "name": "projection",
+            "in": "query",
+            "required": false,
+            "description": "Output projection. Default: utm.",
+            "schema": {
+              "type": "string",
+              "enum": ["latlon", "utm", "best"],
+              "default": "utm"
+            }
+          },
+          {
+            "name": "tight_bounds",
+            "in": "query",
+            "required": false,
+            "description": "When true, optimizes output bounds to input bounding box with potential accuracy trade-off. Default: false.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "output_profile",
+            "in": "query",
+            "required": false,
+            "description": "GeoTIFF format: autocad, zstd, or default. Default: default.",
+            "schema": {
+              "type": "string",
+              "enum": ["autocad", "zstd", "default"],
+              "default": "default"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful raster extraction. Returns a Cloud-Optimized GeoTIFF.",
+            "headers": {
+              "x-data-sources": {
+                "description": "Identifies elevation data sources used.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "gpxz-capture-date-min": {
+                "description": "Earliest measurement date (ISO 8601 or 'none').",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "gpxz-capture-date-max": {
+                "description": "Latest measurement date (ISO 8601).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "image/tiff": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/elevation/gmaps-compat/{outputFormat}": {
+      "get": {
+        "operationId": "getGmapsCompat",
+        "summary": "Google Maps Elevation API compatibility endpoint",
+        "description": "Drop-in replacement for the Google Maps Elevation API. Supports both positional and sampled elevation queries.",
+        "parameters": [
+          {
+            "name": "outputFormat",
+            "in": "path",
+            "required": true,
+            "description": "Output format: json or xml.",
+            "schema": {
+              "type": "string",
+              "enum": ["json", "xml"]
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "description": "Your GPXZ API key.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locations",
+            "in": "query",
+            "required": false,
+            "description": "Latitude,longitude pairs separated by pipe or encoded polyline. Required for positional queries.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": false,
+            "description": "Latitude,longitude pairs separated by pipe or encoded polyline. Required for sampled queries.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "samples",
+            "in": "query",
+            "required": false,
+            "description": "Number of points along path to sample. Required for sampled queries.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful elevation lookup in Google Maps compatible format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GmapsCompatResponse"
+                }
+              },
+              "application/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/elevation/otd-compat": {
+      "get": {
+        "operationId": "getOtdCompat",
+        "summary": "Open Topo Data API compatibility endpoint",
+        "description": "Drop-in replacement for the Open Topo Data API.",
+        "parameters": [
+          {
+            "name": "locations",
+            "in": "query",
+            "required": true,
+            "description": "Latitude,longitude pairs separated by pipe or encoded polyline.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "samples",
+            "in": "query",
+            "required": false,
+            "description": "Number of points along path to sample.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful elevation lookup in Open Topo Data compatible format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtdCompatResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postOtdCompat",
+        "summary": "Open Topo Data API compatibility endpoint (POST)",
+        "description": "Drop-in replacement for the Open Topo Data API via POST.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["locations"],
+                "properties": {
+                  "locations": {
+                    "type": "string",
+                    "description": "Latitude,longitude pairs separated by pipe or encoded polyline."
+                  },
+                  "samples": {
+                    "type": "integer",
+                    "description": "Number of points along path to sample."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful elevation lookup in Open Topo Data compatible format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtdCompatResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/elevation/sources": {
+      "get": {
+        "operationId": "getElevationSources",
+        "summary": "Get elevation data source metadata",
+        "description": "Retrieves metadata about all elevation data sources used by GPXZ, including resolution, attribution, and licensing information.",
+        "responses": {
+          "200": {
+            "description": "Successful retrieval of data source metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourcesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Health check",
+        "description": "Health check endpoint for load balancing or monitoring.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API is healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "OK"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "API key passed via the x-api-key header (recommended for production)."
+      },
+      "apiKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "api-key",
+        "description": "API key passed as a query parameter."
+      }
+    },
+    "schemas": {
+      "ElevationResult": {
+        "type": "object",
+        "properties": {
+          "elevation": {
+            "type": "number",
+            "description": "Elevation in metres above mean sea level."
+          },
+          "lat": {
+            "type": "number",
+            "description": "Latitude of the point."
+          },
+          "lon": {
+            "type": "number",
+            "description": "Longitude of the point."
+          },
+          "data_source": {
+            "type": "string",
+            "description": "Identifier of the elevation data source used."
+          },
+          "resolution": {
+            "type": "number",
+            "description": "Approximate resolution of the data source in metres."
+          },
+          "capture_date_min": {
+            "type": "string",
+            "nullable": true,
+            "description": "Earliest measurement date for the data source (ISO 8601 or null)."
+          },
+          "capture_date_max": {
+            "type": "string",
+            "description": "Latest measurement date for the data source (ISO 8601)."
+          }
+        }
+      },
+      "ElevationPointResponse": {
+        "type": "object",
+        "properties": {
+          "elevation": {
+            "type": "number",
+            "description": "Elevation in metres above mean sea level."
+          },
+          "lat": {
+            "type": "number",
+            "description": "Latitude of the queried point."
+          },
+          "lon": {
+            "type": "number",
+            "description": "Longitude of the queried point."
+          },
+          "data_source": {
+            "type": "string",
+            "description": "Identifier of the elevation data source used."
+          },
+          "resolution": {
+            "type": "number",
+            "description": "Approximate resolution of the data source in metres."
+          },
+          "capture_date_min": {
+            "type": "string",
+            "nullable": true,
+            "description": "Earliest measurement date."
+          },
+          "capture_date_max": {
+            "type": "string",
+            "description": "Latest measurement date."
+          },
+          "status": {
+            "type": "string",
+            "description": "Response status.",
+            "enum": ["OK", "INVALID_REQUEST", "SERVER_ERROR"]
+          }
+        }
+      },
+      "ElevationPointsResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ElevationResult"
+            },
+            "description": "Array of elevation results."
+          },
+          "status": {
+            "type": "string",
+            "description": "Response status.",
+            "enum": ["OK", "INVALID_REQUEST", "SERVER_ERROR"]
+          }
+        }
+      },
+      "GmapsCompatResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "elevation": {
+                  "type": "number",
+                  "description": "Elevation in metres."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "lat": {
+                      "type": "number"
+                    },
+                    "lng": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "resolution": {
+                  "type": "number",
+                  "description": "Approximate resolution in metres."
+                }
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["OK", "INVALID_REQUEST", "SERVER_ERROR"]
+          },
+          "error_message": {
+            "type": "string",
+            "description": "Optional error description."
+          }
+        }
+      },
+      "OtdCompatResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "elevation": {
+                  "type": "number",
+                  "description": "Elevation in metres."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "lat": {
+                      "type": "number"
+                    },
+                    "lng": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "dataset": {
+                  "type": "string",
+                  "description": "GPXZ data source identifier."
+                }
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["OK", "INVALID_REQUEST", "SERVER_ERROR"]
+          },
+          "error_message": {
+            "type": "string",
+            "description": "Optional error description."
+          }
+        }
+      },
+      "SourcesResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "data_source": {
+                  "type": "string",
+                  "description": "Source identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Dataset full name."
+                },
+                "resolution": {
+                  "type": "integer",
+                  "description": "Approximate resolution in metres."
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "Link to dataset information."
+                },
+                "organization": {
+                  "type": "string",
+                  "description": "Creating organization."
+                },
+                "attribution": {
+                  "type": "string",
+                  "description": "Attribution statement."
+                },
+                "licence": {
+                  "type": "string",
+                  "description": "License name."
+                },
+                "licence_url": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "License terms link."
+                },
+                "capture_date_min": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Earliest measurement date."
+                },
+                "capture_date_max": {
+                  "type": "string",
+                  "description": "Latest measurement date."
+                }
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["OK", "INVALID_REQUEST", "SERVER_ERROR"]
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["INVALID_REQUEST", "SERVER_ERROR"]
+          },
+          "error": {
+            "type": "string",
+            "description": "Error description."
+          }
+        }
+      }
+    }
+  }
+}

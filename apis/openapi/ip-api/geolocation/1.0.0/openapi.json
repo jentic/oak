@@ -1,0 +1,440 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ip-api Geolocation API",
+    "description": "IP geolocation API that provides location, ISP, and network information for IP addresses and domains. Free for non-commercial use with no API key required. Supports JSON, XML, CSV, and newline response formats. Data includes country, region, city, coordinates, timezone, ISP, organization, AS number, proxy/VPN detection, and more.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "ip-api",
+      "url": "https://ip-api.com"
+    },
+    "license": {
+      "name": "Free for non-commercial use"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://ip-api.com",
+      "description": "Free tier (HTTP only, non-commercial use)"
+    },
+    {
+      "url": "https://pro.ip-api.com",
+      "description": "Pro tier (HTTPS, commercial use, requires API key)"
+    }
+  ],
+  "paths": {
+    "/json/{query}": {
+      "get": {
+        "operationId": "getGeolocationByIp",
+        "summary": "Geolocate an IP address or domain",
+        "description": "Returns geolocation and network data for a given IPv4/IPv6 address or domain name. Rate limited to 45 requests per minute per originating IP.",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "path",
+            "required": true,
+            "description": "IPv4 address, IPv6 address, or domain name to look up.",
+            "schema": {
+              "type": "string"
+            },
+            "examples": {
+              "ipv4": {
+                "value": "208.80.152.201",
+                "summary": "IPv4 address"
+              },
+              "domain": {
+                "value": "google.com",
+                "summary": "Domain name"
+              }
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "required": false,
+            "description": "Comma-separated list of response field names to include, or a numeric bitmask value. If omitted, a default set of fields is returned.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "status,message,country,countryCode,city,lat,lon,query"
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "description": "Response language for localized fields (city, regionName, country).",
+            "schema": {
+              "type": "string",
+              "enum": ["en", "de", "es", "pt-BR", "fr", "ja", "zh-CN", "ru"],
+              "default": "en"
+            }
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "required": false,
+            "description": "JSONP callback function name.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Geolocation result. Check the `status` field: \"success\" or \"fail\".",
+            "headers": {
+              "X-Rl": {
+                "description": "Number of requests remaining in the current rate limit window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-Ttl": {
+                "description": "Seconds until the rate limit window resets.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeolocationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (45 requests/minute). Continued abuse results in a 1-hour IP ban."
+          }
+        }
+      }
+    },
+    "/json/": {
+      "get": {
+        "operationId": "getGeolocationSelf",
+        "summary": "Geolocate the requesting IP address",
+        "description": "Returns geolocation and network data for the IP address making the request. Rate limited to 45 requests per minute.",
+        "parameters": [
+          {
+            "name": "fields",
+            "in": "query",
+            "required": false,
+            "description": "Comma-separated list of response field names to include, or a numeric bitmask value.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "description": "Response language for localized fields.",
+            "schema": {
+              "type": "string",
+              "enum": ["en", "de", "es", "pt-BR", "fr", "ja", "zh-CN", "ru"],
+              "default": "en"
+            }
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "required": false,
+            "description": "JSONP callback function name.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Geolocation result for the requesting IP.",
+            "headers": {
+              "X-Rl": {
+                "description": "Number of requests remaining in the current rate limit window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-Ttl": {
+                "description": "Seconds until the rate limit window resets.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeolocationResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded."
+          }
+        }
+      }
+    },
+    "/batch": {
+      "post": {
+        "operationId": "batchGeolocation",
+        "summary": "Batch geolocate multiple IP addresses",
+        "description": "Query up to 100 IP addresses in a single HTTP request. Rate limited to 15 requests per minute per originating IP.",
+        "parameters": [
+          {
+            "name": "fields",
+            "in": "query",
+            "required": false,
+            "description": "Default fields for all queries (can be overridden per-item in the request body).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "description": "Default language for all queries.",
+            "schema": {
+              "type": "string",
+              "enum": ["en", "de", "es", "pt-BR", "fr", "ja", "zh-CN", "ru"],
+              "default": "en"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Array of IP addresses (strings) or objects with query, fields, and lang properties. Maximum 100 items.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "maxItems": 100,
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "description": "IPv4 or IPv6 address"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BatchQueryItem"
+                    }
+                  ]
+                }
+              },
+              "examples": {
+                "simple": {
+                  "summary": "Simple array of IPs",
+                  "value": ["208.80.152.201", "8.8.8.8"]
+                },
+                "detailed": {
+                  "summary": "Per-query field selection",
+                  "value": [
+                    {
+                      "query": "208.80.152.201",
+                      "fields": "country,city,lat,lon"
+                    },
+                    {
+                      "query": "8.8.8.8",
+                      "fields": "country,isp",
+                      "lang": "de"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Array of geolocation results, one per queried IP.",
+            "headers": {
+              "X-Rl": {
+                "description": "Number of requests remaining in the current rate limit window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-Ttl": {
+                "description": "Seconds until the rate limit window resets.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GeolocationResponse"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request body exceeds 100 IP addresses."
+          },
+          "429": {
+            "description": "Rate limit exceeded (15 requests/minute for batch)."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GeolocationResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success", "fail"],
+            "description": "Indicates whether the query was successful."
+          },
+          "message": {
+            "type": "string",
+            "description": "Error message when status is \"fail\". Possible values: private range, reserved range, invalid query.",
+            "examples": ["invalid query"]
+          },
+          "continent": {
+            "type": "string",
+            "description": "Continent name.",
+            "examples": ["North America"]
+          },
+          "continentCode": {
+            "type": "string",
+            "description": "Two-letter continent code.",
+            "examples": ["NA"]
+          },
+          "country": {
+            "type": "string",
+            "description": "Country name.",
+            "examples": ["United States"]
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 country code.",
+            "examples": ["US"]
+          },
+          "region": {
+            "type": "string",
+            "description": "Region/state short code (FIPS or ISO 3166-2).",
+            "examples": ["CA"]
+          },
+          "regionName": {
+            "type": "string",
+            "description": "Full region/state name.",
+            "examples": ["California"]
+          },
+          "city": {
+            "type": "string",
+            "description": "City name.",
+            "examples": ["Mountain View"]
+          },
+          "district": {
+            "type": "string",
+            "description": "District or subdivision of a city.",
+            "examples": ["Old Farm District"]
+          },
+          "zip": {
+            "type": "string",
+            "description": "Postal/zip code.",
+            "examples": ["94043"]
+          },
+          "lat": {
+            "type": "number",
+            "format": "float",
+            "description": "Latitude.",
+            "examples": [37.4192]
+          },
+          "lon": {
+            "type": "number",
+            "format": "float",
+            "description": "Longitude.",
+            "examples": [-122.0574]
+          },
+          "timezone": {
+            "type": "string",
+            "description": "Timezone in tz database format.",
+            "examples": ["America/Los_Angeles"]
+          },
+          "offset": {
+            "type": "integer",
+            "description": "UTC DST offset in seconds.",
+            "examples": [-25200]
+          },
+          "currency": {
+            "type": "string",
+            "description": "National currency code.",
+            "examples": ["USD"]
+          },
+          "isp": {
+            "type": "string",
+            "description": "Internet Service Provider name.",
+            "examples": ["Google"]
+          },
+          "org": {
+            "type": "string",
+            "description": "Organization name.",
+            "examples": ["Google"]
+          },
+          "as": {
+            "type": "string",
+            "description": "Autonomous System number and organization.",
+            "examples": ["AS15169 Google Inc."]
+          },
+          "asname": {
+            "type": "string",
+            "description": "Autonomous System name.",
+            "examples": ["GOOGLE"]
+          },
+          "reverse": {
+            "type": "string",
+            "description": "Reverse DNS hostname.",
+            "examples": ["wi-in-f94.1e100.net"]
+          },
+          "mobile": {
+            "type": "boolean",
+            "description": "Whether the IP belongs to a mobile/cellular connection."
+          },
+          "proxy": {
+            "type": "boolean",
+            "description": "Whether the IP is a known proxy, VPN, or Tor exit node."
+          },
+          "hosting": {
+            "type": "boolean",
+            "description": "Whether the IP belongs to a hosting/data center provider."
+          },
+          "query": {
+            "type": "string",
+            "description": "The IP address that was queried.",
+            "examples": ["173.194.67.94"]
+          }
+        }
+      },
+      "BatchQueryItem": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "IPv4 or IPv6 address to look up."
+          },
+          "fields": {
+            "type": "string",
+            "description": "Comma-separated list of fields or numeric bitmask."
+          },
+          "lang": {
+            "type": "string",
+            "description": "Response language for this query.",
+            "enum": ["en", "de", "es", "pt-BR", "fr", "ja", "zh-CN", "ru"]
+          }
+        }
+      }
+    }
+  }
+}

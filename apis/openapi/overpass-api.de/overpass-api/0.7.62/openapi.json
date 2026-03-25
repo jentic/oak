@@ -1,0 +1,431 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Overpass API",
+    "description": "The Overpass API is a read-only API that serves up custom selected parts of the OpenStreetMap (OSM) map data. It acts as a database over the web: the client sends a query to the API and gets back the data set that corresponds to the query. The API is optimized for data consumers that need a few elements within a glimpse or up to roughly 10 million elements in some minutes.",
+    "version": "0.7.62",
+    "contact": {
+      "name": "Overpass API",
+      "url": "https://overpass-api.de/"
+    },
+    "license": {
+      "name": "Open Database License (ODbL)",
+      "url": "https://opendatacommons.org/licenses/odbl/"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://overpass-api.de",
+      "description": "Primary Overpass API instance (overpass-api.de)"
+    },
+    {
+      "url": "https://maps.mail.ru/osm/tools/overpass",
+      "description": "VK Maps Overpass API instance"
+    },
+    {
+      "url": "https://overpass.kumi.systems",
+      "description": "Kumi Systems Overpass API instance"
+    }
+  ],
+  "paths": {
+    "/api/interpreter": {
+      "get": {
+        "operationId": "getInterpreter",
+        "summary": "Execute an Overpass query via GET",
+        "description": "Executes an Overpass QL or Overpass XML query passed as the 'data' query parameter. Suitable for shorter queries. For larger queries, use the POST method instead.",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "query",
+            "required": true,
+            "description": "The Overpass QL or Overpass XML query string. Example: `[out:json];node[\"name\"=\"Berlin\"];out;`",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "description": "Optional global bounding box in the format lon_west,lat_south,lon_east,lat_north (note: reversed order compared to the in-query [bbox:] setting which uses south,west,north,east).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful query response. The format depends on the [out:format] setting in the query.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverpassJsonResponse"
+                }
+              },
+              "application/osm3s+xml": {
+                "schema": {
+                  "type": "string",
+                  "description": "OSM XML response"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "description": "CSV formatted response when [out:csv] is used"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. The query has a syntax error or is otherwise malformed.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Rate limit exceeded. The server allows a limited number of concurrent connections per client.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timeout. The query exceeded the timeout setting (default 180 seconds).",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postInterpreter",
+        "summary": "Execute an Overpass query via POST",
+        "description": "Executes an Overpass QL or Overpass XML query sent in the POST body. Recommended for longer or complex queries.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "The Overpass QL or Overpass XML query string."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful query response. The format depends on the [out:format] setting in the query.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverpassJsonResponse"
+                }
+              },
+              "application/osm3s+xml": {
+                "schema": {
+                  "type": "string",
+                  "description": "OSM XML response"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "description": "CSV formatted response when [out:csv] is used"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request. The query has a syntax error or is otherwise malformed.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Rate limit exceeded.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway timeout. The query exceeded the timeout setting.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "operationId": "getStatus",
+        "summary": "Get server status",
+        "description": "Returns the current status of the Overpass API server, including the connected endpoint, rate limit information, available slots, and any currently running queries.",
+        "responses": {
+          "200": {
+            "description": "Plain text status information including server identity, rate limit slots, and running queries.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "description": "Plain text status output with server info, available slots, and running queries."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/timestamp": {
+      "get": {
+        "operationId": "getTimestamp",
+        "summary": "Get data timestamp",
+        "description": "Returns the timestamp of the most recent OpenStreetMap data available on this Overpass API instance.",
+        "responses": {
+          "200": {
+            "description": "The timestamp of the latest OSM data in ISO 8601 format.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "ISO 8601 timestamp, e.g. 2026-03-25T00:10:11Z"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/kill_my_queries": {
+      "get": {
+        "operationId": "killMyQueries",
+        "summary": "Kill running queries from your IP",
+        "description": "Terminates all currently running queries associated with the caller's IP address. Useful for freeing up rate limit slots if a query is taking too long.",
+        "responses": {
+          "200": {
+            "description": "Confirmation that queries have been terminated.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "OverpassJsonResponse": {
+        "type": "object",
+        "description": "JSON response from the Overpass API when [out:json] is specified in the query.",
+        "properties": {
+          "version": {
+            "type": "number",
+            "description": "The Overpass API version number.",
+            "example": 0.6
+          },
+          "generator": {
+            "type": "string",
+            "description": "The software that generated the response.",
+            "example": "Overpass API 0.7.62"
+          },
+          "osm3s": {
+            "type": "object",
+            "description": "Metadata about the OSM data.",
+            "properties": {
+              "timestamp_osm_base": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The timestamp of the OSM data used for the query."
+              },
+              "copyright": {
+                "type": "string",
+                "description": "Copyright notice for the data."
+              }
+            }
+          },
+          "elements": {
+            "type": "array",
+            "description": "Array of OSM elements (nodes, ways, relations) matching the query.",
+            "items": {
+              "$ref": "#/components/schemas/OsmElement"
+            }
+          },
+          "remark": {
+            "type": "string",
+            "description": "Optional remark or warning message from the server."
+          }
+        }
+      },
+      "OsmElement": {
+        "type": "object",
+        "description": "An OpenStreetMap element (node, way, or relation).",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["node", "way", "relation", "area"],
+            "description": "The type of OSM element."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The unique OSM identifier for this element."
+          },
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "description": "Latitude (only for nodes)."
+          },
+          "lon": {
+            "type": "number",
+            "format": "double",
+            "description": "Longitude (only for nodes)."
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Key-value pairs of OSM tags."
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Ordered list of node IDs (only for ways)."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelationMember"
+            },
+            "description": "List of relation members (only for relations)."
+          },
+          "bounds": {
+            "type": "object",
+            "description": "Bounding box of the element (when out bb is used).",
+            "properties": {
+              "minlat": { "type": "number", "format": "double" },
+              "minlon": { "type": "number", "format": "double" },
+              "maxlat": { "type": "number", "format": "double" },
+              "maxlon": { "type": "number", "format": "double" }
+            }
+          },
+          "center": {
+            "type": "object",
+            "description": "Center point of the element (when out center is used).",
+            "properties": {
+              "lat": { "type": "number", "format": "double" },
+              "lon": { "type": "number", "format": "double" }
+            }
+          },
+          "geometry": {
+            "type": "array",
+            "description": "Full geometry coordinates (when out geom is used).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lat": { "type": "number", "format": "double" },
+                "lon": { "type": "number", "format": "double" }
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last modification timestamp (when out meta is used)."
+          },
+          "version": {
+            "type": "integer",
+            "description": "Element version number (when out meta is used)."
+          },
+          "changeset": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Changeset ID (when out meta is used)."
+          },
+          "user": {
+            "type": "string",
+            "description": "Username of last editor (when out meta is used)."
+          },
+          "uid": {
+            "type": "integer",
+            "description": "User ID of last editor (when out meta is used)."
+          }
+        },
+        "required": ["type", "id"]
+      },
+      "RelationMember": {
+        "type": "object",
+        "description": "A member of an OSM relation.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["node", "way", "relation"],
+            "description": "The type of the member element."
+          },
+          "ref": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The OSM ID of the member element."
+          },
+          "role": {
+            "type": "string",
+            "description": "The role of this member within the relation."
+          },
+          "geometry": {
+            "type": "array",
+            "description": "Full geometry of the member (when out geom is used).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lat": { "type": "number", "format": "double" },
+                "lon": { "type": "number", "format": "double" }
+              }
+            }
+          }
+        },
+        "required": ["type", "ref", "role"]
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Overpass API Wiki Documentation",
+    "url": "https://wiki.openstreetmap.org/wiki/Overpass_API"
+  }
+}
