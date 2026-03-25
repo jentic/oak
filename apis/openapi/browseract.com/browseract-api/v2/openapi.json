@@ -1,0 +1,1617 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "BrowserAct API",
+    "version": "v2",
+    "description": "BrowserAct's API lets you run BrowserAct workflows programmatically and monitor their execution.\n\n**Core concepts (same as the Dashboard):**\n- **Workflow**: a reusable automation blueprint (the \"design\").\n- **Task**: a single execution record of a workflow (the \"run\").\n\n## Base URL\nAll requests use the following base URL:\n\n```\nhttps://api.browseract.com\n```\n\n## API versioning\nThe API is versioned in the URL path (for example, `/v2/...`).\n\n## Authentication\nAuthenticate with a Bearer token in the `Authorization` header:\n\n```\nAuthorization: Bearer <API_KEY>\n```\n\n## Requests\n- Send request bodies as JSON.\n- Set `Content-Type: application/json` for endpoints that accept a body.\n\n## Response codes\nWe use standard HTTP status codes:\n- `2xx` for successful requests\n- `4xx` for client-side errors (invalid parameters, missing auth, etc.)\n- `5xx` for server-side errors\n\n## Errors\nFor most error responses, the API returns a standard JSON envelope:\n- `code`: non-zero means an error\n- `msg`: human-readable error message\n- `traceId`: include this when contacting support\n\n## Pagination\nList endpoints use **page-based pagination** with these query parameters:\n- `page` (starts at 1)\n- `limit` (1-500)\n\nPaginated responses include: `page`, `limit`, `items`, `total_pages`, `total_count`.\n\n## Webhooks (optional)\nWhen creating a task, you can provide:\n- `callback_url`: called when a task **finishes**, **fails**, or is **canceled**.\n- `status_change_callback_url`: called whenever the task status changes (e.g. running -> paused -> running).\n\n## Task status values\n`created`, `running`, `finished`, `canceled`, `pausing`, `paused`, `failed`, `unknown`.\n\n## Rate limits\nTo protect platform stability, rate limits may apply. If you hit a limit, reduce request frequency and retry with backoff.\n\n## Need help?\nJoin our Discord community: https://discord.com/invite/UpnCKd7GaU\n",
+    "contact": {
+      "name": "BrowserAct Support",
+      "url": "https://discord.com/invite/UpnCKd7GaU"
+    },
+    "x-jentic-source-url": "https://docs.browseract.com/"
+  },
+  "servers": [
+    {
+      "url": "https://api.browseract.com",
+      "description": "Production"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Tasks",
+      "description": "Create and manage **tasks** (executions).\n\nTypical flow:\n1) Start a task (`run-task` or `run-task-by-template`)\n2) Poll for status (`get-task-status`) or full details (`get-task`)\n3) Retrieve outputs from the task response once finished\n"
+    },
+    {
+      "name": "Workflows",
+      "description": "Workflows are reusable automation blueprints created in the BrowserAct Dashboard.\nUse these endpoints to list workflows and fetch a workflow's expected input parameters."
+    },
+    {
+      "name": "Workflow Templates",
+      "description": "Official workflow templates curated by BrowserAct.\nTemplates are a fast way to start with common scraping/automation use cases."
+    },
+    {
+      "name": "Regions",
+      "description": "Supported proxy regions that can be used when running template-based tasks."
+    }
+  ],
+  "paths": {
+    "/v2/workflow/run-task": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Run a workflow (create a task)",
+        "description": "Starts a new task execution for a workflow and returns a `task_id`.\n\n### How it works\n1) Choose a workflow in the Dashboard and copy its `workflow_id`\n2) Provide any `input_parameters` required by the workflow\n3) Optionally enable `save_browser_data` to receive a `profile_id` that can be reused later\n\n### Webhooks\nYou can provide `callback_url` and/or `status_change_callback_url` to receive POST notifications.",
+        "operationId": "runTask",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunWorkflowTaskRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Start a workflow task",
+                  "value": {
+                    "workflow_id": "wf_123456789",
+                    "input_parameters": [
+                      {
+                        "name": "keyword",
+                        "value": "laptops"
+                      }
+                    ]
+                  }
+                },
+                "withProfileAndWebhooks": {
+                  "summary": "Save browser data and receive webhook callbacks",
+                  "value": {
+                    "workflow_id": "wf_123456789",
+                    "input_parameters": [
+                      {
+                        "name": "keyword",
+                        "value": "laptops"
+                      }
+                    ],
+                    "save_browser_data": true,
+                    "callback_url": "https://your-server.com/webhooks/workflow-callback",
+                    "status_change_callback_url": "https://your-server.com/webhooks/task-status-change-callback"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCreatedResponse"
+                },
+                "examples": {
+                  "created": {
+                    "value": {
+                      "id": "task_123456789",
+                      "profile_id": "profile_abc123"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/run-task-by-template": {
+      "post": {
+        "tags": [
+          "Tasks",
+          "Workflow Templates"
+        ],
+        "summary": "Run an official workflow template (create a task)",
+        "description": "Starts a new task execution from an **official workflow template** and returns a `task_id`.\n\nUse `GET /v2/workflow/list-official-workflow-templates` to discover templates.",
+        "operationId": "runTemplateTask",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunWorkflowTemplateTaskRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Run a template task",
+                  "value": {
+                    "proxyRegion": "US",
+                    "workflow_template_id": "tpl_123456789",
+                    "input_parameters": [
+                      {
+                        "name": "url",
+                        "value": "https://example.com"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCreatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/get-task-status": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Retrieve a task status",
+        "description": "Returns just the current status of a task.\n\nThis endpoint is more lightweight than `GET /v2/workflow/get-task`.",
+        "operationId": "getTaskStatus",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "query",
+            "description": "Task ID returned by `run-task` or `run-task-by-template`.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "example": "task_123456789"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskStatusResponse"
+                },
+                "examples": {
+                  "running": {
+                    "value": {
+                      "status": "running"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/get-task": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Retrieve a task",
+        "description": "Returns comprehensive information about a task, including:\n- current `status`\n- step-level progress (`steps`)\n- output (if finished)\n- failure details (if failed)\n\nIf you only need the current status, use `GET /v2/workflow/get-task-status`.",
+        "operationId": "getTask",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "query",
+            "description": "Task ID returned by `run-task` or `run-task-by-template`.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "example": "task_123456789"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowTaskResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/list-tasks": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "List tasks",
+        "description": "Returns a paginated list of tasks (workflow executions).\n\n### Filtering\n- Use `status` to filter by task status.\n- Use `workflow_id` to only list tasks created from a specific workflow.\n\n### Pagination\nUse `page` and `limit`. The response includes `total_pages` and `total_count`.",
+        "operationId": "pageTasks",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter tasks by status.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TaskStatus"
+            },
+            "example": "running"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number to retrieve (starts at 1).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of tasks per page (max 500).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "example": 50
+          },
+          {
+            "name": "workflow_id",
+            "in": "query",
+            "description": "Only return tasks created from this workflow ID.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "wf_123456789"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageRespWorkflowTaskSimpleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/resume-task": {
+      "put": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Resume a paused task",
+        "description": "Resumes execution of a previously paused task.\n\n- The task will continue from where it was paused.\n- You **can't** resume a task that is `finished`, `failed`, or `canceled`.",
+        "operationId": "resumeTask",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "query",
+            "description": "The `task_id` to resume.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "example": "task_123456789"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. The task was resumed (or was already running)."
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/stop-task": {
+      "put": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Cancel a running task",
+        "description": "Cancels a running task immediately.\n\n- Use this when you no longer need the result.\n- A canceled task **cannot** be resumed.\n\n**Tip:** If you only need to check progress, prefer `GET /v2/workflow/get-task-status`.",
+        "operationId": "stopTask",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "query",
+            "description": "The `task_id` returned by `run-task` or `run-task-by-template`.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "example": "task_123456789"
+          },
+          {
+            "name": "biz_code",
+            "in": "query",
+            "description": "Optional business cancellation code (for your own tracking/analytics).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "example": 1001
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK. The task was canceled (or was already in a terminal state)."
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/list-workflows": {
+      "get": {
+        "tags": [
+          "Workflows"
+        ],
+        "summary": "List workflows",
+        "description": "Returns a paginated list of workflows in your workspace.\n\n### Pagination\nThis endpoint uses page-based pagination with `page` and `limit`.",
+        "operationId": "getWorkflowList",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number to retrieve (starts at 1).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of workflows per page (max 500).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "example": 20
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageRespApiWorkflowDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/get-workflow": {
+      "get": {
+        "tags": [
+          "Workflows"
+        ],
+        "summary": "Retrieve a workflow",
+        "description": "Fetches a workflow's configuration, including the **input parameter definitions** needed to run it.\n\nIf you only need a list of workflows, use `GET /v2/workflow/list-workflows`.",
+        "operationId": "getWorkflowConfig",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "query",
+            "description": "Workflow ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "wf_123456789"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiWorkflowConfigDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/list-official-workflow-templates": {
+      "get": {
+        "tags": [
+          "Workflow Templates"
+        ],
+        "summary": "List official workflow templates",
+        "description": "Returns BrowserAct's official workflow templates.\n\nUse `keyword` to search by name/description.",
+        "operationId": "getWorkflowTemplates",
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "description": "Search keyword (optional).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "amazon"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number to retrieve (starts at 1).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of templates per page (max 500).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "example": 20
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageRespWorkflowTemplateDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/get-official-workflow-template": {
+      "get": {
+        "tags": [
+          "Workflow Templates"
+        ],
+        "summary": "Retrieve an official workflow template",
+        "description": "Fetches the configuration for an official workflow template, including input parameter definitions.",
+        "operationId": "getWorkflowTemplateConfig",
+        "parameters": [
+          {
+            "name": "workflow_template_id",
+            "in": "query",
+            "description": "Workflow template ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "tpl_123456789"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiWorkflowTemplateConfigDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/workflow/get-region-list": {
+      "get": {
+        "tags": [
+          "Regions"
+        ],
+        "summary": "List supported proxy regions",
+        "description": "Returns regions supported by BrowserAct.\n\nYou can pass a region code from this list as `proxyRegion` when running a template task.",
+        "operationId": "getRegionList",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SysRegionSimpleView"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseData"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ResponseData": {
+        "type": "object",
+        "description": "Standard error response envelope.\n\nMost successful responses return the resource directly (without this envelope).\nWhen an error occurs, you can use `traceId` to help BrowserAct support locate the issue.",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Response code. `0` means success; non-zero means failure.",
+            "example": 123
+          },
+          "msg": {
+            "type": "string",
+            "description": "Human-readable error message (present when `code` is non-zero).",
+            "example": "Invalid task_id"
+          },
+          "data": {
+            "description": "Error details (shape may vary by error).",
+            "type": "object",
+            "additionalProperties": true,
+            "example": {}
+          },
+          "ts": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Server timestamp (milliseconds).",
+            "example": 1699335116000
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server time in ISO 8601 format.",
+            "example": "2023-11-07T05:31:56Z"
+          },
+          "traceId": {
+            "type": "string",
+            "description": "Error ID for tracking in logs.",
+            "example": "b4bb01c1b2b14f11a6a2d7c1c8b0e3a1"
+          }
+        }
+      },
+      "InputParamItemDto": {
+        "type": "object",
+        "description": "A single workflow input parameter passed when starting a task.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Parameter name (must match the workflow's input parameter definition).",
+            "example": "keyword"
+          },
+          "value": {
+            "type": "string",
+            "description": "Parameter value as a string.",
+            "example": "laptops"
+          }
+        }
+      },
+      "RunWorkflowTaskRequest": {
+        "type": "object",
+        "description": "Request body used to start a new task from a workflow.",
+        "properties": {
+          "workflow_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The workflow ID to run.",
+            "example": "wf_123456789"
+          },
+          "input_parameters": {
+            "type": "array",
+            "description": "Input parameters for this run.",
+            "items": {
+              "$ref": "#/components/schemas/InputParamItemDto"
+            },
+            "example": [
+              {
+                "name": "keyword",
+                "value": "laptops"
+              }
+            ]
+          },
+          "save_browser_data": {
+            "type": "boolean",
+            "description": "If `true`, the response will include a `profile_id`. You can reuse that `profile_id` in later runs to reuse browser data (e.g., cookies).",
+            "example": true
+          },
+          "profile_id": {
+            "type": "string",
+            "description": "Reuse browser data from a previous run (e.g., cookies) by providing a `profile_id`.",
+            "example": "profile_abc123"
+          },
+          "open_incognito_mode": {
+            "type": "boolean",
+            "deprecated": true,
+            "description": "Deprecated. No longer required.",
+            "example": false
+          },
+          "callback_url": {
+            "type": "string",
+            "description": "Optional. HTTP/HTTPS URL to receive a POST notification when the task **finishes**, **fails**, or is **canceled**. Maximum length: 2048 characters. Must be publicly reachable (no private/local addresses).",
+            "example": "https://your-server.com/webhooks/workflow-callback",
+            "maxLength": 2048
+          },
+          "status_change_callback_url": {
+            "type": "string",
+            "description": "Optional. HTTP/HTTPS URL to receive a POST notification whenever the task status changes (e.g., running, paused, finished, canceled, failed). Maximum length: 2048 characters. Must be publicly reachable (no private/local addresses).",
+            "example": "https://your-server.com/webhooks/task-status-change-callback",
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "workflow_id"
+        ]
+      },
+      "TaskCreatedResponse": {
+        "type": "object",
+        "description": "Response returned after successfully creating a task.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique `task_id`. Use it to poll status/results or to stop/resume the task.",
+            "example": "task_123456789"
+          },
+          "profile_id": {
+            "type": "string",
+            "description": "Returned only when `save_browser_data` is `true`. Use it to reuse browser data (e.g., cookies) in later runs.",
+            "example": "profile_abc123"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "RunWorkflowTemplateTaskRequest": {
+        "type": "object",
+        "description": "Request body used to start a new task from an official workflow template.",
+        "properties": {
+          "proxyRegion": {
+            "type": "string",
+            "description": "Optional. Proxy region code. Defaults to `US`.",
+            "example": "US"
+          },
+          "workflow_template_id": {
+            "type": "string",
+            "description": "The official workflow template ID to run.",
+            "example": "tpl_123456789"
+          },
+          "input_parameters": {
+            "type": "array",
+            "description": "Input parameters for this run.",
+            "items": {
+              "$ref": "#/components/schemas/InputParamItemDto"
+            },
+            "example": [
+              {
+                "name": "url",
+                "value": "https://example.com"
+              }
+            ]
+          },
+          "callback_url": {
+            "type": "string",
+            "description": "Optional. See `RunWorkflowTaskRequest.callback_url`.",
+            "example": "https://your-server.com/webhooks/workflow-callback",
+            "maxLength": 2048
+          },
+          "status_change_callback_url": {
+            "type": "string",
+            "description": "Optional. See `RunWorkflowTaskRequest.status_change_callback_url`.",
+            "example": "https://your-server.com/webhooks/task-status-change-callback",
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "workflow_template_id"
+        ]
+      },
+      "ApiWorkflowDto": {
+        "type": "object",
+        "description": "Basic workflow information.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Workflow ID",
+            "example": "wf_123456789"
+          },
+          "name": {
+            "type": "string",
+            "description": "Workflow name",
+            "example": "Price Monitor"
+          },
+          "description": {
+            "type": "string",
+            "description": "Workflow description",
+            "example": "Scrape product prices and export CSV."
+          },
+          "create_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Workflow creation time"
+          },
+          "publish_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Workflow publish time"
+          }
+        }
+      },
+      "PageRespApiWorkflowDto": {
+        "type": "object",
+        "description": "Paginated response containing items and metadata.",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Current page number.",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of items per page.",
+            "example": 20
+          },
+          "items": {
+            "type": "array",
+            "description": "Items for the current page.",
+            "items": {
+              "$ref": "#/components/schemas/ApiWorkflowDto"
+            }
+          },
+          "total_pages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Total number of pages available.",
+            "example": 5
+          },
+          "total_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Total number of items.",
+            "example": 87
+          }
+        }
+      },
+      "LiveUrlInfo": {
+        "type": "object",
+        "description": "Information for viewing a live task execution.\n\nAvailable only when the task status is `running`.",
+        "properties": {
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Viewport width",
+            "example": 1280
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Viewport height",
+            "example": 720
+          },
+          "live_url": {
+            "type": "string",
+            "description": "Live view URL. Can be embedded in an `<iframe>`.",
+            "example": "https://live.browseract.com/task/task_123..."
+          }
+        },
+        "required": [
+          "height",
+          "width"
+        ]
+      },
+      "TaskFailureInfo": {
+        "type": "object",
+        "description": "Failure details. Present only when the task status is `failed`.",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Error code",
+            "example": 10001
+          },
+          "message": {
+            "type": "string",
+            "description": "Error message",
+            "example": "Navigation timeout"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "TaskOutputDto": {
+        "type": "object",
+        "description": "Task output produced by the workflow.\n\nThe exact output depends on the workflow. Common patterns:\n- `string`: plain text or JSON string\n- `files`: URLs for output files (if any)",
+        "properties": {
+          "string": {
+            "type": "string",
+            "description": "Plain output string (format depends on the workflow).",
+            "example": "{\"items\":[...]}"
+          },
+          "files": {
+            "type": "array",
+            "description": "Output file URLs (if any).",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "WorkflowTaskSimpleResponse": {
+        "type": "object",
+        "description": "A simplified task representation used in list responses.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Task ID"
+          },
+          "output": {
+            "$ref": "#/components/schemas/TaskOutputDto",
+            "description": "Present only when the task has ended."
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "live_url_info": {
+            "$ref": "#/components/schemas/LiveUrlInfo",
+            "description": "Present only when the task is `running`."
+          },
+          "live_url": {
+            "type": "string",
+            "deprecated": true,
+            "description": "Deprecated. Use `live_url_info.live_url` instead."
+          },
+          "profile_id": {
+            "type": "string",
+            "description": "Browser profile ID for reusing browser data."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Task creation time"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Task finish time (if ended)"
+          },
+          "task_failure_info": {
+            "$ref": "#/components/schemas/TaskFailureInfo"
+          },
+          "credit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Credits consumed by this task.",
+            "example": 42
+          },
+          "workflow_id": {
+            "type": "string",
+            "description": "Workflow ID"
+          },
+          "input_parameters": {
+            "type": "string",
+            "description": "Workflow input parameters in key=value form.",
+            "example": "keyword=laptops;max_items=50"
+          }
+        },
+        "required": [
+          "created_at",
+          "id",
+          "status",
+          "workflow_id"
+        ]
+      },
+      "PageRespWorkflowTaskSimpleResponse": {
+        "type": "object",
+        "description": "Paginated response containing tasks and metadata.",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Current page number."
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of items per page."
+          },
+          "items": {
+            "type": "array",
+            "description": "Tasks for the current page.",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowTaskSimpleResponse"
+            }
+          },
+          "total_pages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Total number of pages available."
+          },
+          "total_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Total number of items."
+          }
+        }
+      },
+      "WorkflowTemplateDto": {
+        "type": "object",
+        "description": "A lightweight representation of an official workflow template.",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "description": "Template ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Template name"
+          },
+          "recommendDesc": {
+            "type": "string",
+            "description": "Short recommended use case description"
+          },
+          "detailUrl": {
+            "type": "string",
+            "description": "Public detail URL for the template"
+          }
+        },
+        "required": [
+          "detailUrl",
+          "name",
+          "recommendDesc",
+          "templateId"
+        ]
+      },
+      "PageRespWorkflowTemplateDto": {
+        "type": "object",
+        "description": "Paginated response containing workflow templates and metadata.",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Current page number."
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of items per page."
+          },
+          "items": {
+            "type": "array",
+            "description": "Templates for the current page.",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowTemplateDto"
+            }
+          },
+          "total_pages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Total number of pages available."
+          },
+          "total_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Total number of items."
+          }
+        }
+      },
+      "WorkflowInputParameterDto": {
+        "type": "object",
+        "description": "Definition of an input parameter expected by a workflow or template.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Parameter name",
+            "example": "keyword"
+          },
+          "default_enabled": {
+            "type": "boolean",
+            "description": "Whether the parameter is enabled by default in the UI.",
+            "example": true
+          }
+        }
+      },
+      "ApiWorkflowConfigDto": {
+        "type": "object",
+        "description": "Full workflow configuration.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Workflow ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Workflow name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Workflow description"
+          },
+          "create_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Workflow creation time"
+          },
+          "publish_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Workflow publish time"
+          },
+          "input_parameters": {
+            "type": "array",
+            "description": "Input parameters required to run this workflow.",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowInputParameterDto"
+            }
+          }
+        }
+      },
+      "TaskDownloadFileView": {
+        "type": "object",
+        "description": "A file generated and uploaded by a task, with a pre-signed download URL (when available).",
+        "properties": {
+          "guid": {
+            "type": "string",
+            "description": "File unique identifier"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Display file name"
+          },
+          "fileSize": {
+            "type": "integer",
+            "format": "int64",
+            "description": "File size in bytes"
+          },
+          "status": {
+            "type": "string",
+            "description": "File status (value may vary)"
+          },
+          "progress": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Download progress (0-100)"
+          },
+          "downloadUrl": {
+            "type": "string",
+            "description": "Pre-signed download URL (present when uploaded)"
+          },
+          "downloadStartTime": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Download start timestamp (ms)"
+          },
+          "downloadCompletedTime": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Download completion timestamp (ms)"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Expiration timestamp"
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "Error message if the file generation/download failed"
+          },
+          "createTime": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Creation timestamp (ms)"
+          }
+        }
+      },
+      "TaskStepDto": {
+        "type": "object",
+        "description": "A single step within a task execution.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Step ID"
+          },
+          "step": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Step sequence number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StepStatus"
+          },
+          "evaluation_previous_goal": {
+            "type": "string",
+            "description": "Evaluation result of the previous step"
+          },
+          "step_goal": {
+            "type": "string",
+            "description": "Goal of the current step"
+          },
+          "screenshots_url": {
+            "type": "string",
+            "description": "Screenshot URL captured during this step"
+          }
+        },
+        "required": [
+          "evaluation_previous_goal",
+          "id",
+          "screenshots_url",
+          "status",
+          "step",
+          "step_goal"
+        ]
+      },
+      "WorkflowTaskResponse": {
+        "type": "object",
+        "description": "Full task details, including step-level progress and outputs (when available).",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Task ID"
+          },
+          "output": {
+            "$ref": "#/components/schemas/TaskOutputDto",
+            "description": "Present only when the task has ended."
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "steps": {
+            "type": "array",
+            "description": "Steps executed within the task.",
+            "items": {
+              "$ref": "#/components/schemas/TaskStepDto"
+            }
+          },
+          "live_url_info": {
+            "$ref": "#/components/schemas/LiveUrlInfo",
+            "description": "Present only when the task is `running`."
+          },
+          "live_url": {
+            "type": "string",
+            "deprecated": true,
+            "description": "Deprecated. Use `live_url_info.live_url` instead."
+          },
+          "profile_id": {
+            "type": "string",
+            "description": "Browser profile ID for reusing browser data."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Task creation time"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Task finish time (if ended)"
+          },
+          "task_failure_info": {
+            "$ref": "#/components/schemas/TaskFailureInfo"
+          },
+          "credit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Credits consumed by this task."
+          },
+          "download_files": {
+            "type": "array",
+            "description": "Files generated by the task (if any).",
+            "items": {
+              "$ref": "#/components/schemas/TaskDownloadFileView"
+            }
+          },
+          "files_expires_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Expiration timestamp for download files."
+          },
+          "workflow_id": {
+            "type": "string",
+            "description": "Workflow ID"
+          },
+          "input_parameters": {
+            "type": "string",
+            "description": "Input parameters used for this run, as `key=value` pairs."
+          },
+          "log_detail_url": {
+            "type": "string",
+            "description": "URL to detailed execution logs for this task."
+          }
+        },
+        "required": [
+          "created_at",
+          "id",
+          "status",
+          "steps",
+          "workflow_id"
+        ]
+      },
+      "TaskStatusResponse": {
+        "type": "object",
+        "description": "Lightweight response containing only the task status.",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "SysRegionSimpleView": {
+        "type": "object",
+        "description": "Supported proxy region.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human-readable region name",
+            "example": "United States"
+          },
+          "code": {
+            "type": "string",
+            "description": "Region code",
+            "maxLength": 30,
+            "example": "US"
+          }
+        }
+      },
+      "ApiWorkflowTemplateConfigDto": {
+        "type": "object",
+        "description": "Official workflow template configuration.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Workflow Template ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Template name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Template description"
+          },
+          "recommendDesc": {
+            "type": "string",
+            "description": "Short recommended use case description"
+          },
+          "detailUrl": {
+            "type": "string",
+            "description": "Public detail URL for the template"
+          },
+          "create_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Template creation time"
+          },
+          "publish_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Template publish time"
+          },
+          "input_parameters": {
+            "type": "array",
+            "description": "Input parameters required to run this template.",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowInputParameterDto"
+            }
+          }
+        },
+        "required": [
+          "detailUrl",
+          "recommendDesc"
+        ]
+      },
+      "TaskStatus": {
+        "type": "string",
+        "description": "Current task status.\n\n- `created`: Task is created but not yet running\n- `running`: Task is currently executing\n- `finished`: Task completed successfully\n- `canceled`: Task was canceled (e.g., via Stop Task)\n- `pausing`: Task is transitioning into paused state\n- `paused`: Task is paused and can be resumed\n- `failed`: Task ended with an error\n- `unknown`: Unknown or unsupported status",
+        "enum": [
+          "created",
+          "running",
+          "finished",
+          "canceled",
+          "pausing",
+          "paused",
+          "failed",
+          "unknown"
+        ]
+      },
+      "StepStatus": {
+        "type": "string",
+        "description": "Status of an individual step within a task.",
+        "enum": [
+          "running",
+          "succeed",
+          "failed"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Send your API key in the `Authorization` header as `Bearer <API_KEY>`."
+      }
+    }
+  },
+  "security": [
+    {
+      "HTTPBearer": []
+    }
+  ]
+}
