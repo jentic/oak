@@ -1,0 +1,840 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Clicksign API",
+    "version": "1.0.0",
+    "description": "Clicksign REST API for electronic document signing. Allows creating documents, adding signers, creating signature lists, and managing the signing workflow. Authentication uses an access_token query parameter.",
+    "x-jentic-source-url": "https://clicksign.github.io/rest-api-v1/"
+  },
+  "servers": [
+    {
+      "url": "https://app.clicksign.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "https://sandbox.clicksign.com/api/v1",
+      "description": "Sandbox"
+    }
+  ],
+  "security": [
+    {
+      "apiKeyQuery": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Documents",
+      "description": "Document management"
+    },
+    {
+      "name": "Signers",
+      "description": "Signer management"
+    },
+    {
+      "name": "Signature Lists",
+      "description": "Manage signature lists (associating signers to documents)"
+    },
+    {
+      "name": "Notifications",
+      "description": "Send signing notifications"
+    },
+    {
+      "name": "Webhooks",
+      "description": "Webhook management"
+    }
+  ],
+  "paths": {
+    "/documents": {
+      "post": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Create Document",
+        "description": "Upload a document (PDF, DOCX) to be signed. Supports file upload or URL-based creation.",
+        "operationId": "createDocument",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "document"
+                ],
+                "properties": {
+                  "document": {
+                    "type": "object",
+                    "required": [
+                      "path",
+                      "content_base64"
+                    ],
+                    "properties": {
+                      "path": {
+                        "type": "string",
+                        "description": "Path/filename for the document (e.g., '/documents/contract.pdf')"
+                      },
+                      "content_base64": {
+                        "type": "string",
+                        "description": "Base64-encoded document content"
+                      },
+                      "deadline_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Signing deadline"
+                      },
+                      "auto_close": {
+                        "type": "boolean",
+                        "description": "Auto-close document after all signatures"
+                      },
+                      "locale": {
+                        "type": "string",
+                        "enum": [
+                          "pt-BR",
+                          "en-US"
+                        ],
+                        "description": "Language locale"
+                      },
+                      "sequence_enabled": {
+                        "type": "boolean",
+                        "description": "Enable signing sequence"
+                      },
+                      "remind_interval": {
+                        "type": "integer",
+                        "description": "Reminder interval in days"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Document created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "List Documents",
+        "description": "List all documents in the account",
+        "operationId": "listDocuments",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Document"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/documents/{key}": {
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Get Document",
+        "description": "Get details of a specific document by its key",
+        "operationId": "getDocument",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Document key (UUID)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Cancel Document",
+        "description": "Cancel a document, preventing further signatures",
+        "operationId": "cancelDocument",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document cancelled"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/signers": {
+      "post": {
+        "tags": [
+          "Signers"
+        ],
+        "summary": "Create Signer",
+        "description": "Create a new signer that can be added to documents",
+        "operationId": "createSigner",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "signer"
+                ],
+                "properties": {
+                  "signer": {
+                    "type": "object",
+                    "required": [
+                      "email",
+                      "auths"
+                    ],
+                    "properties": {
+                      "email": {
+                        "type": "string",
+                        "format": "email"
+                      },
+                      "phone_number": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "documentation": {
+                        "type": "string",
+                        "description": "CPF or CNPJ number"
+                      },
+                      "birthday": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "auths": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "email",
+                            "sms",
+                            "whatsapp",
+                            "api",
+                            "icp_brasil",
+                            "pix"
+                          ]
+                        },
+                        "description": "Authentication methods"
+                      },
+                      "has_documentation": {
+                        "type": "boolean"
+                      },
+                      "selfie_enabled": {
+                        "type": "boolean"
+                      },
+                      "handwritten_enabled": {
+                        "type": "boolean"
+                      },
+                      "official_document_enabled": {
+                        "type": "boolean"
+                      },
+                      "liveness_enabled": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Signer created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/lists": {
+      "post": {
+        "tags": [
+          "Signature Lists"
+        ],
+        "summary": "Add Signer to Document",
+        "description": "Create a signature list entry that associates a signer with a document",
+        "operationId": "addSignerToDocument",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "list"
+                ],
+                "properties": {
+                  "list": {
+                    "type": "object",
+                    "required": [
+                      "document_key",
+                      "signer_key",
+                      "sign_as"
+                    ],
+                    "properties": {
+                      "document_key": {
+                        "type": "string"
+                      },
+                      "signer_key": {
+                        "type": "string"
+                      },
+                      "sign_as": {
+                        "type": "string",
+                        "enum": [
+                          "sign",
+                          "approve",
+                          "acknowledge",
+                          "witness",
+                          "party",
+                          "intervening",
+                          "receipt"
+                        ],
+                        "description": "Signing role"
+                      },
+                      "group": {
+                        "type": "integer",
+                        "description": "Signing group number for sequenced signing"
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "Custom message for the signer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Signer added to document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Unprocessable Entity"
+          }
+        }
+      }
+    },
+    "/lists/{list_key}": {
+      "delete": {
+        "tags": [
+          "Signature Lists"
+        ],
+        "summary": "Remove Signer from Document",
+        "description": "Remove a signer from a document's signature list",
+        "operationId": "removeSignerFromDocument",
+        "parameters": [
+          {
+            "name": "list_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signer removed"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Send Notification",
+        "description": "Send a signing notification to a signer via email or SMS/WhatsApp",
+        "operationId": "sendNotification",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "request_signature_key"
+                ],
+                "properties": {
+                  "request_signature_key": {
+                    "type": "string",
+                    "description": "Signature list key"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Custom notification message"
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "Custom callback URL"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notification sent"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List Webhooks",
+        "description": "List all configured webhook endpoints",
+        "operationId": "listWebhooks",
+        "responses": {
+          "200": {
+            "description": "Webhook list"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Create Webhook",
+        "description": "Create a new webhook endpoint for receiving document events",
+        "operationId": "createWebhook",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "webhook"
+                ],
+                "properties": {
+                  "webhook": {
+                    "type": "object",
+                    "required": [
+                      "url"
+                    ],
+                    "properties": {
+                      "url": {
+                        "type": "string"
+                      },
+                      "events": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "upload",
+                            "sign",
+                            "close",
+                            "auto_close",
+                            "deadline",
+                            "cancel",
+                            "update_deadline",
+                            "update_auto_close"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/webhooks/{key}": {
+      "put": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Update Webhook",
+        "description": "Update a webhook endpoint",
+        "operationId": "updateWebhook",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "webhook": {
+                    "type": "object",
+                    "properties": {
+                      "url": {
+                        "type": "string"
+                      },
+                      "events": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook updated"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Delete Webhook",
+        "description": "Delete a webhook endpoint",
+        "operationId": "deleteWebhook",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook deleted"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "access_token",
+        "description": "Clicksign access token"
+      }
+    },
+    "schemas": {
+      "Document": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "closed",
+              "canceled"
+            ]
+          },
+          "auto_close": {
+            "type": "boolean"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "deadline_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "downloads": {
+            "type": "object",
+            "properties": {
+              "original_file_url": {
+                "type": "string"
+              },
+              "signed_file_url": {
+                "type": "string"
+              }
+            }
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Signer"
+            }
+          }
+        }
+      },
+      "DocumentResponse": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          }
+        }
+      },
+      "Signer": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone_number": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "documentation": {
+            "type": "string"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date"
+          },
+          "auths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "has_documentation": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SignerResponse": {
+        "type": "object",
+        "properties": {
+          "signer": {
+            "$ref": "#/components/schemas/Signer"
+          }
+        }
+      },
+      "ListResponse": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "document_key": {
+                "type": "string"
+              },
+              "signer_key": {
+                "type": "string"
+              },
+              "sign_as": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
