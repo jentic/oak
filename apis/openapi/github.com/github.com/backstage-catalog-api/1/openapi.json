@@ -1,0 +1,638 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Backstage Catalog API",
+    "version": "1",
+    "description": "The Backstage Software Catalog API provides access to entities, locations, and facets in the Backstage catalog. It supports filtering, cursor-based pagination, field selection, and batch operations.",
+    "license": {
+      "name": "Apache-2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "x-jentic-source-url": "https://raw.githubusercontent.com/backstage/backstage/master/plugins/catalog-backend/src/schema/openapi.yaml"
+  },
+  "servers": [
+    { "url": "/" }
+  ],
+  "tags": [
+    { "name": "Entity" },
+    { "name": "Locations" }
+  ],
+  "security": [
+    {}
+  ],
+  "components": {
+    "securitySchemes": {
+      "JWT": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error", "response"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["name", "message"],
+            "properties": {
+              "name": { "type": "string" },
+              "message": { "type": "string" },
+              "stack": { "type": "string" },
+              "code": { "type": "string" }
+            }
+          },
+          "request": {
+            "type": "object",
+            "required": ["method", "url"],
+            "properties": {
+              "method": { "type": "string" },
+              "url": { "type": "string" }
+            }
+          },
+          "response": {
+            "type": "object",
+            "required": ["statusCode"],
+            "properties": {
+              "statusCode": { "type": "number" }
+            }
+          }
+        }
+      },
+      "EntityLink": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": { "type": "string", "description": "The url to the external site, document, etc." },
+          "title": { "type": "string", "description": "An optional descriptive title for the link." },
+          "icon": { "type": "string", "description": "An optional semantic key that represents a visual icon." },
+          "type": { "type": "string", "description": "An optional value to categorize links into specific groups" }
+        }
+      },
+      "EntityMeta": {
+        "type": "object",
+        "required": ["name"],
+        "description": "Metadata fields common to all versions/kinds of entity.",
+        "properties": {
+          "uid": { "type": "string", "description": "A globally unique ID for the entity." },
+          "etag": { "type": "string", "description": "An opaque string that changes for each update operation to any part of the entity." },
+          "name": { "type": "string", "description": "The name of the entity." },
+          "namespace": { "type": "string", "description": "The namespace that the entity belongs to." },
+          "title": { "type": "string", "description": "A display name of the entity." },
+          "description": { "type": "string", "description": "A short description of the entity." },
+          "labels": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "annotations": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "links": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EntityLink" }
+          }
+        }
+      },
+      "EntityRelation": {
+        "type": "object",
+        "required": ["targetRef", "type"],
+        "properties": {
+          "type": { "type": "string", "description": "The type of the relation." },
+          "targetRef": { "type": "string", "description": "The entity ref of the target of this relation." }
+        }
+      },
+      "Entity": {
+        "type": "object",
+        "required": ["apiVersion", "kind", "metadata"],
+        "description": "The parts of the format that's common to all versions/kinds of entity.",
+        "properties": {
+          "apiVersion": { "type": "string", "description": "The version of specification format for this particular entity." },
+          "kind": { "type": "string", "description": "The high level entity type being described." },
+          "metadata": { "$ref": "#/components/schemas/EntityMeta" },
+          "spec": { "type": "object", "additionalProperties": {} },
+          "relations": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EntityRelation" }
+          }
+        }
+      },
+      "Location": {
+        "type": "object",
+        "required": ["id", "type", "target"],
+        "description": "Entity location for a specific entity.",
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "target": { "type": "string" }
+        }
+      },
+      "EntitiesQueryResponse": {
+        "type": "object",
+        "required": ["items", "totalItems", "pageInfo"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Entity" }
+          },
+          "totalItems": { "type": "number" },
+          "pageInfo": {
+            "type": "object",
+            "properties": {
+              "nextCursor": { "type": "string" },
+              "prevCursor": { "type": "string" }
+            }
+          }
+        }
+      },
+      "EntityFacetsResponse": {
+        "type": "object",
+        "required": ["facets"],
+        "properties": {
+          "facets": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["value", "count"],
+                "properties": {
+                  "value": { "type": "string" },
+                  "count": { "type": "number" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "ErrorResponse": {
+        "description": "An error response from the backend.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/entities": {
+      "get": {
+        "operationId": "GetEntities",
+        "tags": ["Entity"],
+        "summary": "Get entities",
+        "description": "Get all entities matching a given filter.",
+        "security": [{}],
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "description": "Filter conditions for entities.",
+            "required": false,
+            "schema": { "type": "array", "items": { "type": "string" } }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Fields to include in the response.",
+            "required": false,
+            "schema": { "type": "array", "items": { "type": "string" } }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 0 }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 0 }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Entity" }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/entities/by-uid/{uid}": {
+      "get": {
+        "operationId": "GetEntityByUid",
+        "tags": ["Entity"],
+        "summary": "Get entity by UID",
+        "description": "Get a single entity by the UID.",
+        "security": [{}],
+        "parameters": [
+          { "name": "uid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Entity" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "delete": {
+        "operationId": "DeleteEntityByUid",
+        "tags": ["Entity"],
+        "summary": "Delete entity by UID",
+        "description": "Delete a single entity by UID.",
+        "security": [{}],
+        "parameters": [
+          { "name": "uid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "204": { "description": "Deleted successfully." },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/entities/by-name/{kind}/{namespace}/{name}": {
+      "get": {
+        "operationId": "GetEntityByName",
+        "tags": ["Entity"],
+        "summary": "Get entity by name",
+        "description": "Get an entity by an entity ref.",
+        "security": [{}],
+        "parameters": [
+          { "name": "kind", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespace", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Entity" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/entities/by-refs": {
+      "post": {
+        "operationId": "GetEntitiesByRefs",
+        "tags": ["Entity"],
+        "summary": "Get entities by refs",
+        "description": "Get a batch set of entities given an array of entityRefs.",
+        "security": [{}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["entityRefs"],
+                "properties": {
+                  "entityRefs": { "type": "array", "items": { "type": "string" } },
+                  "fields": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Entity" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/entities/by-query": {
+      "get": {
+        "operationId": "GetEntitiesByQuery",
+        "tags": ["Entity"],
+        "summary": "Search entities by query",
+        "description": "Search for entities by a given query.",
+        "security": [{}],
+        "parameters": [
+          { "name": "filter", "in": "query", "required": false, "schema": { "type": "array", "items": { "type": "string" } } },
+          { "name": "fields", "in": "query", "required": false, "schema": { "type": "array", "items": { "type": "string" } } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 0 } },
+          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 0 } },
+          { "name": "cursor", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "orderField", "in": "query", "required": false, "schema": { "type": "array", "items": { "type": "string" } } },
+          { "name": "fullTextFilterTerm", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EntitiesQueryResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/entity-facets": {
+      "get": {
+        "operationId": "GetEntityFacets",
+        "tags": ["Entity"],
+        "summary": "Get entity facets",
+        "description": "Get all entity facets that match the given filters.",
+        "security": [{}],
+        "parameters": [
+          {
+            "name": "facet",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "array", "items": { "type": "string" } }
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "array", "items": { "type": "string" } }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EntityFacetsResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/refresh": {
+      "post": {
+        "operationId": "RefreshEntity",
+        "tags": ["Entity"],
+        "summary": "Refresh entity",
+        "description": "Refresh the entity related to entityRef.",
+        "security": [{}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["entityRef"],
+                "properties": {
+                  "entityRef": { "type": "string", "description": "The reference to a single entity that should be refreshed" },
+                  "authorizationToken": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Refreshed" },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/validate-entity": {
+      "post": {
+        "operationId": "ValidateEntity",
+        "tags": ["Entity"],
+        "summary": "Validate entity",
+        "description": "Validate that a passed in entity has no errors in schema.",
+        "security": [{}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["location", "entity"],
+                "properties": {
+                  "location": { "type": "string" },
+                  "entity": { "type": "object", "additionalProperties": {} }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK" },
+          "400": { "description": "Validation errors." },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/locations": {
+      "get": {
+        "operationId": "GetLocations",
+        "tags": ["Locations"],
+        "summary": "Get all locations",
+        "description": "Get all locations.",
+        "security": [{}],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "data": { "$ref": "#/components/schemas/Location" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "CreateLocation",
+        "tags": ["Locations"],
+        "summary": "Create a location",
+        "description": "Create a location for a given target.",
+        "security": [{}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["type", "target"],
+                "properties": {
+                  "type": { "type": "string" },
+                  "target": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["entities", "location"],
+                  "properties": {
+                    "location": { "$ref": "#/components/schemas/Location" },
+                    "entities": { "type": "array", "items": { "$ref": "#/components/schemas/Entity" } },
+                    "exists": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/locations/{id}": {
+      "get": {
+        "operationId": "GetLocation",
+        "tags": ["Locations"],
+        "summary": "Get a location by id",
+        "description": "Get a location by id.",
+        "security": [{}],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Location" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "delete": {
+        "operationId": "DeleteLocation",
+        "tags": ["Locations"],
+        "summary": "Delete location by id",
+        "description": "Delete a location by id.",
+        "security": [{}],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "204": { "description": "No content" },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/analyze-location": {
+      "post": {
+        "operationId": "AnalyzeLocation",
+        "tags": ["Locations"],
+        "summary": "Analyze location",
+        "description": "Validate a given location.",
+        "security": [{}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["location"],
+                "properties": {
+                  "location": {
+                    "type": "object",
+                    "required": ["type", "target"],
+                    "properties": {
+                      "type": { "type": "string" },
+                      "target": { "type": "string" }
+                    }
+                  },
+                  "catalogFileName": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "generateEntities": { "type": "array", "items": { "type": "object" } },
+                    "existingEntityFiles": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    }
+  }
+}
