@@ -1,0 +1,424 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "SavePage.io API",
+    "description": "SavePage.io provides web page archiving and screenshot capture services. Save complete web pages with all assets for permanent archival.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "SavePage.io",
+      "url": "https://www.savepage.io"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.savepage.io/v1",
+      "description": "Production API Server"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key for authentication"
+      }
+    },
+    "schemas": {
+      "SavePageRequest": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the page to save",
+            "example": "https://example.com"
+          },
+          "format": {
+            "type": "string",
+            "enum": ["html", "pdf", "screenshot", "mhtml"],
+            "default": "html",
+            "description": "Output format for the saved page"
+          },
+          "full_page": {
+            "type": "boolean",
+            "default": true,
+            "description": "Capture full page (for screenshots)"
+          },
+          "wait_until": {
+            "type": "string",
+            "enum": ["load", "domcontentloaded", "networkidle0", "networkidle2"],
+            "default": "load",
+            "description": "When to consider page loading complete"
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "default": 1920,
+                "description": "Viewport width"
+              },
+              "height": {
+                "type": "integer",
+                "default": 1080,
+                "description": "Viewport height"
+              }
+            }
+          },
+          "delay": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30000,
+            "description": "Additional wait time in milliseconds"
+          },
+          "user_agent": {
+            "type": "string",
+            "description": "Custom user agent string"
+          }
+        }
+      },
+      "SavePageResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Archive ID"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Original URL"
+          },
+          "archive_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the archived page"
+          },
+          "download_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Direct download URL"
+          },
+          "format": {
+            "type": "string",
+            "description": "Output format"
+          },
+          "size": {
+            "type": "integer",
+            "description": "File size in bytes"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of archive creation"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Expiration timestamp"
+          }
+        }
+      },
+      "ArchiveList": {
+        "type": "object",
+        "properties": {
+          "archives": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavePageResponse"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of archives"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number"
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Items per page"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/save": {
+      "post": {
+        "operationId": "savePage",
+        "summary": "Save web page",
+        "description": "Archive a web page and save it in the specified format",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Page saved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavePageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/archives": {
+      "get": {
+        "operationId": "listArchives",
+        "summary": "List archives",
+        "description": "Get a list of saved archives",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["html", "pdf", "screenshot", "mhtml"]
+            },
+            "description": "Filter by format"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/archives/{id}": {
+      "get": {
+        "operationId": "getArchive",
+        "summary": "Get archive details",
+        "description": "Retrieve details of a specific archive",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Archive ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavePageResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Archive not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteArchive",
+        "summary": "Delete archive",
+        "description": "Delete a saved archive",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Archive ID"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Archive deleted successfully"
+          },
+          "404": {
+            "description": "Archive not found"
+          }
+        }
+      }
+    },
+    "/screenshot": {
+      "post": {
+        "operationId": "captureScreenshot",
+        "summary": "Capture screenshot",
+        "description": "Take a screenshot of a web page",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL to capture"
+                  },
+                  "full_page": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Capture full page scrolling"
+                  },
+                  "viewport": {
+                    "type": "object",
+                    "properties": {
+                      "width": {
+                        "type": "integer",
+                        "default": 1920
+                      },
+                      "height": {
+                        "type": "integer",
+                        "default": 1080
+                      }
+                    }
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": ["png", "jpeg", "webp"],
+                    "default": "png",
+                    "description": "Image format"
+                  },
+                  "quality": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 90,
+                    "description": "Image quality (for jpeg/webp)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Screenshot captured successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "screenshot_url": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "URL to the screenshot"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "description": "File size in bytes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    }
+  }
+}

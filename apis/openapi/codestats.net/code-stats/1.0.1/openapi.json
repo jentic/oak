@@ -1,0 +1,251 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Code::Stats API",
+    "description": "Programming activity tracking API. Track XP (experience points) for programming languages and view public profile statistics.",
+    "version": "1.0.1",
+    "contact": {
+      "name": "Code::Stats",
+      "url": "https://codestats.net"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://codestats.net/api",
+      "description": "Production API (HTTPS only)"
+    },
+    {
+      "url": "https://beta.codestats.net/api",
+      "description": "Beta testing environment"
+    }
+  ],
+  "paths": {
+    "/users/{username}": {
+      "get": {
+        "summary": "Get user profile",
+        "description": "Retrieve public user information including total XP, language statistics, machines, and activity dates",
+        "operationId": "getUserProfile",
+        "tags": ["Profile"],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Username of the Code::Stats user"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/my/pulses": {
+      "post": {
+        "summary": "Submit pulse",
+        "description": "Submit a new pulse containing programming activity data (XP) for one or more languages",
+        "operationId": "submitPulse",
+        "tags": ["Pulse"],
+        "security": [
+          {
+            "ApiTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PulseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pulse submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PulseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request - check timestamp format or XP values"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing API token"
+          },
+          "403": {
+            "description": "Forbidden - token signature invalid or tampered"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiTokenAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Token",
+        "description": "API token generated from the Machine control panel. Tokens are signed to prevent tampering."
+      }
+    },
+    "schemas": {
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "string",
+            "description": "Username"
+          },
+          "total_xp": {
+            "type": "integer",
+            "description": "Total experience points accumulated"
+          },
+          "new_xp": {
+            "type": "integer",
+            "description": "XP gained in the last 12 hours"
+          },
+          "machines": {
+            "type": "array",
+            "description": "List of machines associated with the user",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "xp": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "languages": {
+            "type": "array",
+            "description": "Programming languages and their XP",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "xp": {
+                  "type": "integer"
+                },
+                "new_xp": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "dates": {
+            "type": "object",
+            "description": "Activity dates and XP per date",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "recent": {
+            "type": "array",
+            "description": "Recent activity pulses",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "xps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "language": {
+                        "type": "string"
+                      },
+                      "xp": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "PulseRequest": {
+        "type": "object",
+        "required": ["coded_at", "xps"],
+        "properties": {
+          "coded_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "RFC 3339 timestamp with timezone offset (e.g., 2016-12-31T23:59:59+02:00)"
+          },
+          "xps": {
+            "type": "array",
+            "description": "Array of XP entries by language",
+            "items": {
+              "type": "object",
+              "required": ["language", "xp"],
+              "properties": {
+                "language": {
+                  "type": "string",
+                  "description": "Programming language name"
+                },
+                "xp": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Experience points gained"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PulseResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "string",
+            "example": "Great success!"
+          },
+          "total_xp": {
+            "type": "integer",
+            "description": "Updated total XP after the pulse"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Profile",
+      "description": "Public user profile and statistics"
+    },
+    {
+      "name": "Pulse",
+      "description": "Submit programming activity data"
+    }
+  ]
+}

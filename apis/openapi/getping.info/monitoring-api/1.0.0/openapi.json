@@ -1,0 +1,655 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "GETPing API",
+    "description": "GETPing is a website monitoring and uptime checking service. Use this API to monitor websites, check server status, and receive ping results.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "GETPing",
+      "url": "https://www.getping.info"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.getping.info",
+      "description": "GETPing Production API Server"
+    },
+    {
+      "url": "https://www.getping.info/api",
+      "description": "GETPing Alternative API Endpoint"
+    }
+  ],
+  "security": [
+    {
+      "apiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/ping": {
+      "get": {
+        "summary": "Ping a URL",
+        "description": "Check if a website or server is online and measure response time",
+        "operationId": "pingUrl",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "description": "The URL to ping",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "example": "https://example.com"
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "description": "Timeout in seconds (default: 30)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60,
+              "default": 30
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ping successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["online", "offline"],
+                      "description": "The status of the target URL"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "The URL that was pinged"
+                    },
+                    "responseTime": {
+                      "type": "integer",
+                      "description": "Response time in milliseconds"
+                    },
+                    "statusCode": {
+                      "type": "integer",
+                      "description": "HTTP status code returned"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "When the ping was performed"
+                    }
+                  }
+                },
+                "example": {
+                  "status": "online",
+                  "url": "https://example.com",
+                  "responseTime": 145,
+                  "statusCode": 200,
+                  "timestamp": "2026-03-25T10:30:00Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests - rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Batch Ping Multiple URLs",
+        "description": "Check multiple websites or servers in a single request",
+        "operationId": "batchPing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["urls"],
+                "properties": {
+                  "urls": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "description": "Array of URLs to ping",
+                    "maxItems": 100
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60,
+                    "default": 30,
+                    "description": "Timeout in seconds for each ping"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch ping results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": ["online", "offline"]
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "responseTime": {
+                            "type": "integer"
+                          },
+                          "statusCode": {
+                            "type": "integer"
+                          },
+                          "error": {
+                            "type": "string",
+                            "description": "Error message if ping failed"
+                          }
+                        }
+                      }
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors": {
+      "get": {
+        "summary": "List Monitors",
+        "description": "Get a list of all configured uptime monitors",
+        "operationId": "listMonitors",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of monitors to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Number of monitors to skip",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of monitors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "monitors": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Monitor"
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total number of monitors"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Monitor",
+        "description": "Create a new uptime monitor",
+        "operationId": "createMonitor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitorInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Monitor created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Monitor"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{monitorId}": {
+      "get": {
+        "summary": "Get Monitor Details",
+        "description": "Get detailed information about a specific monitor",
+        "operationId": "getMonitor",
+        "parameters": [
+          {
+            "name": "monitorId",
+            "in": "path",
+            "required": true,
+            "description": "Monitor ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monitor details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Monitor"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Monitor not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update Monitor",
+        "description": "Update an existing monitor",
+        "operationId": "updateMonitor",
+        "parameters": [
+          {
+            "name": "monitorId",
+            "in": "path",
+            "required": true,
+            "description": "Monitor ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitorInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Monitor updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Monitor"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Monitor not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Monitor",
+        "description": "Delete a monitor",
+        "operationId": "deleteMonitor",
+        "parameters": [
+          {
+            "name": "monitorId",
+            "in": "path",
+            "required": true,
+            "description": "Monitor ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Monitor deleted successfully"
+          },
+          "404": {
+            "description": "Monitor not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{monitorId}/history": {
+      "get": {
+        "summary": "Get Monitor History",
+        "description": "Get historical uptime data for a monitor",
+        "operationId": "getMonitorHistory",
+        "parameters": [
+          {
+            "name": "monitorId",
+            "in": "path",
+            "required": true,
+            "description": "Monitor ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Start date for history",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "End date for history",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monitor history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "monitorId": {
+                      "type": "string"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["online", "offline"]
+                          },
+                          "responseTime": {
+                            "type": "integer"
+                          },
+                          "statusCode": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "uptime": {
+                      "type": "number",
+                      "description": "Uptime percentage"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Monitor not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key for authentication"
+      }
+    },
+    "schemas": {
+      "Monitor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Monitor ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Monitor name"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL being monitored"
+          },
+          "interval": {
+            "type": "integer",
+            "description": "Check interval in minutes"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["online", "offline", "paused"],
+            "description": "Current monitor status"
+          },
+          "uptime": {
+            "type": "number",
+            "description": "Uptime percentage"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MonitorInput": {
+        "type": "object",
+        "required": ["name", "url", "interval"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Monitor name"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to monitor"
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440,
+            "description": "Check interval in minutes"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "default": 30,
+            "description": "Request timeout in seconds"
+          },
+          "alertEmail": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address for alerts"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

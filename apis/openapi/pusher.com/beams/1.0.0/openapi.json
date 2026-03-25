@@ -1,0 +1,951 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Pusher Beams API",
+    "description": "Pusher Beams is a hosted service that makes it easy to send push notifications to iOS, Android, and Web users via their devices' native notification platform.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Pusher",
+      "url": "https://pusher.com/beams"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://{instanceId}.pushnotifications.pusher.com",
+      "description": "Pusher Beams API Server",
+      "variables": {
+        "instanceId": {
+          "default": "YOUR_INSTANCE_ID",
+          "description": "Your Pusher Beams instance ID"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Secret key for server-side authentication"
+      },
+      "BeamsUserJWT": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "JWT token for user authentication"
+      }
+    },
+    "schemas": {
+      "PublishToInterestsRequest": {
+        "type": "object",
+        "required": ["interests"],
+        "properties": {
+          "interests": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "Array of interest names (1-100 interests per request)",
+            "example": ["hello", "world"]
+          },
+          "webhookUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL for publishing lifecycle webhooks"
+          },
+          "apns": {
+            "type": "object",
+            "description": "Apple Push Notification payload"
+          },
+          "fcm": {
+            "type": "object",
+            "description": "Firebase Cloud Messaging payload"
+          },
+          "web": {
+            "type": "object",
+            "description": "Web push gateway payload"
+          }
+        }
+      },
+      "PublishToUsersRequest": {
+        "type": "object",
+        "required": ["users"],
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 1000,
+            "description": "Array of user IDs (1-1000 users per request, max 164 bytes each)",
+            "example": ["user-001", "user-002"]
+          },
+          "apns": {
+            "type": "object",
+            "description": "Apple Push Notification payload"
+          },
+          "fcm": {
+            "type": "object",
+            "description": "Firebase Cloud Messaging payload"
+          },
+          "web": {
+            "type": "object",
+            "description": "Web push gateway payload"
+          }
+        }
+      },
+      "PublishResponse": {
+        "type": "object",
+        "properties": {
+          "publishId": {
+            "type": "string",
+            "description": "Unique identifier for the publish request"
+          }
+        }
+      },
+      "DeviceRegistrationApns": {
+        "type": "object",
+        "required": ["token", "bundleIdentifier"],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "APNs device token"
+          },
+          "bundleIdentifier": {
+            "type": "string",
+            "description": "iOS app bundle identifier"
+          }
+        }
+      },
+      "DeviceRegistrationFcm": {
+        "type": "object",
+        "required": ["token", "bundleIdentifier"],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "FCM device token"
+          },
+          "bundleIdentifier": {
+            "type": "string",
+            "description": "Android app bundle identifier"
+          }
+        }
+      },
+      "DeviceResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Device ID"
+          },
+          "userId": {
+            "type": "string",
+            "description": "User ID associated with the device"
+          },
+          "initialInterestSet": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Initial set of interests for the device"
+          }
+        }
+      },
+      "DeviceMetadataApns": {
+        "type": "object",
+        "properties": {
+          "sdkVersion": {
+            "type": "string",
+            "description": "SDK version"
+          },
+          "iosVersion": {
+            "type": "string",
+            "description": "iOS version"
+          },
+          "macosVersion": {
+            "type": "string",
+            "description": "macOS version"
+          }
+        }
+      },
+      "DeviceMetadataFcm": {
+        "type": "object",
+        "properties": {
+          "sdkVersion": {
+            "type": "string",
+            "description": "SDK version"
+          },
+          "androidVersion": {
+            "type": "string",
+            "description": "Android version"
+          }
+        }
+      },
+      "InterestsResponse": {
+        "type": "object",
+        "properties": {
+          "interests": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of interests"
+          }
+        }
+      },
+      "InterestsUpdate": {
+        "type": "object",
+        "required": ["interests"],
+        "properties": {
+          "interests": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "description": "Array of interests (max 5000)"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed error description"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/publish_api/v1/instances/{instanceId}/publishes/interests": {
+      "post": {
+        "operationId": "publishToInterests",
+        "summary": "Publish to interests",
+        "description": "Send push notifications to devices subscribed to specific interests",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishToInterestsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited (max 100 requests per second)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/publish_api/v1/instances/{instanceId}/publishes/users": {
+      "post": {
+        "operationId": "publishToUsers",
+        "summary": "Publish to users",
+        "description": "Send push notifications to specific users",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishToUsersRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Instance not found"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/device_api/v1/instances/{instanceId}/devices/apns": {
+      "post": {
+        "operationId": "registerApnsDevice",
+        "summary": "Register APNs device",
+        "description": "Register an iOS device for push notifications",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceRegistrationApns"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/device_api/v1/instances/{instanceId}/devices/fcm": {
+      "post": {
+        "operationId": "registerFcmDevice",
+        "summary": "Register FCM device",
+        "description": "Register an Android device for push notifications",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceRegistrationFcm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/device_api/v1/instances/{instanceId}/devices/apns/{deviceId}": {
+      "get": {
+        "operationId": "getApnsDevice",
+        "summary": "Get APNs device details",
+        "description": "Retrieve details of a specific APNs device",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device not found"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteApnsDevice",
+        "summary": "Delete APNs device",
+        "description": "Remove an APNs device",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device deleted successfully"
+          },
+          "404": {
+            "description": "Device not found"
+          }
+        }
+      }
+    },
+    "/device_api/v1/instances/{instanceId}/devices/fcm/{deviceId}": {
+      "get": {
+        "operationId": "getFcmDevice",
+        "summary": "Get FCM device details",
+        "description": "Retrieve details of a specific FCM device",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device not found"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteFcmDevice",
+        "summary": "Delete FCM device",
+        "description": "Remove an FCM device",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device deleted successfully"
+          },
+          "404": {
+            "description": "Device not found"
+          }
+        }
+      }
+    },
+    "/device_api/v1/instances/{instanceId}/devices/apns/{deviceId}/metadata": {
+      "put": {
+        "operationId": "updateApnsDeviceMetadata",
+        "summary": "Update APNs device metadata",
+        "description": "Update metadata for an APNs device",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceMetadataApns"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Metadata updated successfully"
+          }
+        }
+      }
+    },
+    "/device_api/v1/instances/{instanceId}/devices/fcm/{deviceId}/metadata": {
+      "put": {
+        "operationId": "updateFcmDeviceMetadata",
+        "summary": "Update FCM device metadata",
+        "description": "Update metadata for an FCM device",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceMetadataFcm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Metadata updated successfully"
+          }
+        }
+      }
+    },
+    "/device_api/v1/instances/{instanceId}/devices/{platform}/{deviceId}/interests": {
+      "get": {
+        "operationId": "getDeviceInterests",
+        "summary": "Get device interests",
+        "description": "Retrieve interests for a specific device",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["apns", "fcm"]
+            },
+            "description": "Platform (apns or fcm)"
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Pagination limit"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Pagination cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of interests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterestsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "replaceDeviceInterests",
+        "summary": "Replace device interests",
+        "description": "Replace all interests for a device (max 5000)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["apns", "fcm"]
+            },
+            "description": "Platform (apns or fcm)"
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterestsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Interests replaced successfully"
+          }
+        }
+      }
+    },
+    "/device_api/v1/instances/{instanceId}/devices/{platform}/{deviceId}/interests/{interest}": {
+      "post": {
+        "operationId": "addDeviceInterest",
+        "summary": "Add device interest",
+        "description": "Add a single interest to a device",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["apns", "fcm"]
+            },
+            "description": "Platform (apns or fcm)"
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID"
+          },
+          {
+            "name": "interest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Interest name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Interest added successfully"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeDeviceInterest",
+        "summary": "Remove device interest",
+        "description": "Remove a single interest from a device",
+        "security": [],
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "platform",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["apns", "fcm"]
+            },
+            "description": "Platform (apns or fcm)"
+          },
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device ID"
+          },
+          {
+            "name": "interest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Interest name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Interest removed successfully"
+          }
+        }
+      }
+    },
+    "/customer_api/v1/instances/{instanceId}/users/{userId}": {
+      "delete": {
+        "operationId": "deleteUser",
+        "summary": "Delete user",
+        "description": "Delete a user and all associated devices",
+        "parameters": [
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your Pusher Beams instance ID"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID (URL encoded)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User deleted successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Instance not found"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    }
+  }
+}
