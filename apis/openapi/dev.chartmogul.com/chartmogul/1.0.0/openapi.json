@@ -1,0 +1,541 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ChartMogul API",
+    "version": "1.0.0",
+    "description": "ChartMogul is a subscription analytics platform. The API allows importing billing data, managing customers, data sources, subscriptions, invoices, plans, and retrieving SaaS metrics like MRR, ARR, churn, and more.",
+    "x-jentic-source-url": "https://dev.chartmogul.com/"
+  },
+  "servers": [
+    {
+      "url": "https://api.chartmogul.com/v1",
+      "description": "ChartMogul API v1"
+    }
+  ],
+  "security": [
+    {
+      "basicAuth": []
+    }
+  ],
+  "tags": [
+    {"name": "Data Sources", "description": "Manage data sources for importing billing data"},
+    {"name": "Customers", "description": "Manage customer records"},
+    {"name": "Subscriptions", "description": "View customer subscriptions"},
+    {"name": "Metrics", "description": "Retrieve SaaS metrics"}
+  ],
+  "paths": {
+    "/data_sources": {
+      "get": {
+        "operationId": "listDataSources",
+        "summary": "List data sources",
+        "description": "Returns a list of all data sources (billing connections) that have been created.",
+        "tags": ["Data Sources"],
+        "responses": {
+          "200": {
+            "description": "List of data sources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data_sources": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/DataSource"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "post": {
+        "operationId": "createDataSource",
+        "summary": "Create a data source",
+        "description": "Creates a new data source for importing billing data.",
+        "tags": ["Data Sources"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {"type": "string", "description": "Name of the data source."}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created data source",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DataSource"}}}
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/data_sources/{data_source_uuid}": {
+      "get": {
+        "operationId": "retrieveDataSource",
+        "summary": "Retrieve a data source",
+        "description": "Retrieves a specific data source by UUID.",
+        "tags": ["Data Sources"],
+        "parameters": [
+          {"name": "data_source_uuid", "in": "path", "required": true, "schema": {"type": "string"}, "description": "UUID of the data source"}
+        ],
+        "responses": {
+          "200": {"description": "Data source details", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DataSource"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "delete": {
+        "operationId": "deleteDataSource",
+        "summary": "Delete a data source",
+        "description": "Deletes a data source and all associated data.",
+        "tags": ["Data Sources"],
+        "parameters": [
+          {"name": "data_source_uuid", "in": "path", "required": true, "schema": {"type": "string"}, "description": "UUID of the data source"}
+        ],
+        "responses": {
+          "204": {"description": "Successfully deleted"},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/customers": {
+      "get": {
+        "operationId": "listCustomers",
+        "summary": "List customers",
+        "description": "Returns a paginated list of all customer objects. Supports cursor-based pagination.",
+        "tags": ["Customers"],
+        "parameters": [
+          {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 50}, "description": "Number of results per page"},
+          {"name": "cursor", "in": "query", "schema": {"type": "string"}, "description": "Cursor for pagination"},
+          {"name": "data_source_uuid", "in": "query", "schema": {"type": "string"}, "description": "Filter by data source UUID"},
+          {"name": "status", "in": "query", "schema": {"type": "string", "enum": ["Active", "Past Due", "Cancelled"]}, "description": "Filter by customer status"},
+          {"name": "system", "in": "query", "schema": {"type": "string"}, "description": "Filter by billing system"},
+          {"name": "external_id", "in": "query", "schema": {"type": "string"}, "description": "Filter by external ID"}
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of customers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {"type": "array", "items": {"$ref": "#/components/schemas/Customer"}},
+                    "cursor": {"type": "string"},
+                    "has_more": {"type": "boolean"},
+                    "per_page": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "post": {
+        "operationId": "createCustomer",
+        "summary": "Import a customer",
+        "description": "Creates a new customer in ChartMogul linked to a data source.",
+        "tags": ["Customers"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Created customer", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Customer"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/customers/{customer_uuid}": {
+      "get": {
+        "operationId": "retrieveCustomer",
+        "summary": "Retrieve a customer",
+        "description": "Retrieves a customer by UUID.",
+        "tags": ["Customers"],
+        "parameters": [
+          {"name": "customer_uuid", "in": "path", "required": true, "schema": {"type": "string"}, "description": "UUID of the customer"}
+        ],
+        "responses": {
+          "200": {"description": "Customer details", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Customer"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "patch": {
+        "operationId": "updateCustomer",
+        "summary": "Update a customer",
+        "description": "Updates a customer record.",
+        "tags": ["Customers"],
+        "parameters": [
+          {"name": "customer_uuid", "in": "path", "required": true, "schema": {"type": "string"}, "description": "UUID of the customer"}
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"},
+                  "email": {"type": "string"},
+                  "company": {"type": "string"},
+                  "country": {"type": "string"},
+                  "state": {"type": "string"},
+                  "city": {"type": "string"},
+                  "zip": {"type": "string"},
+                  "lead_created_at": {"type": "string", "format": "date-time"},
+                  "free_trial_started_at": {"type": "string", "format": "date-time"},
+                  "owner": {"type": "string"},
+                  "website_url": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Updated customer", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Customer"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "delete": {
+        "operationId": "deleteCustomer",
+        "summary": "Delete a customer",
+        "description": "Deletes a customer and all associated data.",
+        "tags": ["Customers"],
+        "parameters": [
+          {"name": "customer_uuid", "in": "path", "required": true, "schema": {"type": "string"}, "description": "UUID of the customer"}
+        ],
+        "responses": {
+          "204": {"description": "Successfully deleted"},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/customers/{customer_uuid}/subscriptions": {
+      "get": {
+        "operationId": "listCustomerSubscriptions",
+        "summary": "List customer subscriptions",
+        "description": "Lists all subscriptions for a given customer. Subscriptions are auto-generated from invoice objects.",
+        "tags": ["Subscriptions"],
+        "parameters": [
+          {"name": "customer_uuid", "in": "path", "required": true, "schema": {"type": "string"}, "description": "UUID of the customer"},
+          {"name": "per_page", "in": "query", "schema": {"type": "integer"}, "description": "Number of results per page"},
+          {"name": "cursor", "in": "query", "schema": {"type": "string"}, "description": "Cursor for pagination"}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of subscriptions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {"type": "array", "items": {"$ref": "#/components/schemas/Subscription"}},
+                    "cursor": {"type": "string"},
+                    "has_more": {"type": "boolean"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/customers/{customer_uuid}/merge/{into_customer_uuid}": {
+      "post": {
+        "operationId": "mergeCustomers",
+        "summary": "Merge customers",
+        "description": "Merges one customer into another. All data from the source customer is moved to the target.",
+        "tags": ["Customers"],
+        "parameters": [
+          {"name": "customer_uuid", "in": "path", "required": true, "schema": {"type": "string"}, "description": "UUID of the source customer to merge from"},
+          {"name": "into_customer_uuid", "in": "path", "required": true, "schema": {"type": "string"}, "description": "UUID of the target customer to merge into"}
+        ],
+        "responses": {
+          "200": {"description": "Customers merged successfully"},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/metrics/mrr": {
+      "get": {
+        "operationId": "retrieveMrr",
+        "summary": "Retrieve MRR",
+        "description": "Retrieves Monthly Recurring Revenue (MRR) metrics over a specified date range. All amounts are in cents.",
+        "tags": ["Metrics"],
+        "parameters": [
+          {"name": "start-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}, "description": "Start date (YYYY-MM-DD)"},
+          {"name": "end-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}, "description": "End date (YYYY-MM-DD)"},
+          {"name": "interval", "in": "query", "schema": {"type": "string", "enum": ["day", "week", "month", "quarter"]}, "description": "Time interval for grouping"},
+          {"name": "geo", "in": "query", "schema": {"type": "string"}, "description": "Filter by geography (ISO country code)"},
+          {"name": "plans", "in": "query", "schema": {"type": "string"}, "description": "Filter by plan name"}
+        ],
+        "responses": {
+          "200": {
+            "description": "MRR metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/MrrEntry"}
+                    },
+                    "summary": {"$ref": "#/components/schemas/MetricsSummary"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/metrics/arr": {
+      "get": {
+        "operationId": "retrieveArr",
+        "summary": "Retrieve ARR",
+        "description": "Retrieves Annual Recurring Revenue (ARR) metrics over a specified date range.",
+        "tags": ["Metrics"],
+        "parameters": [
+          {"name": "start-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}, "description": "Start date"},
+          {"name": "end-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}, "description": "End date"},
+          {"name": "interval", "in": "query", "schema": {"type": "string", "enum": ["day", "week", "month", "quarter"]}}
+        ],
+        "responses": {
+          "200": {"description": "ARR metrics", "content": {"application/json": {"schema": {"type": "object", "properties": {"entries": {"type": "array", "items": {"type": "object"}}, "summary": {"$ref": "#/components/schemas/MetricsSummary"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/metrics/customer-count": {
+      "get": {
+        "operationId": "retrieveCustomerCount",
+        "summary": "Retrieve customer count",
+        "description": "Retrieves customer count metrics over a specified date range.",
+        "tags": ["Metrics"],
+        "parameters": [
+          {"name": "start-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}},
+          {"name": "end-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}},
+          {"name": "interval", "in": "query", "schema": {"type": "string", "enum": ["day", "week", "month", "quarter"]}}
+        ],
+        "responses": {
+          "200": {"description": "Customer count metrics", "content": {"application/json": {"schema": {"type": "object", "properties": {"entries": {"type": "array", "items": {"type": "object"}}, "summary": {"$ref": "#/components/schemas/MetricsSummary"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/metrics/customer-churn-rate": {
+      "get": {
+        "operationId": "retrieveCustomerChurnRate",
+        "summary": "Retrieve customer churn rate",
+        "description": "Retrieves customer churn rate metrics over a specified date range.",
+        "tags": ["Metrics"],
+        "parameters": [
+          {"name": "start-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}},
+          {"name": "end-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}},
+          {"name": "interval", "in": "query", "schema": {"type": "string", "enum": ["day", "week", "month", "quarter"]}}
+        ],
+        "responses": {
+          "200": {"description": "Customer churn rate metrics", "content": {"application/json": {"schema": {"type": "object", "properties": {"entries": {"type": "array", "items": {"type": "object"}}, "summary": {"$ref": "#/components/schemas/MetricsSummary"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/metrics/mrr-churn-rate": {
+      "get": {
+        "operationId": "retrieveMrrChurnRate",
+        "summary": "Retrieve MRR churn rate",
+        "description": "Retrieves MRR churn rate metrics over a specified date range.",
+        "tags": ["Metrics"],
+        "parameters": [
+          {"name": "start-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}},
+          {"name": "end-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}},
+          {"name": "interval", "in": "query", "schema": {"type": "string", "enum": ["day", "week", "month", "quarter"]}}
+        ],
+        "responses": {
+          "200": {"description": "MRR churn rate metrics", "content": {"application/json": {"schema": {"type": "object", "properties": {"entries": {"type": "array", "items": {"type": "object"}}, "summary": {"$ref": "#/components/schemas/MetricsSummary"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/metrics/ltv": {
+      "get": {
+        "operationId": "retrieveLtv",
+        "summary": "Retrieve LTV",
+        "description": "Retrieves Customer Lifetime Value (LTV) metrics over a specified date range.",
+        "tags": ["Metrics"],
+        "parameters": [
+          {"name": "start-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}},
+          {"name": "end-date", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}},
+          {"name": "interval", "in": "query", "schema": {"type": "string", "enum": ["day", "week", "month", "quarter"]}}
+        ],
+        "responses": {
+          "200": {"description": "LTV metrics", "content": {"application/json": {"schema": {"type": "object", "properties": {"entries": {"type": "array", "items": {"type": "object"}}, "summary": {"$ref": "#/components/schemas/MetricsSummary"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "HTTP Basic authentication using your ChartMogul API key as the username. Leave password empty."
+      }
+    },
+    "schemas": {
+      "DataSource": {
+        "type": "object",
+        "properties": {
+          "uuid": {"type": "string", "description": "Unique identifier for the data source"},
+          "name": {"type": "string", "description": "Name of the data source"},
+          "system": {"type": "string", "description": "The billing system type (e.g., Custom)"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "status": {"type": "string", "description": "Current status of the data source (e.g., idle)"}
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "uuid": {"type": "string"},
+          "external_id": {"type": "string"},
+          "external_ids": {"type": "array", "items": {"type": "string"}},
+          "data_source_uuid": {"type": "string"},
+          "data_source_uuids": {"type": "array", "items": {"type": "string"}},
+          "name": {"type": "string"},
+          "email": {"type": "string"},
+          "status": {"type": "string", "enum": ["Active", "Past Due", "Cancelled", "Lead"]},
+          "customer-since": {"type": "string", "format": "date-time"},
+          "attributes": {"$ref": "#/components/schemas/CustomerAttributes"},
+          "address": {"$ref": "#/components/schemas/Address"},
+          "company": {"type": "string"},
+          "country": {"type": "string"},
+          "state": {"type": "string"},
+          "city": {"type": "string"},
+          "zip": {"type": "string"},
+          "lead_created_at": {"type": "string", "format": "date-time", "nullable": true},
+          "free_trial_started_at": {"type": "string", "format": "date-time", "nullable": true},
+          "mrr": {"type": "integer", "description": "Monthly Recurring Revenue in cents"},
+          "arr": {"type": "integer", "description": "Annual Recurring Revenue in cents"},
+          "billing-system-url": {"type": "string"},
+          "chartmogul-url": {"type": "string"},
+          "billing-system-type": {"type": "string"},
+          "currency": {"type": "string"},
+          "currency-sign": {"type": "string"},
+          "owner": {"type": "string", "nullable": true},
+          "website_url": {"type": "string", "nullable": true},
+          "last_seen": {"type": "string", "format": "date-time", "nullable": true}
+        }
+      },
+      "CreateCustomerRequest": {
+        "type": "object",
+        "required": ["data_source_uuid", "external_id"],
+        "properties": {
+          "data_source_uuid": {"type": "string", "description": "UUID of the data source"},
+          "external_id": {"type": "string", "description": "Unique external identifier from your billing system"},
+          "name": {"type": "string"},
+          "email": {"type": "string"},
+          "company": {"type": "string"},
+          "country": {"type": "string"},
+          "state": {"type": "string"},
+          "city": {"type": "string"},
+          "zip": {"type": "string"},
+          "lead_created_at": {"type": "string", "format": "date-time"},
+          "free_trial_started_at": {"type": "string", "format": "date-time"},
+          "owner": {"type": "string"},
+          "website_url": {"type": "string"}
+        }
+      },
+      "CustomerAttributes": {
+        "type": "object",
+        "properties": {
+          "tags": {"type": "array", "items": {"type": "string"}},
+          "stripe": {"type": "object", "additionalProperties": true},
+          "custom": {"type": "object", "additionalProperties": true}
+        }
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "address_zip": {"type": "string"},
+          "city": {"type": "string"},
+          "state": {"type": "string"},
+          "country": {"type": "string"}
+        }
+      },
+      "Subscription": {
+        "type": "object",
+        "properties": {
+          "uuid": {"type": "string"},
+          "external_id": {"type": "string"},
+          "plan_uuid": {"type": "string"},
+          "data_source_uuid": {"type": "string"},
+          "cancellation_dates": {"type": "array", "items": {"type": "string", "format": "date-time"}}
+        }
+      },
+      "MrrEntry": {
+        "type": "object",
+        "properties": {
+          "date": {"type": "string", "format": "date"},
+          "mrr": {"type": "integer", "description": "MRR value in cents"},
+          "percentage-change": {"type": "number"},
+          "mrr-new-business": {"type": "integer"},
+          "mrr-expansion": {"type": "integer"},
+          "mrr-contraction": {"type": "integer"},
+          "mrr-churn": {"type": "integer"},
+          "mrr-reactivation": {"type": "integer"}
+        }
+      },
+      "MetricsSummary": {
+        "type": "object",
+        "properties": {
+          "current": {"type": "integer"},
+          "previous": {"type": "integer"},
+          "percentage-change": {"type": "number"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {"type": "string"},
+          "message": {"type": "string"}
+        }
+      }
+    }
+  }
+}
