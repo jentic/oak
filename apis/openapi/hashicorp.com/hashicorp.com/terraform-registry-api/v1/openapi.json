@@ -1,0 +1,340 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Terraform Registry API",
+    "version": "1.0.0",
+    "description": "The Terraform Registry API provides endpoints for listing, searching, and downloading Terraform modules from the public Terraform Registry.",
+    "x-jentic-source-url": "https://developer.hashicorp.com/terraform/registry/api-docs"
+  },
+  "servers": [
+    { "url": "https://registry.terraform.io/v1/modules", "description": "v1 Modules API" },
+    { "url": "https://registry.terraform.io/v2/modules", "description": "v2 Modules API (download metrics)" }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "listModules",
+        "tags": ["Modules"],
+        "summary": "List modules",
+        "description": "Returns a list of modules from the registry, optionally filtered.",
+        "parameters": [
+          { "name": "offset", "in": "query", "schema": { "type": "integer" }, "description": "Pagination offset" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" }, "description": "Maximum number of results to return" },
+          { "name": "provider", "in": "query", "schema": { "type": "string" }, "description": "Limit to a specific provider" },
+          { "name": "verified", "in": "query", "schema": { "type": "boolean" }, "description": "If true, limit to partner/verified modules" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ModuleListResponse" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      }
+    },
+    "/{namespace}": {
+      "get": {
+        "operationId": "listModulesByNamespace",
+        "tags": ["Modules"],
+        "summary": "List modules by namespace",
+        "description": "Returns a list of modules published by a specific user or organization.",
+        "parameters": [
+          { "name": "namespace", "in": "path", "required": true, "schema": { "type": "string" }, "description": "The user or organization namespace" },
+          { "name": "offset", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ModuleListResponse" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "operationId": "searchModules",
+        "tags": ["Modules"],
+        "summary": "Search modules",
+        "description": "Searches modules by keyword or phrase.",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "description": "The search string" },
+          { "name": "offset", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "provider", "in": "query", "schema": { "type": "string" } },
+          { "name": "namespace", "in": "query", "schema": { "type": "string" } },
+          { "name": "verified", "in": "query", "schema": { "type": "boolean" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ModuleListResponse" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/{namespace}/{name}": {
+      "get": {
+        "operationId": "getLatestModuleVersions",
+        "tags": ["Modules"],
+        "summary": "Get latest version of each provider for a module",
+        "parameters": [
+          { "name": "namespace", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ModuleListResponse" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/{namespace}/{name}/{provider}": {
+      "get": {
+        "operationId": "getLatestModuleVersionForProvider",
+        "tags": ["Modules"],
+        "summary": "Get latest version of a module for a single provider",
+        "parameters": [
+          { "name": "namespace", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "provider", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ModuleDetail" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/{namespace}/{name}/{provider}/versions": {
+      "get": {
+        "operationId": "getModuleVersions",
+        "tags": ["Modules"],
+        "summary": "List available versions for a module",
+        "description": "Returns all available versions for a given fully-qualified module.",
+        "parameters": [
+          { "name": "namespace", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "provider", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ModuleVersionsResponse" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/{namespace}/{name}/{provider}/{version}": {
+      "get": {
+        "operationId": "getModuleVersion",
+        "tags": ["Modules"],
+        "summary": "Get a specific version of a module",
+        "parameters": [
+          { "name": "namespace", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "provider", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "version", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ModuleDetail" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/{namespace}/{name}/{provider}/{version}/download": {
+      "get": {
+        "operationId": "downloadModuleVersion",
+        "tags": ["Modules"],
+        "summary": "Download a specific version of a module",
+        "description": "Returns 204 with X-Terraform-Get header pointing to download URL.",
+        "parameters": [
+          { "name": "namespace", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "provider", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "version", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "204": { "description": "No content, see X-Terraform-Get header for download URL" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/{namespace}/{name}/{provider}/download": {
+      "get": {
+        "operationId": "downloadLatestModuleVersion",
+        "tags": ["Modules"],
+        "summary": "Download the latest version of a module",
+        "description": "Returns a 302 redirect to the specific version download endpoint.",
+        "parameters": [
+          { "name": "namespace", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "provider", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "302": { "description": "Found - redirect to versioned download" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/{namespace}/{name}/{provider}/downloads/summary": {
+      "get": {
+        "operationId": "getModuleDownloadSummary",
+        "tags": ["Modules"],
+        "summary": "Get module download metrics summary",
+        "description": "Returns download count summary (week, month, year, total). Uses v2 API base URL.",
+        "parameters": [
+          { "name": "namespace", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "name", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "provider", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DownloadSummaryResponse" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Optional bearer token for authenticated requests"
+      }
+    },
+    "schemas": {
+      "Module": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "hashicorp/consul/aws/0.0.1" },
+          "owner": { "type": "string" },
+          "namespace": { "type": "string" },
+          "name": { "type": "string" },
+          "version": { "type": "string" },
+          "provider": { "type": "string" },
+          "description": { "type": "string" },
+          "source": { "type": "string" },
+          "published_at": { "type": "string", "format": "date-time" },
+          "downloads": { "type": "integer" },
+          "verified": { "type": "boolean" }
+        }
+      },
+      "ModuleDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Module" },
+          {
+            "type": "object",
+            "properties": {
+              "root": { "type": "object" },
+              "submodules": { "type": "array", "items": { "type": "object" } },
+              "providers": { "type": "array", "items": { "type": "string" } },
+              "versions": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        ]
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "integer" },
+          "current_offset": { "type": "integer" },
+          "next_offset": { "type": "integer" },
+          "prev_offset": { "type": "integer" },
+          "next_url": { "type": "string" }
+        }
+      },
+      "ModuleListResponse": {
+        "type": "object",
+        "properties": {
+          "meta": { "$ref": "#/components/schemas/PaginationMeta" },
+          "modules": { "type": "array", "items": { "$ref": "#/components/schemas/Module" } }
+        }
+      },
+      "ModuleVersionsResponse": {
+        "type": "object",
+        "properties": {
+          "modules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": { "type": "string" },
+                "versions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "version": { "type": "string" },
+                      "submodules": { "type": "array", "items": { "type": "object" } },
+                      "root": { "type": "object" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "DownloadSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "id": { "type": "string" },
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "week": { "type": "integer" },
+                  "month": { "type": "integer" },
+                  "year": { "type": "integer" },
+                  "total": { "type": "integer" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
