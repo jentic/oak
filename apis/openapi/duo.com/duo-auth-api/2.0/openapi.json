@@ -1,0 +1,392 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Duo Auth API",
+    "description": "The Duo Auth API (by Cisco Duo) lets you integrate two-factor authentication into your application. It supports pre-authentication checks, second-factor authentication (push, passcode, phone, SMS), user enrollment, and server health checks. Requests are signed using HMAC-SHA1.",
+    "version": "2.0",
+    "contact": {
+      "name": "Duo Security (Cisco)",
+      "url": "https://duo.com/docs/authapi"
+    },
+    "x-jentic-source-url": "https://duo.com/docs/authapi"
+  },
+  "servers": [
+    {
+      "url": "https://{api_hostname}",
+      "description": "Duo Auth API host (unique per Duo account)",
+      "variables": {
+        "api_hostname": {
+          "default": "api-XXXXXXXX.duosecurity.com",
+          "description": "Your Duo API hostname"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "duoHmacAuth": []
+    }
+  ],
+  "tags": [
+    { "name": "Health", "description": "API health check endpoints" },
+    { "name": "Enrollment", "description": "User enrollment" },
+    { "name": "Pre-Authentication", "description": "Pre-authentication checks" },
+    { "name": "Authentication", "description": "Second-factor authentication" },
+    { "name": "Authentication Status", "description": "Async authentication polling" }
+  ],
+  "paths": {
+    "/auth/v2/ping": {
+      "get": {
+        "operationId": "ping",
+        "summary": "Ping",
+        "description": "Check that the Duo service is up and running. Does not require authentication.",
+        "tags": ["Health"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service is up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stat": { "type": "string", "enum": ["OK"] },
+                    "response": {
+                      "type": "object",
+                      "properties": {
+                        "time": { "type": "integer", "description": "Current server time as a Unix timestamp" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/v2/check": {
+      "get": {
+        "operationId": "check",
+        "summary": "Check",
+        "description": "Check that the integration key, secret key, and API hostname are valid. Requires authentication.",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Credentials are valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stat": { "type": "string", "enum": ["OK"] },
+                    "response": {
+                      "type": "object",
+                      "properties": {
+                        "time": { "type": "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Invalid credentials", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/auth/v2/logo": {
+      "get": {
+        "operationId": "getLogo",
+        "summary": "Get logo",
+        "description": "Returns the logo image associated with this Duo account.",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Logo image",
+            "content": {
+              "image/png": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/auth/v2/enroll": {
+      "post": {
+        "operationId": "enroll",
+        "summary": "Enroll a user",
+        "description": "Enroll a user with Duo and return a QR code for activating Duo Mobile. Requires valid_secs parameter if the username is new. If the user already exists, returns the existing enrollment information.",
+        "tags": ["Enrollment"],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string", "description": "Username for the user. If not provided, a synthetic username will be generated." },
+                  "valid_secs": { "type": "integer", "default": 86400, "description": "Seconds for which the activation code remains valid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Enrollment initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stat": { "type": "string", "enum": ["OK"] },
+                    "response": {
+                      "type": "object",
+                      "properties": {
+                        "activation_barcode": { "type": "string", "description": "URL for the QR code image" },
+                        "activation_code": { "type": "string", "description": "Code for manual activation" },
+                        "expiration": { "type": "integer", "description": "Unix timestamp when the activation expires" },
+                        "user_id": { "type": "string" },
+                        "username": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/auth/v2/enroll_status": {
+      "post": {
+        "operationId": "enrollStatus",
+        "summary": "Check enrollment status",
+        "description": "Check whether a user has completed enrollment.",
+        "tags": ["Enrollment"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id", "activation_code"],
+                "properties": {
+                  "user_id": { "type": "string" },
+                  "activation_code": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Enrollment status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stat": { "type": "string", "enum": ["OK"] },
+                    "response": { "type": "string", "enum": ["success", "waiting", "invalid"], "description": "Enrollment status" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/auth/v2/preauth": {
+      "post": {
+        "operationId": "preauth",
+        "summary": "Pre-authentication",
+        "description": "Determine whether a user is authorized to log in, and if so, return the user's available authentication factors. This should be called before /auth/v2/auth.",
+        "tags": ["Pre-Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": { "type": "string", "description": "Permanent, unique Duo user ID (preferred)" },
+                  "username": { "type": "string", "description": "Unique username (alternative to user_id)" },
+                  "ipaddr": { "type": "string", "description": "IP address of the user (for policy evaluation)" },
+                  "hostname": { "type": "string", "description": "Hostname of the device" },
+                  "trusted_device_token": { "type": "string", "description": "Token from a previously trusted device" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pre-auth result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stat": { "type": "string", "enum": ["OK"] },
+                    "response": {
+                      "type": "object",
+                      "properties": {
+                        "result": { "type": "string", "enum": ["auth", "allow", "deny", "enroll"], "description": "auth=user must authenticate, allow=bypass, deny=blocked, enroll=user needs enrollment" },
+                        "status_msg": { "type": "string" },
+                        "devices": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/Device" }
+                        },
+                        "enroll_portal_url": { "type": "string", "description": "URL for inline enrollment (when result is enroll)" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/auth/v2/auth": {
+      "post": {
+        "operationId": "auth",
+        "summary": "Authenticate",
+        "description": "Perform second-factor authentication for a user. The user must complete pre-authentication first. Supports push, passcode, phone, and SMS factors.",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["factor"],
+                "properties": {
+                  "user_id": { "type": "string" },
+                  "username": { "type": "string" },
+                  "factor": { "type": "string", "enum": ["auto", "push", "passcode", "phone", "sms"], "description": "Factor to use for authentication" },
+                  "ipaddr": { "type": "string" },
+                  "hostname": { "type": "string" },
+                  "async": { "type": "string", "enum": ["0", "1"], "description": "If 1, returns a transaction ID for polling instead of waiting" },
+                  "device": { "type": "string", "description": "Device ID to authenticate with (from preauth)" },
+                  "type": { "type": "string", "description": "Display type for push notifications" },
+                  "display_username": { "type": "string" },
+                  "pushinfo": { "type": "string", "description": "URL-encoded key=value pairs for push notification display" },
+                  "passcode": { "type": "string", "description": "Passcode (when factor=passcode)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stat": { "type": "string", "enum": ["OK"] },
+                    "response": {
+                      "type": "object",
+                      "properties": {
+                        "result": { "type": "string", "enum": ["allow", "deny", "waiting"], "description": "allow=authenticated, deny=rejected, waiting=pending (async mode)" },
+                        "status": { "type": "string" },
+                        "status_msg": { "type": "string" },
+                        "txid": { "type": "string", "description": "Transaction ID (async mode)" },
+                        "trusted_device_token": { "type": "string", "description": "Token for remembering device" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/auth/v2/auth_status": {
+      "get": {
+        "operationId": "authStatus",
+        "summary": "Authentication status",
+        "description": "Poll for the result of an asynchronous authentication request (when async=1 was used with /auth/v2/auth).",
+        "tags": ["Authentication Status"],
+        "parameters": [
+          { "name": "txid", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Transaction ID from the /auth response" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authentication status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stat": { "type": "string", "enum": ["OK"] },
+                    "response": {
+                      "type": "object",
+                      "properties": {
+                        "result": { "type": "string", "enum": ["allow", "deny", "waiting"] },
+                        "status": { "type": "string" },
+                        "status_msg": { "type": "string" },
+                        "trusted_device_token": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "duoHmacAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Duo HMAC-SHA1 authentication. The username is the integration key (ikey), and the password is the HMAC-SHA1 signature of the request using the secret key (skey). See https://duo.com/docs/authapi#authentication for details."
+      }
+    },
+    "schemas": {
+      "Device": {
+        "type": "object",
+        "properties": {
+          "capabilities": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["auto", "push", "sms", "phone", "mobile_otp"] }
+          },
+          "device": { "type": "string", "description": "Device ID" },
+          "display_name": { "type": "string" },
+          "name": { "type": "string" },
+          "number": { "type": "string" },
+          "sms_nextcode": { "type": "string" },
+          "type": { "type": "string", "enum": ["phone", "token"] }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "stat": { "type": "string", "enum": ["FAIL"] },
+          "message": { "type": "string" },
+          "message_detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}
