@@ -1,0 +1,772 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "JokeAPI",
+    "version": "2.0.0",
+    "description": "JokeAPI is a RESTful API that delivers consistently formatted jokes. It supports multiple categories, languages, blacklist filters, and response formats. No authentication required. Rate limited to 120 requests per minute.",
+    "x-jentic-source-url": "https://jokeapi.dev/"
+  },
+  "servers": [
+    {
+      "url": "https://v2.jokeapi.dev"
+    }
+  ],
+  "paths": {
+    "/joke/{category}": {
+      "get": {
+        "operationId": "getJoke",
+        "summary": "Get a joke",
+        "description": "Returns one or more random jokes from the specified category. Supports filtering by type, language, blacklist flags, search string, and ID range.",
+        "tags": ["Jokes"],
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "description": "Joke category. Use 'Any' for all categories, or specify one or more from: Programming, Misc, Dark, Pun, Spooky, Christmas (comma-separated)",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "Any"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["json", "xml", "yaml", "txt"],
+              "default": "json"
+            }
+          },
+          {
+            "name": "blacklistFlags",
+            "in": "query",
+            "description": "Comma-separated list of flags to blacklist: nsfw, religious, political, racist, sexist, explicit",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "description": "ISO 639-1 language code for the joke",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Joke type filter",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["single", "twopart"]
+            }
+          },
+          {
+            "name": "contains",
+            "in": "query",
+            "description": "Only return jokes containing this search string (case insensitive, must be percent-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idRange",
+            "in": "query",
+            "description": "ID range filter. Single ID or range like '0-55'",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "amount",
+            "in": "query",
+            "description": "Number of jokes to return (1-10). Default is 1.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 1
+            }
+          },
+          {
+            "name": "safe-mode",
+            "in": "query",
+            "description": "Enable safe mode to only serve safe jokes. No value needed — just include the parameter.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with joke(s)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SingleJoke"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TwoPartJoke"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MultipleJokesResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request — invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (120 requests per minute)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/info": {
+      "get": {
+        "operationId": "getApiInfo",
+        "summary": "Get API information",
+        "description": "Returns information about the JokeAPI instance, including version, joke counts per category and language, and supported categories/flags/formats.",
+        "tags": ["Meta"],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["json", "xml", "yaml", "txt"],
+              "default": "json"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "description": "Language code for the response",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with API info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiInfoResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "operationId": "getCategories",
+        "summary": "Get available joke categories",
+        "description": "Returns a list of all available joke categories and category aliases.",
+        "tags": ["Meta"],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["json", "xml", "yaml", "txt"],
+              "default": "json"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "description": "Language code",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/langcode/{language}": {
+      "get": {
+        "operationId": "getLanguageCode",
+        "summary": "Get language code",
+        "description": "Returns the ISO 639-1 language code for a given language name. Useful for determining the correct language code to pass to other endpoints.",
+        "tags": ["Meta"],
+        "parameters": [
+          {
+            "name": "language",
+            "in": "path",
+            "description": "The language name (e.g., 'english', 'german', 'czech')",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["json", "xml", "yaml", "txt"],
+              "default": "json"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with language code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LanguageCodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/flags": {
+      "get": {
+        "operationId": "getFlags",
+        "summary": "Get available blacklist flags",
+        "description": "Returns a list of all available blacklist flags that can be used to filter jokes.",
+        "tags": ["Meta"],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["json", "xml", "yaml", "txt"],
+              "default": "json"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "description": "Language code",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with flags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ping": {
+      "get": {
+        "operationId": "ping",
+        "summary": "Ping the API",
+        "description": "Returns a simple ping response indicating the API is operational. Useful for health checks.",
+        "tags": ["Meta"],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["json", "xml", "yaml", "txt"],
+              "default": "json"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful ping response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "JokeFlags": {
+        "type": "object",
+        "properties": {
+          "nsfw": {
+            "type": "boolean"
+          },
+          "religious": {
+            "type": "boolean"
+          },
+          "political": {
+            "type": "boolean"
+          },
+          "racist": {
+            "type": "boolean"
+          },
+          "sexist": {
+            "type": "boolean"
+          },
+          "explicit": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SingleJoke": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["Programming", "Misc", "Dark", "Pun", "Spooky", "Christmas"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["single"]
+          },
+          "joke": {
+            "type": "string",
+            "description": "The joke text"
+          },
+          "flags": {
+            "$ref": "#/components/schemas/JokeFlags"
+          },
+          "id": {
+            "type": "integer",
+            "description": "Unique joke identifier"
+          },
+          "safe": {
+            "type": "boolean",
+            "description": "Whether the joke is considered safe for everyone"
+          },
+          "lang": {
+            "type": "string",
+            "description": "ISO 639-1 language code of the joke"
+          }
+        }
+      },
+      "TwoPartJoke": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["Programming", "Misc", "Dark", "Pun", "Spooky", "Christmas"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["twopart"]
+          },
+          "setup": {
+            "type": "string",
+            "description": "The setup of the joke"
+          },
+          "delivery": {
+            "type": "string",
+            "description": "The punchline of the joke"
+          },
+          "flags": {
+            "$ref": "#/components/schemas/JokeFlags"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "safe": {
+            "type": "boolean"
+          },
+          "lang": {
+            "type": "string"
+          }
+        }
+      },
+      "MultipleJokesResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean"
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Number of jokes returned"
+          },
+          "jokes": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SingleJoke"
+                },
+                {
+                  "$ref": "#/components/schemas/TwoPartJoke"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ApiInfoResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string"
+          },
+          "jokes": {
+            "type": "object",
+            "properties": {
+              "totalCount": {
+                "type": "integer"
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "flags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "submissionURL": {
+                "type": "string",
+                "format": "uri"
+              },
+              "idRange": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "safeJokes": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "jokeLanguages": {
+            "type": "integer"
+          },
+          "systemLanguages": {
+            "type": "integer"
+          },
+          "info": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "UNIX timestamp"
+          }
+        }
+      },
+      "CategoriesResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "categoryAliases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "alias": {
+                  "type": "string"
+                },
+                "resolved": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "timestamp": {
+            "type": "integer"
+          }
+        }
+      },
+      "LanguageCodeResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean"
+          },
+          "code": {
+            "type": "string",
+            "description": "ISO 639-1 language code"
+          },
+          "timestamp": {
+            "type": "integer"
+          }
+        }
+      },
+      "FlagsResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean"
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timestamp": {
+            "type": "integer"
+          }
+        }
+      },
+      "PingResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean"
+          },
+          "ping": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "integer"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean"
+          },
+          "internalError": {
+            "type": "boolean"
+          },
+          "code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "causedBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "additionalInfo": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}
