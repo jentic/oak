@@ -1,0 +1,810 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Ubidots HTTP API",
+    "version": "1.6",
+    "description": "Ubidots IoT platform HTTP API for sending and retrieving sensor data from connected devices. The API supports device management, variable data storage, data aggregation, resampling, and raw data retrieval. Authentication is via API token passed in the X-Auth-Token header.",
+    "x-jentic-source-url": "https://docs.ubidots.com/v1.6/reference/http"
+  },
+  "servers": [
+    {
+      "url": "https://industrial.api.ubidots.com/api/v1.6",
+      "description": "Ubidots Industrial API"
+    },
+    {
+      "url": "https://industrial.api.ubidots.com/api/v2.0",
+      "description": "Ubidots Industrial API v2.0"
+    }
+  ],
+  "tags": [
+    {"name": "Devices", "description": "Send and retrieve data via device labels"},
+    {"name": "Variables", "description": "Send and retrieve data via variable IDs"},
+    {"name": "Data", "description": "Data aggregation, resampling, and raw series"}
+  ],
+  "paths": {
+    "/devices/{deviceLabel}": {
+      "post": {
+        "operationId": "sendDataToDevice",
+        "summary": "Send data to a device",
+        "description": "Sends one or multiple variable values to a device identified by its label. Creates the device and variables automatically if they don't exist. Each key in the body represents a variable label, and the value can be a number, string, or object with 'value', 'timestamp', and 'context' fields.",
+        "tags": ["Devices"],
+        "parameters": [
+          {
+            "name": "deviceLabel",
+            "in": "path",
+            "required": true,
+            "description": "Device label (URL-friendly identifier)",
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceDataPayload"
+              },
+              "example": {
+                "temperature": 25.5,
+                "humidity": {"value": 60, "timestamp": 1609459200000, "context": {"source": "sensor-1"}}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Data accepted",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/SuccessResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/devices/{deviceLabel}/{variableLabel}": {
+      "post": {
+        "operationId": "sendDataToDeviceVariable",
+        "summary": "Send data to a specific variable in a device",
+        "description": "Sends a data point to a specific variable within a device.",
+        "tags": ["Devices"],
+        "parameters": [
+          {
+            "name": "deviceLabel",
+            "in": "path",
+            "required": true,
+            "description": "Device label",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "variableLabel",
+            "in": "path",
+            "required": true,
+            "description": "Variable label",
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VariableDataPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Data accepted",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/SuccessResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getLastValueFromDevice",
+        "summary": "Get last value of a variable from a device",
+        "description": "Gets the last value of a specific variable from a device using device and variable labels.",
+        "tags": ["Devices"],
+        "parameters": [
+          {
+            "name": "deviceLabel",
+            "in": "path",
+            "required": true,
+            "description": "Device label",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "variableLabel",
+            "in": "path",
+            "required": true,
+            "description": "Variable label",
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Last value retrieved",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/DataPoint"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/devices/{deviceLabel}/{variableLabel}/values": {
+      "get": {
+        "operationId": "getVariableDataFromDevice",
+        "summary": "Get variable data from a device",
+        "description": "Returns all data points for a specific variable in a device. Supports pagination.",
+        "tags": ["Devices"],
+        "parameters": [
+          {
+            "name": "deviceLabel",
+            "in": "path",
+            "required": true,
+            "description": "Device label",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "variableLabel",
+            "in": "path",
+            "required": true,
+            "description": "Variable label",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "description": "Number of results per page",
+            "schema": {"type": "integer", "default": 20}
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Page number",
+            "schema": {"type": "integer", "default": 1}
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "description": "Start timestamp (milliseconds since epoch)",
+            "schema": {"type": "integer"}
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "description": "End timestamp (milliseconds since epoch)",
+            "schema": {"type": "integer"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data points retrieved",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/DataPointListResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/variables/{variableId}": {
+      "post": {
+        "operationId": "sendDataToVariable",
+        "summary": "Send data to a variable",
+        "description": "Sends a data point to a variable identified by its ID.",
+        "tags": ["Variables"],
+        "parameters": [
+          {
+            "name": "variableId",
+            "in": "path",
+            "required": true,
+            "description": "Variable ID",
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VariableDataPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Data accepted",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/SuccessResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/variables/{variableId}/values": {
+      "get": {
+        "operationId": "getVariableData",
+        "summary": "Get variable data",
+        "description": "Returns data points for a variable identified by its ID.",
+        "tags": ["Variables"],
+        "parameters": [
+          {
+            "name": "variableId",
+            "in": "path",
+            "required": true,
+            "description": "Variable ID",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "description": "Number of results per page",
+            "schema": {"type": "integer", "default": 20}
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Page number",
+            "schema": {"type": "integer", "default": 1}
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "description": "Start timestamp (milliseconds since epoch)",
+            "schema": {"type": "integer"}
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "description": "End timestamp (milliseconds since epoch)",
+            "schema": {"type": "integer"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data points retrieved",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/DataPointListResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/variables/{variableId}/statistics/{aggregation}": {
+      "get": {
+        "operationId": "getVariableAggregatedData",
+        "summary": "Get variable aggregated data",
+        "description": "Returns aggregated data (mean, sum, min, max, count) for a variable over a time range.",
+        "tags": ["Variables"],
+        "parameters": [
+          {
+            "name": "variableId",
+            "in": "path",
+            "required": true,
+            "description": "Variable ID",
+            "schema": {"type": "string"}
+          },
+          {
+            "name": "aggregation",
+            "in": "path",
+            "required": true,
+            "description": "Aggregation function",
+            "schema": {
+              "type": "string",
+              "enum": ["mean", "sum", "min", "max", "count"]
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "description": "Start timestamp (milliseconds since epoch)",
+            "schema": {"type": "integer"}
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "description": "End timestamp (milliseconds since epoch)",
+            "schema": {"type": "integer"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregated value",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {"type": "number"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/stats/aggregation": {
+      "post": {
+        "operationId": "dataAggregation",
+        "summary": "Data aggregation",
+        "description": "Performs aggregation operations on one or more variables. Returns aggregated values (mean, sum, min, max, count) with optional time bucketing. Supports multiple variables in a single request.",
+        "tags": ["Data"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/AggregationRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Aggregation results",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/AggregationResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/stats/resample": {
+      "post": {
+        "operationId": "dataResample",
+        "summary": "Data resample",
+        "description": "Resamples data from one or more variables at a specified time interval. Returns evenly-spaced data points using interpolation or aggregation.",
+        "tags": ["Data"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/ResampleRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resampled data",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ResampleResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/raw/series": {
+      "post": {
+        "operationId": "dataRawSeries",
+        "summary": "Data raw series",
+        "description": "Retrieves raw data series from one or more variables over a specified time range. Returns unprocessed data points in chronological order.",
+        "tags": ["Data"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/RawSeriesRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Raw series data",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/RawSeriesResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DeviceDataPayload": {
+        "type": "object",
+        "description": "Key-value pairs where keys are variable labels. Values can be numbers, strings, or objects with 'value', 'timestamp', and 'context' properties.",
+        "additionalProperties": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "string"},
+            {
+              "type": "object",
+              "properties": {
+                "value": {"type": "number", "description": "Numeric value to store"},
+                "timestamp": {"type": "integer", "description": "Unix timestamp in milliseconds"},
+                "context": {
+                  "type": "object",
+                  "additionalProperties": {"type": "string"},
+                  "description": "Key-value context metadata (e.g., location, source)"
+                }
+              },
+              "required": ["value"]
+            }
+          ]
+        }
+      },
+      "VariableDataPayload": {
+        "type": "object",
+        "properties": {
+          "value": {"type": "number", "description": "Numeric value to store"},
+          "timestamp": {"type": "integer", "description": "Unix timestamp in milliseconds"},
+          "context": {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "description": "Key-value context metadata"
+          }
+        },
+        "required": ["value"]
+      },
+      "DataPoint": {
+        "type": "object",
+        "properties": {
+          "value": {"type": "number", "description": "Data point value"},
+          "timestamp": {"type": "integer", "description": "Unix timestamp in milliseconds"},
+          "context": {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+          },
+          "created_at": {"type": "integer", "description": "Server-side creation timestamp"}
+        }
+      },
+      "DataPointListResponse": {
+        "type": "object",
+        "properties": {
+          "count": {"type": "integer", "description": "Total number of data points"},
+          "next": {"type": "string", "nullable": true, "description": "URL for next page"},
+          "previous": {"type": "string", "nullable": true, "description": "URL for previous page"},
+          "results": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/DataPoint"}
+          }
+        }
+      },
+      "AggregationRequest": {
+        "type": "object",
+        "properties": {
+          "variables": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "List of variable IDs to aggregate"
+          },
+          "aggregation": {
+            "type": "string",
+            "enum": ["mean", "sum", "min", "max", "count"],
+            "description": "Aggregation function"
+          },
+          "period": {
+            "type": "string",
+            "description": "Time period for bucketing (e.g., '1H', '1D', '1W')"
+          },
+          "start": {"type": "integer", "description": "Start timestamp in milliseconds"},
+          "end": {"type": "integer", "description": "End timestamp in milliseconds"},
+          "join_dataframes": {"type": "boolean", "description": "Whether to join results into a single DataFrame"}
+        },
+        "required": ["variables", "aggregation"]
+      },
+      "AggregationResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "variable": {"type": "string"},
+                "value": {"type": "number"},
+                "timestamp": {"type": "integer"}
+              }
+            }
+          }
+        }
+      },
+      "ResampleRequest": {
+        "type": "object",
+        "properties": {
+          "variables": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "List of variable IDs"
+          },
+          "aggregation": {
+            "type": "string",
+            "enum": ["mean", "sum", "min", "max", "count"],
+            "description": "Aggregation function for resampling"
+          },
+          "period": {
+            "type": "string",
+            "description": "Resample period (e.g., '1T' for 1 minute, '1H' for 1 hour)"
+          },
+          "start": {"type": "integer", "description": "Start timestamp in milliseconds"},
+          "end": {"type": "integer", "description": "End timestamp in milliseconds"},
+          "join_dataframes": {"type": "boolean"}
+        },
+        "required": ["variables", "aggregation", "period"]
+      },
+      "ResampleResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "variable": {"type": "string"},
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {"type": "number"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "RawSeriesRequest": {
+        "type": "object",
+        "properties": {
+          "variables": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "List of variable IDs"
+          },
+          "columns": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Columns to include (e.g., 'value.value', 'value.context')"
+          },
+          "start": {"type": "integer", "description": "Start timestamp in milliseconds"},
+          "end": {"type": "integer", "description": "End timestamp in milliseconds"},
+          "join_dataframes": {"type": "boolean"}
+        },
+        "required": ["variables"]
+      },
+      "RawSeriesResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "variable": {"type": "string"},
+                "columns": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "status_code": {"type": "integer"},
+          "message": {"type": "string"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {"type": "integer"},
+          "message": {"type": "string"},
+          "detail": {"type": "string"}
+        }
+      }
+    },
+    "securitySchemes": {
+      "ApiToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Auth-Token",
+        "description": "Ubidots API token. Found in Credentials section of your Ubidots account."
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiToken": []
+    }
+  ]
+}
