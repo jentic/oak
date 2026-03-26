@@ -1,0 +1,434 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Sirv API",
+    "version": "2.0.0",
+    "description": "Sirv is an image CDN and digital asset management platform. The REST API provides authentication, account management, file upload/download, folder management, image processing (resize, crop, watermark), spin set creation, video management, and user management. Uses JWT bearer token authentication.",
+    "x-jentic-source-url": "https://apidocs.sirv.com/"
+  },
+  "servers": [
+    { "url": "https://api.sirv.com/v2" }
+  ],
+  "paths": {
+    "/token": {
+      "post": {
+        "operationId": "getToken",
+        "summary": "Get authentication token",
+        "description": "Authenticate with client ID and secret to obtain a JWT bearer token.",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["clientId", "clientSecret"],
+                "properties": {
+                  "clientId": { "type": "string", "description": "API client ID" },
+                  "clientSecret": { "type": "string", "description": "API client secret" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Authentication successful", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenResponse" } } } },
+          "401": { "description": "Invalid credentials", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/account": {
+      "get": {
+        "operationId": "getAccount",
+        "summary": "Get account information",
+        "description": "Returns account details including storage usage, plan info, and settings.",
+        "tags": ["Account"],
+        "responses": {
+          "200": { "description": "Account info", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AccountInfo" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/files/upload": {
+      "post": {
+        "operationId": "uploadFile",
+        "summary": "Upload a file",
+        "description": "Upload an image, video, or other file to Sirv.",
+        "tags": ["Files"],
+        "parameters": [
+          { "name": "filename", "in": "query", "required": true, "description": "Destination path including filename (e.g., /images/photo.jpg)", "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": { "type": "string", "format": "binary" }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "File uploaded", "content": { "application/json": { "schema": { "type": "object", "properties": { "filename": { "type": "string" } } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/files/stat": {
+      "get": {
+        "operationId": "getFileInfo",
+        "summary": "Get file information",
+        "description": "Returns metadata about a file including size, type, dimensions, and timestamps.",
+        "tags": ["Files"],
+        "parameters": [
+          { "name": "filename", "in": "query", "required": true, "description": "File path (e.g., /images/photo.jpg)", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "File metadata", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FileInfo" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "File not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/files/delete": {
+      "post": {
+        "operationId": "deleteFile",
+        "summary": "Delete a file",
+        "description": "Delete a file from Sirv.",
+        "tags": ["Files"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["filename"],
+                "properties": {
+                  "filename": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "File deleted" },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "File not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/files/readdir": {
+      "get": {
+        "operationId": "listDirectory",
+        "summary": "List directory contents",
+        "description": "Returns a list of files and folders in a directory.",
+        "tags": ["Folders"],
+        "parameters": [
+          { "name": "dirname", "in": "query", "required": true, "description": "Directory path (e.g., /images/)", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Directory listing", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DirectoryListing" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "Directory not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/files/mkdir": {
+      "post": {
+        "operationId": "createDirectory",
+        "summary": "Create a directory",
+        "tags": ["Folders"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["dirname"],
+                "properties": {
+                  "dirname": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Directory created" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/files/rename": {
+      "post": {
+        "operationId": "renameFile",
+        "summary": "Rename or move a file",
+        "tags": ["Files"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["from", "to"],
+                "properties": {
+                  "from": { "type": "string", "description": "Current file path" },
+                  "to": { "type": "string", "description": "New file path" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "File renamed" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/files/copy": {
+      "post": {
+        "operationId": "copyFile",
+        "summary": "Copy a file",
+        "tags": ["Files"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["from", "to"],
+                "properties": {
+                  "from": { "type": "string" },
+                  "to": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "File copied" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/files/search": {
+      "post": {
+        "operationId": "searchFiles",
+        "summary": "Search files",
+        "description": "Search for files across your Sirv account using various criteria.",
+        "tags": ["Files"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": { "type": "string", "description": "Search query" },
+                  "from": { "type": "integer", "description": "Result offset" },
+                  "size": { "type": "integer", "description": "Number of results" },
+                  "sort": { "type": "object", "description": "Sort criteria" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Search results", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SearchResponse" } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/files/spin": {
+      "post": {
+        "operationId": "createSpin",
+        "summary": "Create a 360° spin",
+        "description": "Create a 360° product spin from multiple images in a folder.",
+        "tags": ["Spins"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["dirname"],
+                "properties": {
+                  "dirname": { "type": "string", "description": "Folder containing spin images" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Spin created" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/account/users": {
+      "get": {
+        "operationId": "listUsers",
+        "summary": "List account users",
+        "tags": ["Users"],
+        "responses": {
+          "200": { "description": "User list", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/User" } } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/stats/http": {
+      "get": {
+        "operationId": "getHttpStats",
+        "summary": "Get HTTP request statistics",
+        "description": "Returns HTTP request and bandwidth statistics for your account.",
+        "tags": ["Statistics"],
+        "parameters": [
+          { "name": "from", "in": "query", "description": "Start date (ISO 8601)", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "description": "End date (ISO 8601)", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "description": "Statistics data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StatsResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/stats/storage": {
+      "get": {
+        "operationId": "getStorageStats",
+        "summary": "Get storage statistics",
+        "description": "Returns storage usage statistics for your account.",
+        "tags": ["Statistics"],
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "description": "Storage statistics", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StatsResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "description": "JWT bearer token" },
+          "expiresIn": { "type": "integer", "description": "Token expiry in seconds" },
+          "scope": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "AccountInfo": {
+        "type": "object",
+        "properties": {
+          "alias": { "type": "string" },
+          "dateCreated": { "type": "string", "format": "date-time" },
+          "plan": { "type": "object", "properties": { "name": { "type": "string" }, "storage": { "type": "integer" } } },
+          "storage": { "type": "object", "properties": { "used": { "type": "integer" }, "allowance": { "type": "integer" }, "files": { "type": "integer" } } }
+        }
+      },
+      "FileInfo": {
+        "type": "object",
+        "properties": {
+          "filename": { "type": "string" },
+          "size": { "type": "integer" },
+          "contentType": { "type": "string" },
+          "isDirectory": { "type": "boolean" },
+          "mtime": { "type": "string", "format": "date-time" },
+          "ctime": { "type": "string", "format": "date-time" },
+          "width": { "type": "integer" },
+          "height": { "type": "integer" }
+        }
+      },
+      "DirectoryListing": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filename": { "type": "string" },
+                "isDirectory": { "type": "boolean" },
+                "size": { "type": "integer" },
+                "mtime": { "type": "string", "format": "date-time" },
+                "contentType": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "hits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_source": { "$ref": "#/components/schemas/FileInfo" }
+              }
+            }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "role": { "type": "string" }
+        }
+      },
+      "StatsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": { "type": "string", "format": "date" },
+                "requests": { "type": "integer" },
+                "bandwidth": { "type": "integer" }
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "message": { "type": "string" },
+          "statusCode": { "type": "integer" }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token obtained from POST /token"
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ]
+}

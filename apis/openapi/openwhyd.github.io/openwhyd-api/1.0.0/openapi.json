@@ -1,0 +1,206 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Openwhyd API",
+    "version": "1.0.0",
+    "description": "Openwhyd is an open-source music curation platform. The API provides two interfaces: a Data Export API (public, no auth) for downloading user track lists, and a User API (authenticated) for reading and updating track lists. Data includes tracks from YouTube, SoundCloud, Vimeo, and other streaming platforms.",
+    "x-jentic-source-url": "https://openwhyd.github.io/openwhyd/API"
+  },
+  "servers": [
+    { "url": "https://openwhyd.org" }
+  ],
+  "paths": {
+    "/{userId}/playlists": {
+      "get": {
+        "operationId": "getUserPlaylists",
+        "summary": "Get user playlists",
+        "description": "Returns all playlists created by a user.",
+        "tags": ["Data Export"],
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "description": "User ID", "schema": { "type": "string" } },
+          { "name": "format", "in": "query", "description": "Response format", "schema": { "type": "string", "enum": ["json"], "default": "json" } }
+        ],
+        "responses": {
+          "200": { "description": "User playlists", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Playlist" } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "User not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/{userId}": {
+      "get": {
+        "operationId": "getUserTracks",
+        "summary": "Get user track list",
+        "description": "Returns a paginated list of tracks posted by a user.",
+        "tags": ["Data Export"],
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json"], "default": "json" } },
+          { "name": "limit", "in": "query", "description": "Number of tracks to return", "schema": { "type": "integer", "default": 20 } },
+          { "name": "after", "in": "query", "description": "Post ID for pagination", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "User tracks", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Track" } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "User not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/{userId}/playlist/{playlistId}": {
+      "get": {
+        "operationId": "getPlaylistTracks",
+        "summary": "Get playlist tracks",
+        "description": "Returns tracks from a specific playlist.",
+        "tags": ["Data Export"],
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "playlistId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json"], "default": "json" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "after", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Playlist tracks", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Track" } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "Playlist not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/hot": {
+      "get": {
+        "operationId": "getHotTracks",
+        "summary": "Get trending/hot tracks",
+        "description": "Returns trending tracks on the platform.",
+        "tags": ["Discovery"],
+        "parameters": [
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json"], "default": "json" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Hot tracks", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Track" } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/post": {
+      "post": {
+        "operationId": "addTrack",
+        "summary": "Add a track to your library",
+        "description": "Add a track to the authenticated user's library or a specific playlist. Requires authentication.",
+        "tags": ["User API"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["action", "eId", "name"],
+                "properties": {
+                  "action": { "type": "string", "enum": ["insert"], "description": "Action to perform" },
+                  "eId": { "type": "string", "description": "Embed ID (e.g., /yt/dQw4w9WgXcQ for YouTube)" },
+                  "name": { "type": "string", "description": "Track name" },
+                  "pId": { "type": "integer", "description": "Playlist ID to add to" },
+                  "img": { "type": "string", "description": "Thumbnail URL" },
+                  "src": { "type": "object", "description": "Source metadata" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Track added", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Track" } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/user": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "summary": "Get current user info",
+        "description": "Returns information about the currently authenticated user.",
+        "tags": ["User API"],
+        "responses": {
+          "200": { "description": "User info", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "operationId": "searchTracks",
+        "summary": "Search tracks",
+        "description": "Search for tracks by name across all users.",
+        "tags": ["Discovery"],
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "description": "Search query", "schema": { "type": "string" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json"], "default": "json" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Search results", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Track" } } } } },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Track": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "eId": { "type": "string", "description": "Embed ID (e.g., /yt/VIDEO_ID, /sc/URL)" },
+          "name": { "type": "string" },
+          "img": { "type": "string", "format": "uri" },
+          "uId": { "type": "string", "description": "User ID who posted it" },
+          "uNm": { "type": "string", "description": "User name" },
+          "pl": { "type": "object", "properties": { "id": { "type": "integer" }, "name": { "type": "string" } } },
+          "text": { "type": "string", "description": "Comment/description" },
+          "nbP": { "type": "integer", "description": "Number of plays" },
+          "nbR": { "type": "integer", "description": "Number of reposts" },
+          "nbL": { "type": "integer", "description": "Number of likes" }
+        }
+      },
+      "Playlist": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "url": { "type": "string" },
+          "nbTracks": { "type": "integer" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "handle": { "type": "string" },
+          "img": { "type": "string", "format": "uri" },
+          "nbPosts": { "type": "integer" },
+          "nbSubscribers": { "type": "integer" },
+          "nbSubscriptions": { "type": "integer" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "whydSid",
+        "description": "Session cookie obtained after login"
+      }
+    }
+  },
+  "security": [
+    { "cookieAuth": [] }
+  ]
+}
