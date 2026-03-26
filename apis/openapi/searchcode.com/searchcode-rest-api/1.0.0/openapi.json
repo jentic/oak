@@ -1,0 +1,889 @@
+{
+  "components": {
+    "parameters": {
+      "client": {
+        "description": "Client identifier for your application (e.g. 'my-app-v1'). Required for all REST API requests.",
+        "in": "query",
+        "name": "client",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "APIError": {
+        "properties": {
+          "error": {
+            "properties": {
+              "code": {
+                "description": "Machine-readable error code",
+                "type": "string"
+              },
+              "message": {
+                "description": "Human-readable error message",
+                "type": "string"
+              },
+              "retry_after_seconds": {
+                "description": "Seconds to wait before retrying (for rate-limited requests)",
+                "type": "integer"
+              },
+              "suggestion": {
+                "description": "Suggested action to resolve the error",
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Code intelligence for LLMs. Analyze, search, and retrieve code from any public git repository. This REST API mirrors the MCP tool endpoints for non-MCP clients.",
+    "title": "searchcode REST API",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://searchcode.com/openapi.json"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/api/v1/code_analyze": {
+      "post": {
+        "operationId": "code_analyze",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/client"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "detail_level": {
+                    "description": "Controls response verbosity. summary returns top 20 across all languages; full returns top 20 per language. Use summary for portfolio reviews, hiring assessments, and high-level overviews. Use full for deep per-language audits or when you need granular per-file breakdowns within a specific language.",
+                    "enum": [
+                      "summary",
+                      "full"
+                    ],
+                    "type": "string"
+                  },
+                  "include_all_dirs": {
+                    "default": false,
+                    "description": "Include dependency/build/cache directories that are excluded by default (vendor, node_modules, third_party, target, build, dist, Pods, generated, etc.). Set to true if you need to analyze generated/vendored code.",
+                    "type": "boolean"
+                  },
+                  "language": {
+                    "description": "Filter results to a specific language (e.g. \"Java\", \"Go\", \"Python\").",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Subdirectory to scope analysis to (e.g. 'src', 'clang/lib'). Only files under this path are walked and analyzed \u2014 use this for large monorepos where full analysis is too slow or when the user's question is about a specific component. Omit to analyze the entire repository.",
+                    "type": "string"
+                  },
+                  "repository": {
+                    "description": "Git URL of a public remote repository",
+                    "type": "string"
+                  },
+                  "scan_test_files": {
+                    "default": false,
+                    "description": "Include test files in code quality and credential scan results. Test files are excluded by default to reduce false positives (e.g. test credit card numbers, mock credentials). Set to true if you need to audit test code.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "repository"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad request (invalid params or missing client)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Repository or file not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Rate limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Internal server error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad gateway (upstream clone failure)"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Service unavailable (clone queue full)"
+          }
+        },
+        "summary": "Instant repo overview \u2014 languages, complexity, file count, tech stack, code quality findings, and credential scanning. Use as your first call to understand any remote public codebase. Supports language filtering and path scoping (for large monorepos, analyze a subdirectory instead of the full repo). When analysing multiple repositories, call in parallel rather than sequentially. Dependency/build directories excluded by default."
+      }
+    },
+    "/api/v1/code_file_tree": {
+      "post": {
+        "operationId": "code_file_tree",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/client"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "include_all_dirs": {
+                    "default": false,
+                    "description": "Include dependency/build/cache directories that are excluded by default (vendor, node_modules, third_party, target, build, dist, Pods, generated, etc.). Set to true if you need to see generated/vendored code in the tree.",
+                    "type": "boolean"
+                  },
+                  "include_stats": {
+                    "default": false,
+                    "description": "If true, include line count and file size for each file.",
+                    "type": "boolean"
+                  },
+                  "language": {
+                    "description": "Filter to only show files of this language (e.g. \"Go\", \"Java\").",
+                    "type": "string"
+                  },
+                  "max_depth": {
+                    "description": "Maximum directory depth to return. If omitted, returns full tree.",
+                    "type": "integer"
+                  },
+                  "max_results": {
+                    "default": 20,
+                    "description": "Max fuzzy matches to return (default 20, max 100). Only used with query.",
+                    "maximum": 100,
+                    "type": "integer"
+                  },
+                  "path_filter": {
+                    "description": "Filter to restrict tree to matching paths. Supports both glob patterns (e.g. 'pkg/**', 'src/**/*.go') and token-style filters (e.g. 'pkg/api .go'). Glob patterns are auto-converted to token filters. Mutually exclusive with query.",
+                    "type": "string"
+                  },
+                  "query": {
+                    "description": "Fuzzy search query for finding files by approximate name. Returns ranked matches instead of tree. Examples: 'main.go', 'auth handler'. Mutually exclusive with path_filter.",
+                    "type": "string"
+                  },
+                  "repository": {
+                    "description": "Git URL of a public remote repository",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "repository"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad request (invalid params or missing client)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Repository or file not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Rate limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Internal server error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad gateway (upstream clone failure)"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Service unavailable (clone queue full)"
+          }
+        },
+        "summary": "List files and directories in any public git repo. Supports fuzzy file search (query parameter), language/path filtering, and depth control. Use to explore project layout, find files by name, or browse specific directories. Results capped at 1000 files; response includes total_files, files_shown, and truncated fields. Use language or path_filter to narrow large repos. Dependency/build directories excluded by default."
+      }
+    },
+    "/api/v1/code_get_file": {
+      "post": {
+        "operationId": "code_get_file",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/client"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "end_line": {
+                    "description": "Last line to return (inclusive). If omitted, returns to end of file. Cannot combine with symbol_name.",
+                    "type": "integer"
+                  },
+                  "include_adjacent_symbols": {
+                    "default": false,
+                    "description": "When true and symbol_name is set, includes structurally related declarations (nearby siblings) alongside the target symbol.",
+                    "type": "boolean"
+                  },
+                  "max_lines": {
+                    "default": 500,
+                    "description": "Lines to return (max: 2000). When reading an unfamiliar file for orientation, set this to 2000. When you already know which function or class you need (from search or findings results), prefer symbol_name instead \u2014 it returns only the relevant declaration and avoids pulling unnecessary context.",
+                    "maximum": 2000,
+                    "type": "integer"
+                  },
+                  "path": {
+                    "description": "File path relative to repository root",
+                    "type": "string"
+                  },
+                  "repository": {
+                    "description": "Git URL of a public remote repository",
+                    "type": "string"
+                  },
+                  "start_line": {
+                    "default": 1,
+                    "description": "First line to return (1-based). Cannot combine with symbol_name.",
+                    "type": "integer"
+                  },
+                  "symbol_name": {
+                    "description": "PREFERRED for targeted retrieval. Name of a function/method/class to extract \u2014 returns only that declaration. Use this when search results or findings have pointed you to a specific symbol, instead of fetching the entire file. Cannot combine with start_line/end_line. Response includes a symbols list for supported languages.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "repository",
+                  "path"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad request (invalid params or missing client)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Repository or file not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Rate limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Internal server error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad gateway (upstream clone failure)"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Service unavailable (clone queue full)"
+          }
+        },
+        "summary": "Get code from a remote public git repository \u2014 either a specific function/class by name, a line range, or a full file. PREFERRED WORKFLOW: When search results or findings have already identified a specific function, method, or class, use symbol_name to extract just that declaration. This avoids fetching entire files and keeps context focused. Only fetch full files when you need a broad understanding of a file you haven't seen before. For supported languages (Go, Python, TypeScript, JavaScript, Java, C, C++, C#, Kotlin, Swift, Rust) the response includes a symbols list of declarations with line ranges. This is not a first-call tool \u2014 use code_analyze or code_search first to identify targets, then extract precisely what you need."
+      }
+    },
+    "/api/v1/code_get_files": {
+      "post": {
+        "operationId": "code_get_files",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/client"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "max_lines": {
+                    "default": 500,
+                    "description": "Per-file safety cap on lines returned (cap: 2000).",
+                    "maximum": 2000,
+                    "type": "integer"
+                  },
+                  "paths": {
+                    "description": "List of files to read. Each entry has a path and optional line range.",
+                    "items": {
+                      "properties": {
+                        "end_line": {
+                          "description": "Last line to return (inclusive). If omitted, returns to end of file.",
+                          "type": "integer"
+                        },
+                        "path": {
+                          "description": "File path relative to repository root",
+                          "type": "string"
+                        },
+                        "start_line": {
+                          "default": 1,
+                          "description": "First line to return (1-based).",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "path"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 10,
+                    "type": "array"
+                  },
+                  "repository": {
+                    "description": "Git URL of a public remote repository",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "repository",
+                  "paths"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad request (invalid params or missing client)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Repository or file not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Rate limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Internal server error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad gateway (upstream clone failure)"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Service unavailable (clone queue full)"
+          }
+        },
+        "summary": "Get contents of multiple files from a remote public git repository in a single call. Reduces round-trips when you need to read several related files. Max 10 files per batch, 5000 total lines budget across all files. Each file supports optional line ranges. Failed files return per-file errors without blocking other files."
+      }
+    },
+    "/api/v1/code_get_findings": {
+      "post": {
+        "operationId": "code_get_findings",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/client"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "category": {
+                    "description": "Filter findings by category.",
+                    "enum": [
+                      "security",
+                      "deprecated",
+                      "safety",
+                      "correctness",
+                      "maintainability",
+                      "accessibility",
+                      "modernization",
+                      "performance",
+                      "concurrency"
+                    ],
+                    "type": "string"
+                  },
+                  "max_results": {
+                    "default": 50,
+                    "description": "Maximum number of findings to return (cap: 200).",
+                    "maximum": 200,
+                    "type": "integer"
+                  },
+                  "offset": {
+                    "default": 0,
+                    "description": "Skip this many findings before returning. Use for paging.",
+                    "type": "integer"
+                  },
+                  "path": {
+                    "description": "Filter findings to files matching this path prefix (e.g. \"pkg/api/\" or \"src/main.go\").",
+                    "type": "string"
+                  },
+                  "repository": {
+                    "description": "Git URL of a public remote repository",
+                    "type": "string"
+                  },
+                  "scan_test_files": {
+                    "default": false,
+                    "description": "Include findings from test files. By default test files are excluded.",
+                    "type": "boolean"
+                  },
+                  "severity": {
+                    "description": "Filter findings by severity level.",
+                    "enum": [
+                      "error",
+                      "warning",
+                      "info"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "repository"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad request (invalid params or missing client)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Repository or file not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Rate limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Internal server error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad gateway (upstream clone failure)"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Service unavailable (clone queue full)"
+          }
+        },
+        "summary": "Get detailed code quality findings from a remote public git repository. Returns rule IDs, line numbers, severity, category, descriptions, and source snippets. Supports filtering by file path, severity (error, warning, info), and category (security, deprecated, safety, correctness, maintainability, accessibility, modernization, performance, concurrency). Use after code_analyze to drill into specific findings. Shares the same analysis cache \u2014 no duplicate work if analyze already ran."
+      }
+    },
+    "/api/v1/code_search": {
+      "post": {
+        "operationId": "code_search",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/client"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "case_sensitive": {
+                    "default": false,
+                    "description": "Whether to match case-sensitively.",
+                    "type": "boolean"
+                  },
+                  "code_filter": {
+                    "description": "Structural filter to narrow matches to specific code regions. only-declarations and only-usages use heuristic patterns and support 30+ languages (Go, Python, JS/TS, Rust, Java, C/C++, C#, Ruby, PHP, Kotlin, Swift, and more). For unsupported languages, all matches are classified as usages.",
+                    "enum": [
+                      "only-code",
+                      "only-strings",
+                      "only-comments",
+                      "only-declarations",
+                      "only-usages"
+                    ],
+                    "type": "string"
+                  },
+                  "context_lines": {
+                    "default": 2,
+                    "description": "Lines of context before and after each match.",
+                    "maximum": 20,
+                    "type": "integer"
+                  },
+                  "include_all_dirs": {
+                    "default": false,
+                    "description": "Include dependency/build/cache directories that are excluded by default (vendor, node_modules, third_party, target, build, dist, Pods, generated, etc.). Set to true if you need to search generated/vendored code.",
+                    "type": "boolean"
+                  },
+                  "max_results": {
+                    "default": 20,
+                    "description": "Maximum number of results to return (cap: 100).",
+                    "maximum": 100,
+                    "type": "integer"
+                  },
+                  "offset": {
+                    "default": 0,
+                    "description": "Skip this many results before returning. Use for paging.",
+                    "type": "integer"
+                  },
+                  "query": {
+                    "description": "Search query. Keywords are ANDed \u2014 use OR for exploratory multi-term searches (e.g. auth OR login OR session). Prefer single precise terms over multi-keyword phrases. Supports OR, NOT, \"phrases\", regex (/pattern/), fuzzy (term~1), file:, path:, lang:, ext: filters.",
+                    "type": "string"
+                  },
+                  "repository": {
+                    "description": "Git URL of a public remote repository",
+                    "type": "string"
+                  },
+                  "snippet_mode": {
+                    "description": "auto (ranked relevance) or grep (every matching line). Use auto when exploring or discovering where something is used across a codebase (e.g. \"how is authentication handled?\"). Use grep when you know the exact identifier or string you want every occurrence of (e.g. \"find all calls to parseConfig\").",
+                    "enum": [
+                      "auto",
+                      "grep"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "repository",
+                  "query"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad request (invalid params or missing client)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Repository or file not found"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Rate limited"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Internal server error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Bad gateway (upstream clone failure)"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Service unavailable (clone queue full)"
+          }
+        },
+        "summary": "Fast code search across any public git repo. Returns file paths, line numbers, and code snippets with context. Supports regex, boolean queries, fuzzy matching, and structural filters (declarations, usages, strings, comments). Dependency/build directories excluded by default."
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "Production",
+      "url": "https://api.searchcode.com"
+    }
+  ]
+}
