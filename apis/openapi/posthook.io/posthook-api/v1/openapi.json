@@ -1,0 +1,643 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Posthook API",
+        "version": "1.0.0",
+        "description": "REST API for scheduling, managing, and inspecting durable webhook deliveries."
+    },
+    "servers": [
+        {
+            "url": "https://api.posthook.io/v1"
+        }
+    ],
+    "components": {
+        "schemas": {
+            "Hook": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "domain": {
+                        "type": "string"
+                    },
+                    "data": {
+                        "type": "object"
+                    },
+                    "postAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "completed",
+                            "failed",
+                            "retry"
+                        ]
+                    },
+                    "postDurationSeconds": {
+                        "type": "number"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "attempts": {
+                        "type": "integer"
+                    },
+                    "failureError": {
+                        "type": "string"
+                    },
+                    "tryAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "wasNotified": {
+                        "type": "boolean"
+                    },
+                    "sequenceData": {
+                        "$ref": "#/components/schemas/HookSequenceData"
+                    }
+                }
+            },
+            "HookSequenceData": {
+                "type": "object",
+                "properties": {
+                    "sequenceID": {
+                        "type": "string"
+                    },
+                    "stepName": {
+                        "type": "string"
+                    },
+                    "sequenceLastRunAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "RetryOverride": {
+                "type": "object",
+                "description": "Per-hook retry configuration. Overrides the project's default retry settings for this hook.",
+                "properties": {
+                    "minRetries": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 15,
+                        "description": "Number of retry attempts (1–15)."
+                    },
+                    "delaySecs": {
+                        "type": "integer",
+                        "minimum": 5,
+                        "maximum": 60,
+                        "description": "Delay between retries in seconds (5–60)."
+                    },
+                    "strategy": {
+                        "type": "string",
+                        "enum": [
+                            "fixed",
+                            "exponential"
+                        ],
+                        "description": "Retry strategy. `fixed` uses a constant delay. `exponential` increases the delay with each attempt."
+                    },
+                    "backoffFactor": {
+                        "type": "number",
+                        "minimum": 1.1,
+                        "maximum": 4.0,
+                        "description": "Multiplier for exponential backoff (1.1–4.0). Defaults to 2.0 if omitted. Only used when strategy is `exponential`."
+                    },
+                    "maxDelaySecs": {
+                        "type": "integer",
+                        "minimum": 60,
+                        "maximum": 3600,
+                        "description": "Maximum delay between retries in seconds (60–3600). Only used when strategy is `exponential`."
+                    },
+                    "jitter": {
+                        "type": "boolean",
+                        "description": "Add random jitter to retry delays to avoid thundering herd."
+                    }
+                },
+                "required": [
+                    "minRetries",
+                    "delaySecs",
+                    "strategy"
+                ]
+            },
+            "BulkActionRequest": {
+                "type": "object",
+                "description": "Bulk action request. Provide either `hookIDs` for specific hooks, or `startTime`/`endTime`/`limit` for a filter-based selection.",
+                "properties": {
+                    "hookIDs": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 1000,
+                        "description": "Array of hook IDs to act on (max 1000). Mutually exclusive with filter parameters."
+                    },
+                    "startTime": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Start of time range filter (RFC 3339). Use with `endTime` and `limit`."
+                    },
+                    "endTime": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "End of time range filter (RFC 3339). Use with `startTime` and `limit`."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000,
+                        "description": "Maximum number of hooks to act on (1-1000). Required with time range filters."
+                    },
+                    "endpointKey": {
+                        "type": "string",
+                        "description": "Optional. Filter by endpoint key."
+                    },
+                    "sequenceID": {
+                        "type": "string",
+                        "description": "Optional. Filter by sequence ID."
+                    }
+                }
+            },
+            "BulkActionResponse": {
+                "type": "object",
+                "properties": {
+                    "affected": {
+                        "type": "integer",
+                        "description": "Number of hooks affected by the action."
+                    }
+                }
+            }
+        },
+        "securitySchemes": {
+            "apiKey": {
+                "type": "apiKey",
+                "name": "X-API-Key",
+                "in": "header"
+            }
+        }
+    },
+    "security": [
+        {
+            "apiKey": []
+        }
+    ],
+    "paths": {
+        "/hooks": {
+            "get": {
+                "summary": "List Hooks",
+                "description": "Retrieve a paginated list of hooks for the current project. Supports cursor-based pagination and filtering by status.",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Cursor for pagination. Use the value from the previous response to get the next page."
+                    },
+                    {
+                        "name": "sortBy",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["postAt", "createdAt"]
+                        },
+                        "description": "Field to sort results by"
+                    },
+                    {
+                        "name": "sortOrder",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["asc", "desc"]
+                        },
+                        "description": "Sort direction"
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pending",
+                                "completed",
+                                "failed",
+                                "retry"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "postAtBefore",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Filter hooks scheduled before this timestamp"
+                    },
+                    {
+                        "name": "postAtAfter",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Filter hooks scheduled after this timestamp"
+                    },
+                    {
+                        "name": "createdAtBefore",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Filter hooks created before this timestamp"
+                    },
+                    {
+                        "name": "createdAtAfter",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Filter hooks created after this timestamp"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of hooks",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Hook"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "totalItems": {
+                                                    "type": "integer",
+                                                    "description": "Total number of hooks matching the query."
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "summary": "Schedule Hook",
+                "description": "Schedule a new hook for delivery at a specific time. Supports UTC, local-time, and relative-delay scheduling modes.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "path",
+                                    "data"
+                                ],
+                                "properties": {
+                                    "path": {
+                                        "type": "string",
+                                        "description": "The endpoint path for delivery.",
+                                        "example": "/webhooks/reminder"
+                                    },
+                                    "postAt": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "description": "RFC 3339 timestamp in UTC for delivery. Mutually exclusive with `postAtLocal` + `timezone`. Timestamps in the past are delivered immediately.",
+                                        "example": "2026-03-14T12:00:00Z"
+                                    },
+                                    "postAtLocal": {
+                                        "type": "string",
+                                        "description": "ISO 8601 local datetime without offset, in YYYY-MM-DDTHH:MM:SS format (e.g. `2026-03-15T13:00:00`). Must be used with `timezone`. Mutually exclusive with `postAt`.",
+                                        "example": "2026-03-15T13:00:00"
+                                    },
+                                    "timezone": {
+                                        "type": "string",
+                                        "description": "IANA Time Zone identifier (e.g. `America/New_York`). Required when using `postAtLocal`. Forbidden with `postAt` and `postIn`.",
+                                        "example": "America/New_York"
+                                    },
+                                    "postIn": {
+                                        "type": "string",
+                                        "description": "Relative delay from now as a duration string (e.g., `5m`, `2h`, `1d12h`). Units: `d` (days), `h` (hours), `m` (minutes), `s` (seconds). Min 1s, max 365d. Mutually exclusive with `postAt` and `postAtLocal`. Cannot be used with `timezone`.",
+                                        "example": "1h30m"
+                                    },
+                                    "data": {
+                                        "type": "object",
+                                        "description": "Arbitrary JSON payload delivered with the hook.",
+                                        "example": {
+                                            "user_id": "123"
+                                        }
+                                    },
+                                    "retryOverride": {
+                                        "$ref": "#/components/schemas/RetryOverride"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Hook scheduled",
+                        "headers": {
+                            "Posthook-HookQuota-Limit": {
+                                "description": "The maximum number of hooks allowed in the current billing period.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "Posthook-HookQuota-Usage": {
+                                "description": "The number of hooks used in the current billing period.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "Posthook-HookQuota-Remaining": {
+                                "description": "The number of hooks remaining in the current billing period.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "Posthook-HookQuota-Resets-At": {
+                                "description": "RFC 3339 timestamp when the quota resets.",
+                                "schema": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Hook"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hooks/{id}": {
+            "get": {
+                "summary": "Get Hook",
+                "description": "Retrieve a single hook by ID.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Hook details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Hook"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Cancel Hook",
+                "description": "Cancel a hook. The hook will be cancelled immediately and deleted.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Hook cancelled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hooks/bulk/retry": {
+            "post": {
+                "summary": "Bulk Retry Hooks",
+                "description": "Retry failed hooks in bulk. Provide specific hook IDs or use time-range filters.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BulkActionRequest"
+                            },
+                            "examples": {
+                                "by-ids": {
+                                    "summary": "By Hook IDs",
+                                    "value": {
+                                        "hookIDs": ["e5405623-2c1c-460e-9737-c884f7f59035", "a1b2c3d4-5678-90ab-cdef-1234567890ab"]
+                                    }
+                                },
+                                "by-filter": {
+                                    "summary": "By Time-Range Filter",
+                                    "value": {
+                                        "startTime": "2026-02-01T00:00:00Z",
+                                        "endTime": "2026-02-02T00:00:00Z",
+                                        "limit": 500
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Bulk retry initiated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BulkActionResponse"
+                                        }
+                                    }
+                                },
+                                "example": {
+                                    "data": {
+                                        "affected": 2
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hooks/bulk/replay": {
+            "post": {
+                "summary": "Bulk Replay Hooks",
+                "description": "Replay completed hooks in bulk. Creates new hook deliveries with the same payload. Provide specific hook IDs or use time-range filters.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BulkActionRequest"
+                            },
+                            "examples": {
+                                "by-ids": {
+                                    "summary": "By Hook IDs",
+                                    "value": {
+                                        "hookIDs": ["e5405623-2c1c-460e-9737-c884f7f59035", "a1b2c3d4-5678-90ab-cdef-1234567890ab"]
+                                    }
+                                },
+                                "by-filter": {
+                                    "summary": "By Time-Range Filter",
+                                    "value": {
+                                        "startTime": "2026-02-01T00:00:00Z",
+                                        "endTime": "2026-02-02T00:00:00Z",
+                                        "limit": 500
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Bulk replay initiated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BulkActionResponse"
+                                        }
+                                    }
+                                },
+                                "example": {
+                                    "data": {
+                                        "affected": 2
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hooks/bulk/cancel": {
+            "post": {
+                "summary": "Bulk Cancel Hooks",
+                "description": "Cancel pending hooks in bulk. Provide specific hook IDs or use time-range filters.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BulkActionRequest"
+                            },
+                            "examples": {
+                                "by-ids": {
+                                    "summary": "By Hook IDs",
+                                    "value": {
+                                        "hookIDs": ["e5405623-2c1c-460e-9737-c884f7f59035", "a1b2c3d4-5678-90ab-cdef-1234567890ab"]
+                                    }
+                                },
+                                "by-filter": {
+                                    "summary": "By Time-Range Filter",
+                                    "value": {
+                                        "startTime": "2026-02-01T00:00:00Z",
+                                        "endTime": "2026-02-02T00:00:00Z",
+                                        "limit": 500
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Bulk cancel initiated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BulkActionResponse"
+                                        }
+                                    }
+                                },
+                                "example": {
+                                    "data": {
+                                        "affected": 2
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
