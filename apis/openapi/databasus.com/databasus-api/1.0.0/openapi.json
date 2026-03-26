@@ -1,0 +1,288 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Databasus API",
+    "version": "1.0.0",
+    "description": "Databasus is a cloud database management and monitoring service. The API provides database provisioning, monitoring, backup management, user management, and query execution capabilities for managing hosted database instances.",
+    "x-jentic-source-url": "https://databasus.com"
+  },
+  "servers": [
+    {
+      "url": "https://api.databasus.com/v1",
+      "description": "Databasus API v1"
+    }
+  ],
+  "paths": {
+    "/databases": {
+      "get": {
+        "operationId": "listDatabases",
+        "summary": "List databases",
+        "description": "Returns a list of all database instances in the account.",
+        "tags": ["Databases"],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "status", "in": "query", "description": "Filter by status", "schema": { "type": "string", "enum": ["running", "stopped", "provisioning", "error"] } }
+        ],
+        "responses": {
+          "200": { "description": "Database list", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatabaseList" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "createDatabase",
+        "summary": "Create a database",
+        "description": "Provisions a new database instance.",
+        "tags": ["Databases"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateDatabaseRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Database created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Database" } } } },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" },
+          "422": { "description": "Validation error" }
+        }
+      }
+    },
+    "/databases/{databaseId}": {
+      "get": {
+        "operationId": "getDatabase",
+        "summary": "Get database details",
+        "tags": ["Databases"],
+        "parameters": [
+          { "name": "databaseId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Database details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Database" } } } },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Database not found" }
+        }
+      },
+      "patch": {
+        "operationId": "updateDatabase",
+        "summary": "Update database settings",
+        "tags": ["Databases"],
+        "parameters": [
+          { "name": "databaseId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateDatabaseRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Database updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Database" } } } },
+          "400": { "description": "Bad request" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteDatabase",
+        "summary": "Delete a database",
+        "tags": ["Databases"],
+        "parameters": [
+          { "name": "databaseId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "204": { "description": "Database deleted" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/databases/{databaseId}/metrics": {
+      "get": {
+        "operationId": "getDatabaseMetrics",
+        "summary": "Get database metrics",
+        "description": "Returns performance metrics for a database instance.",
+        "tags": ["Monitoring"],
+        "parameters": [
+          { "name": "databaseId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "metric", "in": "query", "description": "Metric name (cpu, memory, connections, storage, iops)", "schema": { "type": "string" } },
+          { "name": "period", "in": "query", "description": "Time period", "schema": { "type": "string", "enum": ["1h", "6h", "24h", "7d", "30d"] } }
+        ],
+        "responses": {
+          "200": { "description": "Metrics data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MetricsResponse" } } } },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/databases/{databaseId}/backups": {
+      "get": {
+        "operationId": "listBackups",
+        "summary": "List backups",
+        "tags": ["Backups"],
+        "parameters": [
+          { "name": "databaseId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Backup list", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BackupList" } } } }
+        }
+      },
+      "post": {
+        "operationId": "createBackup",
+        "summary": "Create a backup",
+        "tags": ["Backups"],
+        "parameters": [
+          { "name": "databaseId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "name": { "type": "string" } } } } }
+        },
+        "responses": {
+          "201": { "description": "Backup created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Backup" } } } },
+          "400": { "description": "Bad request" }
+        }
+      }
+    },
+    "/databases/{databaseId}/backups/{backupId}/restore": {
+      "post": {
+        "operationId": "restoreBackup",
+        "summary": "Restore from backup",
+        "tags": ["Backups"],
+        "parameters": [
+          { "name": "databaseId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "backupId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "202": { "description": "Restore initiated" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/databases/{databaseId}/query": {
+      "post": {
+        "operationId": "executeQuery",
+        "summary": "Execute a SQL query",
+        "tags": ["Query"],
+        "parameters": [
+          { "name": "databaseId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "query": { "type": "string" }, "params": { "type": "array", "items": {} } }, "required": ["query"] } } }
+        },
+        "responses": {
+          "200": { "description": "Query results", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/QueryResult" } } } },
+          "400": { "description": "Query error" }
+        }
+      }
+    },
+    "/account": {
+      "get": {
+        "operationId": "getAccount",
+        "summary": "Get account information",
+        "tags": ["Account"],
+        "responses": {
+          "200": { "description": "Account details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Account" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Database": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "engine": { "type": "string", "enum": ["postgresql", "mysql", "mariadb"] },
+          "version": { "type": "string" },
+          "status": { "type": "string", "enum": ["running", "stopped", "provisioning", "error"] },
+          "region": { "type": "string" },
+          "size": { "type": "string" },
+          "storage_gb": { "type": "integer" },
+          "connection_string": { "type": "string" },
+          "host": { "type": "string" },
+          "port": { "type": "integer" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "DatabaseList": {
+        "type": "object",
+        "properties": {
+          "databases": { "type": "array", "items": { "$ref": "#/components/schemas/Database" } },
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "per_page": { "type": "integer" }
+        }
+      },
+      "CreateDatabaseRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "engine": { "type": "string", "enum": ["postgresql", "mysql", "mariadb"] },
+          "version": { "type": "string" },
+          "region": { "type": "string" },
+          "size": { "type": "string" },
+          "storage_gb": { "type": "integer" }
+        },
+        "required": ["name", "engine", "region", "size"]
+      },
+      "UpdateDatabaseRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "size": { "type": "string" },
+          "storage_gb": { "type": "integer" }
+        }
+      },
+      "MetricsResponse": {
+        "type": "object",
+        "properties": {
+          "database_id": { "type": "string" },
+          "metric": { "type": "string" },
+          "period": { "type": "string" },
+          "datapoints": { "type": "array", "items": { "type": "object", "properties": { "timestamp": { "type": "string", "format": "date-time" }, "value": { "type": "number" } } } }
+        }
+      },
+      "Backup": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
+          "size_bytes": { "type": "integer" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "BackupList": {
+        "type": "object",
+        "properties": {
+          "backups": { "type": "array", "items": { "$ref": "#/components/schemas/Backup" } }
+        }
+      },
+      "QueryResult": {
+        "type": "object",
+        "properties": {
+          "columns": { "type": "array", "items": { "type": "string" } },
+          "rows": { "type": "array", "items": { "type": "array", "items": {} } },
+          "row_count": { "type": "integer" },
+          "execution_time_ms": { "type": "number" }
+        }
+      },
+      "Account": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "plan": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API token from Databasus dashboard"
+      }
+    }
+  },
+  "security": [
+    { "BearerAuth": [] }
+  ]
+}

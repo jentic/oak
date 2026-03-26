@@ -1,0 +1,359 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FaynoSync API",
+    "version": "1.0.0",
+    "description": "FaynoSync is an open-source self-hosted OTA (Over-The-Air) update server for managing application updates. Supports multi-platform app distribution with channels, versioning, and update checking for desktop and mobile applications.",
+    "x-jentic-source-url": "https://github.com/ku9nov/faynoSync"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4000",
+      "description": "Local FaynoSync server (replace with your deployment URL)"
+    }
+  ],
+  "paths": {
+    "/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Authenticate and get token",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string" },
+                  "password": { "type": "string" }
+                },
+                "required": ["username", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Authentication successful", "content": { "application/json": { "schema": { "type": "object", "properties": { "token": { "type": "string" } } } } } },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/apps": {
+      "get": {
+        "operationId": "listApps",
+        "summary": "List all applications",
+        "tags": ["Apps"],
+        "responses": {
+          "200": { "description": "Application list", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/App" } } } } }
+        }
+      },
+      "post": {
+        "operationId": "createApp",
+        "summary": "Create a new application",
+        "tags": ["Apps"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateAppRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "App created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/App" } } } },
+          "400": { "description": "Bad request" }
+        }
+      }
+    },
+    "/apps/{appId}": {
+      "get": {
+        "operationId": "getApp",
+        "summary": "Get application details",
+        "tags": ["Apps"],
+        "parameters": [
+          { "name": "appId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Application details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/App" } } } },
+          "404": { "description": "Not found" }
+        }
+      },
+      "put": {
+        "operationId": "updateApp",
+        "summary": "Update an application",
+        "tags": ["Apps"],
+        "parameters": [
+          { "name": "appId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateAppRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "App updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/App" } } } },
+          "400": { "description": "Bad request" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteApp",
+        "summary": "Delete an application",
+        "tags": ["Apps"],
+        "parameters": [
+          { "name": "appId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "App deleted" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/apps/{appId}/versions": {
+      "get": {
+        "operationId": "listVersions",
+        "summary": "List versions for an application",
+        "tags": ["Versions"],
+        "parameters": [
+          { "name": "appId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Version list", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Version" } } } } }
+        }
+      }
+    },
+    "/upload": {
+      "post": {
+        "operationId": "uploadVersion",
+        "summary": "Upload a new version",
+        "description": "Uploads a new application version binary with associated metadata.",
+        "tags": ["Versions"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary", "description": "Version binary file" },
+                  "app_name": { "type": "string" },
+                  "version": { "type": "string" },
+                  "channel": { "type": "string" },
+                  "platform": { "type": "string", "enum": ["windows", "mac", "linux", "android", "ios"] },
+                  "arch": { "type": "string", "enum": ["amd64", "arm64", "x86", "universal"] },
+                  "changelog": { "type": "string" },
+                  "critical": { "type": "boolean" },
+                  "publish": { "type": "boolean" }
+                },
+                "required": ["file", "app_name", "version", "platform"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Version uploaded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Version" } } } },
+          "400": { "description": "Bad request" }
+        }
+      }
+    },
+    "/versions/{versionId}": {
+      "delete": {
+        "operationId": "deleteVersion",
+        "summary": "Delete a version",
+        "tags": ["Versions"],
+        "parameters": [
+          { "name": "versionId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Version deleted" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/channels": {
+      "get": {
+        "operationId": "listChannels",
+        "summary": "List channels",
+        "tags": ["Channels"],
+        "responses": {
+          "200": { "description": "Channel list", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Channel" } } } } }
+        }
+      },
+      "post": {
+        "operationId": "createChannel",
+        "summary": "Create a channel",
+        "tags": ["Channels"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] } } }
+        },
+        "responses": {
+          "201": { "description": "Channel created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Channel" } } } },
+          "400": { "description": "Bad request" }
+        }
+      }
+    },
+    "/channels/{channelId}": {
+      "delete": {
+        "operationId": "deleteChannel",
+        "summary": "Delete a channel",
+        "tags": ["Channels"],
+        "parameters": [
+          { "name": "channelId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Channel deleted" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/platforms": {
+      "get": {
+        "operationId": "listPlatforms",
+        "summary": "List platforms",
+        "tags": ["Platforms"],
+        "responses": {
+          "200": { "description": "Platform list", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Platform" } } } } }
+        }
+      },
+      "post": {
+        "operationId": "createPlatform",
+        "summary": "Create a platform",
+        "tags": ["Platforms"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] } } }
+        },
+        "responses": {
+          "201": { "description": "Platform created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Platform" } } } }
+        }
+      }
+    },
+    "/architectures": {
+      "get": {
+        "operationId": "listArchitectures",
+        "summary": "List architectures",
+        "tags": ["Architectures"],
+        "responses": {
+          "200": { "description": "Architecture list", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Architecture" } } } } }
+        }
+      },
+      "post": {
+        "operationId": "createArchitecture",
+        "summary": "Create an architecture",
+        "tags": ["Architectures"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] } } }
+        },
+        "responses": {
+          "201": { "description": "Architecture created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Architecture" } } } }
+        }
+      }
+    },
+    "/checkVersion": {
+      "get": {
+        "operationId": "checkVersion",
+        "summary": "Check for updates",
+        "description": "Public endpoint for clients to check if a newer version is available.",
+        "tags": ["Public"],
+        "parameters": [
+          { "name": "app_name", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "version", "in": "query", "required": true, "description": "Current client version", "schema": { "type": "string" } },
+          { "name": "platform", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "arch", "in": "query", "schema": { "type": "string" } },
+          { "name": "channel", "in": "query", "schema": { "type": "string", "default": "stable" } }
+        ],
+        "responses": {
+          "200": { "description": "Update available", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateCheckResponse" } } } },
+          "204": { "description": "No update available" },
+          "400": { "description": "Bad request" }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "App": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateAppRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" }
+        },
+        "required": ["name"]
+      },
+      "Version": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "version": { "type": "string" },
+          "app_name": { "type": "string" },
+          "channel": { "type": "string" },
+          "platform": { "type": "string" },
+          "arch": { "type": "string" },
+          "changelog": { "type": "string" },
+          "critical": { "type": "boolean" },
+          "published": { "type": "boolean" },
+          "file_url": { "type": "string", "format": "uri" },
+          "file_size": { "type": "integer" },
+          "checksum": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Channel": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" }
+        }
+      },
+      "Platform": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" }
+        }
+      },
+      "Architecture": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" }
+        }
+      },
+      "UpdateCheckResponse": {
+        "type": "object",
+        "properties": {
+          "update_available": { "type": "boolean" },
+          "version": { "type": "string" },
+          "download_url": { "type": "string", "format": "uri" },
+          "changelog": { "type": "string" },
+          "critical": { "type": "boolean" },
+          "checksum": { "type": "string" },
+          "file_size": { "type": "integer" }
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "JWT token obtained via /login endpoint"
+      }
+    }
+  },
+  "security": [
+    { "BearerAuth": [] }
+  ]
+}
