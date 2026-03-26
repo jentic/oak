@@ -1,0 +1,3761 @@
+openapi: 3.0.2
+info:
+  x-logo: https://qcs.rigetti.com/static/img/rigetti-logo.svg
+  contact:
+    email: support@rigetti.com
+    url: https://rigetti.zendesk.com
+  title: Rigetti QCS API
+  version: 2020-07-31
+  description: >
+    # Introduction
+
+
+    This is the documentation for the Rigetti QCS HTTP API.
+
+
+    You can find out more about Rigetti at [https://rigetti.com](https://rigetti.com), and also
+
+    interact with QCS via the web at [https://qcs.rigetti.com](https://qcs.rigetti.com).
+
+
+    This API is documented in **OpenAPI format** and so is compatible with the dozens of
+
+    language-specific client generators available
+
+    [here](https://github.com/OpenAPITools/openapi-generator) and elsewhere on the web.
+
+
+    # Principles
+
+
+    This API follows REST design principles where appropriate, and otherwise an HTTP RPC paradigm.
+
+    We adhere to the Google [API Improvement Proposals](https://google.aip.dev/general) where
+
+    reasonable to provide a consistent, intuitive developer experience. HTTP response codes match
+
+    their specifications, and error messages fit a common format.
+
+
+    # Authentication
+
+
+    All access to the QCS API requires OAuth2 authentication provided by Okta. You can request
+
+    access [here](https://www.rigetti.com/get-quantum). Once you have a user account, you can download
+
+    your access token from QCS [here](https://qcs.rigetti.com/auth/token). 
+
+
+    That access token is valid for 24 hours after issuance. The value of `access_token` within the
+
+    JSON file is the token used for authentication (don't use the entire JSON file).
+
+
+    Authenticate requests using the `Authorization` header and a `Bearer` prefix:
+
+
+    ```
+
+    curl --header "Authorization: Bearer eyJraW...Iow"
+
+    ```
+
+
+    # Quantum Processor Access
+
+
+    Access to the quantum processors themselves is not yet provided directly by this HTTP API, but
+
+    is instead performed over ZeroMQ/[rpcq](https://github.com/rigetti/rpcq). Until that changes,
+
+    we suggest using [pyquil](https://github.com/rigetti/pyquil) to build and execute quantum
+
+    programs via the Legacy API.
+
+
+    # Legacy API
+
+
+    Our legacy HTTP API remains accessible at https://forest-server.qcs.rigetti.com, and it shares
+
+    a source of truth with this API's services. You can use either service with the same user
+
+    account and means of authentication. We strongly recommend using the API documented here, as the
+
+    legacy API is on the path to deprecation.
+servers:
+  - description: Rigetti API
+    url: https://api.qcs.rigetti.com
+tags:
+  - description: Internal Rigetti administrative Access
+    name: internal
+    x-displayName: Internal
+  - description: Legacy routes and objects
+    name: legacy
+    x-displayName: Legacy
+  - description: The Quantum Processor is the heart of the Rigetti services.
+    name: quantumProcessors
+    x-displayName: Quantum Processors
+  - description: Deployments manage Controller Services and supporting services.
+    name: deployments
+    x-displayName: Quantum Processor Deployments
+  - description: The Endpoint is the means of access to a Quantum Processor.
+    name: endpoints
+    x-displayName: Quantum Processor Endpoints
+  - description: The Engagement is the authorization mechanism for access to the
+      Quantum Processor.
+    name: engagements
+    x-displayName: Engagements
+  - description: |
+      Translation is the process of transforming Quil into programs ready 
+      for execution on a Quantum Processor.
+    name: translation
+    x-displayName: Translation
+  - name: account
+    x-displayName: Account
+  - name: authentication
+    x-displayName: Authentication
+  - description: Check for the latest SDK versions.
+    name: clientApplications
+    x-displayName: SDK Versions
+  - description: Find existing time on a Rigetti QPU and reserve it.
+    name: reservations
+    x-displayName: Reservations
+  - name: filterParameter
+    description: <SchemaDefinition schemaRef="#/components/schemas/Filter" />
+    x-displayName: Filter Parameter
+  - name: orderParameter
+    description: <SchemaDefinition schemaRef="#/components/schemas/Order" />
+    x-displayName: Order Parameter
+  - name: errors
+    description: >
+      All service errors conform to the below schema.
+
+
+      <SchemaDefinition schemaRef="#/components/schemas/Error" />
+
+
+      `code` conforms to the conventional HTTP status code, but offers more granularity.
+
+
+      | Code                                | HTTP Status Code | Notes                                                                               |
+
+      |-------------------------------------|------------------|-------------------------------------------------------------------------------------|
+
+      | unauthorized                        | 401              | If your token expires, we will return a 401 and you should refresh it accordingly\. |
+
+      | forbidden                           | 403              |                                                                                     |
+
+      | not\_found                          | 404              |                                                                                     |
+
+      | insufficient\_payment               | 402              | Insufficient funds are available to book the reservation\.                          |
+
+      | reservation\_unavailable            | 409              | The requested reservation time is not available\.                                   |
+
+      | invalid\_input                      | 422              |                                                                                     |
+
+      | invalid\_password\_reset\_token     | 422              |                                                                                     |
+
+      | invalid\_email\_verification\_token | 422              |                                                                                     |
+
+
+      Additionally, errors returned with code `invalid_input` *may* include additional detail under the `validationErrors`
+
+      attribute. Note, not all validation errors will specify a `path`, but they will contain a message. Please heed those
+
+      messages *in addition to* the top level error message.
+
+
+      <SchemaDefinition schemaRef="#/components/schemas/ValidationError" />
+    x-displayName: ""
+x-tagGroups:
+  - name: Account Management
+    tags:
+      - account
+      - authentication
+  - name: QPU Access
+    tags:
+      - endpoints
+      - engagements
+      - quantumProcessors
+      - reservations
+      - translation
+  - name: SDKs
+    tags:
+      - clientApplications
+  - name: Filtering and ordering
+    tags:
+      - filterParameter
+      - orderParameter
+  - name: Errors
+    tags:
+      - errors
+paths:
+  /:
+    get:
+      description: Retrieve the health status of the API
+      operationId: GetHealth
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+          description: Critical services are healthy.
+  /v1/:
+    get:
+      deprecated: true
+      description: Endpoint to return a status 200 for load balancer health checks
+      operationId: HealthCheckDeprecated
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+          description: Unprocessable Entity
+      summary: Health Check
+  /v1/endpoints:
+    get:
+      description: List all endpoints, optionally filtering by attribute.
+      operationId: ListEndpoints
+      parameters:
+        - description: Filtering logic specified using
+            [rule-engine](https://zerosteiner.github.io/rule-engine/syntax.html)
+            grammar
+          in: query
+          name: filter
+          required: false
+          schema:
+            description: Filtering logic specified using
+              [rule-engine](https://zerosteiner.github.io/rule-engine/syntax.html)
+              grammar
+            title: Filter
+            type: string
+        - in: query
+          name: pageSize
+          required: false
+          schema:
+            default: 10
+            title: Pagesize
+            type: integer
+        - in: query
+          name: pageToken
+          required: false
+          schema:
+            title: Pagetoken
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListEndpointsResponse"
+          description: Successful Response
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+          description: Unprocessable Entity
+      security:
+        - JWTBearer: []
+      summary: List Endpoints
+      tags:
+        - endpoints
+    post:
+      description: Create an endpoint associated with your user account.
+      operationId: CreateEndpoint
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEndpointParameters"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Endpoint"
+          description: Successful Response
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Not Found
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+          description: Unprocessable Entity
+      security:
+        - JWTBearer: []
+      summary: Create Endpoint
+      tags:
+        - endpoints
+  "/v1/endpoints/{endpointId}":
+    delete:
+      description: Delete an endpoint, releasing its resources. This operation is not
+        reversible.
+      operationId: DeleteEndpoint
+      parameters:
+        - in: path
+          name: endpointId
+          required: true
+          schema:
+            title: Endpoint ID
+            type: string
+      responses:
+        "204":
+          description: Successful Response
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Not Found
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+          description: Unprocessable Entity
+      security:
+        - JWTBearer: []
+      summary: Delete Endpoint
+      tags:
+        - endpoints
+    get:
+      description: Retrieve a specific endpoint by its ID.
+      operationId: GetEndpoint
+      parameters:
+        - in: path
+          name: endpointId
+          required: true
+          schema:
+            title: Endpoint ID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Endpoint"
+          description: Successful Response
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Not Found
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+          description: Unprocessable Entity
+      security:
+        - JWTBearer: []
+      summary: Get Endpoint
+      tags:
+        - endpoints
+  "/v1/endpoints/{endpointId}:restart":
+    post:
+      description: Restart an entire endpoint or a single component within an endpoint.
+      operationId: RestartEndpoint
+      parameters:
+        - in: path
+          name: endpointId
+          required: true
+          schema:
+            title: Endpoint ID
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestartEndpointRequest"
+      responses:
+        "204":
+          description: Successful Response
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Forbidden
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+          description: Unprocessable Entity
+      security:
+        - JWTBearer: []
+      summary: Restart Endpoint
+      tags:
+        - endpoints
+  /v1/engagements:
+    post:
+      description: >-
+        Create a new engagement using the specified parameters.
+
+
+        At least one of the following parameters must be supplied:
+
+        - **endpointId**: The ID of the endpoint on which to engage.
+
+        - **quantumProcessorId**: The ID of the quantum processor on which to engage, allowing the
+            service to select a default endpoint. Ignored if **endpointId** is set.
+      operationId: CreateEngagement
+      parameters:
+        - description: Either the client's user ID or the name of a group on behalf of
+            which the client wishes to engage. May be overriden by accountId set
+            in body.
+          in: header
+          name: x-qcs-account-id
+          required: false
+          schema:
+            description: Either the client's user ID or the name of a group on behalf of
+              which the client wishes to engage. May be overriden by accountId
+              set in body.
+            title: X-Qcs-Account-Id
+            type: string
+        - description: Indicates whether the engagement request should be made for the
+            user or on behalf of a group. May be overriden by accountType set in
+            body.
+          in: header
+          name: x-qcs-account-type
+          required: false
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/AccountType"
+            description: Indicates whether the engagement request should be made for the
+              user or on behalf of a group. May be overriden by accountType set
+              in body.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEngagementRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngagementWithCredentials"
+          description: Successful Response
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Not Found
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Validation error
+        "503":
+          description: Endpoint is temporarily unavailable, try again later.
+          headers:
+            Retry-After:
+              description: Number of seconds to wait before retrying
+              schema:
+                type: integer
+      security:
+        - JWTBearer: []
+      summary: Create Engagement
+      tags:
+        - engagements
+  "/v1/quantumProcessors/{quantumProcessorId}/endpoints:getDefault":
+    get:
+      description: |-
+        Retrieve the endpoint set as "default" for the given Quantum Processor.
+
+        If no endpoint is set as the default, return "not found."
+      operationId: GetDefaultEndpoint
+      parameters:
+        - description: "Public identifier for a quantum processor [example: Aspen-1]"
+          in: path
+          name: quantumProcessorId
+          required: true
+          schema:
+            description: "Public identifier for a quantum processor [example: Aspen-1]"
+            title: Quantum Processor ID
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Endpoint"
+          description: Successful Response
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Not Found
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+          description: Unprocessable Entity
+      security:
+        - JWTBearer: []
+      summary: Get Default Endpoint
+      tags:
+        - endpoints
+  "/v1/quantumProcessors/{quantum_processor_id}":
+    get:
+      tags:
+        - quantumProcessors
+      summary: Get Quantum Processor
+      description: Retrieve a single `QuantumProcessor` by ID.
+      parameters:
+        - name: quantum_processor_id
+          schema:
+            type: string
+          in: path
+          required: true
+          deprecated: false
+          explode: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/QuantumProcessor"
+        "422":
+          description: User-provided data failed validation
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        default:
+          description: Some other error
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - JWTBearerOptional: []
+      operationId: GetQuantumProcessor
+  /v1/quantumProcessors:
+    get:
+      tags:
+        - quantumProcessors
+      summary: List Quantum Processors
+      description: |-
+        List the [`QuantumProcessor`]s that this user is authorized to access.
+
+        If no auth token is provided, only public processors will be returned.
+      parameters:
+        - name: pageSize
+          schema:
+            type: integer
+            format: uint64
+            title: How many items to return in a single page.
+            default: 10
+            minimum: 0
+            exclusiveMinimum: true
+          in: query
+          required: false
+          deprecated: false
+          explode: true
+        - name: pageToken
+          schema:
+            type: string
+            title: A page token to continue pagination across requests.
+          in: query
+          required: false
+          deprecated: false
+          explode: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ListQuantumProcessorsResponse"
+        "422":
+          description: User-provided data failed validation
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        default:
+          description: Some other error
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - JWTBearerOptional: []
+      operationId: ListQuantumProcessors
+  "/v1/quantumProcessors/{quantum_processor_id}/accessors":
+    get:
+      tags:
+        - quantumProcessors
+      summary: Get Quantum Processor Accessors
+      description: Retrieve a single `QuantumProcessor` by ID.
+      parameters:
+        - name: quantum_processor_id
+          schema:
+            type: string
+          in: path
+          required: true
+          deprecated: false
+          explode: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ListQuantumProcessorAccessorsResponse"
+        "422":
+          description: User-provided data failed validation
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        default:
+          description: Some other error
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - JWTBearerOptional: []
+      operationId: GetQuantumProcessorAccessors
+  "/v1/quantumProcessors/{quantum_processor_id}/instructionSetArchitecture":
+    get:
+      tags:
+        - quantumProcessors
+      summary: Get Instruction Set Architecture
+      parameters:
+        - name: quantum_processor_id
+          schema:
+            type: string
+          in: path
+          required: true
+          deprecated: false
+          explode: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/InstructionSetArchitecture"
+        "422":
+          description: User-provided data failed validation
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        default:
+          description: Some other error
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - JWTBearerOptional: []
+      operationId: GetInstructionSetArchitecture
+  /v1/instructionSetArchitectures:
+    get:
+      tags:
+        - quantumProcessors
+      summary: List Instruction Set Architectures
+      parameters:
+        - name: pageSize
+          schema:
+            type: integer
+            format: uint64
+            title: How many items to return in a single page.
+            default: 5
+            maximum: 5
+            minimum: 0
+            exclusiveMinimum: true
+          in: query
+          required: false
+          deprecated: false
+          explode: true
+        - name: pageToken
+          schema:
+            type: string
+            title: A page token to continue pagination across requests.
+          in: query
+          required: false
+          deprecated: false
+          explode: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ListInstructionSetArchitectureResponse"
+        "422":
+          description: User-provided data failed validation
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        default:
+          description: Some other error
+          content:
+            application/json; charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - JWTBearerOptional: []
+      operationId: ListInstructionSetArchitectures
+  /v1/healthcheck:
+    get:
+      summary: Health Check
+      description: Check the health of the service.
+      responses:
+        "200":
+          description: The service is healthy, but there are no additional details.
+      operationId: HealthCheck
+  /v1/auth:emailPasswordResetToken:
+    post:
+      description: Send a password reset link to the provided email address, if that
+        email matches a registered user.
+      operationId: AuthEmailPasswordResetToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthEmailPasswordResetTokenRequest"
+      responses:
+        "204":
+          description: Request completed successfully.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      summary: Email Password Reset Token
+      tags:
+        - authentication
+  /v1/auth:getUser:
+    get:
+      description: Retrieve the profile of the authenticated user.
+      operationId: AuthGetUser
+      parameters: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+          description: Request completed successfully.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The authenticated user could not be located within our records.
+            Please contact support@rigetti.com if you reach this error.
+      security:
+        - JWTBearer: []
+      summary: Get User
+      tags:
+        - authentication
+  /v1/auth:resetPassword:
+    parameters: []
+    post:
+      description: Reset the password using the user's existing password. Note, this
+        is an authenticated route.
+      operationId: AuthResetPassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthResetPasswordRequest"
+        required: true
+      responses:
+        "204":
+          description: Password successfully reset.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      summary: Reset Password
+      tags:
+        - authentication
+  /v1/auth:resetPasswordWithToken:
+    parameters: []
+    post:
+      description: Complete the forgot password flow, resetting the new password in
+        exchange for an emailed token.
+      operationId: AuthResetPasswordWithToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthResetPasswordWithTokenRequest"
+        required: true
+      responses:
+        "204":
+          description: Password successfully reset.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No account exists for the requested email.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      summary: Reset Password With Token
+      tags:
+        - authentication
+  "/v1/calendars/{quantumProcessorId}":
+    get:
+      description: Get calendar details for the requested quantum processor.
+      operationId: GetQuantumProcessorCalendar
+      parameters:
+        - in: path
+          name: quantumProcessorId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuantumProcessorCalendar"
+          description: Request completed successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client not authorized to complete request.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The requested quantum processor does not exist.
+      summary: Get Quantum Processor Calendar
+      tags:
+        - reservations
+      security:
+        - JWTBearer: []
+  /v1/clientApplications:
+    get:
+      description: List supported clients of Rigetti system components along with
+        their latest and minimum supported versions.
+      operationId: ListClientApplications
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListClientApplicationsResponse"
+          description: Request completed successfully.
+      summary: List Client Applications
+      tags:
+        - clientApplications
+    parameters: []
+  "/v1/clientApplications/{clientApplicationName}":
+    get:
+      description: Get details of a specific Rigetti system component along with its
+        latest and minimum supported versions.
+      operationId: GetClientApplication
+      parameters:
+        - in: path
+          name: clientApplicationName
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientApplication"
+          description: Request completed successfully.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The requested client application does not exist.
+      summary: Get Client Application
+      tags:
+        - clientApplications
+  /v1/clientApplications:check:
+    post:
+      description: Check the requested client application version against the latest
+        and minimum version.
+      operationId: CheckClientApplication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckClientApplicationRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckClientApplicationResponse"
+          description: Successfully checked Forest versions.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Requested component does not exist.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      summary: Check Client Application
+      tags:
+        - clientApplications
+  "/v1/groups/{groupName}/balance":
+    get:
+      description: Retrieve the balance of the requested QCS group account.
+      operationId: GetGroupBalance
+      parameters:
+        - description: URL encoded name of group for which to retrieve account balance.
+          in: path
+          name: groupName
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountBalance"
+          description: Request completed successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client not authorized to complete request.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: QCS group account does not exist.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      summary: Get Group Balance
+      tags:
+        - account
+  "/v1/groups/{groupName}/billingCustomer":
+    get:
+      description: Retrieve billing customer for a QCS group account.
+      operationId: GetGroupBillingCustomer
+      parameters:
+        - description: URL-encoded name of group.
+          in: path
+          name: groupName
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingCustomer"
+          description: Billing customer retrieved successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to view account billing customer.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Group billing customer does not exist.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/groups/{groupName}/billingInvoices":
+    get:
+      description: Retrieve billing invoices for a QCS group account.
+      operationId: ListGroupBillingInvoices
+      parameters:
+        - description: URL-encoded name of group.
+          in: path
+          name: groupName
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/pageTokenParam"
+        - $ref: "#/components/parameters/pageSizeParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAccountBillingInvoicesResponse"
+          description: Billing invoices retrieved successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to view group billing invoices.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Group billing customer does not exist.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/groups/{groupName}/billingInvoices/{billingInvoiceId}/lines":
+    get:
+      description: Retrieve billing invoice lines for a QCS group account's invoice.
+      operationId: ListGroupBillingInvoiceLines
+      parameters:
+        - description: URL-encoded name of group.
+          in: path
+          name: groupName
+          required: true
+          schema:
+            type: string
+        - description: URL-encoded billing invoice id.
+          in: path
+          name: billingInvoiceId
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/pageTokenParam"
+        - $ref: "#/components/parameters/pageSizeParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAccountBillingInvoiceLinesResponse"
+          description: Billing invoice lines retrieved successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to view group billing invoice lines.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Group billing customer or invoice does not exist.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/groups/{groupName}/billingInvoices:getUpcoming":
+    get:
+      description: Retrieve upcoming invoice for QCS group billing customer.
+      operationId: GetGroupUpcomingBillingInvoice
+      parameters:
+        - description: URL-encoded name of group.
+          in: path
+          name: groupName
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingUpcomingInvoice"
+          description: Billing invoice retrieved successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to view group billing invoice.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Group billing customer or invoice does not exist.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/groups/{groupName}/billingInvoices:listUpcomingLines":
+    get:
+      description: List invoice lines for QCS group billing customer upcoming invoice.
+      operationId: ListGroupUpcomingBillingInvoiceLines
+      parameters:
+        - description: URL-encoded name of group.
+          in: path
+          name: groupName
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/pageTokenParam"
+        - $ref: "#/components/parameters/pageSizeParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAccountBillingInvoiceLinesResponse"
+          description: Billing invoice lines retrieved successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to view group billing invoice lines.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Group billing customer or invoice does not exist.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/groups/{groupName}/reservations":
+    get:
+      description: |
+        List existing reservations for the requested group.
+
+        Available filter fields include:
+
+        * `startTime` - timestamp
+        * `endTime` - timestamp
+        * `createdTime` - timestamp
+        * `price` - integer
+        * `quantumProcessorId` - string
+
+        Available order fields include:
+
+        * `startTime` - timestamp
+        * `endTime` - timestamp
+        * `createdTime` - timestamp
+        * `price` - integer
+      operationId: ListGroupReservations
+      parameters:
+        - description: URL encoded name of group for which to retrieve reservations.
+          in: path
+          name: groupName
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/filterParam"
+        - $ref: "#/components/parameters/orderParam"
+        - $ref: "#/components/parameters/pageSizeParam"
+        - $ref: "#/components/parameters/pageTokenParam"
+        - $ref: "#/components/parameters/showDeleted"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListReservationsResponse"
+          description: Request completed successfully.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      summary: List Group Reservations
+      tags:
+        - reservations
+  "/v1/groups/{groupName}/users":
+    get:
+      description: List users belonging to a group. Note, group membership may take
+        several minutes to update within our identity provider. After adding or
+        removing a user to or from a group, please allow up to 60 minutes for
+        changes to be reflected.
+      operationId: ListGroupUsers
+      parameters:
+        - description: URL encoded name of group for which to retrieve users.
+          in: path
+          name: groupName
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/pageSizeParam"
+        - $ref: "#/components/parameters/pageTokenParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListGroupUsersResponse"
+          description: Group users successfully retrieved.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The requested group does not exist.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      summary: List users belonging to a group
+      tags:
+        - account
+  /v1/groups:addUser:
+    post:
+      description: Add a user to a group. Note, group membership may take several
+        minutes to update within our identity provider. After adding a user to a
+        group, please allow up to 60 minutes for changes to be reflected.
+      operationId: AddGroupUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddGroupUserRequest"
+        required: true
+      responses:
+        "204":
+          description: User successfully added to group.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Group or user does not exist.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      summary: Add user to a group
+      tags:
+        - account
+  /v1/groups:removeUser:
+    post:
+      description: Remove a user from a group. Note, group membership may take several
+        minutes to update within our identity provider. After removing a user
+        from a group, please allow up to 60 minutes for changes to be reflected.
+      operationId: RemoveGroupUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoveGroupUserRequest"
+        required: true
+      responses:
+        "204":
+          description: User successfully removed from group.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Group does not exist.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed, possibly because the user does not
+            belong to the group.
+      security:
+        - JWTBearer: []
+      summary: Remove user from a group.
+      tags:
+        - account
+  /v1/internal/reservations:findAvailable:
+    parameters: []
+  "/v1/internal/users/{userId}/profile":
+    parameters:
+      - description: The user's QCS Okta id.
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+  /v1/reservations:
+    get:
+      description: >
+        List existing reservations for the authenticated user,
+
+        or a target user when specifying `X-QCS-ACCOUNT-ID` and `X-QCS-ACCOUNT-TYPE`
+
+        headers.
+
+
+        Available filter fields include:
+
+
+        * `startTime` - timestamp
+
+        * `endTime` - timestamp
+
+        * `createdTime` - timestamp
+
+        * `price` - integer
+
+        * `cancelled` - boolean (deprecated, use `showDeleted` parameter)
+
+        * `quantumProcessorId` - string
+
+
+        Available order fields include:
+
+
+        * `startTime` - timestamp
+
+        * `endTime` - timestamp
+
+        * `createdTime` - timestamp
+
+        * `price` - integer
+      operationId: ListReservations
+      parameters:
+        - $ref: "#/components/parameters/filterParam"
+        - $ref: "#/components/parameters/orderParam"
+        - $ref: "#/components/parameters/pageSizeParam"
+        - $ref: "#/components/parameters/pageTokenParam"
+        - $ref: "#/components/parameters/showDeleted"
+        - $ref: "#/components/parameters/accountIdHeader"
+        - $ref: "#/components/parameters/accountTypeHeader"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListReservationsResponse"
+          description: Request completed successfully.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      summary: List Reservations
+      tags:
+        - reservations
+    parameters: []
+    post:
+      description: >
+        Create a new reservation.
+
+
+        The following precedence applies when specifying the reservation subject account
+
+        ID and type:
+
+        * request body `accountId` field, or if unset then `X-QCS-ACCOUNT-ID` header,
+
+        or if unset then requesting user's ID.
+
+        * request body `accountType` field, or if unset then `X-QCS-ACCOUNT-TYPE`
+
+        header, or if unset then "user" type.
+      operationId: CreateReservation
+      parameters:
+        - $ref: "#/components/parameters/accountIdHeader"
+        - $ref: "#/components/parameters/accountTypeHeader"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReservationRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+          description: Reservation successfully created.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "402":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Insufficient payment to book reservation.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: User not authorized to make the requested reservation.
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The requested reservation is unavailable.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      summary: Create Reservation
+      tags:
+        - reservations
+  "/v1/reservations/{reservationId}":
+    get:
+      description: Find an existing reservation by ID.
+      operationId: GetReservation
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+          description: Request completed successfully.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: User not authorized to retrieve reservation.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Requested reservation does not exist.
+      security:
+        - JWTBearer: []
+      summary: Get Reservation
+      tags:
+        - reservations
+    delete:
+      description: Cancel an existing reservation for the user.
+      operationId: DeleteReservation
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+          description: Reservation successfully cancelled.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: User not authorized to delete reservation.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Requested reservation does not exist.
+      security:
+        - JWTBearer: []
+      summary: Delete Reservation
+      tags:
+        - reservations
+    parameters:
+      - in: path
+        name: reservationId
+        required: true
+        schema:
+          type: integer
+  /v1/reservations:findAvailable:
+    get:
+      description: List currently available reservations on the requested Rigetti
+        quantum computer.
+      operationId: FindAvailableReservations
+      parameters:
+        - $ref: "#/components/parameters/pageSizeParam"
+        - $ref: "#/components/parameters/pageTokenParam"
+        - in: query
+          name: quantumProcessorId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: startTimeFrom
+          required: true
+          schema:
+            format: date-time
+            type: string
+        - in: query
+          name: duration
+          required: true
+          schema:
+            description: Formatted as specified for golang
+              https://golang.org/pkg/time/#ParseDuration.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindAvailableReservationsResponse"
+          description: Request completed successfully.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      summary: Find Available Reservations
+      tags:
+        - reservations
+    parameters: []
+  "/v1/users/{idpId}":
+    parameters:
+      - description: The user's QCS id. May be found as `idpId` in the `AuthGetUser` API
+          call.
+        in: path
+        name: idpId
+        required: true
+        schema:
+          type: string
+  "/v1/users/{userId}/balance":
+    get:
+      description: Retrieve the balance of the requested QCS user account.
+      operationId: GetUserBalance
+      parameters:
+        - description: The user's QCS id. May be found as `idpId` in the `AuthGetUser` API
+            call.
+          in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountBalance"
+          description: Request completed successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client not authorized to complete request.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: QCS user account does not exist.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      summary: Get User Balance
+      tags:
+        - account
+  "/v1/users/{userId}/billingCustomer":
+    get:
+      description: Retrieve billing customer for a QCS user account.
+      operationId: GetUserBillingCustomer
+      parameters:
+        - description: The user's QCS id. May be found as `idpId` in the `AuthGetUser` API
+            call.
+          in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingCustomer"
+          description: Billing customer retrieved successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to view user billing customer.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: User billing customer does not exist.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/users/{userId}/billingInvoices":
+    get:
+      description: Retrieve billing invoices for a QCS user account.
+      operationId: ListUserBillingInvoices
+      parameters:
+        - description: The user's QCS id. May be found as `idpId` in the `AuthGetUser` API
+            call.
+          in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/pageTokenParam"
+        - $ref: "#/components/parameters/pageSizeParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAccountBillingInvoicesResponse"
+          description: Billing invoices retrieved successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to view user billing invoices.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: User billing customer does not exist.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/users/{userId}/billingInvoices/{billingInvoiceId}/lines":
+    get:
+      description: Retrieve billing invoice lines for a QCS user account's invoice.
+      operationId: ListUserBillingInvoiceLines
+      parameters:
+        - description: URL-encoded QCS id of user. May be found as `idpId` in the
+            `AuthGetUser` API call.
+          in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+        - description: URL-encoded billing invoice id.
+          in: path
+          name: billingInvoiceId
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/pageTokenParam"
+        - $ref: "#/components/parameters/pageSizeParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAccountBillingInvoiceLinesResponse"
+          description: Billing invoice lines retrieved successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to view user billing invoice lines.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: User billing customer or invoice does not exist.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/users/{userId}/billingInvoices:getUpcoming":
+    get:
+      description: Retrieve upcoming invoice for QCS user billing customer.
+      operationId: GetUserUpcomingBillingInvoice
+      parameters:
+        - description: The user's QCS id. May be found as `idpId` in the `AuthGetUser` API
+            call.
+          in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingUpcomingInvoice"
+          description: Upcoming billing invoice retrieved successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to view user billing invoice.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: User billing customer or invoice does not exist.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/users/{userId}/billingInvoices:listUpcomingLines":
+    get:
+      description: List invoice lines for QCS user billing customer upcoming invoice.
+      operationId: ListUserUpcomingBillingInvoiceLines
+      parameters:
+        - description: The user's QCS id. May be found as `idpId` in the `AuthGetUser` API
+            call.
+          in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/pageTokenParam"
+        - $ref: "#/components/parameters/pageSizeParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAccountBillingInvoiceLinesResponse"
+          description: Billing invoice lines retrieved successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to view user's billing invoice lines.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Group billing customer or invoice does not exist.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/users/{userId}/eventBillingPrices:get":
+    post:
+      description: Retrieve `EventBillingPrice` for a user for a specific event. If no
+        price is configured this operation will return a default
+        `EventBillingPrice` for the specified `product`.
+      operationId: GetUserEventBillingPrice
+      parameters:
+        - description: The user's QCS id. May be found as `idpId` in the `AuthGetUser` API
+            call.
+          in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetAccountEventBillingPriceRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventBillingPriceRate"
+          description: Retrieved `EventBillingPrice` successfully.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Client is not authorized to retrieve the `EventBillingPrice`.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The `EventBillingPrice` does not exist for the specified event.
+            Because the server guarantees prices for events, the server will
+            trigger alerts whenever returning this response.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request parameter validation error.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/users/{userId}/groups":
+    get:
+      description: List QCS groups for the requested user
+      operationId: ListUserGroups
+      parameters:
+        - description: The user's QCS id. May be found as `idpId` in the `AuthGetUser` API
+            call.
+          in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/pageSizeParam"
+        - $ref: "#/components/parameters/pageTokenParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListGroupsResponse"
+          description: Successfully retrieved groups.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      summary: List QCS groups for the requested user
+      tags:
+        - account
+  /v1/users:activate:
+    post:
+      description: Activate a user, completing an invitation request.
+      operationId: ActivateUser
+      summary: Activate User
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivateUserRequest"
+      responses:
+        "204":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+          description: Request completed successfully.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      tags:
+        - account
+  /v1/viewer/announcements:
+    get:
+      description: List all announcements relevant to the authenticating user. By
+        default, does not include dismissed announcements.
+      operationId: ListViewerAnnouncements
+      parameters:
+        - $ref: "#/components/parameters/pageSizeParam"
+        - $ref: "#/components/parameters/pageTokenParam"
+        - name: includeDismissed
+          description: Include dismissed announcements in the response.
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnouncementsResponse"
+          description: Request completed successfully.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request validation failed.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  "/v1/viewer/announcements/{announcementId}":
+    delete:
+      description: Dismiss an announcement for an authenticating user, indicating that
+        they do not want to see it again.
+      operationId: DismissViewerAnnouncement
+      parameters:
+        - name: announcementId
+          description: The ID of an existing announcement.
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Request completed successfully.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Unknown announcement ID.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  /v1/viewer/userProfile:
+    put:
+      description: Update the profile of the authenticated user.
+      operationId: UpdateViewerUserProfile
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateViewerUserProfileRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+          description: Request completed successfully.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The authenticated user could not be located within our records.
+            Please contact support@rigetti.com if you reach this error.
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request could not be validated.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+  /v1/viewer/onboardingCompleted:
+    get:
+      description: Get the onboarding status of the authenticated user.
+      operationId: GetViewerUserOnboardingCompleted
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ViewerUserOnboardingCompleted"
+          description: Request completed successfully.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+    put:
+      description: Update the onboarding status of the authenticated user.
+      operationId: PutViewerUserOnboardingCompleted
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ViewerUserOnboardingCompleted"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ViewerUserOnboardingCompleted"
+          description: Request completed successfully.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Request authentication failed.
+      security:
+        - JWTBearer: []
+      tags:
+        - account
+components:
+  schemas:
+    Error:
+      properties:
+        code:
+          title: Code
+          type: string
+        message:
+          title: Message
+          type: string
+        requestId:
+          title: Request ID
+          type: string
+        validationErrors:
+          items:
+            $ref: "#/components/schemas/ValidationError"
+          title: Validation Errors
+          type: array
+      required:
+        - code
+        - message
+        - requestId
+      title: Error
+      type: object
+    ValidationError:
+      properties:
+        in:
+          enum:
+            - header
+            - query
+            - path
+            - body
+          type: string
+        message:
+          title: Message
+          type: string
+        path:
+          items:
+            type: string
+          title: Path
+          type: array
+      required:
+        - in
+        - message
+      title: ValidationError
+      type: object
+    Health:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: PASS
+    CreateEndpointParameters:
+      description: A publicly available set of parameters for defining an endpoint.
+      properties:
+        datacenters:
+          description: Which datacenters are available for endpoint placement. Defaults to
+            berkeley-775
+          items:
+            $ref: "#/components/schemas/NomadJobDatacenters"
+          title: Datacenters
+          type: array
+        quantumProcessorIds:
+          description: Public identifiers for quantum processors served by this endpoint.
+          items:
+            type: string
+          title: Quantum Processor IDs
+          type: array
+      title: CreateEndpointParameters
+      type: object
+    CreateEngagementRequest:
+      properties:
+        accountId:
+          description: Either the client's user ID or the name of a group on behalf of
+            which the client wishes to engage. This value will override any
+            values set in the headers.
+          title: Account Id
+          type: string
+        accountType:
+          allOf:
+            - $ref: "#/components/schemas/AccountType"
+          description: Indicates whether the engagement request should be made for the
+            user or on behalf of a group. This value will override any values
+            set in the headers.
+          title: Account Type
+        endpointId:
+          description: Unique, opaque identifier for the endpoint
+          title: Endpoint ID
+          type: string
+        quantumProcessorId:
+          description: "Public identifier for a quantum processor [example: Aspen-1]"
+          title: Quantum Processor ID
+          type: string
+        tags:
+          description: Tags recorded on QPU requests, which reporting services may later
+            use for querying usage records.
+          items:
+            type: string
+          title: Tags
+          type: array
+      title: CreateEngagementRequest
+      type: object
+    Endpoint:
+      description: An Endpoint is the entry point for remote access to a QuantumProcessor.
+      properties:
+        address:
+          description: Network address at which the endpoint is locally reachable
+          nullable: true
+          title: Address
+          type: string
+        addresses:
+          allOf:
+            - $ref: "#/components/schemas/EndpointAddresses"
+          description: Addresses at which this endpoint is reachable over the network
+          title: Endpoint Addresses
+        datacenter:
+          description: Datacenter within which the endpoint is deployed
+          title: Datacenter
+          type: string
+        healthy:
+          description: Whether the endpoint is operating as intended
+          title: Healthy
+          type: boolean
+        id:
+          description: Unique, opaque identifier for the endpoint
+          title: Endpoint ID
+          type: string
+        mock:
+          description: Whether the endpoint serves simulated or substituted data for
+            testing purposes
+          title: Mock
+          type: boolean
+        quantumProcessorIds:
+          description: Public identifiers for quantum processors served by this endpoint.
+          items:
+            type: string
+          title: Quantum Processor IDs
+          type: array
+      required:
+        - id
+        - addresses
+        - healthy
+        - mock
+      title: Endpoint
+      type: object
+    EndpointAddresses:
+      description: Addresses at which an endpoint is reachable over the network.
+      properties:
+        grpc:
+          title: Grpc
+          type: string
+        rpcq:
+          title: Rpcq
+          type: string
+      title: EndpointAddresses
+      type: object
+    EngagementCredentials:
+      description: >-
+        Credentials are the ZeroMQ CURVE Keys used to encrypt the connection
+        with the Quantum Processor
+
+        Endpoint.
+      properties:
+        clientPublic:
+          title: Client Public Key
+          type: string
+        clientSecret:
+          title: Client Secret Key
+          type: string
+        serverPublic:
+          title: Server Public Key
+          type: string
+      required:
+        - clientPublic
+        - clientSecret
+        - serverPublic
+      title: EngagementCredentials
+      type: object
+    EngagementWithCredentials:
+      description: An engagement is the authorization of a user to execute work on a
+        Quantum Processor Endpoint.
+      properties:
+        accountId:
+          description: User ID or group name on behalf of which the engagement is made.
+          title: Account Id
+          type: string
+        accountType:
+          allOf:
+            - $ref: "#/components/schemas/AccountType"
+          description: Indicates whether the grant was made on behalf of a single user or
+            group.
+          title: Account Type
+        address:
+          description: The network address of the endpoint to which this engagement grants
+            access
+          title: Address
+          type: string
+        credentials:
+          $ref: "#/components/schemas/EngagementCredentials"
+        endpointId:
+          description: The ID of the endpoint to which this engagement grants access
+          title: Endpoint ID
+          type: string
+        expiresAt:
+          description: Time after which the engagement is no longer valid. Given in
+            RFC3339 format.
+          title: Expiration Time
+          type: string
+        minimumPriority:
+          description: The minimum priority value allowed for execution
+          title: Minimum Priority
+          type: integer
+        quantumProcessorIds:
+          default: []
+          description: The quantum processors for which this engagement enables access and
+            execution
+          items:
+            type: string
+          title: Quantum Processor IDs
+          type: array
+        tags:
+          description: Tags recorded on QPU requests and recorded on usage records.
+          items:
+            type: string
+          title: Tags
+          type: array
+        userId:
+          title: User ID of client
+          type: string
+      required:
+        - address
+        - endpointId
+        - expiresAt
+        - userId
+        - credentials
+      title: EngagementWithCredentials
+      type: object
+    ListEndpointsResponse:
+      properties:
+        endpoints:
+          items:
+            $ref: "#/components/schemas/Endpoint"
+          title: Endpoints
+          type: array
+        nextPageToken:
+          description: Opaque token indicating the start of the next page of results to
+            return; do not decode
+          title: Next Page Token
+          type: string
+      required:
+        - endpoints
+      title: ListEndpointsResponse
+      type: object
+    NomadJobDatacenters:
+      description: An enumeration.
+      enum:
+        - berkeley-775
+        - fremont-fab
+        - rigetti-gb-1
+      title: NomadJobDatacenters
+      type: string
+    RestartEndpointRequest:
+      properties:
+        componentName:
+          description: Individual component to restart
+          title: Component Name
+          type: string
+      title: RestartEndpointRequest
+      type: object
+    Architecture:
+      type: object
+      title: Architecture
+      description: >-
+        Represents the logical underlying architecture of a quantum processor.
+
+
+        The architecture is defined in detail by the nodes and edges that constitute the quantum
+
+        processor. This defines the set of all nodes that could be operated upon, and indicates to
+
+        some approximation their physical layout. The main purpose of this is to support geometry
+
+        calculations that are independent of the available operations, and rendering ISA-based
+
+        information. Architecture layouts are defined by the `family`, as follows.
+
+
+        The "Aspen" family of quantum processor indicates a 2D planar grid layout of octagon unit
+
+        cells. The `node_id` in this architecture is computed as `100 p_y + 10 p_x + p_u` where
+
+        `p_y` is the zero-based Y position in the unit cell grid, `p_x` is the zero-based
+
+        X position in the unit cell grid, and `p_u` is the zero-based position in the octagon
+
+        unit cell and always ranges from 0 to 7. This scheme has a natural size limit of a 10x10
+
+        unit cell grid, which permits the architecture to scale up to 800 nodes.
+
+
+        Note that the operations that are actually available are defined entirely by `Operation`
+
+        instances. The presence of a node or edge in the `Architecture` model provides no guarantee
+
+        that any 1Q or 2Q operation will be available to users writing QUIL programs.
+      required:
+        - family
+        - nodes
+        - edges
+      properties:
+        family:
+          description: The architecture family. The nodes and edges conform to this family.
+          allOf:
+            - $ref: "#/components/schemas/Family"
+            - description: The architecture family. The nodes and edges conform to this
+                family.
+        nodes:
+          type: array
+          description: A list of all computational nodes in the instruction set
+            architecture.
+          items:
+            $ref: "#/components/schemas/Node"
+          uniqueItems: true
+        edges:
+          type: array
+          description: A list of all computational edges in the instruction set
+            architecture.
+          items:
+            $ref: "#/components/schemas/Edge"
+          uniqueItems: true
+    Characteristic:
+      type: object
+      title: Characteristic
+      description: A measured characteristic of an operation.
+      required:
+        - name
+        - value
+        - timestamp
+      properties:
+        name:
+          type: string
+          title: The format of a name (an identifier).
+          description: The name of the characteristic.
+        value:
+          type: number
+          format: double
+          description: The characteristic value measured.
+        error:
+          type: number
+          format: double
+          description: The error in the characteristic value, or None otherwise.
+        node_ids:
+          type: array
+          description: >-
+            The list of architecture node ids for the site where the
+            characteristic is
+
+            measured, if that is different from the site of the enclosing operation.
+
+            None if it is the same. The order of this or the enclosing node ids obey
+
+            the definition of node symmetry from the enclosing operation.
+          items:
+            type: integer
+            format: uint64
+            title: A node integer identifier; must be greater than or equal to zero.
+          minItems: 1
+          uniqueItems: true
+        timestamp:
+          type: string
+          format: date-time
+          description: The date and time at which the characteristic was measured.
+        parameter_values:
+          type: array
+          description: >-
+            The optional ordered list of parameter values used to generate the
+
+            characteristic. The order matches the parameters in the enclosing operation,
+
+            and so the lengths of these two lists must match.
+          items:
+            type: number
+            format: double
+    Code:
+      type: string
+      description: API error codes to indicate what kind of error occurred beyond what
+        an HTTP status can convey.
+      enum:
+        - conflicting_resource_access
+        - resource_exists
+        - access_forbidden
+        - internal_error
+        - invalid_request
+        - invalid_token
+        - resource_not_found
+        - under_load
+        - unauthenticated
+    Edge:
+      type: object
+      title: Edge
+      description: >-
+        A degree-two logical connection in the quantum processor's architecture.
+
+
+        The existence of an edge in the ISA `Architecture` does not necessarily mean that a given 2Q
+
+        operation will be available on the edge. This information is conveyed by the presence of the
+
+        two `node_id` values in instances of `Instruction`.
+
+
+        Note that edges are undirected in this model. Thus edge `(a, b)` is equivalent to edge
+
+        `(b, a)`.
+      required:
+        - node_ids
+      properties:
+        node_ids:
+          type: array
+          description: >-
+            The integer ids of the computational nodes at the two ends of the
+            edge.
+
+            Order is not important; an architecture edge is treated as undirected.
+          items:
+            type: integer
+            format: uint64
+            title: A node integer identifier; must be greater than or equal to zero.
+          maxLength: 2
+          minLength: 2
+    Family:
+      type: string
+      description: >-
+        Family identifier.
+
+
+        Value 'None' implies the architecture has no specific layout topology.
+
+        Value 'Full' implies that each node is connected to every other (a fully-connected architecture)
+
+
+        For other values based on deployed architecture layouts (e.g. `Aspen` and `Ankaa`), refer to
+
+        the architecture classes themselves for more details.
+      enum:
+        - None
+        - Full
+        - Aspen
+        - Ankaa
+    InstructionSetArchitecture:
+      type: object
+      title: InstructionSetArchitecture
+      description: >-
+        The native instruction set architecture of a quantum processor,
+        annotated with characteristics.
+
+
+        The operations described by the `instructions` field are named by their QUIL instruction name,
+
+        while the operation described by the `benchmarks` field are named by their benchmark routine
+
+        and are a future extension point that will be populated in future iterations.
+
+
+        The characteristics that annotate both instructions and benchmarks assist the user to generate
+
+        the best native QUIL program for a desired task, and so are provided as part of the native ISA.
+      required:
+        - name
+        - architecture
+        - instructions
+        - benchmarks
+      properties:
+        name:
+          type: string
+          description: The name of the quantum processor.
+          minLength: 1
+        architecture:
+          $ref: "#/components/schemas/Architecture"
+        instructions:
+          type: array
+          description: The list of native QUIL instructions supported by the quantum
+            processor.
+          items:
+            $ref: "#/components/schemas/Operation"
+        benchmarks:
+          type: array
+          description: The list of benchmarks that have characterized the quantum processor.
+          items:
+            $ref: "#/components/schemas/Operation"
+    ListInstructionSetArchitectureResponse:
+      type: object
+      required:
+        - instructionSetArchitectures
+      properties:
+        nextPageToken:
+          type: string
+          description: Send an opaque page token returned from a prior request
+        instructionSetArchitectures:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstructionSetArchitecture"
+    ListQuantumProcessorAccessorsResponse:
+      type: object
+      required:
+        - accessors
+      properties:
+        nextPageToken:
+          type: string
+          description: Send an opaque page token returned from a prior request
+        accessors:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuantumProcessorAccessor"
+    ListQuantumProcessorsResponse:
+      type: object
+      required:
+        - quantumProcessors
+      properties:
+        nextPageToken:
+          type: string
+          description: Send an opaque page token returned from a prior request
+        quantumProcessors:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuantumProcessor"
+    Node:
+      type: object
+      title: Node
+      description: >-
+        A logical node in the quantum processor's architecture.
+
+
+        The existence of a node in the ISA `Architecture` does not necessarily mean that a given 1Q
+
+        operation will be available on the node. This information is conveyed by the presence of the
+
+        specific `node_id` in instances of `Instruction`.
+      required:
+        - node_id
+      properties:
+        node_id:
+          type: integer
+          format: uint64
+          title: A node integer identifier; must be greater than or equal to zero.
+          description: >-
+            An integer id assigned to the computational node. The ids may not be
+            contiguous and will be assigned based
+
+            on the architecture family.
+    Operation:
+      type: object
+      title: Operation
+      description: An operation, with its sites and site-independent characteristics.
+      required:
+        - name
+        - parameters
+        - sites
+        - characteristics
+      properties:
+        name:
+          type: string
+          title: The format of a name (an identifier).
+          description: The name of the operation.
+        node_count:
+          type: integer
+          format: uint64
+          description: The number of nodes that this operation applies to. None if
+            unspecified.
+          minimum: 0
+          exclusiveMinimum: true
+        parameters:
+          type: array
+          description: The list of parameters. Each parameter must be uniquely named. May
+            be empty.
+          items:
+            $ref: "#/components/schemas/Parameter"
+        sites:
+          type: array
+          description: The list of sites at which this operation can be applied, together
+            with its site-dependent characteristics.
+          items:
+            $ref: "#/components/schemas/OperationSite"
+        characteristics:
+          type: array
+          description: The list of site-independent characteristics of this operation.
+          items:
+            $ref: "#/components/schemas/Characteristic"
+    OperationSite:
+      type: object
+      title: OperationSite
+      description: A site for an operation, with its site-dependent characteristics.
+      required:
+        - node_ids
+        - characteristics
+      properties:
+        node_ids:
+          type: array
+          description: >-
+            The list of architecture node ids for the site. The order of these
+            node ids
+
+            obey the definition of node symmetry from the enclosing operation.
+          items:
+            type: integer
+            format: uint64
+            title: A node integer identifier; must be greater than or equal to zero.
+          minItems: 1
+          uniqueItems: true
+        characteristics:
+          type: array
+          description: The list of site-dependent characteristics of this operation.
+          items:
+            $ref: "#/components/schemas/Characteristic"
+    Parameter:
+      type: object
+      title: Parameter
+      description: A parameter to an operation.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          title: The format of a name (an identifier).
+          description: The name of the parameter, such as the name of a mathematical symbol.
+    QuantumProcessor:
+      type: object
+      title: QuantumProcessor
+      description: An object representing a quantum processor.
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: "Immutable, unique identifier for a quantum processor [example:
+            Aspen-1]"
+    QuantumProcessorAccessor:
+      type: object
+      title: QuantumProcessorAccessor
+      description: An accessor for a controller deployment.
+      required:
+        - accessType
+        - live
+        - url
+      properties:
+        accessType:
+          description: The type of access to the controller.
+          allOf:
+            - $ref: "#/components/schemas/QuantumProcessorAccessorType"
+            - description: The type of access to the controller.
+        live:
+          type: boolean
+          description: Whether this connection is attached to live hardware.
+        url:
+          type: string
+          description: The gRPC endpoint for this accessor.
+        rank:
+          type: integer
+          format: int64
+          description: >-
+            (Deprecated) Rank of this accessor against others for the same QPU.
+            If two accessors both serve a client's
+
+            purposes, that with the lower rank value should be used for access.
+          deprecated: true
+    QuantumProcessorAccessorType:
+      type: string
+      description: Type of the accessor. Each accessor type is a different mechanism
+        of accessing a QPU, each with their own benefits and/or drawbacks.
+      enum:
+        - gateway.v1
+        - direct.v1
+    ValidationLocation:
+      type: string
+      enum:
+        - header
+        - query
+        - path
+        - body
+    AccountBalance:
+      description: Balance of QCS account in billing system. Note, a negative balance
+        signifies that the account has QCS credits to spend. A positive account
+        balance signifies that the account has no additional QCS credits to
+        spend. The QCS UI may display these quantities in absolute or negative
+        value and provide a clear meaning to the significance.
+      properties:
+        balance:
+          description: The balance in cents USD.
+          type: integer
+      required:
+        - balance
+      type: object
+    AccountId:
+      description: userId for `accountType` "user", group name for `accountType` "group".
+      type: string
+    AccountType:
+      description: "There are two types of accounts within QCS: user (representing a
+        single user in Okta) and group (representing one or more users in
+        Okta)."
+      default: user
+      enum:
+        - group
+        - user
+      type: string
+    AddGroupUserRequest:
+      description: Must provide either `userId` or `userEmail` and `groupId` or `groupName`.
+      properties:
+        groupId:
+          type: string
+        groupName:
+          type: string
+        userEmail:
+          type: string
+        userId:
+          type: string
+      type: object
+    Announcement:
+      description: An announcement to be displayed to users.
+      properties:
+        id:
+          type: integer
+        contentHtml:
+          description: The HTML content of the announcement to be displayed.
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+          description: The RFC3339-format time the announcement was created.
+        active:
+          type: boolean
+          description: Whether the announcement is currently active.
+      required:
+        - id
+        - contentHtml
+        - createdAt
+        - active
+    AnnouncementsResponse:
+      description: A page of announcements.
+      properties:
+        nextPageToken:
+          type: string
+        announcements:
+          type: array
+          items:
+            $ref: "#/components/schemas/Announcement"
+      required:
+        - announcements
+    AuthEmailPasswordResetTokenRequest:
+      properties:
+        email:
+          type: string
+      required:
+        - email
+      type: object
+    AuthResetPasswordRequest:
+      properties:
+        newPassword:
+          type: string
+        oldPassword:
+          type: string
+      required:
+        - oldPassword
+        - newPassword
+      type: object
+    AuthResetPasswordWithTokenRequest:
+      description: Token may be requested with AuthEmailPasswordResetToken.
+      properties:
+        newPassword:
+          type: string
+        token:
+          type: string
+      required:
+        - token
+        - newPassword
+      type: object
+    AvailableReservation:
+      properties:
+        duration:
+          type: string
+        endTime:
+          format: date-time
+          type: string
+        price:
+          type: integer
+        quantumProcessorId:
+          type: string
+        startTime:
+          format: date-time
+          type: string
+      required:
+        - quantumProcessorId
+        - startTime
+        - endTime
+        - duration
+        - price
+      type: object
+    BillingCustomer:
+      description: Billing account information of a particular QCS account.
+      properties:
+        email:
+          type: string
+        id:
+          type: string
+      required:
+        - id
+        - email
+      title: Billing Customer
+      type: object
+    BillingInvoice:
+      allOf:
+        - $ref: "#/components/schemas/BillingUpcomingInvoice"
+        - description: A finalized invoice for the current invoice period.
+          properties:
+            id:
+              type: string
+          required:
+            - id
+            - periodEnd
+            - periodStart
+            - startingBalance
+            - status
+            - subtotal
+            - tax
+            - total
+          type: object
+      description: A finalized billing invoice.
+      type: object
+    BillingInvoiceLine:
+      description: A line item on an invoice representing a particular purchase (such
+        as a reservation) or aggregate usage for the invoice period.
+      properties:
+        amount:
+          type: integer
+        description:
+          type: string
+        id:
+          type: string
+        invoiceItem:
+          type: string
+        lineItemType:
+          enum:
+            - invoiceitem
+            - subscription
+          type: string
+        metadata:
+          additionalProperties:
+            type: string
+          type: object
+        price:
+          $ref: "#/components/schemas/BillingPrice"
+        quantity:
+          type: integer
+        subscription:
+          type: string
+        subscriptionItem:
+          type: string
+      required:
+        - id
+        - description
+        - amount
+        - quantity
+        - lineItemType
+        - metadata
+      type: object
+    BillingInvoiceStatus:
+      enum:
+        - draft
+        - open
+        - paid
+        - uncollectible
+        - void
+      type: string
+    BillingPrice:
+      description: |
+        A configuration for calculating the cost of `BillingProduct` usage
+        based on quantity,
+        and when that cost should be added as an invoice item.
+      properties:
+        active:
+          description: Whether the price can be used for new purchases.
+          type: boolean
+        billingScheme:
+          $ref: "#/components/schemas/BillingPriceScheme"
+        id:
+          description: Unique identifier for the object.
+          maxLength: 5000
+          type: string
+        object:
+          description: This object's type, which is always `price`.
+          enum:
+            - price
+          type: string
+        priceType:
+          description: >
+            Use `one_time` to invoice immediately based on a single usage
+
+            report, e.g. purchasing a QPU reservation.
+
+            Use `recurring` to aggregate usage reports over an interval and then invoice
+
+            once based on `BillingPriceRecurrence`, e.g. on-demand QPU usage.
+          enum:
+            - one_time
+            - recurring
+          type: string
+        product:
+          $ref: "#/components/schemas/BillingProduct"
+        recurring:
+          $ref: "#/components/schemas/BillingPriceRecurrence"
+        tiers:
+          description: |
+            Configure how price should be calculated based on quantity
+            when `billingScheme=tiered`.
+            Requires at least two tiers.
+          items:
+            $ref: "#/components/schemas/BillingPriceTier"
+          type: array
+        tiersMode:
+          $ref: "#/components/schemas/BillingPriceTiersMode"
+        unitAmountDecimal:
+          description: |
+            The amount of `currency` to charge per quantity used.
+            Requires that `billingScheme=per_unit`.
+          format: double
+          type: number
+      required:
+        - id
+      title: Billing Price
+      type: object
+    BillingPriceRecurrence:
+      description: |
+        How to invoice for the usage of a product that has a recurring
+        (subscription) price.
+      properties:
+        aggregateUsage:
+          description: |
+            How to determine the aggregate usage over the `interval` when
+            `usageType=metered`.
+            Using `sum` is recommended.
+          enum:
+            - last_during_period
+            - last_ever
+            - max
+            - sum
+          type: string
+        interval:
+          description: |
+            The frequency at which recurring usage should be billed.
+            Using `month` is recommended.
+          enum:
+            - day
+            - month
+            - week
+            - year
+          type: string
+        intervalCount:
+          description: >
+            The number of `interval` units between each billing cycle.
+
+            For example, `interval=month` and `intervalCount=1` means every month
+
+            (recommended).
+          format: int64
+          type: integer
+        usageType:
+          description: >
+            Use `metered` to calculate a dynamic quantity based on reported
+
+            usage records (recommended).
+
+            Use `licensed` when you provide a fixed quantity, e.g. a TV subscription.
+          enum:
+            - licensed
+            - metered
+          type: string
+      required:
+        - interval
+      title: Billing Price Recurrence
+      type: object
+    BillingPriceScheme:
+      description: >
+        Use `per_unit` to charge a linear rate per quantity (recommended).
+
+        Use `tiered` to charge a dynamic rate based on quantity as defined in the
+
+        `tiers` of a `BillingPice`.
+      enum:
+        - per_unit
+        - tiered
+      type: string
+    BillingPriceTier:
+      description: >
+        Use `flatAmount` to charge a fixed amount for the quantity relevant
+
+        to the tier.
+
+        Use `unitAmount` to charge a linear rate for the quantity relevant to the
+
+        tier.
+
+        Only one field between `flatAmount`, `flatAmountDecimal`, `unitAmount`, or
+
+        `unitAmountDecimal` should be set.
+      properties:
+        flatAmount:
+          format: int64
+          type: integer
+        flatAmountDecimal:
+          format: double
+          type: number
+        unitAmount:
+          format: int64
+          type: integer
+        unitAmountDecimal:
+          format: double
+          type: number
+        upTo:
+          description: >
+            The upper bound of product quantity relevant to this tier.
+
+            The highest tier should be open ended, represented by an `upTo` value
+
+            of `-1`.
+          format: int64
+          type: integer
+      required:
+        - upTo
+      title: tier
+      type: object
+    BillingPriceTiersMode:
+      description: |
+        Use `graduated` to apply each tier calculation to the portion
+        of relevant quantity, e.g. how US federal tax brackets work.
+        Use `volume` to apply the highest relevant tier to the entire quantity.
+      enum:
+        - graduated
+        - volume
+      type: string
+    BillingProduct:
+      description: >
+        A QCS service product, such as reservation time or on-demand execution.
+
+        One product can be associated with multiple prices, which may be associated
+
+        to particular resources or customers.
+      properties:
+        description:
+          maxLength: 5000
+          type: string
+        id:
+          description: Unique identifier for the object.
+          maxLength: 5000
+          type: string
+        name:
+          description: This name will show up on associated invoice line item descriptions.
+          maxLength: 5000
+          type: string
+        object:
+          description: This object's type, which is always `product`.
+          enum:
+            - product
+          type: string
+          x-enum-varnames:
+            - productObject
+        unitLabel:
+          description: >
+            A label for units of this product which appears on customer
+
+            invoices, e.g. "microseconds" for on-demand execution or "minutes" for
+
+            qpu reservations.
+          maxLength: 5000
+          type: string
+      required:
+        - id
+        - name
+        - object
+      title: Billing Product
+      type: object
+    BillingUpcomingInvoice:
+      description: An unfinalized billing invoice.
+      properties:
+        periodEnd:
+          format: date-time
+          type: string
+        periodStart:
+          format: date-time
+          type: string
+        startingBalance:
+          type: integer
+        status:
+          $ref: "#/components/schemas/BillingInvoiceStatus"
+        subtotal:
+          type: integer
+        tax:
+          type: integer
+        total:
+          type: integer
+      required:
+        - periodEnd
+        - periodStart
+        - startingBalance
+        - status
+        - subtotal
+        - tax
+        - total
+      type: object
+    CheckClientApplicationRequest:
+      properties:
+        name:
+          description: Name of component
+          type: string
+        version:
+          description: Semantic version of component.
+          type: string
+      required:
+        - name
+        - version
+      type: object
+    CheckClientApplicationResponse:
+      properties:
+        isLatestVersion:
+          type: boolean
+        isUpdateRequired:
+          description: Set to true if component is not at latest version.
+          type: boolean
+        message:
+          type: string
+      required:
+        - isLatestVersion
+        - isUpdateRequired
+        - message
+      type: object
+    ChecksumDescription:
+      properties:
+        headerName:
+          type: string
+        type:
+          enum:
+            - md5
+          type: string
+      required:
+        - headerName
+        - type
+      type: object
+    ClientApplication:
+      properties:
+        detailsUri:
+          type: string
+        latestVersion:
+          description: Semantic version
+          type: string
+        links:
+          items:
+            $ref: "#/components/schemas/ClientApplicationsDownloadLink"
+          type: array
+        minimumVersion:
+          description: Semantic version
+          type: string
+        name:
+          type: string
+        supported:
+          type: boolean
+      required:
+        - latestVersion
+        - name
+        - supported
+      type: object
+    ClientApplicationsDownloadLink:
+      properties:
+        checksumDescription:
+          $ref: "#/components/schemas/ChecksumDescription"
+        platform:
+          type: string
+        url:
+          type: string
+      required:
+        - url
+      type: object
+    CreateReservationRequest:
+      properties:
+        accountId:
+          $ref: "#/components/schemas/AccountId"
+        accountType:
+          $ref: "#/components/schemas/AccountType"
+        endTime:
+          format: date-time
+          type: string
+        notes:
+          type: string
+        quantumProcessorId:
+          type: string
+        startTime:
+          format: date-time
+          type: string
+      required:
+        - quantumProcessorId
+        - startTime
+        - endTime
+      type: object
+    ActivateUserRequest:
+      properties:
+        credentials:
+          $ref: "#/components/schemas/UserCredentials"
+        profile:
+          $ref: "#/components/schemas/UserProfile"
+        token:
+          description: Verification token provided in invitation email.
+          type: string
+      required:
+        - profile
+        - credentials
+        - token
+      type: object
+    EventBillingPriceRate:
+      description: |
+        The per-unit price associated with a particular QCS service product,
+        and (optionally) with a particular quantum processor.
+      properties:
+        id:
+          type: integer
+        product:
+          $ref: "#/components/schemas/Product"
+        quantumProcessorId:
+          description: If unset, this per-unit price applies to any quantum processor.
+          type: string
+        unitAmountDecimal:
+          description: The unit amount in currency to be charged.
+          format: double
+          type: number
+        unitLabel:
+          description: Human-readable unit label infomation.
+          type: string
+      required:
+        - id
+        - product
+      type: object
+    Filter:
+      description: >
+        A string conforming to a *limited* set of the filtering operations
+        described in [Google AIP 160](https://google.aip.dev/160).
+
+
+        * Expressions are always of the form `{field} {operator} {value}` and may be grouped with `()` and joined with `AND` or `OR`.
+
+        * Fields are specific to the route in question, but are typically a subset of attributes of the requested resource.
+
+        * Operators are limited to `=`, `>`, `>=`, `<`, `<=`, and `!=`.
+
+        * Values may take the following forms:
+          * `true` or `false` for boolean fields
+          * a number
+          * a string (include surrounding `"`s),
+          * a duration string (include surrounding `"`s). Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+          * a date string (include surrounding `"`s). Should be formatted [RFC3339 5.6](https://tools.ietf.org/html/rfc3339#section-5.6).
+
+        For example, `startTime >= "2020-06-24T22:00:00.000Z" OR (duration >= "15m" AND endTime < "2020-06-24T22:00:00.000Z")`.
+      type: string
+    FindAvailableReservationsResponse:
+      properties:
+        availableReservations:
+          items:
+            $ref: "#/components/schemas/AvailableReservation"
+          type: array
+        nextPageToken:
+          type: string
+      required:
+        - availableReservations
+      type: object
+    GetAccountEventBillingPriceRequest:
+      description: Property `quantumProcessorId` is currently required for all
+        `product`s, however in the future there may be `product`s that do not
+        require a `quantumProcessorId`.
+      properties:
+        product:
+          $ref: "#/components/schemas/Product"
+        quantumProcessorId:
+          maxLength: 1000
+          type: string
+      required:
+        - product
+      type: object
+    Group:
+      properties:
+        createdTime:
+          format: date-time
+          type: string
+        description:
+          type: string
+        id:
+          type: string
+        lastMembershipUpdatedTime:
+          format: date-time
+          type: string
+        name:
+          type: string
+        updatedTime:
+          format: date-time
+          type: string
+      required:
+        - id
+        - name
+        - description
+        - createdTime
+        - updatedTime
+        - lastMembershipUpdatedTime
+      type: object
+    InviteUserRequest:
+      properties:
+        email:
+          type: string
+        groupName:
+          type: string
+        billingOrganizationId:
+          type: integer
+      required:
+        - email
+      type: object
+    ListAccountBillingInvoiceLinesResponse:
+      properties:
+        billingInvoiceLines:
+          items:
+            $ref: "#/components/schemas/BillingInvoiceLine"
+          type: array
+        nextPageToken:
+          type: string
+      required:
+        - billingInvoiceLines
+      type: object
+    ListAccountBillingInvoicesResponse:
+      properties:
+        billingInvoices:
+          items:
+            $ref: "#/components/schemas/BillingInvoice"
+          type: array
+        nextPageToken:
+          type: string
+      required:
+        - billingInvoices
+      type: object
+    ListClientApplicationsResponse:
+      properties:
+        clientApplications:
+          items:
+            $ref: "#/components/schemas/ClientApplication"
+          type: array
+      required:
+        - clientApplications
+      type: object
+    ListGroupUsersResponse:
+      properties:
+        nextPageToken:
+          type: string
+        users:
+          items:
+            $ref: "#/components/schemas/User"
+          type: array
+      required:
+        - users
+      type: object
+    ListGroupsResponse:
+      properties:
+        groups:
+          items:
+            $ref: "#/components/schemas/Group"
+          type: array
+        nextPageToken:
+          type: string
+      required:
+        - groups
+      type: object
+    ListReservationsResponse:
+      properties:
+        nextPageToken:
+          type: string
+        reservations:
+          items:
+            $ref: "#/components/schemas/Reservation"
+          type: array
+      required:
+        - reservations
+        - nextPageToken
+      type: object
+    Order:
+      description: >
+        A string conforming to order specification described in [Google
+
+        AIP 132](https://google.aip.dev/132#ordering).
+
+
+        * Fields are specific to the route in question, but are typically a subset
+
+        of attributes of the requested resource.
+
+        * May include a comma separated list of many fields.
+
+        * Fields are sorted in *ascending* order unless the field is followed by `DESC`.
+
+
+        For example, `quantumProcessorId, startTime DESC`.
+      type: string
+    Product:
+      description: The set of known QCS service products.
+      enum:
+        - reservationCreation
+        - qpuJobCompletion
+        - qpuJobTime
+      type: string
+    QuantumProcessorCalendar:
+      description: Details about calendars related to a quantum processor.
+      properties:
+        maintenanceICal:
+          description: This calendar's schedule contains maintenance events for the QPU,
+            during which execution is not available.
+          type: string
+      type: object
+    RemoveGroupUserRequest:
+      description: Must provide either `userId` or `userEmail` and `groupId` or `groupName`.
+      properties:
+        groupId:
+          type: string
+        groupName:
+          type: string
+        userEmail:
+          type: string
+        userId:
+          type: string
+      type: object
+    Reservation:
+      properties:
+        accountId:
+          $ref: "#/components/schemas/AccountId"
+        accountType:
+          $ref: "#/components/schemas/AccountType"
+        cancellationBillingInvoiceItemId:
+          type: string
+        cancelled:
+          type: boolean
+        createdByAccountId:
+          $ref: "#/components/schemas/AccountId"
+        createdByAccountType:
+          $ref: "#/components/schemas/AccountType"
+        createdTime:
+          format: date-time
+          type: string
+        creationBillingInvoiceItemId:
+          type: string
+        endTime:
+          format: date-time
+          type: string
+        id:
+          type: integer
+        notes:
+          type: string
+        price:
+          type: integer
+        quantumProcessorId:
+          type: string
+        startTime:
+          format: date-time
+          type: string
+        updatedTime:
+          format: date-time
+          type: string
+        userId:
+          deprecated: true
+          description: Deprecated in favor of `accountId`.
+          type: string
+      required:
+        - accountId
+        - accountType
+        - id
+        - userId
+        - quantumProcessorId
+        - startTime
+        - endTime
+        - createdTime
+        - price
+      type: object
+    User:
+      properties:
+        createdTime:
+          format: date-time
+          type: string
+        id:
+          type: integer
+        idpId:
+          type: string
+        profile:
+          $ref: "#/components/schemas/UserProfile"
+      required:
+        - id
+        - idpId
+        - createdTime
+      type: object
+    UserCredentials:
+      properties:
+        password:
+          properties:
+            value:
+              type: string
+          required:
+            - value
+          type: object
+      required:
+        - password
+      type: object
+    UserProfile:
+      properties:
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        organization:
+          type: string
+      required:
+        - email
+        - firstName
+        - lastName
+        - organization
+      type: object
+    UpdateViewerUserProfileRequest:
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        organization:
+          type: string
+      required:
+        - firstName
+        - lastName
+        - organization
+      type: object
+    ViewerUserOnboardingCompleted:
+      properties:
+        onboardingCompleted:
+          type: boolean
+      required:
+        - onboardingCompleted
+  securitySchemes:
+    JWTBearer:
+      bearerFormat: JWT
+      description: A JSON web token with `sub` or `uid` claim, as well as `groups`
+        claim. If the token is absent, invalid or expired, the client will
+        receive a 401 response. If the token is valid, the server uses the
+        claims to authorize the request, which may result in a 403 response.
+      scheme: bearer
+      type: http
+    JWTBearerOptional:
+      bearerFormat: JWT
+      description: Same as `JWTBearer`, but the Authorization header is optionally
+        parsed. Clients will receive a 401 response if an invalid or expired
+        token is provided. Otherwise, the server authorizes the request against
+        either the valid token claims or an unauthenticated user. In either
+        case, the client may receive a 403 response.
+      scheme: bearer
+      type: http
+  parameters:
+    accountIdHeader:
+      description: >
+        Used to specify a subject account ID for a request.
+
+        Does not take precedence over a corresponding request body field when one
+
+        is present.
+      in: header
+      name: X-QCS-ACCOUNT-ID
+      schema:
+        $ref: "#/components/schemas/AccountId"
+    accountTypeHeader:
+      description: >
+        Used to specify the subject account's type for a request
+
+        in conjunction with the X-QCS-ACCOUNT-ID header.
+
+        Does not take precedence over a corresponding request body field when one
+
+        is present.
+      in: header
+      name: X-QCS-ACCOUNT-TYPE
+      schema:
+        $ref: "#/components/schemas/AccountType"
+    filterParam:
+      in: query
+      name: filter
+      schema:
+        $ref: "#/components/schemas/Filter"
+    orderParam:
+      in: query
+      name: order
+      required: false
+      schema:
+        $ref: "#/components/schemas/Order"
+    pageSizeParam:
+      in: query
+      name: pageSize
+      required: false
+      schema:
+        type: integer
+    pageTokenParam:
+      description: An opaque token that can be appended to a request query to retrieve
+        the next page of results. Empty if there are no more results to
+        retrieve.
+      in: query
+      name: pageToken
+      required: false
+      schema:
+        type: string
+    showDeleted:
+      description: If you wish to include deleted (or cancelled) resources in your
+        response, include `showDeleted=true`.
+      in: query
+      name: showDeleted
+      required: false
+      schema:
+        default: "false"
+        enum:
+          - "true"
+          - "false"
+        type: string
