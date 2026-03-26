@@ -1,0 +1,5175 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "description": "Aptly operations are also available via REST API served with `aptly api serve`.\n\nOn Debian based systems, a package `aptly-api` is available, which will run aptly as systemd service as dedicated aptly-api user.\n\nSome configuration changes (S3 publishing endpoints, ...) will require restarting the aptly service in order to take effect.\n\nThe REST API shouldn't be exposed to the Internet as there is no authentication/protection, consider using a HTTP proxy (e.g. nginx) to add https and authentication.\n",
+    "title": "Aptly REST API Documentation",
+    "version": "1.6.0",
+    "x-jentic-source-url": "https://www.aptly.info/doc/api/"
+  },
+  "paths": {
+    "/api/db/cleanup": {
+      "post": {
+        "description": "**Cleanup Aptly DB**\nDatabase cleanup removes information about unreferenced packages and deletes files in the package pool that aren\u2019t used by packages anymore.\nIt is a good idea to run this command after massive deletion of mirrors, snapshots or local repos.",
+        "tags": [
+          "Database"
+        ],
+        "summary": "DB Cleanup",
+        "parameters": [
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Output",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files": {
+      "get": {
+        "description": "**Get list of upload directories**\n\n**Example:**\n```\n$ curl http://localhost:8080/api/files\n[\"aptly-0.9\"]\n```",
+        "tags": [
+          "Files"
+        ],
+        "summary": "List Directories",
+        "responses": {
+          "200": {
+            "description": "List of files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/{dir}": {
+      "get": {
+        "description": "**Show uploaded files in upload directory**\n\n**Example:**\n```\n$ curl http://localhost:8080/api/files/aptly-0.9\n[\"aptly_0.9~dev+217+ge5d646c_i386.deb\"]\n```",
+        "tags": [
+          "Files"
+        ],
+        "summary": "List Files",
+        "parameters": [
+          {
+            "description": "Directory to list",
+            "name": "dir",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Files found in directory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "**Upload files to a directory**\n\n- one or more files can be uploaded\n- existing uploaded are overwritten\n\n**Example:**\n```\n$ curl -X POST -F file=@aptly_0.9~dev+217+ge5d646c_i386.deb http://localhost:8080/api/files/aptly-0.9\n[\"aptly-0.9/aptly_0.9~dev+217+ge5d646c_i386.deb\"]\n```",
+        "tags": [
+          "Files"
+        ],
+        "summary": "Upload Files",
+        "parameters": [
+          {
+            "description": "Directory to upload files to. Created if does not exist",
+            "name": "dir",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "description": "Files to upload",
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "files"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "list of uploaded files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "**Delete upload directory and uploaded files within**\n\n**Example:**\n```\n$ curl -X DELETE http://localhost:8080/api/files/aptly-0.9\n{}\n```",
+        "tags": [
+          "Files"
+        ],
+        "summary": "Delete Directory",
+        "parameters": [
+          {
+            "description": "Directory",
+            "name": "dir",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "msg",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/{dir}/{name}": {
+      "delete": {
+        "description": "**Delete a uploaded file in upload directory**\n\n**Example:**\n```\n$ curl -X DELETE http://localhost:8080/api/files/aptly-0.9/aptly_0.9~dev+217+ge5d646c_i386.deb\n{}\n```",
+        "tags": [
+          "Files"
+        ],
+        "summary": "Delete File",
+        "parameters": [
+          {
+            "description": "Directory to delete from",
+            "name": "dir",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "File to delete",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "msg",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gpg": {
+      "post": {
+        "description": "**Adds GPG keys to aptly keyring**\n\nAdd GPG public keys for veryfing remote repositories for mirroring.",
+        "tags": [
+          "Mirrors"
+        ],
+        "summary": "Add GPG Keys",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/graph.{ext}": {
+      "get": {
+        "description": "**Generate dependency graph**\n\nCommand graph generates graph of dependencies:\n\n* between snapshots and mirrors (what mirror was used to create each snapshot)\n* between snapshots and local repos (what local repo was used to create snapshot)\n* between snapshots (pulling, merging, etc.)\n* between snapshots, local repos and published repositories (how snapshots were published).\n\nGraph is rendered to PNG file using graphviz package.\n\nExample URL: `http://localhost:8080/api/graph.svg?layout=vertical`",
+        "tags": [
+          "Status"
+        ],
+        "summary": "Graph Output",
+        "parameters": [
+          {
+            "description": "ext specifies desired file extension, e.g. .png, .svg.",
+            "name": "ext",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Change between a `horizontal` (default) and a `vertical` graph layout.",
+            "name": "layout",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Output",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                }
+              },
+              " image/svg+xml": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              },
+              " image/svg+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              },
+              " image/svg+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/healthy": {
+      "get": {
+        "description": "**Get aptly health state**\n\nReturn aptly health state:\n- `Aptly is healthy` (HTTP 200)",
+        "tags": [
+          "Status"
+        ],
+        "summary": "Get Health State",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.aptlyStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mirrors": {
+      "get": {
+        "description": "**Show list of currently available mirrors**\nEach mirror is returned as in \u201cshow\u201d API.",
+        "tags": [
+          "Mirrors"
+        ],
+        "summary": "List Mirrors",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/deb.RemoteRepo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "**Create a mirror of a remote repository**",
+        "tags": [
+          "Mirrors"
+        ],
+        "summary": "Create Mirror",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.mirrorCreateParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.RemoteRepo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mirrors/{name}": {
+      "get": {
+        "description": "**Get mirror information by name**",
+        "tags": [
+          "Mirrors"
+        ],
+        "summary": "Get Mirror Info",
+        "parameters": [
+          {
+            "description": "mirror name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.RemoteRepo"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mirror not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "**Update Mirror and download packages**",
+        "tags": [
+          "Mirrors"
+        ],
+        "summary": "Update Mirror",
+        "parameters": [
+          {
+            "description": "mirror name to update",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.mirrorUpdateParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Mirror was updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/task.ProcessReturnValue"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Mirror is being updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/task.Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unable to determine list of architectures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mirror not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "**Delete a mirror**",
+        "tags": [
+          "Mirrors"
+        ],
+        "summary": "Delete Mirror",
+        "parameters": [
+          {
+            "description": "mirror name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "force: 1 to enable",
+            "name": "force",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/task.ProcessReturnValue"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unable to delete mirror with snapshots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mirror not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unable to delete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mirrors/{name}/packages": {
+      "get": {
+        "description": "**Get a list of packages from a mirror**",
+        "tags": [
+          "Mirrors"
+        ],
+        "summary": "List Mirror Packages",
+        "parameters": [
+          {
+            "description": "mirror name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "search query",
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "format: `details` for more detailed information",
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of Packages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/deb.Package"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unable to determine list of architectures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mirror not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mirrors/{name}/snapshots": {
+      "post": {
+        "description": "**Create a snapshot of a mirror**",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Snapshot Mirror",
+        "parameters": [
+          {
+            "description": "Mirror name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.snapshotsCreateFromMirrorParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created Snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mirror Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicting snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/packages": {
+      "get": {
+        "description": "**Get list of packages**",
+        "tags": [
+          "Packages"
+        ],
+        "summary": "List Packages",
+        "parameters": [
+          {
+            "description": "search query",
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "format: `details` for more detailed information",
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of packages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/packages/{key}": {
+      "get": {
+        "description": "**Show information about package by package key**\nPackage keys could be obtained from various GET .../packages APIs.",
+        "tags": [
+          "Packages"
+        ],
+        "summary": "Get Package Info",
+        "parameters": [
+          {
+            "description": "package key (unique package identifier)",
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.Package"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/publish": {
+      "get": {
+        "description": "**Get list of published repositories**\n\nReturn list of published repositories including detailed information.\n\nSee also: `aptly publish list`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "List Published Repositories",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/deb.PublishedRepo"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/publish/{prefix}": {
+      "post": {
+        "description": "**Publish a local repository or snapshot**\n\nCreate a published repository.\n\nThe prefix may contain a storage specifier, e.g. `s3:packages/`, or it may also be empty to publish to the root directory.\n\n**Example:**\n```\n$ curl -X POST -H 'Content-Type: application/json' --data '{\"Distribution\": \"wheezy\", \"Sources\": [{\"Name\": \"aptly-repo\"}]}' http://localhost:8080/api/publish//repos\n{\"Architectures\":[\"i386\"],\"Distribution\":\"wheezy\",\"Label\":\"\",\"Origin\":\"\",\"Prefix\":\".\",\"SourceKind\":\"local\",\"Sources\":[{\"Component\":\"main\",\"Name\":\"aptly-repo\"}],\"Storage\":\"\"}\n```\n\nSee also: `aptly publish create`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Create Published Repository",
+        "parameters": [
+          {
+            "description": "publishing prefix",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.publishedRepoCreateParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.PublishedRepo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/publish/{prefix}/{distribution}": {
+      "get": {
+        "description": "**Get published repository information**\n\nShow detailed information of a published repository.\n\nSee also: `aptly publish show`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Show Published Repository",
+        "parameters": [
+          {
+            "description": "publishing prefix, use `:.` instead of `.` because it is ambigious in URLs",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "distribution name",
+            "name": "distribution",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.PublishedRepo"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published repository not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "**Update a published repository**\n\nUpdate a published local repository or switch snapshot.\n\nFor published local repositories:\n* update to match local repository contents\n\nFor published snapshots:\n* switch components to new snapshot\n\nSee also: `aptly publish update` / `aptly publish switch`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Update Published Repository",
+        "parameters": [
+          {
+            "description": "publishing prefix",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "distribution name",
+            "name": "distribution",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.publishedRepoUpdateSwitchParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.PublishedRepo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published repository or source not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "**Delete a published repository**\n\nDelete a distribution of a published repository and remove associated files.\n\nIf no other published repositories share the same prefix, all files inside the prefix will be removed.\n\nSee also: `aptly publish drop`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Delete Published Repository",
+        "parameters": [
+          {
+            "description": "publishing prefix",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "distribution name",
+            "name": "distribution",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "force: 1 to enable",
+            "name": "force",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "skipCleanup: 1 to enable",
+            "name": "skipCleanup",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published repository not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/publish/{prefix}/{distribution}/sources": {
+      "get": {
+        "description": "**List source component changes to be applied**\n\nReturn added, removed or changed components of snapshots or local repository to be published.\n\nThe changes will be applied by a subsequent publish update call (i.e. `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).\n\nSee also: `aptly publish source list`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "List Pending Changes",
+        "parameters": [
+          {
+            "description": "publishing prefix",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "distribution name",
+            "name": "distribution",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/deb.SourceEntry"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published repository pending changes not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "**Replace the source components of a published repository**\n\nSets the components of snapshots or local repositories to be published. Existing Sourced will be replaced.\n\nThis call does not publish the changes, but rather schedules them for a subsequent publish update call (i.e `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).\n\nSee also: `aptly publish source replace`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Replace Source Components",
+        "parameters": [
+          {
+            "description": "publishing prefix",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "distribution name",
+            "name": "distribution",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/api.sourceParams"
+                }
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published repository not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "**Add a source component to a published repo**\n\nAdd a component of a snapshot or local repository to be published.\n\nThis call does not publish the changes, but rather schedules them for a subsequent publish update call (i.e `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).\n\nSee also: `aptly publish source add`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Add Source Component",
+        "parameters": [
+          {
+            "description": "publishing prefix",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "distribution name",
+            "name": "distribution",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/api.sourceParams"
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published repository not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "**Discard pending source component changes of a published repository**\n\nRemove all pending changes what would be applied with a subsequent publish update call (i.e. `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).\n\nSee also: `aptly publish source drop`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Discard Pending Changes",
+        "parameters": [
+          {
+            "description": "publishing prefix",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "distribution name",
+            "name": "distribution",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published repository not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/publish/{prefix}/{distribution}/sources/{component}": {
+      "put": {
+        "description": "**Update the source component of a published repository**\n\nUpdate a component of a snapshot or local repository to be published.\n\nThis call does not publish the changes, but rather schedules them for a subsequent publish update call (i.e `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).\n\nSee also: `aptly publish source update`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Update Source Component",
+        "parameters": [
+          {
+            "description": "publishing prefix",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "distribution name",
+            "name": "distribution",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "component name",
+            "name": "component",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/api.sourceParams"
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published repository/component not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "**Remove a source component from a published repo**\n\nRemove a source component (snapshot / local repo) from a published repository.\n\nThis call does not publish the changes, but rather schedules them for a subsequent publish update call (i.e `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).\n\nSee also: `aptly publish source remove`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Remove Source Component",
+        "parameters": [
+          {
+            "description": "publishing prefix",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "distribution name",
+            "name": "distribution",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "component name",
+            "name": "component",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published repository not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/publish/{prefix}/{distribution}/update": {
+      "post": {
+        "description": "**Update a published repository**\n\nPublish pending source component changes which were added with `Add/Remove/Replace Source Components`\n\nSee also: `aptly publish update`",
+        "tags": [
+          "Publish"
+        ],
+        "summary": "Update Published Repository",
+        "parameters": [
+          {
+            "description": "publishing prefix",
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "distribution name",
+            "name": "distribution",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.publishedRepoUpdateParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.PublishedRepo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Published repository/component not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "description": "**Get aptly ready state**\n\nReturn aptly ready state:\n- `Aptly is ready` (HTTP 200)\n- `Aptly is unavailable` (HTTP 503)",
+        "tags": [
+          "Status"
+        ],
+        "summary": "Get Ready State",
+        "responses": {
+          "200": {
+            "description": "Aptly is ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.aptlyStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Aptly is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.aptlyStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repos": {
+      "get": {
+        "description": "**Get list of available repos**\nEach repo is returned as in \u201cshow\u201d API.",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "List Repositories",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/deb.LocalRepo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "**Create a local repository**\n\nDistribution and component are used as defaults when publishing repo either directly or via snapshot.\n\n```\n$ curl -X POST -H 'Content-Type: application/json' --data '{\"Name\": \"aptly-repo\"}' http://localhost:8080/api/repos\n{\"Name\":\"aptly-repo\",\"Comment\":\"\",\"DefaultDistribution\":\"\",\"DefaultComponent\":\"\"}\n```",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Create Repository",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.repoCreateParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.LocalRepo"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source snapshot not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Local repo already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repos/{name}": {
+      "get": {
+        "description": "Returns basic information about local repository.",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Get Repository Info",
+        "parameters": [
+          {
+            "description": "Repository name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.LocalRepo"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Repository not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "**Update local repository meta information**",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Update Repository",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.reposEditParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "msg",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.LocalRepo"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Drop/delete a repo\nCannot drop repos that are published.\nNeeds force=1 to drop repos used as source by other repos.",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Delete Repository",
+        "parameters": [
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "force: 1 to enable",
+            "name": "force",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Repo object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/task.ProcessReturnValue"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Repo Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repos/{name}/copy/{src}/{file}": {
+      "post": {
+        "description": "Copies a package from a source to destination repository",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Copy Package",
+        "parameters": [
+          {
+            "description": "Source repo",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Destination repo",
+            "name": "src",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "File/packages to copy",
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "msg",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/task.ProcessReturnValue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repos/{name}/file/{dir}": {
+      "post": {
+        "description": "Import packages from files (uploaded using File Upload API) to the local repository. If directory specified, aptly would discover package files automatically.\nAdding same package to local repository is not an error.\nBy default aptly would try to remove every successfully processed file and directory `dir` (if it becomes empty after import).",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Add Uploaded Directory",
+        "parameters": [
+          {
+            "description": "Repository name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Directory to add",
+            "name": "dir",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "when value is set to 1, don\u2019t remove any files",
+            "name": "noRemove",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "when value is set to 1, remove packages conflicting with package being added (in local repository)",
+            "name": "forceReplace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "wrong file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Repository not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error adding files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repos/{name}/file/{dir}/{file}": {
+      "post": {
+        "description": "Import packages from files (uploaded using File Upload API) to the local repository. If directory specified, aptly would discover package files automatically.\nAdding same package to local repository is not an error.\nBy default aptly would try to remove every successfully processed file and directory `dir` (if it becomes empty after import).",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Add Uploaded File",
+        "parameters": [
+          {
+            "description": "Repository name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Directory of packages",
+            "name": "dir",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filename (optional)",
+            "name": "file",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "wrong file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Repository not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error adding files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repos/{name}/include/{dir}": {
+      "post": {
+        "description": "Allows automatic processing of .changes file controlling package upload (uploaded using File Upload API) to the local repository. i.e. Exposes repo include command in api.",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Include Directory",
+        "parameters": [
+          {
+            "description": "when value is set to 1, when adding package that conflicts with existing package, remove existing package",
+            "name": "forceReplace",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "when value is set to 1, don\u2019t remove files that have been imported successfully into repository",
+            "name": "noRemoveFiles",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "when value is set to 1, accept unsigned .changes files",
+            "name": "acceptUnsigned",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "when value is set to 1 disable verification of .changes file signature",
+            "name": "ignoreSignature",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.reposIncludePackageFromDirResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repos/{name}/include/{dir}/{file}": {
+      "post": {
+        "description": "Allows automatic processing of .changes file controlling package upload (uploaded using File Upload API) to the local repository. i.e. Exposes repo include command in api.",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Include File from Directory",
+        "parameters": [
+          {
+            "description": "when value is set to 1, when adding package that conflicts with existing package, remove existing package",
+            "name": "forceReplace",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "when value is set to 1, don\u2019t remove files that have been imported successfully into repository",
+            "name": "noRemoveFiles",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "when value is set to 1, accept unsigned .changes files",
+            "name": "acceptUnsigned",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "when value is set to 1 disable verification of .changes file signature",
+            "name": "ignoreSignature",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "msg",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repos/{name}/packages": {
+      "get": {
+        "description": "**Return a list of packages present in the repo**\n\nIf `q` query parameter is missing, return all packages, otherwise return packages that match q\n\n**Example:**\n```\n$ curl http://localhost:8080/api/repos/aptly-repo/packages\n[\"Pi386 aptly 0.8 966561016b44ed80\"]\n```",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "List Repo Packages",
+        "parameters": [
+          {
+            "description": "Snapshot to search",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Package query (e.g Name%20(~%20matlab))",
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Set to 1 to include dependencies when evaluating package query",
+            "name": "withDeps",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Set to 'details' to return extra info about each package",
+            "name": "format",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Set to 1 to only return the highest version for each package name",
+            "name": "maximumVersion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "msg",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "**Add packages to local repository by package keys.**\n\nAny package can be added that is present in the aptly database (from any mirror, snapshot, local repository). This API combined with package list (search) APIs allows one to implement importing, copying, moving packages around.\n\nAPI verifies that packages actually exist in aptly database and checks constraint that conflicting packages can\u2019t be part of the same local repository.",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Add Packages by Key",
+        "parameters": [
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/api.reposPackagesAddDeleteParams"
+        },
+        "responses": {
+          "200": {
+            "description": "msg",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "**Remove packages from local repository by package keys.**\n\nAny package(s) can be removed from a local repository. Package references from a local repository can be retrieved with GET /api/repos/:name/packages.",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Delete Packages by Key",
+        "parameters": [
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/api.reposPackagesAddDeleteParams"
+        },
+        "responses": {
+          "200": {
+            "description": "msg",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repos/{name}/snapshots": {
+      "post": {
+        "description": "**Create a snapshot of a repository by name**",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Snapshot Repository",
+        "parameters": [
+          {
+            "description": "Repository name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Name of the snapshot",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.snapshotsCreateFromRepositoryParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created snapshot object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Repo Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/s3": {
+      "get": {
+        "description": "**Get list of S3 buckets**\n\nList configured S3 buckets.",
+        "tags": [
+          "Status"
+        ],
+        "summary": "S3 buckets",
+        "responses": {
+          "200": {
+            "description": "List of S3 buckets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots": {
+      "get": {
+        "description": "**Get list of snapshots**\n\nEach snapshot is returned as in \u201cshow\u201d API.",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "List Snapshots",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/deb.Snapshot"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "**Create a snapshot from package refs**\n\nRefs can be obtained from snapshots, local repos, or mirrors",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Snapshot Packages",
+        "parameters": [
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.snapshotsCreateParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source snapshot or package refs not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots/{name}": {
+      "get": {
+        "description": "**Query detailed information about a snapshot by name**",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Get Snapshot Info",
+        "parameters": [
+          {
+            "description": "Name of the snapshot",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "msg",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.Snapshot"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "**Update snapshot metadata (Name, Description)**",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Update Snapshot",
+        "parameters": [
+          {
+            "description": "Snapshot name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.snapshotsUpdateParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated snapshot object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.Snapshot"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicting snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "**Delete snapshot by name**\nCannot drop snapshots that are published.\nNeeds force=1 to drop snapshots used as source by other snapshots.",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Delete Snapshot",
+        "parameters": [
+          {
+            "description": "Snapshot name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Force operation",
+            "name": "force",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "404": {
+            "description": "Snapshot Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Snapshot in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots/{name}/diff/{withSnapshot}": {
+      "get": {
+        "description": "**Return the diff between two snapshots (name & withSnapshot)**\nProvide `onlyMatching=1` to return only packages present in both snapshots.\nOtherwise, returns a `left` and `right` result providing packages only in the first and second snapshots",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Snapshot diff",
+        "parameters": [
+          {
+            "description": "Snapshot name",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Snapshot name to diff against",
+            "name": "withSnapshot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only return packages present in both snapshots",
+            "name": "onlyMatching",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Package Diff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/deb.PackageDiff"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots/{name}/merge": {
+      "post": {
+        "description": "**Merge several source snapshots into a new snapshot**\n\nMerge happens from left to right. By default, packages with the same name-architecture pair are replaced during merge (package from latest snapshot on the list wins).\n\nIf only one snapshot is specified, merge copies source into destination.",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Snapshot Merge",
+        "parameters": [
+          {
+            "description": "Name of the snapshot to be created",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "merge only the latest version of each package",
+            "name": "latest",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "all versions of packages are preserved during merge",
+            "name": "no-remove",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.snapshotsMergeParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Resulting snapshot object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots/{name}/packages": {
+      "get": {
+        "description": "**List all packages in snapshot or perform search on snapshot contents and return results**\nIf `q` query parameter is missing, return all packages, otherwise return packages that match q",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "List Snapshot Packages",
+        "parameters": [
+          {
+            "description": "Snapshot to search",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Package query (e.g Name%20(~%20matlab))",
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Set to 1 to include dependencies when evaluating package query",
+            "name": "withDeps",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Set to 'details' to return extra info about each package",
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Set to 1 to only return the highest version for each package name",
+            "name": "maximumVersion",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Package info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots/{name}/pull": {
+      "post": {
+        "description": "**Pulls new packages and dependencies from a source snapshot into a new snapshot**\n\nMay also upgrade package versions if name snapshot already contains packages being pulled. New snapshot `Destination` is created as result of this process.\nIf architectures are limited (with config architectures or parameter `Architectures`, only mentioned architectures are processed, otherwise aptly will process all architectures in the snapshot.\nIf following dependencies by source is enabled (using dependencyFollowSource config), pulling binary packages would also pull corresponding source packages as well.\nBy default aptly would remove packages matching name and architecture while importing: e.g. when importing software_1.3_amd64, package software_1.2.9_amd64 would be removed.\n\nWith flag `no-remove` both package versions would stay in the snapshot.\n\nAptly pulls first package matching each of package queries, but with flag -all-matches all matching packages would be pulled.",
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Snapshot Pull",
+        "parameters": [
+          {
+            "description": "Name of the snapshot to be created",
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "pull all the packages that satisfy the dependency version requirements (default is to pull first matching package): 1 to enable",
+            "name": "all-matches",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "don\u2019t create destination snapshot, just show what would be pulled: 1 to enable",
+            "name": "dry-run",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "don\u2019t process dependencies, just pull listed packages: 1 to enable",
+            "name": "no-deps",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "don\u2019t remove other package versions when pulling package: 1 to enable",
+            "name": "no-remove",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Run in background and return task object",
+            "name": "_async",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api.snapshotsPullParams"
+              }
+            }
+          },
+          "description": "Parameters",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Resulting Snapshot object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/deb.Snapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storage": {
+      "get": {
+        "description": "**Get disk free information of aptly storage**\n\nUnits in MiB.",
+        "tags": [
+          "Status"
+        ],
+        "summary": "Get Storage Utilization",
+        "responses": {
+          "200": {
+            "description": "Storage information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.diskFree"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Internal Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks": {
+      "get": {
+        "description": "**Get list of available tasks. Each task is returned as in \u201cshow\u201d API**",
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "List Tasks",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/task.Task"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks-clear": {
+      "post": {
+        "description": "**Removes finished and failed tasks from internal task list**",
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Clear Tasks",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/tasks-wait": {
+      "get": {
+        "description": "**Waits for and returns when all running tasks are complete**",
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Wait for all Tasks",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}": {
+      "get": {
+        "description": "**Return task information for a given ID**",
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Get Task Info",
+        "parameters": [
+          {
+            "description": "Task ID",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/task.Task"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "invalid syntax, bad id?",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "**Delete completed task by given ID. Does not stop task execution**",
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Delete Task",
+        "parameters": [
+          {
+            "description": "Task ID",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/task.Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Task in progress or not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "invalid syntax, bad ID?",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}/detail": {
+      "get": {
+        "description": "**Return task detail for a given ID**",
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Get Task Details",
+        "parameters": [
+          {
+            "description": "Task ID",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "invalid syntax, bad ID?",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}/output": {
+      "get": {
+        "description": "**Return task output for a given ID**",
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Get Task Output",
+        "parameters": [
+          {
+            "description": "Task ID",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task output",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "invalid syntax, bad ID?",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}/return_value": {
+      "get": {
+        "description": "**Return task return value (status code) by given ID**",
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Get Task Return Value",
+        "parameters": [
+          {
+            "description": "Task ID",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "msg",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "invalid syntax, bad ID?",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}/wait": {
+      "get": {
+        "description": "**Waits for and returns when given Task ID is complete**",
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Wait for Task",
+        "parameters": [
+          {
+            "description": "Task ID",
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/task.Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Task Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "invalid syntax, bad id?",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/version": {
+      "get": {
+        "description": "**Get aptly version**\n\n**Example:**\n```\n$ curl http://localhost:8080/api/version\n{\"Version\":\"0.9~dev\"}\n```",
+        "tags": [
+          "Status"
+        ],
+        "summary": "Aptly Version",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api.aptlyVersion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/{storage}/{pkgPath}": {
+      "get": {
+        "description": "If ServeInAPIMode is enabled in aptly config,\nthis api serves a specified package from storage",
+        "tags": [
+          "Repos"
+        ],
+        "summary": "Serve Packages",
+        "parameters": [
+          {
+            "description": "Storage",
+            "name": "storage",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Package Path",
+            "name": "pkgPath",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "# Manage Local Repositories\n<div>\nA local repository is a collection of versionned packages (usually custom packages created internally).\n\nPackages can be added, removed, moved or copied between repos.\n\nLocal repositories can be published (either directly or via snapshot) to be used a APT source on a debian based system.\n</div>\n\n",
+      "name": "Repos"
+    },
+    {
+      "description": "# Upload Package Files\n<div>\n\nIn order to add debian package files to a local repository, files are first uploaded to a temporary directory.\nThen the directory (or a specific file within) is added to a repository. After adding to a repositorty, the directory resp. files are removed bt default.\n\nAll uploaded files are stored under `<rootDir>/upload/<tempdir>` directory.\n\nFor concurrent uploads from CI/CD pipelines, make sure the tempdir is unique.\n\n\n</div>\n",
+      "name": "Files"
+    },
+    {
+      "description": "# Manage Remote Repository Mirrors\n<div>\nManage mirrors of remote Debian repositories (http, https or ftp).\n\nFlat debian repositories, mirroring source packages and debian installers is supported.\n\n</div>\n\n",
+      "name": "Mirrors"
+    },
+    {
+      "description": "# Manage Snapshots\n<div>\n\nLocal Repositories and Mirrors can be snapshotted to get an immutable state.\n\nSnapshots cab be merged, filtered, verified for missing dependencies. Snapshots can be published to be used as APT source.\n\n</div>\n",
+      "name": "Snapshots"
+    },
+    {
+      "description": "# Publish Repositories, Snapshots, Mirrors\n<div>\n\nPublish snapshot or local repo as Debian repository to be used as APT source on Debian based systems.\n\nThe published repository is signed with the user's GnuPG key.\n\nRepositories can be published to local directories, Amazon S3 buckets, Azure or Swift Storage.\n\n#### GPG Keys\n\nGPG key is required to sign any published repository. The key pari should be generated before publishing.\n\nPubli\u0441 part of the key should be exported from your keyring using `gpg --export --armor` and imported on the system which uses a published repository.\n\n#### Parameters\n\nPublish APIs use following convention to identify published repositories: `/api/publish/:prefix/:distribution`.  `:distribution` is distribution name, while `:prefix` is `[<storage>:]<prefix>` (storage is optional, it defaults to empty string), if publishing prefix contains slashes `/`, they should be replaced with underscores (`_`) and underscores\nshould be replaced with double underscore (`__`). To specify root `:prefix`, use `:.`, as `.` is ambigious in URLs.\n\n</div>\n",
+      "name": "Publish"
+    },
+    {
+      "description": "# Search Package Collection\n<div>\nPerform operations on the whole collection of packages in apty database.\n</div>\n\n",
+      "name": "Packages"
+    },
+    {
+      "description": "# Status Information\n<div>\nVarious status information.\n\n</div>\n",
+      "name": "Status"
+    },
+    {
+      "description": "# Maintenance Operations\n<div>\nManage aptly\u2019s internal metadata database and package pool.\n\n</div>\n",
+      "name": "Database"
+    },
+    {
+      "description": "# Background Tasks\n<div>\n\nSeveral API operations allow to be run in background asynchronously in a task. In that case, a Task object with an ID and a State is returned, which can be queried for progress.\n\nTasks should be deleted once they are no longer in progress, in order to not cause memory overflows.\n\n</div>\n",
+      "name": "Tasks"
+    }
+  ],
+  "components": {
+    "requestBodies": {
+      "api.reposPackagesAddDeleteParams": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/api.reposPackagesAddDeleteParams"
+            }
+          }
+        },
+        "description": "Parameters",
+        "required": true
+      },
+      "api.sourceParams": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/api.sourceParams"
+            }
+          }
+        },
+        "description": "Parameters",
+        "required": true
+      }
+    },
+    "schemas": {
+      "api.Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "api.aptlyStatus": {
+        "type": "object",
+        "properties": {
+          "Status": {
+            "description": "Aptly Status",
+            "type": "string",
+            "example": "'Aptly is ready', 'Aptly is unavailable', 'Aptly is healthy'"
+          }
+        }
+      },
+      "api.aptlyVersion": {
+        "type": "object",
+        "properties": {
+          "Version": {
+            "description": "Aptly Version",
+            "type": "string"
+          }
+        }
+      },
+      "api.diskFree": {
+        "type": "object",
+        "properties": {
+          "free": {
+            "description": "Available Storage [MiB]",
+            "type": "integer"
+          },
+          "percentFull": {
+            "description": "Percentage Full",
+            "type": "number"
+          },
+          "total": {
+            "description": "Storage size [MiB]",
+            "type": "integer"
+          }
+        }
+      },
+      "api.mirrorCreateParams": {
+        "type": "object",
+        "required": [
+          "ArchiveURL",
+          "Name"
+        ],
+        "properties": {
+          "Architectures": {
+            "description": "Limit mirror to those architectures, if not specified aptly would fetch all architectures",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "amd64"
+            ]
+          },
+          "ArchiveURL": {
+            "description": "Url of the archive to mirror",
+            "type": "string",
+            "example": "http://deb.debian.org/debian"
+          },
+          "Components": {
+            "description": "Components to mirror, if not specified aptly would fetch all components",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "main"
+            ]
+          },
+          "Distribution": {
+            "description": "Distribution name to mirror",
+            "type": "string",
+            "example": "'buster', for flat repositories use './'"
+          },
+          "DownloadInstaller": {
+            "description": "Set \"true\" to mirror installer files",
+            "type": "boolean"
+          },
+          "DownloadSources": {
+            "description": "Set \"true\" to mirror source packages",
+            "type": "boolean"
+          },
+          "DownloadUdebs": {
+            "description": "Set \"true\" to mirror udeb files",
+            "type": "boolean"
+          },
+          "Filter": {
+            "description": "Package query that is applied to mirror packages",
+            "type": "string",
+            "example": "xserver-xorg"
+          },
+          "FilterWithDeps": {
+            "description": "Set \"true\" to include dependencies of matching packages when filtering",
+            "type": "boolean"
+          },
+          "IgnoreSignatures": {
+            "description": "Set \"true\" to skip the verification of Release file signatures",
+            "type": "boolean"
+          },
+          "Keyrings": {
+            "description": "Gpg keyring(s) for verifying Release file",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "trustedkeys.gpg"
+            ]
+          },
+          "Name": {
+            "description": "Name of mirror to be created",
+            "type": "string",
+            "example": "mirror2"
+          },
+          "SkipArchitectureCheck": {
+            "description": "Set \"true\" to skip the verification of architectures",
+            "type": "boolean"
+          },
+          "SkipComponentCheck": {
+            "description": "Set \"true\" to skip if the given components are in the Release file",
+            "type": "boolean"
+          }
+        }
+      },
+      "api.mirrorUpdateParams": {
+        "type": "object",
+        "properties": {
+          "Architectures": {
+            "description": "Limit mirror to those architectures, if not specified aptly would fetch all architectures",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "amd64"
+            ]
+          },
+          "ArchiveURL": {
+            "description": "Url of the archive to mirror",
+            "type": "string",
+            "example": "http://deb.debian.org/debian"
+          },
+          "Components": {
+            "description": "Components to mirror, if not specified aptly would fetch all components",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "main"
+            ]
+          },
+          "DownloadSources": {
+            "description": "Set \"true\" to mirror source packages",
+            "type": "boolean"
+          },
+          "DownloadUdebs": {
+            "description": "Set \"true\" to mirror udeb files",
+            "type": "boolean"
+          },
+          "Filter": {
+            "description": "Package query that is applied to mirror packages",
+            "type": "string",
+            "example": "xserver-xorg"
+          },
+          "FilterWithDeps": {
+            "description": "Set \"true\" to include dependencies of matching packages when filtering",
+            "type": "boolean"
+          },
+          "ForceUpdate": {
+            "description": "Set \"true\" to force a mirror update even if another process is already updating the mirror (use with caution!)",
+            "type": "boolean"
+          },
+          "IgnoreChecksums": {
+            "description": "Set \"true\" to ignore checksum errors",
+            "type": "boolean"
+          },
+          "IgnoreSignatures": {
+            "description": "Set \"true\" to skip the verification of Release file signatures",
+            "type": "boolean"
+          },
+          "Keyrings": {
+            "description": "Gpg keyring(s) for verifing Release file",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "trustedkeys.gpg"
+            ]
+          },
+          "Name": {
+            "description": "Change mirror name to `Name`",
+            "type": "string",
+            "example": "mirror1"
+          },
+          "SkipArchitectureCheck": {
+            "description": "Set \"true\" to skip checking if the given architectures are in the Release file",
+            "type": "boolean"
+          },
+          "SkipComponentCheck": {
+            "description": "Set \"true\" to skip checking if the given components are in the Release file",
+            "type": "boolean"
+          },
+          "SkipExistingPackages": {
+            "description": "Set \"true\" to skip downloading already downloaded packages",
+            "type": "boolean"
+          }
+        }
+      },
+      "api.publishedRepoCreateParams": {
+        "type": "object",
+        "required": [
+          "SourceKind",
+          "Sources"
+        ],
+        "properties": {
+          "AcquireByHash": {
+            "description": "Provide index files by hash",
+            "type": "boolean",
+            "example": false
+          },
+          "Architectures": {
+            "description": "Override list of published architectures",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "amd64",
+              "armhf"
+            ]
+          },
+          "ButAutomaticUpgrades": {
+            "description": "setting to yes excludes upgrades from the NotAutomic setting",
+            "type": "string",
+            "example": ""
+          },
+          "Distribution": {
+            "description": "Distribution name, if missing Aptly would try to guess from sources",
+            "type": "string",
+            "example": "bookworm"
+          },
+          "ForceOverwrite": {
+            "description": "when publishing, overwrite files in pool/ directory without notice",
+            "type": "boolean",
+            "example": false
+          },
+          "Label": {
+            "description": "Value of Label: field in published repository stanza",
+            "type": "string",
+            "example": ""
+          },
+          "MultiDist": {
+            "description": "Enable multiple packages with the same filename in different distributions",
+            "type": "boolean",
+            "example": false
+          },
+          "NotAutomatic": {
+            "description": "Setting to yes indicates to the package manager to not install or upgrade packages from the repository without user consent",
+            "type": "string",
+            "example": ""
+          },
+          "Origin": {
+            "description": "Value of Origin: field in published repository stanza",
+            "type": "string",
+            "example": ""
+          },
+          "Signing": {
+            "description": "GPG options",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/api.signingParams"
+              }
+            ]
+          },
+          "SkipBz2": {
+            "description": "Skip bz2 compression for index files",
+            "type": "boolean",
+            "example": false
+          },
+          "SkipCleanup": {
+            "description": "Don't remove unreferenced files in prefix/component",
+            "type": "boolean",
+            "example": false
+          },
+          "SkipContents": {
+            "description": "Don't generate contents indexes",
+            "type": "boolean",
+            "example": false
+          },
+          "SourceKind": {
+            "description": "'local' for local repositories and 'snapshot' for snapshots",
+            "type": "string",
+            "example": "snapshot"
+          },
+          "Sources": {
+            "description": "List of 'Component/Name' objects, 'Name' is either local repository or snapshot name",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/api.sourceParams"
+            }
+          }
+        }
+      },
+      "api.publishedRepoUpdateParams": {
+        "type": "object",
+        "properties": {
+          "AcquireByHash": {
+            "description": "Provide index files by hash",
+            "type": "boolean",
+            "example": false
+          },
+          "ForceOverwrite": {
+            "description": "when publishing, overwrite files in pool/ directory without notice",
+            "type": "boolean",
+            "example": false
+          },
+          "MultiDist": {
+            "description": "Enable multiple packages with the same filename in different distributions",
+            "type": "boolean",
+            "example": false
+          },
+          "Signing": {
+            "description": "GPG options",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/api.signingParams"
+              }
+            ]
+          },
+          "SkipBz2": {
+            "description": "Skip bz2 compression for index files",
+            "type": "boolean",
+            "example": false
+          },
+          "SkipCleanup": {
+            "description": "Don't remove unreferenced files in prefix/component",
+            "type": "boolean",
+            "example": false
+          },
+          "SkipContents": {
+            "description": "Don't generate contents indexes",
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "api.publishedRepoUpdateSwitchParams": {
+        "type": "object",
+        "properties": {
+          "AcquireByHash": {
+            "description": "Provide index files by hash",
+            "type": "boolean",
+            "example": false
+          },
+          "ForceOverwrite": {
+            "description": "when publishing, overwrite files in pool/ directory without notice",
+            "type": "boolean",
+            "example": false
+          },
+          "MultiDist": {
+            "description": "Enable multiple packages with the same filename in different distributions",
+            "type": "boolean",
+            "example": false
+          },
+          "Signing": {
+            "description": "GPG options",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/api.signingParams"
+              }
+            ]
+          },
+          "SkipBz2": {
+            "description": "Skip bz2 compression for index files",
+            "type": "boolean",
+            "example": false
+          },
+          "SkipCleanup": {
+            "description": "Don't remove unreferenced files in prefix/component",
+            "type": "boolean",
+            "example": false
+          },
+          "SkipContents": {
+            "description": "Don't generate contents indexes",
+            "type": "boolean",
+            "example": false
+          },
+          "Snapshots": {
+            "description": "only when updating published snapshots, list of objects 'Component/Name'",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/api.sourceParams"
+            }
+          }
+        }
+      },
+      "api.repoCreateParams": {
+        "type": "object",
+        "required": [
+          "Name"
+        ],
+        "properties": {
+          "Comment": {
+            "description": "Text describing the repository (optional)",
+            "type": "string",
+            "example": "this is a repo"
+          },
+          "DefaultComponent": {
+            "description": "Default component when publishing from this local repo",
+            "type": "string",
+            "example": "main"
+          },
+          "DefaultDistribution": {
+            "description": "Default distribution when publishing from this local repo",
+            "type": "string",
+            "example": "stable"
+          },
+          "FromSnapshot": {
+            "description": "Snapshot name to create repoitory from (optional)",
+            "type": "string",
+            "example": ""
+          },
+          "Name": {
+            "description": "Name of repository to create",
+            "type": "string",
+            "example": "repo1"
+          }
+        }
+      },
+      "api.reposEditParams": {
+        "type": "object",
+        "required": [
+          "Name"
+        ],
+        "properties": {
+          "Comment": {
+            "description": "Change Comment of repository",
+            "type": "string",
+            "example": "example repo"
+          },
+          "DefaultComponent": {
+            "description": "Change Devault Component for publishing",
+            "type": "string",
+            "example": ""
+          },
+          "DefaultDistribution": {
+            "description": "Change Default Distribution for publishing",
+            "type": "string",
+            "example": ""
+          },
+          "Name": {
+            "description": "Name of repository to modify",
+            "type": "string",
+            "example": "repo1"
+          }
+        }
+      },
+      "api.reposIncludePackageFromDirReport": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deleted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "api.reposIncludePackageFromDirResponse": {
+        "type": "object",
+        "properties": {
+          "failedFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "report": {
+            "$ref": "#/components/schemas/api.reposIncludePackageFromDirReport"
+          }
+        }
+      },
+      "api.reposPackagesAddDeleteParams": {
+        "type": "object",
+        "required": [
+          "PackageRefs"
+        ],
+        "properties": {
+          "PackageRefs": {
+            "description": "Package Refs",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              ""
+            ]
+          }
+        }
+      },
+      "api.signingParams": {
+        "type": "object",
+        "properties": {
+          "GpgKey": {
+            "description": "GPG key ID to use when signing the release, if not specified default key is used",
+            "type": "string",
+            "example": "A0546A43624A8331"
+          },
+          "Keyring": {
+            "description": "GPG keyring to use (instead of default)",
+            "type": "string",
+            "example": "trustedkeys.gpg"
+          },
+          "Passphrase": {
+            "description": "GPG passphrase to unlock private key (possibly insecure)",
+            "type": "string",
+            "example": "verysecure"
+          },
+          "PassphraseFile": {
+            "description": "GPG passphrase file to unlock private key (possibly insecure)",
+            "type": "string",
+            "example": "/etc/aptly.passphrase"
+          },
+          "SecretKeyring": {
+            "description": "GPG secret keyring to use (instead of default) Note: depreciated with gpg2",
+            "type": "string",
+            "example": ""
+          },
+          "Skip": {
+            "description": "Don't sign published repository",
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "api.snapshotsCreateFromMirrorParams": {
+        "type": "object",
+        "required": [
+          "Name"
+        ],
+        "properties": {
+          "Description": {
+            "description": "Description of snapshot",
+            "type": "string"
+          },
+          "Name": {
+            "description": "Name of snapshot to create",
+            "type": "string",
+            "example": "snap1"
+          }
+        }
+      },
+      "api.snapshotsCreateFromRepositoryParams": {
+        "type": "object",
+        "required": [
+          "Name"
+        ],
+        "properties": {
+          "Description": {
+            "description": "Description of snapshot",
+            "type": "string"
+          },
+          "Name": {
+            "description": "Name of snapshot to create",
+            "type": "string",
+            "example": "snap1"
+          }
+        }
+      },
+      "api.snapshotsCreateParams": {
+        "type": "object",
+        "required": [
+          "Name"
+        ],
+        "properties": {
+          "Description": {
+            "description": "Description of snapshot",
+            "type": "string"
+          },
+          "Name": {
+            "description": "Name of snapshot to create",
+            "type": "string",
+            "example": "snap2"
+          },
+          "PackageRefs": {
+            "description": "List of package refs",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              ""
+            ]
+          },
+          "SourceSnapshots": {
+            "description": "List of source snapshots",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "snap1"
+            ]
+          }
+        }
+      },
+      "api.snapshotsMergeParams": {
+        "type": "object",
+        "required": [
+          "Sources"
+        ],
+        "properties": {
+          "Sources": {
+            "description": "List of snapshot names to be merged",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "snapshot1"
+            ]
+          }
+        }
+      },
+      "api.snapshotsPullParams": {
+        "type": "object",
+        "required": [
+          "Destination",
+          "Queries",
+          "Source"
+        ],
+        "properties": {
+          "Architectures": {
+            "description": "List of architectures (optional)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "amd64",
+              " armhf"
+            ]
+          },
+          "Destination": {
+            "description": "Name of the snapshot to be created",
+            "type": "string",
+            "example": "idestination-snapshot"
+          },
+          "Queries": {
+            "description": "List of package queries (i.e. name of package to be pulled from `Source`)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "xserver-xorg"
+            ]
+          },
+          "Source": {
+            "description": "Source name to be searched for packages and dependencies",
+            "type": "string",
+            "example": "source-snapshot"
+          }
+        }
+      },
+      "api.snapshotsUpdateParams": {
+        "type": "object",
+        "properties": {
+          "Description": {
+            "description": "Change Description of snapshot",
+            "type": "string"
+          },
+          "Name": {
+            "description": "Change Name of snapshot",
+            "type": "string",
+            "example": "snap2"
+          }
+        }
+      },
+      "api.sourceParams": {
+        "type": "object",
+        "required": [
+          "Component",
+          "Name"
+        ],
+        "properties": {
+          "Component": {
+            "description": "Name of the component",
+            "type": "string",
+            "example": "main"
+          },
+          "Name": {
+            "description": "Name of the local repository/snapshot",
+            "type": "string",
+            "example": "snap1"
+          }
+        }
+      },
+      "deb.LocalRepo": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "description": "Comment",
+            "type": "string"
+          },
+          "defaultComponent": {
+            "description": "DefaultComponent",
+            "type": "string"
+          },
+          "defaultDistribution": {
+            "description": "DefaultDistribution",
+            "type": "string"
+          },
+          "name": {
+            "description": "User-assigned name",
+            "type": "string"
+          }
+        }
+      },
+      "deb.Package": {
+        "type": "object",
+        "properties": {
+          "architecture": {
+            "type": "string"
+          },
+          "filesHash": {
+            "description": "Hash of files section",
+            "type": "integer"
+          },
+          "isInstaller": {
+            "description": "Is this package a dummy installer package",
+            "type": "boolean"
+          },
+          "isSource": {
+            "description": "Is this source package",
+            "type": "boolean"
+          },
+          "isUdeb": {
+            "description": "Is this udeb package",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Basic package properties",
+            "type": "string"
+          },
+          "provides": {
+            "description": "List of virtual packages this package provides",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "description": "For binary package, name of source package",
+            "type": "string"
+          },
+          "sourceArchitecture": {
+            "description": "If this source package, this field holds \"real\" architecture value,\nwhile Architecture would be equal to \"source\"",
+            "type": "string"
+          },
+          "v06Plus": {
+            "description": "Is this >= 0.6 package?",
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "deb.PackageDiff": {
+        "type": "object",
+        "properties": {
+          "left": {
+            "$ref": "#/components/schemas/deb.Package"
+          },
+          "right": {
+            "$ref": "#/components/schemas/deb.Package"
+          }
+        }
+      },
+      "deb.PublishedRepo": {
+        "type": "object",
+        "properties": {
+          "acquireByHash": {
+            "description": "Provide index files per hash also",
+            "type": "boolean"
+          },
+          "architectures": {
+            "description": "Architectures is a list of all architectures published",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "butAutomaticUpgrades": {
+            "type": "string"
+          },
+          "codename": {
+            "type": "string"
+          },
+          "component": {
+            "description": "Legacy fields for compatibility with old published repositories (< 0.6)",
+            "type": "string"
+          },
+          "distribution": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "multiDist": {
+            "description": "Support multiple distributions",
+            "type": "boolean"
+          },
+          "notAutomatic": {
+            "type": "string"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "revision": {
+            "description": "Revision",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/deb.PublishedRepoRevision"
+              }
+            ]
+          },
+          "skipBz2": {
+            "description": "Skip bz2 compression for index files",
+            "type": "boolean"
+          },
+          "skipContents": {
+            "description": "Skip contents generation",
+            "type": "boolean"
+          },
+          "sourceKind": {
+            "description": "SourceKind is \"local\"/\"repo\"",
+            "type": "string"
+          },
+          "sourceUUID": {
+            "description": "SourceUUID is UUID of either snapshot or local repo",
+            "type": "string"
+          },
+          "sources": {
+            "description": "Map of sources by each component: component name -> source UUID",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "storage": {
+            "description": "Storage & Prefix & distribution should be unique across all published repositories",
+            "type": "string"
+          },
+          "suite": {
+            "type": "string"
+          },
+          "uuid": {
+            "description": "Internal unique ID",
+            "type": "string"
+          }
+        }
+      },
+      "deb.PublishedRepoRevision": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "description": "Map of sources: component name -> snapshot name/local repo Name",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "deb.RemoteRepo": {
+        "type": "object",
+        "properties": {
+          "architectures": {
+            "description": "List of architectures to fetch, if empty, then fetch all architectures",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "archiveRoot": {
+            "description": "Root of Debian archive, URL",
+            "type": "string"
+          },
+          "components": {
+            "description": "List of components to fetch, if empty, then fetch all components",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "distribution": {
+            "description": "Distribution name, e.g. squeeze",
+            "type": "string"
+          },
+          "downloadInstaller": {
+            "description": "Should we download installer files?",
+            "type": "boolean"
+          },
+          "downloadSources": {
+            "description": "Should we download sources?",
+            "type": "boolean"
+          },
+          "downloadUdebs": {
+            "description": "Should we download .udebs?",
+            "type": "boolean"
+          },
+          "filter": {
+            "description": "Filter for packages",
+            "type": "string"
+          },
+          "filterWithDeps": {
+            "description": "FilterWithDeps to include dependencies from filter query",
+            "type": "boolean"
+          },
+          "lastDownloadDate": {
+            "description": "Last update date",
+            "type": "string"
+          },
+          "meta": {
+            "description": "Meta-information about repository",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/deb.Stanza"
+              }
+            ]
+          },
+          "name": {
+            "description": "User-assigned name",
+            "type": "string"
+          },
+          "packages": {
+            "description": "Packages for json output",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipArchitectureCheck": {
+            "description": "SkipArchitectureCheck skips architecture list verification",
+            "type": "boolean"
+          },
+          "skipComponentCheck": {
+            "description": "SkipComponentCheck skips component list verification",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "Status marks state of repository (being updated, no action)",
+            "type": "integer"
+          },
+          "uuid": {
+            "description": "Permanent internal ID",
+            "type": "string"
+          },
+          "workerPID": {
+            "description": "WorkerPID is PID of the process modifying the mirror (if any)",
+            "type": "integer"
+          }
+        }
+      },
+      "deb.Snapshot": {
+        "type": "object",
+        "properties": {
+          "butAutomaticUpgrades": {
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "Date of creation",
+            "type": "string"
+          },
+          "description": {
+            "description": "Description of how snapshot was created",
+            "type": "string"
+          },
+          "localRepos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/deb.LocalRepo"
+            }
+          },
+          "name": {
+            "description": "Human-readable name",
+            "type": "string"
+          },
+          "notAutomatic": {
+            "type": "string"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "remoteRepos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/deb.RemoteRepo"
+            }
+          },
+          "snapshots": {
+            "description": "Sources",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/deb.Snapshot"
+            }
+          },
+          "sourceKind": {
+            "description": "Source: kind + ID",
+            "type": "string"
+          }
+        }
+      },
+      "deb.SourceEntry": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "deb.Stanza": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "task.ProcessReturnValue": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "value": {}
+        }
+      },
+      "task.State": {
+        "type": "integer",
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "x-enum-varnames": [
+          "IDLE",
+          "RUNNING",
+          "SUCCEEDED",
+          "FAILED"
+        ]
+      },
+      "task.Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/task.State"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "security": [
+    {
+      "basicAuth": []
+    }
+  ]
+}
