@@ -1,0 +1,1520 @@
+openapi: 3.0.1
+info:
+  title: Contrast Agent Dashboard API
+  description: "Contrast Agent Dashboard API for viewing and managing agents deployed by your organization in Contrast. See Contrast Documentation (https://docs.contrastsecurity.com/en/agents.html) for more information."
+  version: 4.0.0
+  x-logo:
+    url: /logo.svg
+    href: /
+servers:
+  - url: https://{baseUrl}
+    variables:
+      baseUrl:
+        default: app.contrastsecurity.com
+        description: The base URL of your Contrast instance
+security:
+  - Contrast-API-Key: [ ]
+    Authorization: [ ]
+paths:
+  /api/v4/organizations/{organizationId}/agents/latest-versions:
+    get:
+      tags:
+        - Agent Versions
+      summary: Get latest agent versions
+      description: Gets the latest version of each language's agent available for download from public repositories for an organization by ID.
+      operationId: getLatestAgentVersions
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 2411f46c-7f57-426e-be61-82d583722c8d
+      responses:
+        "200":
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentLatestVersions'
+              examples:
+                Example:
+                  summary: Successful example
+                  value:
+                    agents:
+                      - language: "PHP"
+                        latestVersion: "1.41.0"
+                        publishedDate: "2025-05-01T16:03:40.052Z"
+                      - language: "GO"
+                        latestVersion: "8.0.0"
+                        publishedDate: "2025-05-22T17:28:45.999Z"
+                      - language: "DOTNET_CORE"
+                        latestVersion: "4.4.0"
+                        publishedDate: "2025-05-13T19:05:46.343Z"
+                      - language: "DOTNET"
+                        latestVersion: "51.2.0"
+                        publishedDate: "2025-05-13T19:05:21.663Z"
+                      - language: "NODE"
+                        latestVersion: "5.35.1"
+                        publishedDate: "2025-05-12T15:03:01.055Z"
+                      - language: "RUBY"
+                        latestVersion: "7.6.1"
+                        publishedDate: "2024-05-30T00:00:00Z"
+                      - language: "JAVA"
+                        latestVersion: "6.17.0"
+                        publishedDate: "2025-05-22T17:26:45Z"
+                    date: "2025-05-22T19:58:17.087Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized401"
+        "403":
+          $ref: "#/components/responses/Forbidden403"
+  /api/v4/organizations/{organizationId}/agents:
+    get:
+      tags:
+        - Agents
+      summary: Get all agents
+      description: Retrieves a paginated list of all agents for an organization with optional filtering.
+      operationId: getAllAgents
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 3cfd04fc-f887-4894-a8fb-ce159fccbe06
+        - name: applications
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          description: Filter by application IDs.
+          example: ["3cfd04fc-f887-4894-a8fb-ce159fccbe06", "40475a62-3f7a-4c55-95bf-492dfc096ece"]
+        - name: languages
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/LanguageEnum'
+          description: Filter by programming languages.
+          example: ["JAVA", "PYTHON"]
+        - name: environments
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/EnvironmentEnum'
+          description: Filter by environments.
+          example: ["DEVELOPMENT", "PRODUCTION"]
+        - name: servers
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+          description: Filter by server IDs.
+          example: [1, 2]
+        - name: hostnames
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by hostnames from server inventory.
+          example: ["server-01", "server-02"]
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/StatusEnum'
+          description: |
+            Filter by agent status. Status is determined by the last active time:
+            - **ONLINE**: Last active time is within 5 minutes from the current time
+            - **TERMINATED**: Last active time is null or more than 5 minutes from the current time
+          example: ["ONLINE", "TERMINATED"]
+        - name: isOverridden
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by whether the agent configuration is overridden.
+          example: true
+        - name: isOutdated
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by whether the agent version is outdated.
+          example: false
+        - name: agentKeys
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by agent keys (agent user UIDs).
+          example: ["default", "custom-key"]
+        - name: filterText
+          in: query
+          required: false
+          schema:
+            type: string
+          description: General query filter to search across multiple fields (case-insensitive, wildcard matching).
+          example: "webapp"
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: Zero-based page index for pagination.
+          example: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: The size of the page to be returned.
+          example: 50
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Sort field and direction. Format: fieldName,direction where direction is either 'asc' or 'desc'.
+            Allowed fields: lastActive, hostname, and other Agent entity fields.
+          example: "lastActive,desc"
+      responses:
+        "200":
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedAgentResponse'
+        "401":
+          $ref: "#/components/responses/Unauthorized401"
+        "403":
+          $ref: "#/components/responses/Forbidden403"
+  /api/v4/organizations/{organizationId}/agents/applications-group-by:
+    get:
+      tags:
+        - Agents
+      summary: Get agents grouped by application
+      description: Retrieves agent summary information grouped by application with optional filtering and pagination.
+      operationId: getApplicationAgents
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 3cfd04fc-f887-4894-a8fb-ce159fccbe06
+        - name: applications
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          description: Filter by application IDs.
+        - name: languages
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/LanguageEnum'
+          description: Filter by programming languages.
+        - name: environments
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/EnvironmentEnum'
+          description: Filter by environments.
+        - name: servers
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+          description: Filter by server IDs.
+        - name: hostnames
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by hostnames.
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/StatusEnum'
+          description: Filter by agent status.
+        - name: isOverridden
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by configuration override status.
+        - name: isOutdated
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by version outdated status.
+        - name: agentKeys
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by agent keys.
+        - name: filterText
+          in: query
+          required: false
+          schema:
+            type: string
+          description: General text filter.
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: Zero-based page index.
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: Page size.
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Sort field and direction (e.g., "applicationName,asc").
+          example: "applicationName,asc"
+      responses:
+        "200":
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedApplicationAgentSummaryResponse'
+        "401":
+          $ref: "#/components/responses/Unauthorized401"
+        "403":
+          $ref: "#/components/responses/Forbidden403"
+  /api/v4/organizations/{organizationId}/agents/servers-group-by:
+    get:
+      tags:
+        - Agents
+      summary: Get agents grouped by server
+      description: Retrieves agent summary information grouped by server with optional filtering and pagination.
+      operationId: getServerAgents
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 3cfd04fc-f887-4894-a8fb-ce159fccbe06
+        - name: applications
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          description: Filter by application IDs.
+        - name: languages
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/LanguageEnum'
+          description: Filter by programming languages.
+        - name: environments
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/EnvironmentEnum'
+          description: Filter by environments.
+        - name: servers
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+          description: Filter by server IDs.
+        - name: hostnames
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by hostnames.
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/StatusEnum'
+          description: Filter by agent status.
+        - name: isOverridden
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by configuration override status.
+        - name: isOutdated
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by version outdated status.
+        - name: agentKeys
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by agent keys.
+        - name: filterText
+          in: query
+          required: false
+          schema:
+            type: string
+          description: General text filter.
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: Zero-based page index.
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: Page size.
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Sort field and direction (e.g., "serverName,asc").
+          example: "serverName,asc"
+      responses:
+        "200":
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedServerAgentSummaryResponse'
+        "401":
+          $ref: "#/components/responses/Unauthorized401"
+        "403":
+          $ref: "#/components/responses/Forbidden403"
+  /api/v4/organizations/{organizationId}/agents/hostnames-group-by:
+    get:
+      tags:
+        - Agents
+      summary: Get agents grouped by hostname
+      description: Retrieves agent summary information grouped by hostname with optional filtering and pagination.
+      operationId: getHostnameAgents
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 3cfd04fc-f887-4894-a8fb-ce159fccbe06
+        - name: applications
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          description: Filter by application IDs.
+        - name: languages
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/LanguageEnum'
+          description: Filter by programming languages.
+        - name: environments
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/EnvironmentEnum'
+          description: Filter by environments.
+        - name: servers
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+          description: Filter by server IDs.
+        - name: hostnames
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by hostnames.
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/StatusEnum'
+          description: Filter by agent status.
+        - name: isOverridden
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by configuration override status.
+        - name: isOutdated
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by version outdated status.
+        - name: agentKeys
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by agent keys.
+        - name: filterText
+          in: query
+          required: false
+          schema:
+            type: string
+          description: General text filter.
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: Zero-based page index.
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: Page size.
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Sort field and direction (e.g., "hostname,asc").
+          example: "hostname,asc"
+      responses:
+        "200":
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedHostnameAgentSummaryResponse'
+        "401":
+          $ref: "#/components/responses/Unauthorized401"
+        "403":
+          $ref: "#/components/responses/Forbidden403"
+  /api/v4/organizations/{organizationId}/agents/{agentInstanceId}/applications/{applicationId}:
+    get:
+      tags:
+        - Agents
+      summary: Get a specific agent by instance ID and application ID
+      description: Retrieves a specific agent by its reporting instance ID and application ID.
+      operationId: getAgentByApplicationIdAndInstanceId
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 3cfd04fc-f887-4894-a8fb-ce159fccbe06
+        - name: agentInstanceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The agent reporting instance ID.
+          example: 909d1262-6f52-425f-9010-105082046e7a
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The application ID.
+          example: 9c3b636b-c409-4d2b-9674-71c10f869294
+      responses:
+        "200":
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDTO'
+        "404":
+          description: Agent not found
+        "401":
+          $ref: "#/components/responses/Unauthorized401"
+        "403":
+          $ref: "#/components/responses/Forbidden403"
+  /api/v4/organizations/{organizationId}/agents/{agentReportingInstanceId}/applications/{applicationId}/effective-config:
+    get:
+      tags:
+        - Effective Config
+      summary: Get effective configuration of an agent for a specific application
+      description: Retrieves the complete effective configuration of an agent for a specific application and organization.
+      operationId: getAgentEffectiveConfig
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The organization ID.
+          example: 3cfd04fc-f887-4894-a8fb-ce159fccbe06
+        - name: agentReportingInstanceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The agent reporting instance ID.
+          example: 909d1262-6f52-425f-9010-105082046e7a
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The application ID.
+          example: 9c3b636b-c409-4d2b-9674-71c10f869294
+      responses:
+        "200":
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentEffectiveConfigResponse'
+        "404":
+          description: Configuration not found
+        "401":
+          $ref: "#/components/responses/Unauthorized401"
+        "403":
+          $ref: "#/components/responses/Forbidden403"
+  /api/v4/organizations/{organizationId}/agents/{agentReportingInstanceId}/applications/{applicationId}/effective-config/overridden:
+    get:
+      tags:
+        - Effective Config
+      summary: Get overridden effective configuration
+      description: Retrieves only the overridden configuration values for an agent and application combination, showing the effective value alongside other source values.
+      operationId: getOverriddenEffectiveConfig
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The organization ID.
+          example: 3cfd04fc-f887-4894-a8fb-ce159fccbe06
+        - name: agentReportingInstanceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The agent reporting instance ID.
+          example: 909d1262-6f52-425f-9010-105082046e7a
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The application ID.
+          example: 9c3b636b-c409-4d2b-9674-71c10f869294
+      responses:
+        "200":
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverriddenEffectiveConfigResponse'
+        "404":
+          description: Configuration not found
+        "401":
+          $ref: "#/components/responses/Unauthorized401"
+        "403":
+          $ref: "#/components/responses/Forbidden403"
+  /api/v4/organizations/{organizationId}/servers/hostnames:
+    get:
+      tags:
+        - Server Inventory
+      summary: Get hostnames
+      description: Retrieves a paginated list of hostnames from the server inventory for an organization with optional text filtering.
+      operationId: getHostnames
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 3cfd04fc-f887-4894-a8fb-ce159fccbe06
+        - name: filterText
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter hostnames by text (case-insensitive).
+          example: "server"
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: Zero-based page index.
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Page size (defaults to maximum integer value for returning all results).
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Sort field and direction (e.g., "hostname,asc").
+          example: "hostname,asc"
+      responses:
+        "200":
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedHostnameResponse'
+        "401":
+          $ref: "#/components/responses/Unauthorized401"
+        "403":
+          $ref: "#/components/responses/Forbidden403"
+components:
+  schemas:
+    AgentVersion:
+      type: object
+      description: Information about a specific agent version release.
+      required:
+        - language
+        - latestVersion
+        - publishedDate
+      properties:
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+          description: The programming language of the agent.
+          example: "GO"
+        latestVersion:
+          type: string
+          description: The most recently published version of the agent.
+          format: Semantic Version
+          pattern: ^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$
+          example: "8.0.0"
+        publishedDate:
+          type: string
+          description: "The date the agent was released; YYYY-MM-DDTHH:MM:SS.SSSZ"
+          format: date-time
+          example: "2025-05-01T16:03:40.052Z"
+    AgentLatestVersions:
+      type: object
+      description: Information about the latest available agent versions for each language.
+      required:
+        - agents
+        - date
+      properties:
+        agents:
+          type: array
+          description: List of agent versions for each language.
+          items:
+            $ref: '#/components/schemas/AgentVersion'
+        date:
+          type: string
+          description: "The date the agent versions were retrieved; YYYY-MM-DDTHH:MM:SS.SSSZ"
+          format: date-time
+          example: "2025-05-01T19:53:16.629Z"
+    LanguageEnum:
+      type: string
+      enum:
+        - JAVA
+        - DOTNET
+        - DOTNET_CORE
+        - NODE
+        - PHP
+        - PYTHON
+        - GO
+        - RUBY
+        - FLEX
+    EnvironmentEnum:
+      type: string
+      enum:
+        - DEVELOPMENT
+        - QA
+        - PRODUCTION
+    StatusEnum:
+      type: string
+      enum:
+        - ONLINE
+        - TERMINATED
+    ServerInventoryDTO:
+      type: object
+      description: Server inventory information including cloud resource metadata and host details.
+      properties:
+        agentReportingInstanceId:
+          type: string
+          description: The agent instance ID.
+          example: "909d1262-6f52-425f-9010-105082046e7a"
+        organizationId:
+          type: string
+          format: uuid
+          description: The organization UUID.
+          example: "3cfd04fc-f887-4894-a8fb-ce159fccbe06"
+        serverUuid:
+          type: string
+          format: uuid
+          description: The server UUID.
+          example: "dac3f52c-3f36-4ead-a26b-adeadc4d72f1"
+        cloudResourceId:
+          type: string
+          description: The cloud resource ID of the host.
+          example: "i-0123456789abcdef0"
+        cloudResourceProvider:
+          type: string
+          description: The cloud resource provider (e.g., AWS, Azure, GCP).
+          example: "AWS"
+        operatingSystem:
+          type: string
+          description: The operating system running on the host.
+          example: "Linux"
+        runtimePath:
+          type: string
+          description: The path of the runtime executable used to start the agent.
+          example: "/usr/bin/java"
+        runtimeVersion:
+          type: string
+          description: The version of the runtime executable.
+          example: "17.0.5"
+        hostname:
+          type: string
+          description: The hostname of the host running the agent.
+          example: "server-01"
+        isKubernetes:
+          type: boolean
+          description: Whether the host is running on Kubernetes.
+          example: false
+        isDocker:
+          type: boolean
+          description: Whether the host is running on Docker.
+          example: true
+    AgentDTO:
+      type: object
+      description: Data transfer object representing an agent with all its properties.
+      properties:
+        id:
+          type: string
+          description: The unique ID of the agent.
+          example: "abc123"
+        organizationId:
+          type: string
+          format: uuid
+          description: The organization ID.
+          example: "3cfd04fc-f887-4894-a8fb-ce159fccbe06"
+        agentReportingInstanceId:
+          type: string
+          format: uuid
+          description: The agent reporting instance ID.
+          example: "909d1262-6f52-425f-9010-105082046e7a"
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+          description: Programming language of the agent.
+          example: "JAVA"
+        serverId:
+          type: integer
+          description: The server ID.
+          example: 1
+        serverUuid:
+          type: string
+          format: uuid
+          description: The server UUID.
+          example: "dac3f52c-3f36-4ead-a26b-adeadc4d72f1"
+        serverName:
+          type: string
+          description: The server name.
+          example: "app-server-01"
+        environment:
+          $ref: '#/components/schemas/EnvironmentEnum'
+          description: Environment where the agent is running.
+          example: "PRODUCTION"
+        applicationId:
+          type: string
+          format: uuid
+          description: The application ID.
+          example: "40475a62-3f7a-4c55-95bf-492dfc096ece"
+        applicationName:
+          type: string
+          description: Name of the application.
+          example: "WebStore"
+        displayVersion:
+          type: string
+          description: The display version of the agent.
+          example: "6.17.0"
+        majorVersion:
+          type: integer
+          description: Major version number.
+          example: 6
+        minorVersion:
+          type: integer
+          description: Minor version number.
+          example: 17
+        patchVersion:
+          type: integer
+          description: Patch version number.
+          example: 0
+        prereleaseTag:
+          type: string
+          description: Prerelease tag if applicable.
+          example: null
+        lastActive:
+          type: string
+          format: date-time
+          description: Last active time of the agent.
+          example: "2025-12-18T10:00:00Z"
+        createdAt:
+          type: string
+          format: date-time
+          description: When the agent was created.
+          example: "2025-12-01T09:00:00Z"
+        isOverridden:
+          type: boolean
+          description: Whether the agent configuration is overridden.
+          example: false
+        isOutdated:
+          type: boolean
+          description: Whether the agent version is outdated.
+          example: false
+        agentUserUid:
+          type: string
+          description: The agent user UID.
+          example: "agent_3cfd04fc-f887-4894-a8fb-ce159fccbe06_default"
+        serverInventory:
+          $ref: '#/components/schemas/ServerInventoryDTO'
+          description: Server inventory information.
+        hostname:
+          type: string
+          description: The hostname from server inventory (derived property).
+          example: "server-01"
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+          description: The agent status (derived from lastActive time).
+          example: "ONLINE"
+        agentKey:
+          type: string
+          description: The agent key extracted from agentUserUid (derived property).
+          example: "default"
+    PagedAgentResponse:
+      type: object
+      description: Paginated response containing agents.
+      properties:
+        content:
+          type: array
+          description: The list of agents for the current page.
+          items:
+            $ref: '#/components/schemas/AgentDTO'
+        pageable:
+          type: object
+          description: Pagination information.
+        totalElements:
+          type: integer
+          description: Total number of agents matching the query.
+          example: 100
+        totalPages:
+          type: integer
+          description: Total number of pages.
+          example: 5
+        size:
+          type: integer
+          description: Page size.
+          example: 20
+        number:
+          type: integer
+          description: Current page number (zero-based).
+          example: 0
+    AgentVersionSummary:
+      type: object
+      description: Lightweight summary containing version information for agents.
+      properties:
+        applicationId:
+          type: string
+          format: uuid
+          example: "40475a62-3f7a-4c55-95bf-492dfc096ece"
+        serverUuid:
+          type: string
+          format: uuid
+          example: "dac3f52c-3f36-4ead-a26b-adeadc4d72f1"
+        hostname:
+          type: string
+          example: "server-01"
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+          example: "JAVA"
+        majorVersion:
+          type: integer
+          example: 6
+        minorVersion:
+          type: integer
+          example: 17
+        patchVersion:
+          type: integer
+          example: 0
+        prereleaseTag:
+          type: string
+          example: null
+        displayVersion:
+          type: string
+          example: "6.17.0"
+    ApplicationAgentSummaryDetailed:
+      type: object
+      description: Detailed summary of agents grouped by application.
+      properties:
+        applicationId:
+          type: string
+          format: uuid
+          description: The application ID.
+          example: "40475a62-3f7a-4c55-95bf-492dfc096ece"
+        applicationName:
+          type: string
+          description: The application name.
+          example: "WebStore"
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+          description: Programming language.
+          example: "JAVA"
+        totalAgents:
+          type: integer
+          description: Total number of agents for this application.
+          example: 15
+        totalServers:
+          type: integer
+          description: Total number of servers running this application.
+          example: 5
+        totalHostnames:
+          type: integer
+          description: Total number of unique hostnames.
+          example: 5
+        onlineCount:
+          type: integer
+          description: Number of online agents.
+          example: 12
+        terminatedCount:
+          type: integer
+          description: Number of terminated agents.
+          example: 3
+        hasOverridden:
+          type: boolean
+          description: Whether any agent has overridden configuration.
+          example: true
+        hasOutdated:
+          type: boolean
+          description: Whether any agent is outdated.
+          example: false
+        lastActive:
+          type: string
+          format: date-time
+          description: Last active time across all agents.
+          example: "2025-12-18T10:00:00Z"
+        agents:
+          type: array
+          description: List of agent version summaries.
+          items:
+            $ref: '#/components/schemas/AgentVersionSummary'
+        minVersion:
+          type: string
+          description: Minimum version among all agents (derived property).
+          example: "6.15.0"
+        maxVersion:
+          type: string
+          description: Maximum version among all agents (derived property).
+          example: "6.17.0"
+    PagedApplicationAgentSummaryResponse:
+      type: object
+      description: Paginated response containing application agent summaries.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationAgentSummaryDetailed'
+        pageable:
+          type: object
+        totalElements:
+          type: integer
+          example: 25
+        totalPages:
+          type: integer
+          example: 2
+        size:
+          type: integer
+          example: 20
+        number:
+          type: integer
+          example: 0
+    ServerAgentSummaryDetailed:
+      type: object
+      description: Detailed summary of agents grouped by server.
+      properties:
+        serverId:
+          type: integer
+          description: The server ID.
+          example: 1
+        serverUuid:
+          type: string
+          format: uuid
+          description: The server UUID.
+          example: "dac3f52c-3f36-4ead-a26b-adeadc4d72f1"
+        serverName:
+          type: string
+          description: The server name.
+          example: "app-server-01"
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+          description: Programming language.
+          example: "JAVA"
+        totalAgents:
+          type: integer
+          description: Total number of agents on this server.
+          example: 8
+        totalApplications:
+          type: integer
+          description: Total number of applications on this server.
+          example: 3
+        totalHostnames:
+          type: integer
+          description: Total number of unique hostnames.
+          example: 1
+        onlineCount:
+          type: integer
+          description: Number of online agents.
+          example: 7
+        terminatedCount:
+          type: integer
+          description: Number of terminated agents.
+          example: 1
+        hasOverridden:
+          type: boolean
+          description: Whether any agent has overridden configuration.
+          example: false
+        hasOutdated:
+          type: boolean
+          description: Whether any agent is outdated.
+          example: true
+        lastActive:
+          type: string
+          format: date-time
+          description: Last active time across all agents.
+          example: "2025-12-18T10:00:00Z"
+        agents:
+          type: array
+          description: List of agent version summaries.
+          items:
+            $ref: '#/components/schemas/AgentVersionSummary'
+        minVersion:
+          type: string
+          description: Minimum version among all agents (derived property).
+          example: "6.15.0"
+        maxVersion:
+          type: string
+          description: Maximum version among all agents (derived property).
+          example: "6.17.0"
+    PagedServerAgentSummaryResponse:
+      type: object
+      description: Paginated response containing server agent summaries.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServerAgentSummaryDetailed'
+        pageable:
+          type: object
+        totalElements:
+          type: integer
+          example: 30
+        totalPages:
+          type: integer
+          example: 2
+        size:
+          type: integer
+          example: 20
+        number:
+          type: integer
+          example: 0
+    HostnameAgentSummaryDetailed:
+      type: object
+      description: Detailed summary of agents grouped by hostname.
+      properties:
+        hostname:
+          type: string
+          description: The hostname.
+          example: "server-01"
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+          description: Programming language.
+          example: "JAVA"
+        totalAgents:
+          type: integer
+          description: Total number of agents on this hostname.
+          example: 10
+        totalApplications:
+          type: integer
+          description: Total number of applications on this hostname.
+          example: 4
+        totalServers:
+          type: integer
+          description: Total number of servers with this hostname.
+          example: 2
+        onlineCount:
+          type: integer
+          description: Number of online agents.
+          example: 9
+        terminatedCount:
+          type: integer
+          description: Number of terminated agents.
+          example: 1
+        hasOverridden:
+          type: boolean
+          description: Whether any agent has overridden configuration.
+          example: true
+        hasOutdated:
+          type: boolean
+          description: Whether any agent is outdated.
+          example: false
+        lastActive:
+          type: string
+          format: date-time
+          description: Last active time across all agents.
+          example: "2025-12-18T10:00:00Z"
+        agents:
+          type: array
+          description: List of agent version summaries.
+          items:
+            $ref: '#/components/schemas/AgentVersionSummary'
+        minVersion:
+          type: string
+          description: Minimum version among all agents (derived property).
+          example: "6.15.0"
+        maxVersion:
+          type: string
+          description: Maximum version among all agents (derived property).
+          example: "6.17.0"
+    PagedHostnameAgentSummaryResponse:
+      type: object
+      description: Paginated response containing hostname agent summaries.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostnameAgentSummaryDetailed'
+        pageable:
+          type: object
+        totalElements:
+          type: integer
+          example: 20
+        totalPages:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 20
+        number:
+          type: integer
+          example: 0
+    EffectiveConfigurationValueDto:
+      type: object
+      description: A single effective configuration value.
+      properties:
+        canonicalName:
+          type: string
+          description: The canonical name of the configuration setting.
+          example: "agent.java.security.assess.enable"
+        name:
+          type: string
+          description: The short name of the configuration setting.
+          example: "assess.enable"
+        value:
+          type: string
+          description: The actual value of the configuration setting.
+          example: "true"
+        source:
+          type: string
+          description: The source of the configuration value.
+          example: "LOCAL_PROPERTIES"
+        filename:
+          type: string
+          description: The filename where the configuration was defined, if applicable.
+          example: "/app/contrast_security.yaml"
+    EffectiveConfigurationSettingDto:
+      type: object
+      description: A configuration setting from various sources.
+      properties:
+        canonicalName:
+          type: string
+          description: The canonical name of the configuration setting.
+          example: "agent.java.security.assess.enable"
+        name:
+          type: string
+          description: The name of the configuration setting as it appears in the source.
+          example: "assess.enable"
+        value:
+          type: string
+          description: The actual value of the configuration setting.
+          example: "true"
+    UserConfigurationFileDto:
+      type: object
+      description: A user configuration file containing settings.
+      properties:
+        path:
+          type: string
+          description: The file path of the user configuration file.
+          example: "/app/contrast_security.yaml"
+        values:
+          type: array
+          description: List of configuration settings defined in this file.
+          items:
+            $ref: '#/components/schemas/EffectiveConfigurationSettingDto'
+    AgentEffectiveConfigResponse:
+      type: object
+      description: Complete effective configuration for an agent.
+      properties:
+        agentId:
+          type: string
+          format: uuid
+          description: The agent ID.
+          example: "909d1262-6f52-425f-9010-105082046e7a"
+        organizationId:
+          type: string
+          format: uuid
+          description: The organization ID.
+          example: "3cfd04fc-f887-4894-a8fb-ce159fccbe06"
+        timestamp:
+          type: string
+          format: date-time
+          description: The timestamp when the configuration was reported.
+          example: "2025-12-18T10:00:00Z"
+        status:
+          type: string
+          description: Status of the configuration.
+          example: "Success"
+        effectiveConfig:
+          type: array
+          description: List of effective configuration values (filtered).
+          items:
+            $ref: '#/components/schemas/EffectiveConfigurationValueDto'
+        userConfigurationFile:
+          type: array
+          description: User configuration files.
+          items:
+            $ref: '#/components/schemas/UserConfigurationFileDto'
+        javaSystemProperty:
+          type: array
+          description: Java system properties.
+          items:
+            $ref: '#/components/schemas/EffectiveConfigurationSettingDto'
+        environmentVariable:
+          type: array
+          description: Environment variables.
+          items:
+            $ref: '#/components/schemas/EffectiveConfigurationSettingDto'
+        commandLine:
+          type: array
+          description: Command line arguments.
+          items:
+            $ref: '#/components/schemas/EffectiveConfigurationSettingDto'
+        contrastUi:
+          type: array
+          description: Contrast UI configurations.
+          items:
+            $ref: '#/components/schemas/EffectiveConfigurationSettingDto'
+        conditions:
+          type: array
+          description: List of conditions associated with the configuration.
+          items:
+            type: string
+          example: ["CONFIG_OVERRIDES"]
+    OverriddenEffectiveConfigurationDetails:
+      type: object
+      description: Details of a single overridden configuration.
+      properties:
+        canonicalName:
+          type: string
+          description: The canonical name of the configuration.
+          example: "agent.java.security.assess.enable"
+        effectiveConfigurationValue:
+          $ref: '#/components/schemas/EffectiveConfigurationValueDto'
+          description: The effective configuration value that is being used.
+        otherValues:
+          type: array
+          description: Other values from different sources that were not selected.
+          items:
+            $ref: '#/components/schemas/EffectiveConfigurationValueDto'
+    OverriddenEffectiveConfigResponse:
+      type: object
+      description: Response containing only overridden effective configuration values.
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: The timestamp when the configuration was reported.
+          example: "2025-12-18T10:00:00Z"
+        agentId:
+          type: string
+          format: uuid
+          description: The agent ID.
+          example: "909d1262-6f52-425f-9010-105082046e7a"
+        organizationId:
+          type: string
+          format: uuid
+          description: The organization ID.
+          example: "3cfd04fc-f887-4894-a8fb-ce159fccbe06"
+        agentReportingInstanceId:
+          type: string
+          format: uuid
+          description: The agent reporting instance ID.
+          example: "909d1262-6f52-425f-9010-105082046e7a"
+        applicationId:
+          type: string
+          format: uuid
+          description: The application ID.
+          example: "9c3b636b-c409-4d2b-9674-71c10f869294"
+        overriddenEffectiveConfigurationDetails:
+          type: array
+          description: List of overridden configuration details.
+          items:
+            $ref: '#/components/schemas/OverriddenEffectiveConfigurationDetails'
+    HostnameDTO:
+      type: object
+      description: A simple hostname data transfer object.
+      properties:
+        hostname:
+          type: string
+          description: The hostname.
+          example: "server-01"
+    PagedHostnameResponse:
+      type: object
+      description: Paginated response containing hostnames.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostnameDTO'
+        pageable:
+          type: object
+        totalElements:
+          type: integer
+          example: 50
+        totalPages:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 2147483647
+        number:
+          type: integer
+          example: 0
+  securitySchemes:
+    Contrast-API-Key:
+      type: apiKey
+      in: header
+      name: API-Key
+    Authorization:
+      type: apiKey
+      in: header
+      name: Authorization
+  responses:
+    Unauthorized401:
+      description: Unauthorized
+      content:
+        application/json:
+          examples:
+            Unauthorized:
+              description: Unauthorized
+              value:
+                message: Authorization failure
+                details: [ ]
+    Forbidden403:
+      description: Forbidden
+      content:
+        application/json:
+          examples:
+            Forbidden:
+              description: Forbidden
+              value:
+                message: Authorization failure
+                details: [ ]

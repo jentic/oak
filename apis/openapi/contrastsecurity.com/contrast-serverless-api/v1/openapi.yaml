@@ -1,0 +1,2182 @@
+openapi: 3.0.3
+info:
+  title: Serverless API
+  description: >-
+    Serverless API for Contrast serverless applications. Scan cloud resources,
+    discover vulnerabilities, and protect your serverless accounts. For more
+    information, explanation, and definitions, see product documentation:
+    [Contrast Security
+    Serverless.](#https://docs.contrastsecurity.com/en/get-started-with-serverless.html)
+  version: '1.0'
+  x-logo:
+    url: /logo.svg
+    href: /
+servers:
+  - url: https://{baseUrl}
+    variables:
+      baseUrl:
+        default: app.contrastsecurity.com
+        description: The base URL of your Contrast instance
+tags:
+  - name: Accounts
+    description: get organization's accounts data
+  - name: Cloud Resources
+    description: Cloud Resources management endpoints.
+  - name: Scans
+    description: Scan cloud resources to test your projects for new vulnerabilities.
+  - name: Results
+    description: >-
+      View results for scans including those for specific cloud resources and
+      scans.
+paths:
+  '/Contrast/api/serverless/organizations/{organizationId}/providers/{provider}/accounts/{accountId}/resource-types/functions/scans':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+      - $ref: '#/components/parameters/AccountID'
+      - $ref: '#/components/parameters/Provider'
+    post:
+      tags:
+        - Scans
+      x-internal: true
+      x-public: true
+      summary: Scan cloud resources
+      description: >-
+        Initiates an asynchronous scan on a list of cloud resources. The scan
+        discovers vulnerabilities for each cloud resource. This operation will
+        return a scan ID which you can use to get [Scan
+        details](#tag/Scans/operation/getScanDetails).
+      operationId: scanFunctionResources
+      requestBody:
+        $ref: '#/components/requestBodies/requestPostScan'
+      responses:
+        '201':
+          $ref: '#/components/responses/postScan201'
+        '400':
+          $ref: '#/components/responses/postScan400'
+        '401':
+          $ref: '#/components/responses/postScan401'
+        '403':
+          $ref: '#/components/responses/postScan403'
+        '404':
+          $ref: '#/components/responses/postScan404'
+  '/Contrast/api/serverless/organizations/{organizationId}/providers/{provider}/accounts/{accountId}/function-scan':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+      - $ref: '#/components/parameters/AccountID'
+      - $ref: '#/components/parameters/Provider'
+    post:
+      tags:
+        - Scans
+      x-internal: true
+      summary: Scan Function
+      description: Initiates an asynchronous scan on a specific lambda function.
+      operationId: scanResource
+      requestBody:
+        content:
+          application/json:
+            schema:
+              required:
+                - function
+              properties:
+                function:
+                  $ref: '#/components/schemas/Function'
+      responses:
+        '201':
+          $ref: '#/components/responses/postScan201'
+        '400':
+          $ref: '#/components/responses/postScan400'
+        '401':
+          $ref: '#/components/responses/postScan401'
+        '403':
+          $ref: '#/components/responses/postScan403'
+        '404':
+          description: Account ID or other resource not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: string
+                    description: Error message
+                  success:
+                    type: boolean
+                    description: false if created unsuccesfully
+              examples:
+                resourcesNotFound:
+                  value:
+                    success: false
+                    data: >-
+                      Function
+                      arn:aws:lambda:eu-central-1:123456789012:function:myFunc
+                      not found
+        '423':
+          $ref: '#/components/responses/postScan423'
+  '/Contrast/api/serverless/organizations/{organizationId}/accounts':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+    get:
+      tags:
+        - Accounts
+      x-internal: true
+      summary: Get accounts
+      description: Returns all active accounts for the given organization.
+      operationId: accounts
+      responses:
+        '200':
+          $ref: '#/components/responses/accounts200'
+        '400':
+          $ref: '#/components/responses/accounts400'
+        '403':
+          $ref: '#/components/responses/accounts403'
+        '404':
+          $ref: '#/components/responses/accounts404'
+        '500':
+          $ref: '#/components/responses/accounts500'
+  '/Contrast/api/serverless/organizations/{organizationId}/providers/{provider}/accounts/{accountId}/resources/functions':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+      - $ref: '#/components/parameters/AccountID'
+      - $ref: '#/components/parameters/Provider'
+      - name: functionId
+        in: query
+        schema:
+          type: string
+        required: false
+        description: >-
+          Filtered by a specific function ID. Supports IDs with forward-slash
+          ("/") characters. Using this filter changes the response to a single
+          function format.
+    get:
+      tags:
+        - Cloud Resources
+      x-internal: true
+      x-public: true
+      summary: Get Functions
+      description: Get all functions filtered by a specific function ID
+      operationId: getFunctions
+      responses:
+        '200':
+          description: OK. Successfully scanned.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/functionsResult'
+                  - $ref: '#/components/schemas/functionResult'
+              example:
+                success: true
+                data:
+                  count: 1
+                  functions:
+                    - lastModified: '2021-11-21T17:23:08.673+0000'
+                      runtime: python3.6
+                      description: ''
+                      lambdaName: function-name-1
+                      timeout: 900
+                      memorySize: 512
+                      accountId: 12345678-abcd-1234-abc6-123456789abc
+                      service: function
+                      orgId: 123abcde-1234-1234-abc5-123456789abc
+                      functionArn: >-
+                        /subscriptions/12345678-abcd-1234-abc6-123456789abc/resourceGroups/test_rg/providers/Microsoft.Web/sites/fnapppfkfk3kdwwy/functions/HttpTrigger1
+                      region: eastus
+                      handler: __init__.main
+                      scriptFile: __init__.py
+                      entryPoint: main
+        '401':
+          description: >-
+            Unauthorized. Cannot provide function details for the requested
+            account
+          content:
+            application/json:
+              schema:
+                type: string
+                description: Error message
+                example: Unauthorized
+        '403':
+          description: The organization is not allowed to scan the specified account
+          content:
+            application/json:
+              schema:
+                type: string
+                description: Error message
+                example: Forbidden
+        '404':
+          description: Account Not Found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: string
+              example:
+                success: false
+                data: Account not found
+  '/Contrast/api/serverless/organizations/{organizationId}/providers/{provider}/accounts/{accountId}/resources/functions/{functionId}':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+      - $ref: '#/components/parameters/AccountID'
+      - $ref: '#/components/parameters/Provider'
+      - name: functionId
+        required: true
+        in: path
+        schema:
+          type: string
+        example: >-
+          /subscriptions/12345678-abcd-1234-abc6-123456789abc/resourceGroups/test_rg/providers/Microsoft.Web/sites/fnapppfkfk3kdwwy/functions/HttpTrigger1
+        description: >-
+          Get function details by Function ID. The path parameter does not
+          support the slash ("/") character. Use functionId= query parameter
+          instead.
+    get:
+      tags:
+        - Cloud Resources
+      x-internal: true
+      x-public: true
+      summary: Get Function
+      description: Get function details
+      operationId: getFunctionById
+      parameters:
+        - name: functionId
+          in: path
+          required: true
+          schema:
+            type: string
+          examples:
+            azure_function_id:
+              value: >-
+                /subscriptions/12345678-abcd-1234-abc6-123456789abc/resourceGroups/test_rg/providers/Microsoft.Web/sites/fnapppfkfk3kdwwy/functions/HttpTrigger1
+      responses:
+        '200':
+          description: OK. A JSON object of function details
+          content:
+            application/json:
+              schema:
+                description: requested function details
+                $ref: '#/components/schemas/functionResult'
+              example:
+                success: true
+                data:
+                  count: 1
+                  function:
+                    lastModified: 1649656696840
+                    runtime: python3.6
+                    description: ''
+                    lambdaName: function-name-1
+                    timeout: 900
+                    memorySize: 512
+                    accountId: 12345678-abcd-1234-abc6-123456789abc
+                    service: function
+                    orgId: 123abcde-1234-1234-abc5-123456789abc
+                    functionArn: >-
+                      /subscriptions/12345678-abcd-1234-abc6-123456789abc/resourceGroups/test_rg/providers/Microsoft.Web/sites/fnapppfkfk3kdwwy/functions/HttpTrigger1
+                    region: eastus
+                    handler: __init__.main
+                    scriptFile: __init__.py
+                    entryPoint: main
+        '401':
+          description: >-
+            Unauthorized. Cannot provide function details for the requested
+            account
+          content:
+            application/json:
+              schema:
+                type: string
+                description: Error message
+              example: Unauthorized
+        '403':
+          description: >-
+            Forbidden. The organization is not allowed to scan the specified
+            account
+          content:
+            application/json:
+              schema:
+                type: string
+                description: Error message
+                example: Forbidden
+        '404':
+          description: Account or Function not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: string
+                    description: Error message
+              examples:
+                functionNotFound:
+                  value:
+                    success: false
+                    data: Function not found
+                accountNotFound:
+                  value:
+                    success: false
+                    data: Account not found
+  '/Contrast/api/serverless/organizations/{organizationId}/providers/{provider}/accounts/{accountId}/scans/{scanId}/resources':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+      - $ref: '#/components/parameters/AccountID1'
+      - $ref: '#/components/parameters/Provider'
+      - name: scanId
+        required: true
+        in: path
+        description: Scan ID provided from a new POST scan.
+        schema:
+          type: string
+        example: 123456789012#1639308035_AdHocScan_821093f1
+    get:
+      tags:
+        - Scans
+      x-internal: true
+      x-public: true
+      summary: Get scanned cloud resources
+      description: >-
+        Lists the resources evaluated for a specific scan. This helps identify
+        areas of interest.
+      operationId: getScannedResources
+      parameters:
+        - $ref: '#/components/parameters/AccountID1'
+      responses:
+        '200':
+          description: OK. Successfully scanned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResourcesResponse'
+        '400':
+          $ref: '#/components/responses/scans400'
+        '401':
+          $ref: '#/components/responses/scans401'
+        '403':
+          $ref: '#/components/responses/scans403'
+        '404':
+          $ref: '#/components/responses/scans404'
+  '/Contrast/api/serverless/organizations/{organizationId}/providers/{provider}/accounts/{accountId}/scans/{scanId}':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+      - $ref: '#/components/parameters/AccountID1'
+      - $ref: '#/components/parameters/Provider'
+      - name: scanId
+        required: true
+        in: path
+        schema:
+          type: string
+        example: 123456789012#1639308035_AdHocScan_821093f1
+    get:
+      tags:
+        - Scans
+      x-internal: true
+      x-public: true
+      summary: Get Scan
+      description: >-
+        Provides all data related to a scan. Includes details about
+        vulnerabilities for permissions, dependencies, exploits, and CVEs. See
+        scan status details
+        (https://docs.contrastsecurity.com/en/scan-status-details.html) for more
+        information.
+      operationId: getScanDetails
+      parameters:
+        - $ref: '#/components/parameters/AccountID1'
+      responses:
+        '200':
+          description: OK. A JSON object of scan details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+              examples:
+                scanDetails:
+                  value:
+                    success: true
+                    data:
+                      scan:
+                        dynamicResourcesCount: 1
+                        dynamicResourcesScannedCount: 1
+                        accountId: '123456789012'
+                        creationTime: '2021-12-12T11:20:38.934767'
+                        staticResourcesScannedCount: 1
+                        source: ''
+                        sourceId: ''
+                        name: '*_*_12Dec_11:20_1093f1'
+                        state: COMPLETED
+                        staticResourcesCount: 1
+                        resultsCount: 1
+                        updatedTime: '2021-12-12T11:21:46.799104'
+                        provider: aws
+                        scanId: 123456789012#1639308035_AdHocScan_821093f1
+        '400':
+          $ref: '#/components/responses/scans400'
+        '401':
+          $ref: '#/components/responses/scans401'
+        '403':
+          $ref: '#/components/responses/scans403'
+        '404':
+          $ref: '#/components/responses/scans404'
+  '/Contrast/api/serverless/organizations/{organizationId}/providers/{provider}/accounts/{accountId}/scans':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+      - $ref: '#/components/parameters/AccountID1'
+      - $ref: '#/components/parameters/Provider'
+    get:
+      tags:
+        - Scans
+      x-internal: true
+      x-public: true
+      summary: Get Scans
+      description: Provides all scans list for a specific account.
+      operationId: getScansList
+      parameters:
+        - $ref: '#/components/parameters/AccountID1'
+      responses:
+        '200':
+          description: OK. A JSON object of scans list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+              examples:
+                scanDetails:
+                  value:
+                    success: true
+                    data:
+                      accounts:
+                        - accountId: 123456789012
+                          active: true
+                          agent: cnagent20230123093949
+                          agentRegion: centralus
+                          autoUpdate: true
+                          creationDate: 1674466919
+                          eventBus: dev4eu_EB_EXT_1
+                          eventBusRole: RoleNotUsed-APIBased
+                          javaAgent: cnagent20230123093949
+                          name: Cloud Native 2
+                          orgId: 2b119d8d-591a-402e-9dc3-c085230b238c
+                          provider: azure
+                          scanConfiguration:
+                            activeScansLimit: 15
+                            dynamic: false
+                            scanModules:
+                              - '0': ALL_STATIC_SCAN_MODULES
+                            static: true
+                          scopeRules:
+                            - effect: Allow
+                              field: '*'
+                              guid: e20d3233-260b-47da-afe5-4caf7bc37801
+                          templateVersion: None
+        '400':
+          $ref: '#/components/responses/scans400'
+        '401':
+          $ref: '#/components/responses/scans401'
+        '403':
+          $ref: '#/components/responses/scans403'
+        '404':
+          $ref: '#/components/responses/scans404'
+    post:
+      tags:
+        - Scans
+      x-internal: true
+      x-public: true
+      summary: Scan resources
+      description: >-
+        This API operation is deprecated, please use [Scan cloud
+        resources](#tag/Scans/operation/scanFunctionResources) instead. <br><br>
+        Initiates an asynchronous scan on a list of cloud resources.<br>
+        Discovers vulnerabilities for each scanned resource. Use the scan ID in
+        the response to Get Scan.
+      operationId: scanResources
+      requestBody:
+        $ref: '#/components/requestBodies/requestPostScan'
+      responses:
+        '201':
+          $ref: '#/components/responses/postScan201'
+        '400':
+          $ref: '#/components/responses/postScan400'
+        '401':
+          $ref: '#/components/responses/postScan401'
+        '403':
+          $ref: '#/components/responses/postScan403'
+        '404':
+          $ref: '#/components/responses/postScan404'
+      deprecated: true
+  '/Contrast/api/serverless/organizations/{organizationId}/providers/{provider}/accounts/{accountId}/scans/{scanId}/resources/{resourceId}/results':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+      - $ref: '#/components/parameters/AccountID2'
+      - name: provider
+        in: path
+        description: >-
+          Name of cloud account provider. For example: AWS, Azure, etc. All
+          lowercase format.
+        required: true
+        example: aws
+        schema:
+          type: string
+          enum:
+            - aws
+            - azure
+      - name: scanId
+        required: true
+        in: path
+        schema:
+          type: string
+        example: 123456789012#1639308035_AdHocScan_821093f1
+      - name: resourceId
+        in: path
+        required: true
+        example: 'arn:aws:lambda:eu-central-1:123456789012:function:functionName'
+        schema:
+          type: string
+      - name: lastResultId
+        in: query
+        schema:
+          type: string
+        example: >-
+          123456789012#arn:aws:lambda:eu-central-1:123456789012:function:functionName#CVE-2022-36359+Django+2.2.23
+      - name: extraSuggestedPolicyFormats
+        in: query
+        schema:
+          $ref: '#/components/schemas/FormatSchema'
+    get:
+      tags:
+        - Results
+      summary: Specific scan results
+      operationId: getSpecificResults
+      description: >-
+        Retrieves a list of vulnerabilities for a cloud resource on a specific
+        scan. Can filter by scanId and/or resourceId.
+      responses:
+        '200':
+          description: Request successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VulnerabilitiesResponse'
+        '400':
+          $ref: '#/components/responses/vulnerabs400'
+        '401':
+          $ref: '#/components/responses/vulnerabs401'
+        '403':
+          $ref: '#/components/responses/vulnerabs403'
+  '/Contrast/api/serverless/organizations/{organizationId}/providers/{provider}/accounts/{accountId}/resources/{resourceId}/results':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+      - $ref: '#/components/parameters/AccountID2'
+      - name: provider
+        in: path
+        description: >-
+          Name of cloud account provider. For example: AWS, Azure, etc. All
+          lowercase format.
+        required: true
+        example: aws
+        schema:
+          type: string
+          enum:
+            - aws
+            - azure
+      - name: resourceId
+        in: path
+        required: true
+        example: 'arn:aws:lambda:eu-central-1:123456789012:function:functionName'
+        description: >-
+          Filter results by the given cloud resource ID. Same as using the
+          resourceId query param but without support for the slash ("/")
+          character in the ID. Supports using "," in name to query for multiple
+          resources at once.
+        schema:
+          type: string
+      - name: lastResultId
+        in: query
+        schema:
+          type: string
+        example: >-
+          123456789012#arn:aws:lambda:eu-central-1:123456789012:function:functionName#CVE-2022-36359+Django+2.2.23
+      - name: extraSuggestedPolicyFormats
+        in: query
+        schema:
+          $ref: '#/components/schemas/FormatSchema'
+    get:
+      tags:
+        - Results
+      summary: Cloud resource scan results
+      operationId: getResourceScanResults
+      description: Get scan results for a specific cloud resource
+      responses:
+        '200':
+          description: OK. Scan results obtained.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VulnerabilitiesResponse'
+        '400':
+          $ref: '#/components/responses/vulnerabs400'
+        '401':
+          $ref: '#/components/responses/vulnerabs401'
+        '403':
+          $ref: '#/components/responses/vulnerabs403'
+  '/Contrast/api/serverless/organizations/{organizationId}/providers/{provider}/accounts/{accountId}/results':
+    parameters:
+      - $ref: '#/components/parameters/OranizationID'
+      - $ref: '#/components/parameters/AccountID2'
+      - name: provider
+        in: path
+        description: >-
+          Name of cloud account provider. For example: AWS, Azure, etc. All
+          lowercase format.
+        required: true
+        example: aws
+        schema:
+          type: string
+          enum:
+            - aws
+            - azure
+      - name: resourceId
+        in: query
+        required: false
+        example: 'arn:aws:lambda:eu-central-1:123456789012:function:functionName'
+        description: >-
+          Filter results by the given cloud resource ID. Same as using the cloud
+          resources/{resourceId} path param but supporting encoded slash ("/")
+          in the ID. Supports using "," in name to query for multiple resources
+          at once.
+        schema:
+          type: string
+      - name: vulnerabilityId
+        in: query
+        required: false
+        example: LEAST_PRIVILEGE
+        description: >-
+          Filter results by the given vulnerability ID. Use when using
+          resourceId query param.
+        schema:
+          type: string
+      - name: lastResultId
+        in: query
+        schema:
+          type: string
+        example: >-
+          123456789012#arn:aws:lambda:eu-central-1:123456789012:function:functionName#LEAST_PRIVILEGE
+      - name: extraSuggestedPolicyFormats
+        in: query
+        schema:
+          $ref: '#/components/schemas/FormatSchema'
+    get:
+      tags:
+        - Results
+      x-internal: true
+      x-public: true
+      summary: Scan results
+      operationId: getSpecificScanResults
+      description: Retrieves a list of vulnerabilities for an account.
+      responses:
+        '200':
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VulnerabilitiesResponse'
+        '400':
+          $ref: '#/components/responses/vulnerabs400'
+        '401':
+          $ref: '#/components/responses/vulnerabs401'
+        '403':
+          $ref: '#/components/responses/vulnerabs403'
+security:
+  - "Contrast-API-Key": [ ]
+    "Authorization": [ ]
+components:
+  securitySchemes:
+    "Contrast-API-Key":
+      type: apiKey
+      in: header
+      name: API-Key
+    "Authorization":
+      type: apiKey
+      in: header
+      name: Authorization
+  schemas:
+    scanConfiguration:
+      type: object
+      properties:
+        dynamic:
+          type: boolean
+          description: >-
+            Controls execution of dynamic scan on resources (true = run, false =
+            skip).
+          example: true
+        static:
+          type: boolean
+          description: >-
+            Controls execution of static scan on resources (true = run, false =
+            skip).
+          example: true
+    Function:
+      type: object
+      required:
+        - functionName
+        - functionArn
+        - runtime
+        - role
+        - handler
+        - rolePolicies
+      properties:
+        architectures:
+          type: array
+          items:
+            type: string
+          description: >-
+            The instruction set architecture that the function supports.
+            Architecture is a string array with one of the valid values - x86_64
+            | arm64
+          example:
+            - x86_64
+        codeSha256:
+          type: string
+          example: ui7ZTE1WMTKd94GBp++cLLilwYFR/GYYgrHJXzG9Y8Y="
+          description: The SHA256 hash of the function's deployment package.
+        codeSize:
+          type: integer
+          format: int32
+          example: 805
+          description: 'The size of the function''s deployment package, in bytes.'
+        description:
+          type: string
+          description: The function's description.
+          example: 'this is my Func. It does this, but not that'
+        functionArn:
+          type: string
+          description: ARN of the desired function to scan
+          example: 'arn:aws:lambda:eu-central-1:123456789012:function:MY-FUNC'
+        functionName:
+          type: string
+          description: Name of function
+          example: MY-FUNC
+        handler:
+          type: string
+          description: Lambda handler function
+          example: handler_package.handler_func
+        lastModified:
+          type: string
+          format: ISO8601
+          example: '2021-11-21T17:23:08.673+0000'
+          description: Time last modified
+        lastUpdateStatus:
+          description: The status of the last update that was performed on the function
+          example: Successful
+          type: string
+        layers:
+          type: array
+          description: The function's layers
+          example:
+            - Arn: 'arn:aws:lambda:eu-central-1:123456789012:layer:MY-LAYER:235'
+              CodeSize: 18280934
+          items:
+            type: object
+        memorySize:
+          type: integer
+          format: int32
+          description: Memory size allotted to function
+          example: 512
+        packageType:
+          type: string
+          description: >-
+            The type of deployment package. Set to Image for container image and
+            set Zip for .zip file archive
+          example: Zip
+        revisionId:
+          type: string
+          description: The latest updated revision of the function or alias.
+          example: f08af1d5-1234-4e8f-a80e-2628b9b50176
+        role:
+          type: string
+          description: Function role ARN
+          example: 'arn:aws:iam::123456789012:role/MY-FUNC-ROLE'
+        runtime:
+          type: string
+          description: Function runtime
+          example: python3.6
+        state:
+          type: string
+          description: The current state of the function
+          example: Active
+        timeout:
+          type: integer
+          format: int32
+          description: Function timeout
+          example: 900
+        tracingConfig:
+          type: object
+          description: The function's AWS X-Ray tracing configuration.
+          properties:
+            Mode:
+              type: string
+              example: PassThrough
+        version:
+          type: string
+          description: Function Version
+          example: $LATEST
+        code:
+          type: object
+          description: Link to code location
+          properties:
+            Location:
+              type: string
+              example: >-
+                https://my-s3-bucket.s3.eu-central-1.amazonaws.com/snapshots/123456789123/location
+            RepositoryType:
+              type: string
+              example: S3
+        rolePolicies:
+          type: array
+          description: Role policies of function role
+          example:
+            - Version: '2012-10-17'
+              Statement:
+                - Action:
+                    - 'logs:CreateLogGroup'
+                    - 'logs:CreateLogStream'
+                    - 'logs:PutLogEvents'
+                  Resource:
+                    - >-
+                      arn:aws:logs:eu-central-1:123456789012:log-group:/aws/lambda/*:*:*
+              PolicyName: MY-FUNC-ROLE
+              Raw:
+                Version: '2012-10-17'
+                Statement:
+                  - Resource: >-
+                      arn:aws:logs:eu-central-1:123456789012:log-group:/aws/lambda/*:*:*
+                    Action:
+                      - 'logs:CreateLogGroup'
+                      - 'logs:CreateLogStream'
+                      - 'logs:PutLogEvents'
+                    Effect: Allow
+                PolicyName: MY-FUNC-ROLE
+          items:
+            type: object
+            properties:
+              Version:
+                type: string
+                format: date
+              Statement:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    Effect:
+                      type: string
+                    Action:
+                      oneOf:
+                        - type: string
+                        - type: array
+                    Resource:
+                      oneOf:
+                        - type: string
+                        - type: array
+                    NotAction:
+                      oneOf:
+                        - type: string
+                        - type: array
+                    NotResource:
+                      oneOf:
+                        - type: string
+                        - type: array
+              PolicyName:
+                type: string
+              PolicyArn:
+                type: string
+    functionsResult:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: Number of functions returned in the result
+        functions:
+          type: array
+          items:
+            $ref: '#/components/schemas/function'
+    functionResult:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: Number of functions returned in the result
+        function:
+          $ref: '#/components/schemas/function'
+    function:
+      type: object
+      properties:
+        role:
+          type: string
+          example: 'arn:aws:iam::123456789012:role/MY-FUNC-ROLE'
+        provider:
+          type: string
+          enum:
+            - azure
+            - aws
+          example: azure
+        functionApp:
+          type: string
+          example: test_function_app_1
+        resourceGroup:
+          type: string
+          example: test_rg
+        lastModified:
+          type: string
+          format: ISO8601
+          example: '2021-11-21T17:23:08.673+0000'
+        runtime:
+          type: string
+          example: python3.6
+        description:
+          type: string
+          example: 'this is my Func. It does this, but not that'
+        functionName:
+          type: string
+          example: function-name-1
+        timeout:
+          type: integer
+          example: 900
+        memorySize:
+          type: integer
+          example: 512
+        accountId:
+          type: string
+          example: 12345678-abcd-1234-abc6-123456789abc
+        service:
+          type: string
+          example: function
+        orgId:
+          type: string
+          example: 123abcde-1234-1234-abc5-123456789abc
+        region:
+          type: string
+          example: astus
+        functionArn:
+          type: string
+          example: >-
+            /subscriptions/12345678-abcd-1234-abc6-123456789abc/resourceGroups/test_rg/providers/Microsoft.Web/sites/fnapppfkfk3kdwwy/functions/HttpTrigger1
+        handler:
+          type: string
+          example: __init__.main
+        scriptFile:
+          type: string
+          example: __init__.py
+        entryPoint:
+          type: string
+          example: main
+    Scan:
+      type: object
+      properties:
+        dynamicResourcesCount:
+          type: integer
+          description: Number of cloud resources to perform dynamic scan.
+          example: 3
+        dynamicResourcesScannedCount:
+          type: integer
+          description: Number of cloud resources scanned in dynamic manner.
+          example: 2
+        accountId:
+          type: string
+          example: '123456789123'
+        creationTime:
+          type: string
+          format: ISO8601
+          example: '2021-12-09T13:38:53.393126'
+        staticResourcesScannedCount:
+          description: Number of cloud resources scanned in static manner.
+          type: integer
+          example: 5
+        source:
+          type: string
+          example: ''
+        sourceId:
+          type: string
+          example: ''
+        name:
+          type: string
+          example: '*_*_16Aug_14:11_ddd51a'
+        state:
+          type: string
+          example: COMPLETED
+        staticResourcesCount:
+          description: Number of cloud resources to perform static scan.
+          type: integer
+          example: 6
+        resultsCount:
+          type: integer
+          description: Number of cloud resources scanned
+          example: 8
+        updatedTime:
+          type: string
+          format: ISO8601
+          example: '2021-12-09T13:38:53.393126'
+        provider:
+          type: string
+          example: aws
+        scanId:
+          type: string
+          example: 123456789123#2222222222_AdHocScan_baddd51a
+    StaticScanData:
+      type: object
+      required:
+        - scannerVersion
+        - filesCount
+        - linesCount
+        - scanDurationMs
+        - classesCount
+        - dependenciesCount
+      properties:
+        scannerVersion:
+          type: string
+          description: Internal version of scanner
+        filesCount:
+          type: number
+          description: Number of files scanned
+        linesCount:
+          type: number
+          description: Number of lines of code scanned
+        scanDurationMs:
+          type: number
+          description: Duration (in ms) of a scan
+        classesCount:
+          type: number
+          description: Number of classes scanned
+        dependenciesCount:
+          type: number
+          description: Number of dependencies found
+    DynamicScanData:
+      type: object
+      required:
+        - attacks
+        - scanDurationMs
+      properties:
+        scanDurationMs:
+          type: number
+          description: Duration (in ms) of a attack
+        attacks:
+          type: array
+          items:
+            required:
+              - attackType
+            properties:
+              attackType:
+                type: string
+                description: 'Name of the attack that runned (SQLI, CMDI...)'
+    ScanResource:
+      type: object
+      required:
+        - runtime
+        - scannedResourceKey
+        - resourceId
+        - scanType
+        - scanTypeText
+        - state
+        - stateReason
+        - stateReasonText
+        - scanData
+        - resultsCount
+        - creationTime
+        - updatedTime
+      properties:
+        scannedResourceKey:
+          type: string
+          description: The key of the scanned cloud resource
+          example: >-
+            123456789123#2222222222_AdHocScan_baddd51a#deprecated#1#arn:aws:lambda:eu-central-1:123456789123:function:function-name-1
+        resourceId:
+          type: string
+          description: The id of the cloud resource.
+          example: 'arn:aws:lambda:eu-central-1:123456789123:function:function-name-1'
+        runtime:
+          type: string
+          description: Runtime of the cloud resource.
+          example: nodejs12.x
+        scanType:
+          type: integer
+          description: The type of the scan
+          example: 1
+        scanTypeText:
+          type: string
+          enum:
+            - DYNAMIC
+            - STATIC
+          description: The type of the scan in text
+          example: DYNAMIC
+        scanData:
+          type: object
+          oneOf:
+            - $ref: '#/components/schemas/StaticScanData'
+            - $ref: '#/components/schemas/DynamicScanData'
+          description: Detailed information about the scan
+          example:
+            dependenciesCount: 2
+            scannerVersion: 0.38.0
+            scanDurationMs: 73
+        resultsCount:
+          type: integer
+          description: The amount of the results that has been found on the cloud resources
+          example: 0
+        state:
+          type: string
+          enum:
+            - CANCELED
+            - DISMISSED
+            - DONE
+            - EXCLUDED
+            - FAILED
+            - PENDING
+            - QUEUED
+            - SCANNING
+            - UNSUPPORTED
+          description: The state of the scan
+          example: FAILED
+        stateReason:
+          type: integer
+          example: 102
+        stateReasonText:
+          type: string
+          description: >-
+            The reason that cause the state, in case of scan that is not
+            completed
+          example: Scan in progress
+        creationTime:
+          type: string
+          format: ISO8601
+          description: Scan start time.
+          example: '2021-12-09T13:38:53.393126'
+        updatedTime:
+          type: string
+          format: ISO8601
+          description: Last updated.
+          example: '2021-12-09T13:38:53.393126'
+    ScanResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: true if request successful
+        data:
+          type: object
+          description: Object containing all scan details
+          properties:
+            scan:
+              $ref: '#/components/schemas/Scan'
+    ScanResourcesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: true if request successful
+        data:
+          type: object
+          description: List of cloud resources scanned
+          properties:
+            resources:
+              type: array
+              items:
+                $ref: '#/components/schemas/ScanResource'
+    FormatSchema:
+      type: string
+      enum:
+        - JSON
+        - YAML
+        - TERRAFORM
+        - ALL
+      example: ALL
+    BaseResultSchema:
+      type: object
+      properties:
+        creationTime:
+          type: string
+          format: ISO8601
+          example: '2021-12-09T13:38:53.393126'
+          description: Time vulnerability first created
+        severity:
+          $ref: '#/components/schemas/SeverityValue'
+        severityText:
+          $ref: '#/components/schemas/SeverityText'
+        resourceId:
+          type: string
+          example: 'arn:aws:lambda:eu-central-1:123456789012:function:functionName'
+          description: Cloud resource ID where vulnerability found.
+        scanId:
+          type: string
+          example: 123456789012#1639308035_AdHocScan_821093f1
+          description: Scan ID where vulnerability found.
+        firstSeenTime:
+          type: string
+          format: ISO8601
+          example: '2021-12-20T12:54:52.062767'
+          description: Time where vulnerability first detected.
+        accountId:
+          type: string
+          example: '123456789012'
+          description: AWS account ID.
+        resultId:
+          type: string
+          example: >-
+            123456789012#arn:aws:lambda:us-east-1:123456789012:function:functionName#LEAST_PRIVILEGE
+          description: Unique vulnerability ID.
+        category:
+          $ref: '#/components/schemas/CategoryValue'
+        categoryText:
+          $ref: '#/components/schemas/CategoryText'
+        lastSeenTime:
+          type: string
+          format: ISO8601
+          example: '2021-12-20T12:54:52.062767'
+          description: Date and time vulnerability last viewed.
+        statusText:
+          type: string
+          enum:
+            - REPORTED
+            - REMEDIATED_AUTO_VERIFIED
+            - DISABLED
+          example: REPORTED
+          description: Vulnerability status.
+        remediation:
+          type: object
+          properties:
+            description:
+              type: string
+          example:
+            description: Upgrade node-jose version 0.3.1 to the latest version.
+    SeverityText:
+      type: string
+      enum:
+        - UNDEFINED_SEVERITY
+        - CRITICAL
+        - HIGH
+        - MEDIUM
+        - LOW
+        - NOTE
+      example: LOW
+      description: 'For display purposes, the severity can be a text value.'
+    ExternalServerityText:
+      type: string
+      enum:
+        - NONE
+        - LOW
+        - MEDIUM
+        - HIGH
+        - CRITICAL
+      example: MEDIUM
+    SeverityValue:
+      type: integer
+      enum:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+      example: 4
+      description: Severity level. Range from 0 (high) to 5 (low).
+    CategoryValue:
+      type: integer
+      enum:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+      example: 4
+    CategoryText:
+      type: string
+      enum:
+        - UNDEFINED_CATEGORY
+        - DEPENDENCIES
+        - EXPLOITS
+        - SECRETS
+        - PERMISSIONS
+        - INJECTION
+        - INPUT_VALIDATION
+        - ACCESS_CONTROL
+        - XSS_CATEGORY
+        - CACHING
+        - CRYPTOGRAPHY
+        - SECURE_COMMUNICATIONS
+        - SESSION_MANAGEMENT
+        - SECURITY_MISCONFIGURATION
+        - MALWARE
+      example: PERMISSIONS
+      description: Vulnerability category.
+    CodeItem:
+      type: object
+      required:
+        - link
+        - snippet
+      properties:
+        link:
+          type: string
+          description: Location of vulnerable code.
+          example: >-
+            org/owasp/webgoat/sql_injection/advanced/SqlInjectionLesson6a.java:58
+        snippet:
+          type: string
+          description: Section of vulnerable code.
+          example: |-
+            public AttackResult injectableQuery(String accountName) {
+              ...
+              $stack0 = this.dataSource;    // Java line 58
+              $local3 = $stack0.getConnection();    // Java line 58
+              ...
+            }
+        title:
+          type: string
+          example: accountName
+    AttackType:
+      type: string
+      enum:
+        - CMDI
+        - JNDI
+        - JSCODEI
+        - LFI
+        - PYCODEI
+        - PYINSDES
+        - RFI
+        - SPELI
+        - SQLI
+        - XSS
+        - XXE
+      example: XSS
+    AttackVector:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeItem'
+        description:
+          type: string
+          example: >-
+            Verifies that untrusted data is not used in dynamic database
+            queries.
+        sink:
+          type: string
+          example: '...and ended up in this database query:'
+        source:
+          type: string
+          example: 'Javascript Injection detected at:'
+        risk:
+          type: string
+          example: >
+            SQL injection is possible when developers hand-build SQL statements
+            containing user-supplied data without validation or encoding. The
+            goal of such attacks is to force the database to retrieve and output
+            data to which the user would not otherwise have access. For example,
+            an attacker could use SQL Injection on a vulnerable application in
+            order to query the database for customer credit card numbers and
+            other data, even if it wasn't part of the query the developer
+            created. SQL injection also allows privilege escalation, account
+            hijacking, and in some cases, it may be possible for an attacker to
+            gain shell access to the database server.
+    Permission:
+      allOf:
+        - $ref: '#/components/schemas/BaseResultSchema'
+        - type: object
+          description: Definition of vulnerability found on policy attached to the scan.
+          properties:
+            evidence:
+              type: object
+              properties:
+                role:
+                  type: string
+                  example: 'arn:aws:iam::123456789012:role/dev-role'
+                  description: >-
+                    The Role ARN (Amazon Cloud Resource Name) that contains a
+                    vulnerability.
+                comment:
+                  type: array
+                  items:
+                    type: string
+                  example:
+                    - >-
+                      Contrast Security has identified usage of a library with a
+                      known exploit
+                leastPrivilege:
+                  type: object
+                  properties:
+                    suggestedDefaultPolicy:
+                      type: object
+                    violatingPolicies:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          violatedPolicyCode:
+                            type: object
+                            properties:
+                              title:
+                                type: string
+                              snippet:
+                                type: string
+                          suggestedPolicy:
+                            type: object
+                            properties:
+                              suggestedPolicyCode:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    title:
+                                      $ref: '#/components/schemas/FormatSchema'
+                                    snippet:
+                                      type: string
+                                      format: string
+                              description:
+                                type: string
+            description:
+              type: string
+              example: >-
+                The Attached Role arn:aws:iam::123456789012:role/role-dev has an
+                over permissive policy that may violate the principle 
+                                      of least privilege. For more information on aws least privilege 
+                                      https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege
+    SASTVulnerability:
+      allOf:
+        - $ref: '#/components/schemas/BaseResultSchema'
+        - type: object
+      description: >-
+        Definition of a vulnerability that identifies a SAST vulnerability in
+        cloud resource
+      properties:
+        title:
+          type: string
+          example: sql-injection
+        description:
+          type: string
+          example: >-
+            Untrusted data flow from SqlOnlyInputValidation.java:48 to
+            SqlInjectionLesson6a.java:67 via variable `query`
+        resourceId:
+          type: string
+          example: >-
+            arn:aws:lambda:eu-central-1:123456789012:function:DVSA-FEEDBACK-UPLOADS
+        attackVector:
+          $ref: '#/components/schemas/AttackVector'
+    Malware:
+      allOf:
+        - $ref: '#/components/schemas/BaseResultSchema'
+        - type: object
+          description: >-
+            Definition of a vulnerability that identifies a malware file in a
+            function package.
+          properties:
+            evidence:
+              type: object
+              properties:
+                ioc:
+                  type: object
+                  properties:
+                    malwares:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          fileHash:
+                            type: string
+                            example: >-
+                              a31ae5b7968056d8d99b1b720a66a9a1aeee3637b97050d95d96ef3a265cbbca
+                          filePath:
+                            type: string
+                            example: /var/task/sub/denonia2
+                    references:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                            example: VirusTotal Report
+                          url:
+                            type: string
+                            example: >-
+                              https://www.virustotal.com/gui/file/739fe13697bc55870ceb35003c4ee01a335f9c1f6549acb6472c5c3078417eed
+                comment:
+                  type: array
+                  items:
+                    type: string
+                  example:
+                    - >-
+                      Evidence of an exploit has been identified in the function
+                      logs
+    VulnerabilitiesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          description: Response detailing all of the vulnerabilities found
+          properties:
+            count:
+              type: integer
+            lastResultId:
+              type: string
+              example: >-
+                123456789012#arn:aws:lambda:eu-central-1:123456789012:function:functionName#CVE-2022-36359+Django+2.2.23
+              description: ID of last vulnerability found
+            results:
+              type: array
+              description: List of all vulnerabilities found
+              items:
+                anyOf:
+                  - $ref: '#/components/schemas/Permission'
+                  - $ref: '#/components/schemas/Cve'
+                  - $ref: '#/components/schemas/Exploits'
+                  - $ref: '#/components/schemas/SASTVulnerability'
+                  - $ref: '#/components/schemas/Malware'
+    CiaType:
+      type: string
+      enum:
+        - None
+        - Partial
+        - Complete
+      example: None
+    Cve:
+      allOf:
+        - $ref: '#/components/schemas/BaseResultSchema'
+        - type: object
+          properties:
+            evidence:
+              type: object
+              properties:
+                cve:
+                  type: object
+                  properties:
+                    cvss:
+                      type: object
+                      description: Common Vulnerability Scoring System (CVSS).
+                      properties:
+                        baseMetrics:
+                          type: object
+                          description: >-
+                            Common Vulnerability Scoring System (CVSS) version
+                            2.0.
+                          properties:
+                            availabilityImpact:
+                              $ref: '#/components/schemas/CiaType'
+                            integrityImpact:
+                              $ref: '#/components/schemas/CiaType'
+                              description: >-
+                                The Integrity (I) metric describes the impact on
+                                the integrity of the exploited system.
+                              example: None
+                            accessComplexity:
+                              type: string
+                              description: There are no special requirements for access.
+                              enum:
+                                - High
+                                - Medium
+                                - Low
+                              example: Medium
+                            confidentialityImpact:
+                              $ref: '#/components/schemas/CiaType'
+                              description: >-
+                                The confidentiality (C) metric describes the
+                                impact on the confidentiality of data processed
+                                by the system.
+                              example: Partial
+                            accessVector:
+                              type: string
+                              enum:
+                                - Network
+                                - Adjacent Network
+                                - Local
+                              description: >-
+                                The vulnerability may be accessed from any
+                                network that can access the target system -
+                                typically the whole of the internet.
+                              example: Network
+                            authentication:
+                              type: string
+                              enum:
+                                - Multiple
+                                - Single
+                                - None
+                              description: >-
+                                The authentication (Au) metric describes the
+                                number of times that an attacker must
+                                authenticate to a target to exploit it. It does
+                                not include (for example) authentication to a
+                                network in order to gain access. For locally
+                                exploitable vulnerabilities, this value should
+                                only be set to Single or Multiple if further
+                                authentication is required after initial access.
+                              example: None
+                        version:
+                          type: string
+                          description: CVSS Version
+                          example: '2.0'
+                        vector:
+                          type: string
+                          description: >-
+                            Represents the values of all the metrics as a block
+                            of text
+                          example: 'AV:N/AC:M/Au:N/C:P/I:N/A:N'
+                    cwes:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            example: NVD-CWE-noinfo
+                    package:
+                      type: object
+                      properties:
+                        version:
+                          type: string
+                          description: Package version.
+                          example: 0.3.1
+                        runtime:
+                          type: string
+                          description: Package runtime
+                          example: node
+                        product:
+                          type: string
+                          description: Package name
+                          example: node-jose
+                        latestVersion:
+                          type: string
+                          description: Latest package version.
+                          example: 2.1.1
+                    references:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                            example: >-
+                              Information from NVD (National Vulnerability
+                              Database).
+                          url:
+                            type: string
+                            example: 'https://nvd.nist.gov/vuln/detail/CVE-2017-16007'
+                    severityValue:
+                      type: number
+                      minimum: 0
+                      maximum: 10
+                      example: 4.3
+                    severityText:
+                      $ref: '#/components/schemas/ExternalServerityText'
+                    description:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          lang:
+                            type: string
+                            description: Language format for description.
+                            example: en
+                          text:
+                            type: string
+                            example: >-
+                              node-jose is a JavaScript implementation of the
+                              JSON Object Signing and Encryption (JOSE) for
+                              current web browsers and node.js-based servers.
+                              node-jose earlier than version 0.9.3 is vulnerable
+                              to an invalid curve attack. This allows an
+                              attacker to recover the private secret key when
+                              JWE with Key Agreement with Elliptic Curve
+                              Diffie-Hellman Ephemeral Static (ECDH-ES) is used.
+                    id:
+                      type: string
+                      description: The CVE unique ID
+                      example: CVE-2017-16007
+            title:
+              type: string
+              description: The CVE ID + specific version of the package
+              example: 'CVE-2017-16007 [node-jose:0.3.1]'
+    Exploits:
+      allOf:
+        - $ref: '#/components/schemas/BaseResultSchema'
+        - type: object
+          properties:
+            evidence:
+              type: object
+              properties:
+                payload:
+                  type: string
+                  example: '|echo $((4*8055723117617))'
+                requestId:
+                  type: string
+                  example: bc5ce4ef-6f45-4ef2-a4a6-e663314c0953
+                logGroup:
+                  type: string
+                  example: /aws/lambda/DVSA-FEEDBACK-UPLOADS
+                logStream:
+                  type: string
+                  example: '2021/12/09/[$LATEST]fc10583c5e4342ce943f053536ff7472'
+                timestamp:
+                  type: object
+                  properties:
+                    start:
+                      type: number
+                      example: 1658154368000
+                    end:
+                      type: number
+                      example: 1658154370000
+                comment:
+                  type: array
+                  items:
+                    type: string
+                  example:
+                    - >-
+                      Evidence of an exploit has been identified in the function
+                      logs
+                vector:
+                  type: string
+                  example: 'arn:aws:s3:::bucketName-123456789012'
+                type:
+                  type: string
+                  example: Log
+            attackInfo:
+              type: object
+              properties:
+                attackDescription:
+                  type: string
+                  example: >-
+                    Command injection (CWE-77 CWE-78) is an attack in which the
+                    goal is execution of arbitrary commands on the host
+                    operating system via a vulnerable application. Command
+                    injection attacks are possible when an application passes
+                    unsafe data to a system shell. In this attack the
+                    attacker-supplied commands is executed with the privileges
+                    of the vulnerable function. Command injection attacks are
+                    possible largely due to insufficient input validation. This
+                    attack differs from Code Injection in that code injection
+                    allows the attacker to add his own code that is then
+                    executed by the application. In Command Injection the
+                    attacker extends the default functionality of the
+                    application which execute system commands without the
+                    necessity of injecting code
+                attackName:
+                  type: string
+                  example: OS Command Injection
+                attackType:
+                  $ref: '#/components/schemas/AttackType'
+                  example: CMDI
+            impact:
+              type: array
+              items:
+                type: string
+              example:
+                - logs
+                - dynamodb
+                - s3
+                - ses
+  responses:
+    postScan201:
+      description: Created. A JSON object containing the created scanId.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              scanId:
+                type: string
+                example: 123456789012#1639308035_AdHocScan_821093f1
+                description: Scan Id of created scan
+              success:
+                type: boolean
+                example: true
+                description: true if created succesfully
+    postScan403:
+      description: Forbidden. Not allowed to scan the specified account.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+                description: false if created unsuccesfully
+              data:
+                type: string
+                description: Error message
+                example: Account 123456789012 not allowed to scan different accounts.
+    postScan400:
+      description: Bad Request. Missing or invalid parameters.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+                description: false if created unsuccesfully
+              data:
+                type: string
+                example: Bad Request. Missing Account ID or resources.
+                description: Error message
+    postScan401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                description: Error message
+          examples:
+            Unauthorized:
+              value:
+                message: Unauthorized
+    postScan404:
+      description: Account ID or other resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: string
+                description: Error message
+              success:
+                type: boolean
+                description: false if created unsuccesfully
+          examples:
+            resourcesNotFound:
+              value:
+                success: false
+                data: Cloud resource not found.
+    postScan423:
+      description: Cloud resource locked. Wait for scan to complete
+      content:
+        applivation/jaon:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+                description: false if created unsuccesfully
+              data:
+                type: string
+                example: >-
+                  Other scan is still running. Please wait until the previous
+                  scan finishes.
+                description: Error message
+          examples:
+            scanStillRunning:
+              value:
+                success: false
+                data: >-
+                  Other scan is still running. Please wait until the previous
+                  scan finishes.
+    accounts200:
+      description: OK. A JSON object of accounts list.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              accounts:
+                type: array
+                items:
+                  type: object
+                example:
+                  - agent: cloudessence_agent
+                    autoUpdate: true
+                    scanConfiguration:
+                      dynamic: true
+                      static: true
+                      scanModules:
+                        - ALL_STATIC_SCAN_MODULES
+                      activeScansLimit: 20
+                    scopeRules:
+                      - field: '*'
+                        guid: 00000000-0000-0000-0000-000000000000
+                        effect: Allow
+                    stackId: >-
+                      arn:aws:cloudformation:us-east-1:057873349377:stack/Xrays-Agent/d9207180-7053-11ea-b666-0a8540e42a70
+                    active: true
+                    agentRegion: eu-central-1
+                    creationDate: '1669283122'
+                    orgId: cn-contrast-security
+                    accountId: '472949936327'
+                    cloudtrailBucket: contrast-gsu7v-contrasts3bucket-prlbykbh0969
+                    javaAgent: cloudessence_java_agent
+                    eventBusRole: event_bus_role
+                    eventBus: default
+                    provider: aws
+                    name: '472949936327'
+                    templateVersion: 0.3.2
+                description: Scan Id of created scan
+    accounts400:
+      description: Bad request - Invalid Account Id
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: string
+                description: Error message
+              success:
+                type: boolean
+                description: false if created unsuccesfully
+          examples:
+            accountNotFound:
+              value:
+                success: false
+                data: Bad request - Invalid Account Id
+    accounts403:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: string
+                description: Error message
+                example: Account 123456789012 not allowed to scan different accounts.
+          examples:
+            accountNotFound:
+              value:
+                data: Unauthorized
+    accounts404:
+      description: Account not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: string
+                description: Error message
+              success:
+                type: boolean
+                description: false if created unsuccesfully
+          examples:
+            accountNotFound:
+              value:
+                success: false
+                data: Account not found
+    accounts500:
+      description: internal error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: string
+                description: Error message
+              success:
+                type: boolean
+                description: false if created unsuccesfully
+          examples:
+            accountNotFound:
+              value:
+                success: false
+                data: internal error
+    scans400:
+      description: Bad Request. Missing or invalid parameters.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+                description: false if request unsuccessful
+              data:
+                type: string
+                example: Missing scan id.
+                description: Error message
+    scans401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                description: Error message
+          examples:
+            Unauthorized:
+              value:
+                message: Unauthorized
+    scans403:
+      description: Forbidden. Not allowed to scan the specified account.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+                description: false if request unsuccessful
+              data:
+                type: string
+                description: Error message
+                example: Account 123456789012 not allowed to scan different accounts.
+    scans404:
+      description: Scan not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+                description: false if request unsuccessful
+              data:
+                type: string
+                description: Error message
+                example: Scan with id 1662704681_UpdateFunctionCode_de857db6 not found
+    vulnerabs400:
+      description: Bad request. Missing required parameter
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+                description: false if request unsuccessful
+              data:
+                type: string
+                example: Bad request
+                description: Error message
+    vulnerabs401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                description: Error message
+          examples:
+            Unauthorized:
+              value:
+                message: Unauthorized
+    vulnerabs403:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+                description: false if request unsuccessful
+              data:
+                type: string
+                description: Error message
+                example: Not allowed to access desired resource
+  parameters:
+    OranizationID:
+      in: path
+      name: organizationId
+      required: true
+      description: >-
+        Organization ID in Contrast web interface. Located under User menu >
+        User Settings > Profile.
+      example: abxabcde-1234-1234-abc5-123456789abc
+      schema:
+        type: string
+        format: uuid
+    AccountID:
+      in: path
+      name: accountId
+      required: true
+      description: Cloud Provider Account ID. Must be 12 numerical characters.
+      example: '123456789012'
+      schema:
+        type: string
+        pattern: '^\d{12}$'
+    Provider:
+      in: path
+      name: provider
+      required: true
+      description: Cloud Provider aws/azure
+      example: aws
+      schema:
+        type: string
+        enum:
+          - aws
+          - azure
+    AccountID1:
+      in: path
+      name: accountId
+      required: true
+      description: Cloud Provider Account ID. Must be 12 numerical characters.
+      example: 123456789012
+      schema:
+        type: string
+        pattern: '^\d{12}$'
+    AccountID2:
+      in: path
+      name: accountId
+      description: >-
+        AWS Account ID or Azure Subscription ID. Must be 12 numerical
+        characters.
+      required: true
+      example: '123456789012'
+      schema:
+        type: string
+        pattern: '^\d{12}$'
+  requestBodies:
+    requestPostScan:
+      content:
+        application/json:
+          schema:
+            required:
+              - resources
+            properties:
+              scanConfiguration:
+                $ref: '#/components/schemas/scanConfiguration'
+              resources:
+                description: ARNs of cloud resources to be scanned.
+                type: array
+                items:
+                  type: string
+          examples:
+            functions arns:
+              value:
+                scanConfiguration:
+                  static: true
+                  dynamic: true
+                resources:
+                  - >-
+                    arn:aws:lambda:eu-central-1:123456789123:function:function-name-1
+                  - >-
+                    arn:aws:lambda:eu-central-1:123456789123:function:function-name-2
