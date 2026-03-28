@@ -1,0 +1,586 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Authentication",
+    "version": "2.0",
+    "description": "BILL is a cloud-based cash flow management system for an organization's Accounts Payable (AP) and Accounts Receivable (AR) automation.\n * **AP**: Automate workflows to pay vendors bills at scale for the goods and services they provide. Pay vendors with a wide range of payment methods. Generate vendor credits, bill credits, and payment disbursement reports.\n * **AR**: Automate workflows to get paid by customers at scale for the goods and services you provide. Generate and send invoices on a schedule, generate customer and invoice credits, and seamlessly charge authorized customers.\n * **Organization**: Manage your bank accounts (for sending and receiving payments), users (with user roles), and sync with your choice of accounting software.\n\nIntegrate with the BILL API to send and receive payments for your business. See [Support Center](https://help.bill.com/hc/en-us) for resources about using the BILL web app.",
+    "contact": {
+      "email": "developerprogram@hq.bill.com"
+    },
+    "x-jentic-source-url": "https://developer.bill.com/reference"
+  },
+  "servers": [
+    {
+      "url": "https://api-stage.bill.com/api/v2",
+      "description": "Sandbox base URL"
+    }
+  ],
+  "x-readme": {
+    "samples-languages": [
+      "curl",
+      "java",
+      "javascript",
+      "python",
+      "ruby"
+    ]
+  },
+  "paths": {
+    "/Login.json": {
+      "post": {
+        "summary": "Login",
+        "operationId": "auth-login",
+        "description": "Sign in to your BILL sandbox developer account. In response, your API session is created and a `sessionId` is generated. Use the `sessionId` in all subsequent API calls to confirm that you are in a signed in session.\n\nIf your API session is inactive or idle for 35 minutes, the session expires and you are automatically signed out.\n\nAfter signing in, making any subsequent call resets the 35 minutes timer. You are required to sign in again and generate a new `sessionId` only if the session is inactive or idle for 35 minutes. See [API login best practices](doc:api-login-best-practices) for more information.\n\nYou can also sign in to your BILL developer account with a user-generated token. The generated `sessionId` does not expire, and provides limited access to the BILL API. See [Token-based sign in](doc:token-based-sign-in) for more information.\n\n### Multi-Factor Authentication (MFA)\n\nThere are four protected endpoints require MFA for login with a trusted API session.\n* Invite a vendor (not in the BILL network) with [`/v2/SendVendorInvite.json`](ref:network-sendvendorinvite)\n* Invite a customer in the BILL network with [`/v2/SendInvite.json`](ref:network-sendinvite)\n* Add a vendor bank account with [`/v2/VendorBankAccount.json`](ref:ap-vendormgmt-createvendorbankaccount)\n* Pay a vendor in the BILL network with [`/v2/PayBills.json`](ref:ap-vendortransactions-paybills)\n\n**Note**: See [Multi-factor authentication (MFA)/2-step verification](https://help.bill.com/hc/en-us/articles/360000023843) in the BILL Help Center for more information about all the security measures in place for your BILL account operations.\n\nSign in with an MFA trusted API session is a three-step process.\n1. Sign in to generate a `sessionId` value with [`/v2/Login.json`](ref:auth-login).\n2. Generate an MFA challenge ID with [`/v2/MFAChallenge.json`](ref:auth-mfachallenge). When you call [`/v2/MFAChallenge.json`](ref:auth-mfachallenge), a token is sent to your mobile device registered with BILL.\n3. Authenticate the challenge ID and token with [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate). At this point, the `sessionId` (from step one) is MFA trusted. Note that the `mfaId` token expires at end of the current session or when you sign out.\n\n#### Maintaining MFA for 30 days\nIn step three of the MFA process, if you set `rememberMe` as `true` in your [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate) request, the `mfaId` value is marked as trusted for 30 days. For these 30 days, set `deviceId` and `mfaId` as additional fields when you sign in ([`/v2/Login.json`](ref:auth-login)).",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "userName",
+                  "password",
+                  "devKey",
+                  "orgId"
+                ],
+                "properties": {
+                  "userName": {
+                    "type": "string",
+                    "description": "Email address used to sign in to your BILL account"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Password used to sign in to your BILL account"
+                  },
+                  "devKey": {
+                    "type": "string",
+                    "description": "Developer key generated with your BILL developer account"
+                  },
+                  "orgId": {
+                    "type": "string",
+                    "description": "Organization ID (sent to you when you create a developer account)"
+                  },
+                  "mfaId": {
+                    "type": "string",
+                    "description": "MFA ID generated with `/v2/MFAAuthenticate.json`. `mfaId` is required when it is marked as trusted for 30 days."
+                  },
+                  "deviceId": {
+                    "type": "string",
+                    "description": "Device ID set with `/v2/MFAAuthenticate.json`. `mfaId` is required when `mfaId` is marked as trusted for 30 days."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Login"
+        ],
+        "parameters": []
+      }
+    },
+    "/GetSessionInfo.json": {
+      "post": {
+        "summary": "Get API session details",
+        "operationId": "auth-getsessioninfo",
+        "description": "Get details about the currently signed in user and organization. This information is useful for ensuring that the correct user and organization is signed in for an operation.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetSessionInfoResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "devKey",
+                  "sessionId"
+                ],
+                "properties": {
+                  "devKey": {
+                    "type": "string",
+                    "description": "Developer key generated with your BILL developer account"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "description": "API session ID generated with [`/v2/Login.json`](ref:auth-login)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Login"
+        ]
+      }
+    },
+    "/Logout.json": {
+      "post": {
+        "summary": "Logout",
+        "operationId": "auth-logout",
+        "description": "Sign out of your BILL sandbox developer account. If your API session is inactive for 35 minutes, the session expires and you are automatically signed out.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "devKey",
+                  "sessionId"
+                ],
+                "properties": {
+                  "devKey": {
+                    "type": "string",
+                    "description": "Developer key generated with your BILL developer account"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "description": "API session ID generated with [`/v2/Login.json`](ref:auth-login)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Login"
+        ]
+      }
+    },
+    "/MFAChallenge.json": {
+      "post": {
+        "summary": "Generate MFA challenge",
+        "operationId": "auth-mfachallenge",
+        "description": "Generate an MFA challenge ID and send a token to your mobile device registered with BILL.\n\nUsing [`/v2/MFAChallenge.json`](ref:auth-mfachallenge) is step two of signing in with an MFA trusted API session.\n\n### Multi-Factor Authentication (MFA)\n\nThere are four protected endpoints require MFA for login with a trusted API session.\n* Invite a vendor (not in the BILL network) with [`/v2/SendVendorInvite.json`](ref:network-sendvendorinvite)\n* Invite a customer in the BILL network with [`/v2/SendInvite.json`](ref:network-sendinvite)\n* Add a vendor bank account with [`/v2/VendorBankAccount.json`](ref:ap-vendormgmt-createvendorbankaccount)\n* Pay a vendor in the BILL network with [`/v2/PayBills.json`](ref:ap-vendortransactions-paybills)\n\n**Note**: See [Multi-factor authentication (MFA)/2-step verification](https://help.bill.com/hc/en-us/articles/360000023843) in the BILL Help Center for more information about all the security measures in place for your BILL account operations.\n\nSign in with an MFA trusted API session is a three-step process.\n1. Sign in to generate a `sessionId` value with [`/v2/Login.json`](ref:auth-login).\n2. Generate an MFA challenge ID with [`/v2/MFAChallenge.json`](ref:auth-mfachallenge). When you call [`/v2/MFAChallenge.json`](ref:auth-mfachallenge), a token is sent to your mobile device registered with BILL.\n3. Authenticate the challenge ID and token with [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate). At this point, the `sessionId` (from step one) is MFA trusted. Note that the `mfaId` token expires at end of the current session or when you sign out.\n\n#### Maintaining MFA for 30 days\nIn step three of the MFA process, if you set `rememberMe` as `true` in your [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate) request, the `mfaId` value is marked as trusted for 30 days. For these 30 days, set `deviceId` and `mfaId` as additional fields when you sign in ([`/v2/Login.json`](ref:auth-login)).",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MFAChallengeResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "devKey",
+                  "sessionId",
+                  "data"
+                ],
+                "properties": {
+                  "devKey": {
+                    "type": "string",
+                    "description": "Developer key generated with your BILL developer account"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "description": "API session ID generated with [`/v2/Login.json`](ref:auth-login)"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/MFAChallengeRequest"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MFA login"
+        ]
+      }
+    },
+    "/MFAAuthenticate.json": {
+      "post": {
+        "summary": "Validate MFA challenge ID",
+        "operationId": "auth-mfaauthenticate",
+        "description": "Authenticate the challenge ID (generated with [`/v2/MFAChallenge.json`](ref:auth-mfachallenge)) and token that was sent to your mobile device registered with BILL. In response, an `mfaId` value is generated and your API session is MFA trusted.\n\nBy default, MFA expires when the API session expires after 35 minutes of inactivity. If you set `rememberMe` as `true` in your [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate) request, the `mfaId` value is marked as trusted for 30 days. You can check the MFA status with [`/v2/MFAStatus.json`](ref:auth-mfastatus).\n\nUsing [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate) is step three of signing in with an MFA trusted API session.\n\n### Multi-Factor Authentication (MFA)\n\nThere are four protected endpoints require MFA for login with a trusted API session.\n* Invite a vendor (not in the BILL network) with [`/v2/SendVendorInvite.json`](ref:network-sendvendorinvite)\n* Invite a customer in the BILL network with [`/v2/SendInvite.json`](ref:network-sendinvite)\n* Add a vendor bank account with [`/v2/VendorBankAccount.json`](ref:ap-vendormgmt-createvendorbankaccount)\n* Pay a vendor in the BILL network with [`/v2/PayBills.json`](ref:ap-vendortransactions-paybills)\n\n**Note**: See [Multi-factor authentication (MFA)/2-step verification](https://help.bill.com/hc/en-us/articles/360000023843) in the BILL Help Center for more information about all the security measures in place for your BILL account operations.\n\nSign in with an MFA trusted API session is a three-step process.\n1. Sign in to generate a `sessionId` value with [`/v2/Login.json`](ref:auth-login).\n2. Generate an MFA challenge ID with [`/v2/MFAChallenge.json`](ref:auth-mfachallenge). When you call [`/v2/MFAChallenge.json`](ref:auth-mfachallenge), a token is sent to your mobile device registered with BILL.\n3. Authenticate the challenge ID and token with [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate). At this point, the `sessionId` (from step one) is MFA trusted. Note that the `mfaId` token expires at end of the current session or when you sign out.\n\n#### Maintaining MFA for 30 days\nIn step three of the MFA process, if you set `rememberMe` as `true` in your [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate) request, the `mfaId` value is marked as trusted for 30 days. For these 30 days, set `deviceId` and `mfaId` as additional fields when you sign in ([`/v2/Login.json`](ref:auth-login)).",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MFAAuthenticateResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "devKey",
+                  "sessionId",
+                  "data"
+                ],
+                "properties": {
+                  "devKey": {
+                    "type": "string",
+                    "description": "Developer key generated with your BILL developer account"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "description": "API session ID generated with [`/v2/Login.json`](ref:auth-login)"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/MFAAuthenticateRequest"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MFA login"
+        ]
+      }
+    },
+    "/MFAStatus.json": {
+      "post": {
+        "summary": "Get MFA status",
+        "operationId": "auth-mfastatus",
+        "description": "Get the status of the current MFA session.\n\n**Note**: You can get the status only for an MFA session where `rememberMe` is set as `true` in `/v2/MFAAuthenticate.json`.\n\nIn the response, if `isTrusted` is `false`, the MFA session is no longer trusted. At that point, you must follow the three-step process again and sign in with an MFA trusted API session.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MFAStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "devKey",
+                  "sessionId",
+                  "data"
+                ],
+                "properties": {
+                  "devKey": {
+                    "type": "string",
+                    "description": "Developer key generated with your BILL developer account"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "description": "API session ID generated with [`/v2/Login.json`](ref:auth-login)"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/MFAStatusRequest"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "MFA login"
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error_code": {
+            "type": "string",
+            "description": "Error code (only when `response_status` is `1`)"
+          },
+          "error_message": {
+            "type": "string",
+            "description": "Error message (only when `response_status` is `1`)"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "response_status": {
+            "type": "integer",
+            "description": "Response status.\n* `0`: Success response\n* `1`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_message": {
+            "type": "string",
+            "description": "Response status.\n* `Success`: Success response\n* `Error`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_data": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            ],
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "description": "API session ID. Use this value in all subsequent API calls to confirm that you are in a signed in session."
+              },
+              "orgId": {
+                "type": "string",
+                "description": "Organization ID used to sign in"
+              },
+              "apiEndPoint": {
+                "type": "string",
+                "description": "API base URL"
+              },
+              "usersId": {
+                "type": "string",
+                "description": "BILL-generated ID of the signed in user"
+              }
+            }
+          }
+        }
+      },
+      "GetSessionInfoResponse": {
+        "type": "object",
+        "properties": {
+          "response_status": {
+            "type": "integer",
+            "description": "Response status.\n* `0`: Success response\n* `1`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_message": {
+            "type": "string",
+            "description": "Response status.\n* `Success`: Success response\n* `Error`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_data": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            ],
+            "properties": {
+              "organizationId": {
+                "type": "string",
+                "description": "BILL-generated ID of the signed in organization"
+              },
+              "userId": {
+                "type": "string",
+                "description": "BILL-generated ID of the signed in user"
+              }
+            }
+          }
+        }
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "properties": {
+          "response_status": {
+            "type": "integer",
+            "description": "Response status.\n* `0`: Success response\n* `1`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_message": {
+            "type": "string",
+            "description": "Response status.\n* `Success`: Success response\n* `Error`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_data": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            ],
+            "maxProperties": 0
+          }
+        }
+      },
+      "MFAChallengeRequest": {
+        "type": "object",
+        "required": [
+          "useBackup"
+        ],
+        "properties": {
+          "useBackup": {
+            "type": "boolean",
+            "description": "Mobile device used for sending the token.\n* `true`: Backup mobile device\n* `false`: Primary mobile device",
+            "default": false
+          }
+        }
+      },
+      "MFAChallengeResponse": {
+        "type": "object",
+        "properties": {
+          "response_status": {
+            "type": "integer",
+            "description": "Response status.\n* `0`: Success response\n* `1`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_message": {
+            "type": "string",
+            "description": "Response status.\n* `Success`: Success response\n* `Error`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_data": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            ],
+            "properties": {
+              "challengeId": {
+                "type": "string",
+                "description": "MFA challenge ID. Authenticate this value and token (sent to your registered phone number) with [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate)."
+              }
+            }
+          }
+        }
+      },
+      "MFAAuthenticateRequest": {
+        "type": "object",
+        "required": [
+          "challengeId",
+          "token",
+          "deviceId",
+          "rememberMe"
+        ],
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "description": "Challenge ID generated with [`/v2/MFAChallenge.json`](ref:auth-mfachallenge)"
+          },
+          "token": {
+            "type": "string",
+            "description": "Token sent to your mobile device registed with BILL"
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "Any alphanumeric ID used to uniquely identify your mobile device registered with BILL"
+          },
+          "machineName": {
+            "type": "string",
+            "description": "Any name used to uniquely identify your mobile device registered with BILL"
+          },
+          "rememberMe": {
+            "type": "boolean",
+            "description": "MFA ID expiration condition.\n* `true`: The MFA ID expires in 30 days\n* `false`: The MFA ID expires when the current user signs out",
+            "default": false
+          }
+        }
+      },
+      "MFAAuthenticateResponse": {
+        "type": "object",
+        "properties": {
+          "response_status": {
+            "type": "integer",
+            "description": "Response status.\n* `0`: Success response\n* `1`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_message": {
+            "type": "string",
+            "description": "Response status.\n* `Success`: Success response\n* `Error`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_data": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            ],
+            "properties": {
+              "machineName": {
+                "type": "string",
+                "description": "The name used to uniquely identify your mobile device registered with BILL"
+              },
+              "mfaId": {
+                "type": "string",
+                "description": "MFA ID. Use this value to retrieve the status of the current MFA session with [`/v2/MFAStatus.json`](ref:auth-mfastatus)."
+              }
+            }
+          }
+        }
+      },
+      "MFAStatusRequest": {
+        "type": "object",
+        "required": [
+          "mfaId",
+          "deviceId"
+        ],
+        "properties": {
+          "mfaId": {
+            "type": "string",
+            "description": "MFA ID (`mfaId`) generated with [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate)"
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "The alphanumeric ID used with [`/v2/MFAAuthenticate.json`](ref:auth-mfaauthenticate) to uniquely identify your mobile device registered with BILL"
+          }
+        }
+      },
+      "MFAStatusResponse": {
+        "type": "object",
+        "properties": {
+          "response_status": {
+            "type": "integer",
+            "description": "Response status.\n* `0`: Success response\n* `1`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_message": {
+            "type": "string",
+            "description": "Response status.\n* `Success`: Success response\n* `Error`: Error response. Only `error_code` and `error_message` is returned in `response_data`."
+          },
+          "response_data": {
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            ],
+            "properties": {
+              "isTrusted": {
+                "type": "boolean",
+                "description": "Set as `true` if the MFA session is trusted"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
