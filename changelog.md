@@ -9,6 +9,9 @@
 - Fixed: get__articlesearch.json — added `print_section` (string) to Doc schema
 - Fixed: get__articlesearch.json — added `uri` (string) to Doc schema; real API returns NYT internal URI e.g. `nyt://article/...`
 
+## Pass 3 — request_params
+- Fixed: get__articlesearch.json — removed `maximum: 10` from `page` parameter schema; real API accepts any page value (tested page=11 and page=100, both return 200 with valid results). The constraint was incorrect and would cause spec-compliant clients to reject valid high-page requests.
+
 ## Pass 2 — field_types
 - Fixed: get__articlesearch.json — changed `keywords` from object to array of objects; real API returns an array of keyword objects
 - Fixed: get__articlesearch.json — changed `keywords[].rank` from string to integer; real API returns integers (1, 2, 3, ...)
