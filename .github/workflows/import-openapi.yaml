@@ -229,9 +229,13 @@ jobs:
                   echo "Response details (if any):"
                   ERROR_RESPONSE=$(cat "$OUTPUT_ZIP")
                   echo "$ERROR_RESPONSE"
-                  echo "error_response=$ERROR_RESPONSE" >> $GITHUB_OUTPUT
+                  echo 'error_response<<EREOF' >> $GITHUB_OUTPUT
+                  echo "$ERROR_RESPONSE" >> $GITHUB_OUTPUT
+                  echo 'EREOF' >> $GITHUB_OUTPUT
               else
-                  echo "error_response=Apitools API call failed with HTTP status code $STATUS_CODE. No additional error details available." >> $GITHUB_OUTPUT
+                  echo 'error_response<<EREOF' >> $GITHUB_OUTPUT
+                  echo "Apitools API call failed with HTTP status code $STATUS_CODE. No additional error details available." >> $GITHUB_OUTPUT
+                  echo 'EREOF' >> $GITHUB_OUTPUT
               fi
               exit 1
           else
@@ -534,6 +538,8 @@ jobs:
       - name: Comment on Issue if Import Failed
         if: failure() && steps.extract_info.outputs.has_issue == 'true' && (steps.extract_info.outputs.extract_failed == 'true' || steps.call_apitools.outputs.api_failed == 'true' || steps.check_duplicate_version.outputs.duplicate_detected == 'true')
         uses: actions/github-script@v7
+        env:
+          API_ERROR_RESPONSE: ${{ steps.call_apitools.outputs.error_response }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -546,16 +552,19 @@ jobs:
               errorMessage += "- \`import_oas_url: <your-openapi-url>\`\n";
               errorMessage += "- \`vendor_name: <your-vendor-name>\`\n\n";
             } else if ('${{ steps.call_apitools.outputs.api_failed }}' === 'true') {
-              const errorResponse = `${{ steps.call_apitools.outputs.error_response }}`;
+              const errorResponse = process.env.API_ERROR_RESPONSE || '';
               errorMessage += `**Error:** Import service failed\n\n`;
 
               try {
                 const response = JSON.parse(errorResponse);
-                if (response.error) {
-                  errorMessage += `**Details:** ${response.error}\n\n`;
+                if (response.title) {
+                  errorMessage += `**${response.status || 'Error'} — ${response.title}**\n\n`;
                 }
-                if (response.message) {
-                  errorMessage += `**Message:** ${response.message}\n\n`;
+                if (response.detail) {
+                  errorMessage += `**Details:** ${response.detail}\n\n`;
+                }
+                if (response.error_code) {
+                  errorMessage += `**Error code:** \`${response.error_code}\`\n\n`;
                 }
               } catch (e) {
                 errorMessage += `**Details:** ${errorResponse}\n\n`;
@@ -573,9 +582,34 @@ jobs:
             errorMessage += "If you believe this is a bug with the import service or need additional support, please contact the development team at Jentic Community Discord (https://discord.gg/yrxmDZWMqB).\n\n";
             errorMessage += "Alternatively create a new issue reporting the bug (https://github.com/jentic/jentic-public-apis/issues/new?template=BLANK_ISSUE).";
 
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: ${{ steps.extract_info.outputs.issue_number }},
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: errorMessage
             });
+
+      - name: Write Error to Workflow Summary
+        if: failure() && (steps.extract_info.outputs.extract_failed == 'true' || steps.call_apitools.outputs.api_failed == 'true' || steps.check_duplicate_version.outputs.duplicate_detected == 'true')
+        env:
+          API_ERROR_RESPONSE: ${{ steps.call_apitools.outputs.error_response }}
+          EXTRACT_ERROR: ${{ steps.extract_info.outputs.error_message }}
+          DUPLICATE_VERSIONS: ${{ steps.check_duplicate_version.outputs.duplicate_versions }}
+          EXTRACT_FAILED: ${{ steps.extract_info.outputs.extract_failed }}
+          API_FAILED: ${{ steps.call_apitools.outputs.api_failed }}
+          DUPLICATE_DETECTED: ${{ steps.check_duplicate_version.outputs.duplicate_detected }}
+        run: |
+          echo "## ❌ Import Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$EXTRACT_FAILED" = "true" ]; then
+            echo "**Error:** $EXTRACT_ERROR" >> $GITHUB_STEP_SUMMARY
+          elif [ "$API_FAILED" = "true" ]; then
+            echo "**Error:** Import service returned an error." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            echo "$API_ERROR_RESPONSE" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          elif [ "$DUPLICATE_DETECTED" = "true" ]; then
+            echo "**Error:** Duplicate API version(s) already exist: $DUPLICATE_VERSIONS" >> $GITHUB_STEP_SUMMARY
+          fi
