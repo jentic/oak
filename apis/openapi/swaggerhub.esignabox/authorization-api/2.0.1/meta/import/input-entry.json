@@ -1,0 +1,168 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API de autorización",
+    "description": "API de autorización. Utilizada para poder acceder a las distintas APIs de eSignaBox, préviamente el sistema cliente deberá autorizarse utilizando la operacion publicada por esta API.",
+    "contact": {
+      "name": "eSignaBox support.",
+      "url": "https://www.esignabox.com",
+      "email": "support@esignabox.com"
+    },
+    "version": "2.0.1",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/eSignaBox/authorization-api/2.0.1/swagger.json"
+  },
+  "servers": [
+    {
+      "url": "https://www.esignabox.com/api/2.0",
+      "description": "Servicio de producción."
+    },
+    {
+      "url": "https://esignabox.indenova.net/api/2.0",
+      "description": "Entorno de test."
+    }
+  ],
+  "paths": {
+    "/auth": {
+      "get": {
+        "operationId": "authorize",
+        "summary": "Obtener un token de autorización",
+        "description": "Operación que permite identificarse y obtener la autorización para el uso de las APIs públicas de eSignaBox. Los token que se generen tendrán una duración determinada. Esta duración puede variar según necesidades tecnicas.\n",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/InternalUserId"
+                },
+                {
+                  "$ref": "#/components/schemas/Email"
+                },
+                {
+                  "$ref": "#/components/schemas/NationalDocument"
+                }
+              ]
+            },
+            "description": "Identificador del usuario en nombre del que se obtiene el token de autorización. Puede tomar 3 tipos de valor:<br> <ul>\n  <li><b>InternalUserId</b>: Identificador interno del usuario en la plataforma. Ver el esquema InternalUserId para más información.<br>Puede obtenerse en la cabecera X-UserId de la respuesta de este mismo recurso al completar con éxito una autorización</li>\n  <code>/auth?userId=99999</code>\n  <li><b>Email</b>: Dirección de correo electrónico del usuario.</li>\n  <code>/auth?userId=username@domain.com</code>\n  <li><b>NationalDocument</b>: Documento nacional de identidad del usuario. El formato y su nombre cambian entre países, en España NIF o CIF, Cédula o NIT en Colombia, DNI o RUC en Perú, etc.<br>Dado que el formato puede repetirse entre 2 o más países, es obligatorio especificar el país del usuario. Ver el esquema para más información sobre el formato</li>\n  <code>/auth?userId={\"id\":\"99999999R\",\"country\":\"ES\"}</code>\n</ul>\n"
+          },
+          {
+            "in": "query",
+            "name": "duration",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "(OPCIONAL) Duración en segundos del token. Pasado este tiempo el token se considerará caducado y no será aceptado por las demás APIs. Por defecto se aplicará una duración de una hora.<br>Cualquier valor menor que 1 se considerará incorrecto y no se tendrá en cuenta por lo que se aplicará la duración por defecto.<br>Es recomendable, por motivos de seguridad, establecer valores que no superen la jornada de trabajo siendo ideal que no superen 1 hora de validez. Por ejemplo: \"duration=3600\" para una hora, \"duration=60\" para un minuto.\n"
+          }
+        ],
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "Autorización obtenida con éxito",
+            "headers": {
+              "X-UserId": {
+                "description": "Identificador del usuario. Si se guarda este dato, y se utiliza para la autorización en lugar del email, se evitarán problemas de desvinculación por cambiar el email solo en uno de los dos sistemas.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "description": "Token JWT generado para su uso en las APIs de eSignaBox"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Fallo en la autenticación por errores o ausencia de parametros esperados",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "description": "Cadena que reporta el error. Sólo para logging."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado, los parámetros recibidos no permiten completar la autorización. Generalmente por que el ClientId no tiene permiso para acceder en nombre del userId remitido o porque la autenticación no ha sido válida (clientId o secret incorrectos).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "description": "Cadena que reporta el error. Sólo para logging."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del servicio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "description": "Cadena que reporta el error. Sólo para logging."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "InternalUserId": {
+        "type": "string",
+        "description": "Identificador del usuario en la plataforma eSignaBox. Se facilita como respuesta al autorizar a un usuario y permite autorizaciones más rápidas y evitar errores en caso de que un usuario cámbie sus datos en uno de los dos sistemas y no en el otro.<br> Se recibe en la cabecera X-UserId\n"
+      },
+      "Email": {
+        "type": "string",
+        "description": "Dirección de correo electrónico del usuario.\n"
+      },
+      "NationalDocument": {
+        "description": "Documento nacional de identidad. Dependiendo de cada pais puede tener un formato distinto e icluso repetirse un mismo código entre 2 o más paises por lo que es obligatorio indicar el pais del usuario si se utiliza este identificador. Debe enviarse como un objeto en formato application/json.",
+        "type": "object",
+        "format": "application/json",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "value": {
+            "id": "12937132T",
+            "country": "es"
+          },
+          "sumary": "Este es un ejemplo correcto."
+        },
+        "required": [
+          "id",
+          "country"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic"
+      }
+    }
+  },
+  "security": [
+    {
+      "basicAuth": []
+    }
+  ]
+}
