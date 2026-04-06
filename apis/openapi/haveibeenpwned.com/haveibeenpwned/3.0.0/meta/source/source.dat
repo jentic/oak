@@ -1,0 +1,722 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Have I Been Pwned API",
+    "description": "The Have I Been Pwned (HIBP) API provides access to data breach information, paste data, and pwned password checks. It allows querying whether an email address or domain has been compromised in known data breaches, checking passwords against a database of previously exposed credentials, and retrieving stealer log information.",
+    "version": "3.0.0",
+    "contact": {
+      "name": "Troy Hunt",
+      "url": "https://haveibeenpwned.com"
+    },
+    "license": {
+      "name": "Creative Commons Attribution 4.0",
+      "url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "x-jentic-source-url": "https://haveibeenpwned.com/API/v3"
+  },
+  "servers": [
+    {
+      "url": "https://haveibeenpwned.com/api/v3",
+      "description": "HIBP Main API"
+    },
+    {
+      "url": "https://api.pwnedpasswords.com",
+      "description": "Pwned Passwords API"
+    }
+  ],
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Breaches",
+      "description": "Endpoints for querying data breach information"
+    },
+    {
+      "name": "Stealer Logs",
+      "description": "Endpoints for querying stealer log data (requires Pwned 5+ subscription)"
+    },
+    {
+      "name": "Pastes",
+      "description": "Endpoints for querying paste site data"
+    },
+    {
+      "name": "Pwned Passwords",
+      "description": "Endpoints for checking passwords against known breaches using k-Anonymity"
+    },
+    {
+      "name": "Subscription",
+      "description": "Endpoints for managing and querying subscription status"
+    }
+  ],
+  "paths": {
+    "/breachedaccount/{account}": {
+      "get": {
+        "operationId": "getBreachesForAccount",
+        "summary": "Get all breaches for an account",
+        "description": "Returns a list of all breaches a particular account has been found in. The account is specified by email address. Requires an API key.",
+        "tags": ["Breaches"],
+        "security": [{"apiKey": []}],
+        "parameters": [
+          {
+            "name": "account",
+            "in": "path",
+            "required": true,
+            "description": "The email address to search for",
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          },
+          {
+            "name": "truncateResponse",
+            "in": "query",
+            "required": false,
+            "description": "When set to false, returns the full breach model",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "required": false,
+            "description": "Filters the result set to only breaches against the specified domain",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeUnverified",
+            "in": "query",
+            "required": false,
+            "description": "When set to false, excludes unverified breaches from the result set",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Breach data found for the account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Breach"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - the account does not comply with an acceptable format"
+          },
+          "401": {
+            "description": "Unauthorized - the API key provided is not valid"
+          },
+          "403": {
+            "description": "Forbidden - no user agent has been specified in the request"
+          },
+          "404": {
+            "description": "Not found - the account could not be found in any breaches"
+          },
+          "429": {
+            "description": "Too many requests - the rate limit has been exceeded",
+            "headers": {
+              "retry-after": {
+                "description": "Number of seconds to wait before retrying",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable"
+          }
+        }
+      }
+    },
+    "/breacheddomain/{domain}": {
+      "get": {
+        "operationId": "getBreachedDomain",
+        "summary": "Get all breached email addresses for a domain",
+        "description": "Returns all breached email addresses found on a specific domain that has been pre-verified on the HIBP dashboard.",
+        "tags": ["Breaches"],
+        "security": [{"apiKey": []}],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "description": "The domain to search (must be verified on dashboard)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Breached accounts found for the domain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - domain has not been verified"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "429": {
+            "description": "Too many requests",
+            "headers": {
+              "retry-after": {
+                "schema": { "type": "integer" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subscribeddomains": {
+      "get": {
+        "operationId": "getSubscribedDomains",
+        "summary": "Get subscribed domains",
+        "description": "Returns a list of all domains the current API key has subscribed to for domain search.",
+        "tags": ["Breaches"],
+        "security": [{"apiKey": []}],
+        "responses": {
+          "200": {
+            "description": "List of subscribed domains",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SubscribedDomain"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/breaches": {
+      "get": {
+        "operationId": "getAllBreaches",
+        "summary": "Get all breaches in the system",
+        "description": "Returns the details of every breach in the system. Does not require an API key.",
+        "tags": ["Breaches"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "query",
+            "required": false,
+            "description": "Filters the result set to only breaches against the specified domain",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isSpamList",
+            "in": "query",
+            "required": false,
+            "description": "Filters by whether the breach is a spam list",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of all breaches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Breach"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/breach/{name}": {
+      "get": {
+        "operationId": "getBreachByName",
+        "summary": "Get a single breached site",
+        "description": "Returns a single breach by its name. Does not require an API key.",
+        "tags": ["Breaches"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "description": "The name of the breach to retrieve (stable identifier, e.g. 'Adobe')",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Breach details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Breach"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Breach not found"
+          }
+        }
+      }
+    },
+    "/latestbreach": {
+      "get": {
+        "operationId": "getLatestBreach",
+        "summary": "Get the most recently added breach",
+        "description": "Returns the most recently added breach to the system. Does not require an API key.",
+        "tags": ["Breaches"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Most recent breach",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Breach"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dataclasses": {
+      "get": {
+        "operationId": "getDataClasses",
+        "summary": "Get all data classes",
+        "description": "Returns an alphabetically sorted list of all data class names. Does not require an API key.",
+        "tags": ["Breaches"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "List of data classes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stealerlogsbyemail/{email}": {
+      "get": {
+        "operationId": "getStealerLogsByEmail",
+        "summary": "Get stealer log domains for an email",
+        "description": "Returns websites that have appeared in stealer logs alongside the specified email address. Requires Pwned 5+ subscription and the email domain must be verified.",
+        "tags": ["Stealer Logs"],
+        "security": [{"apiKey": []}],
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "description": "The email address to search (must be on a verified domain)",
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of domains found in stealer logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Forbidden - insufficient subscription or unverified domain" },
+          "404": { "description": "Not found" },
+          "429": {
+            "description": "Too many requests",
+            "headers": { "retry-after": { "schema": { "type": "integer" } } }
+          }
+        }
+      }
+    },
+    "/stealerlogsbywebsitedomain/{domain}": {
+      "get": {
+        "operationId": "getStealerLogsByWebsiteDomain",
+        "summary": "Get stealer log emails for a website domain",
+        "description": "Returns email addresses found in stealer logs associated with the specified website domain. Requires Pwned 5+ subscription.",
+        "tags": ["Stealer Logs"],
+        "security": [{"apiKey": []}],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "description": "The website domain to search (must be verified on dashboard)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of email addresses found in stealer logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Forbidden" },
+          "429": {
+            "description": "Too many requests",
+            "headers": { "retry-after": { "schema": { "type": "integer" } } }
+          }
+        }
+      }
+    },
+    "/stealerlogsbyemaildomain/{domain}": {
+      "get": {
+        "operationId": "getStealerLogsByEmailDomain",
+        "summary": "Get stealer log aliases for an email domain",
+        "description": "Returns aliases and associated website domains found in stealer logs for the specified email domain. Requires Pwned 5+ subscription.",
+        "tags": ["Stealer Logs"],
+        "security": [{"apiKey": []}],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "description": "The email domain to search (must be verified on dashboard)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "2D array of aliases and website domains",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Forbidden" },
+          "429": {
+            "description": "Too many requests",
+            "headers": { "retry-after": { "schema": { "type": "integer" } } }
+          }
+        }
+      }
+    },
+    "/pasteaccount/{account}": {
+      "get": {
+        "operationId": "getPastesForAccount",
+        "summary": "Get all pastes for an account",
+        "description": "Returns a list of all pastes where the specified email address has been found.",
+        "tags": ["Pastes"],
+        "security": [{"apiKey": []}],
+        "parameters": [
+          {
+            "name": "account",
+            "in": "path",
+            "required": true,
+            "description": "The email address to search for in paste data",
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of pastes containing the account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Paste"
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" },
+          "429": {
+            "description": "Too many requests",
+            "headers": { "retry-after": { "schema": { "type": "integer" } } }
+          }
+        }
+      }
+    },
+    "/subscription/status": {
+      "get": {
+        "operationId": "getSubscriptionStatus",
+        "summary": "Get subscription status",
+        "description": "Returns the current subscription status associated with the API key.",
+        "tags": ["Subscription"],
+        "security": [{"apiKey": []}],
+        "responses": {
+          "200": {
+            "description": "Subscription status details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscription"
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "hibp-api-key",
+        "description": "HIBP API key. Required for all authenticated endpoints. Obtain from https://haveibeenpwned.com/API/Key"
+      }
+    },
+    "schemas": {
+      "Breach": {
+        "type": "object",
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "A Pascal-cased name uniquely representing the breach"
+          },
+          "Title": {
+            "type": "string",
+            "description": "A descriptive title for the breach"
+          },
+          "Domain": {
+            "type": "string",
+            "description": "The domain of the primary website the breach occurred on"
+          },
+          "BreachDate": {
+            "type": "string",
+            "format": "date",
+            "description": "The date the breach occurred in ISO 8601 format"
+          },
+          "AddedDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date the breach was added to the system"
+          },
+          "ModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date the breach was last modified"
+          },
+          "PwnCount": {
+            "type": "integer",
+            "description": "The total number of accounts in the breach"
+          },
+          "Description": {
+            "type": "string",
+            "description": "HTML description of the breach"
+          },
+          "LogoPath": {
+            "type": "string",
+            "format": "uri",
+            "description": "URI to the breach logo"
+          },
+          "DataClasses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Alphabetically sorted list of data classes in the breach"
+          },
+          "IsVerified": {
+            "type": "boolean",
+            "description": "Whether the breach has been verified"
+          },
+          "IsFabricated": {
+            "type": "boolean",
+            "description": "Whether the data is likely fabricated"
+          },
+          "IsSensitive": {
+            "type": "boolean",
+            "description": "Whether the breach is considered sensitive"
+          },
+          "IsRetired": {
+            "type": "boolean",
+            "description": "Whether the breach has been retired"
+          },
+          "IsSpamList": {
+            "type": "boolean",
+            "description": "Whether the breach is a spam list"
+          },
+          "IsMalware": {
+            "type": "boolean",
+            "description": "Whether the data was sourced from malware"
+          },
+          "IsSubscriptionFree": {
+            "type": "boolean",
+            "description": "Whether the breach is available on the free tier"
+          },
+          "IsStealerLog": {
+            "type": "boolean",
+            "description": "Whether the data was sourced from info stealer logs"
+          }
+        }
+      },
+      "Paste": {
+        "type": "object",
+        "properties": {
+          "Source": {
+            "type": "string",
+            "description": "The paste service the record was retrieved from (e.g. Pastebin, Pastie)"
+          },
+          "Id": {
+            "type": "string",
+            "description": "The ID of the paste as given by the paste service"
+          },
+          "Title": {
+            "type": "string",
+            "nullable": true,
+            "description": "The title of the paste, if available"
+          },
+          "Date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "The date the paste was posted"
+          },
+          "EmailCount": {
+            "type": "integer",
+            "description": "The number of email addresses found in the paste"
+          }
+        }
+      },
+      "Subscription": {
+        "type": "object",
+        "properties": {
+          "SubscriptionName": {
+            "type": "string",
+            "description": "The name of the subscription (e.g. Pwned 1, Pwned 2)"
+          },
+          "Description": {
+            "type": "string",
+            "description": "Description of the subscription"
+          },
+          "SubscribedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date the subscription expires"
+          },
+          "Rpm": {
+            "type": "integer",
+            "description": "Requests per minute allowed"
+          },
+          "DomainSearchMaxBreachedAccounts": {
+            "type": "integer",
+            "description": "Maximum number of breached accounts that can be returned in a domain search"
+          },
+          "IncludesStealerLogs": {
+            "type": "boolean",
+            "description": "Whether the subscription includes access to stealer log data"
+          }
+        }
+      },
+      "SubscribedDomain": {
+        "type": "object",
+        "properties": {
+          "DomainName": {
+            "type": "string",
+            "description": "The subscribed domain name"
+          },
+          "PwnCount": {
+            "type": "integer",
+            "description": "Total number of pwned accounts for this domain"
+          },
+          "PwnCountExcludingSpamLists": {
+            "type": "integer",
+            "description": "Pwned accounts excluding spam list entries"
+          },
+          "NextSubscriptionRenewal": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Next subscription renewal date"
+          }
+        }
+      }
+    }
+  }
+}
