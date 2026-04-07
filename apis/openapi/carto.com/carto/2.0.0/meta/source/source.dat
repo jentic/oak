@@ -1,0 +1,1043 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CARTO API",
+    "description": "CARTO is a Location Intelligence platform. The CARTO APIs allow you to manage spatial data, run SQL queries, create map visualizations, import/export datasets, and manage authentication. The SQL API lets you interact with your CARTO tables using SQL. The Maps API generates map tiles and named map templates. The Import API handles dataset uploads and synchronization.",
+    "version": "2.0.0",
+    "contact": {
+      "name": "CARTO Support",
+      "url": "https://carto.com/help/"
+    },
+    "termsOfService": "https://carto.com/legal/",
+    "x-jentic-source-url": "https://carto.com/"
+  },
+  "servers": [
+    {
+      "url": "https://{username}.carto.com",
+      "description": "CARTO user-specific API server",
+      "variables": {
+        "username": {
+          "description": "Your CARTO account username",
+          "default": "your-username"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "apiKeyQuery": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "SQL API",
+      "description": "Execute SQL queries against your CARTO datasets"
+    },
+    {
+      "name": "Maps API",
+      "description": "Create and manage map visualizations and tile layers"
+    },
+    {
+      "name": "Import API",
+      "description": "Import, sync, and manage datasets"
+    },
+    {
+      "name": "Auth API",
+      "description": "Manage API keys and authentication"
+    }
+  ],
+  "paths": {
+    "/api/v2/sql": {
+      "get": {
+        "operationId": "executeSqlGet",
+        "summary": "Execute a SQL query (GET)",
+        "description": "Execute a SQL query against your CARTO tables. Read operations on public tables do not require authentication. Write operations and access to private tables require an API key.",
+        "tags": ["SQL API"],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "The SQL query to execute",
+            "schema": { "type": "string" },
+            "example": "SELECT * FROM my_table LIMIT 10"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Output format for the response",
+            "schema": {
+              "type": "string",
+              "enum": ["json", "geojson", "csv", "shp", "kml", "svg", "gpkg", "spatialite"],
+              "default": "json"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "query",
+            "description": "Custom filename for file exports",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "description": "Your CARTO API key (required for private tables and write operations)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful SQL query execution",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlResponse" }
+              },
+              "text/csv": {
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "400": {
+            "description": "SQL syntax error or invalid query",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlError" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing API key for private data",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlError" }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlError" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "executeSqlPost",
+        "summary": "Execute a SQL query (POST)",
+        "description": "Execute a SQL query using POST. Recommended for long queries or write operations.",
+        "tags": ["SQL API"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["q"],
+                "properties": {
+                  "q": {
+                    "type": "string",
+                    "description": "The SQL query to execute"
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "Output format",
+                    "enum": ["json", "geojson", "csv", "shp", "kml", "svg", "gpkg", "spatialite"]
+                  },
+                  "filename": {
+                    "type": "string",
+                    "description": "Custom filename for exports"
+                  },
+                  "api_key": {
+                    "type": "string",
+                    "description": "Your CARTO API key"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful SQL query execution",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "SQL syntax error or invalid query",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sql/job": {
+      "post": {
+        "operationId": "createBatchJob",
+        "summary": "Create a batch SQL job",
+        "description": "Submit a long-running SQL query as a batch job for asynchronous processing.",
+        "tags": ["SQL API"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The SQL query to execute asynchronously"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Batch job created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BatchJobResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/sql/job/{job_id}": {
+      "get": {
+        "operationId": "getBatchJob",
+        "summary": "Get batch job status",
+        "description": "Check the status of a previously submitted batch SQL job.",
+        "tags": ["SQL API"],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "description": "The batch job ID",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch job status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BatchJobResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlError" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "cancelBatchJob",
+        "summary": "Cancel a batch job",
+        "description": "Cancel a pending or running batch SQL job.",
+        "tags": ["SQL API"],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "description": "The batch job ID to cancel",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job cancelled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BatchJobResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/map": {
+      "post": {
+        "operationId": "createAnonymousMap",
+        "summary": "Create an anonymous map",
+        "description": "Create a temporary, anonymous map instance. Returns a layergroupid that can be used to fetch tiles.",
+        "tags": ["Maps API"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MapConfig" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Anonymous map created successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MapResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid map configuration",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/map/named": {
+      "get": {
+        "operationId": "listNamedMaps",
+        "summary": "List named maps",
+        "description": "List all named map templates for the authenticated user.",
+        "tags": ["Maps API"],
+        "responses": {
+          "200": {
+            "description": "List of named map templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "template_ids": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createNamedMap",
+        "summary": "Create a named map template",
+        "description": "Create a reusable named map template with configurable parameters.",
+        "tags": ["Maps API"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NamedMapTemplate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Named map template created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "template_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/map/named/{template_id}": {
+      "get": {
+        "operationId": "getNamedMap",
+        "summary": "Get a named map template",
+        "description": "Retrieve a specific named map template definition.",
+        "tags": ["Maps API"],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "description": "The named map template ID",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Named map template",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NamedMapTemplate" }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlError" }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateNamedMap",
+        "summary": "Update a named map template",
+        "description": "Update an existing named map template definition.",
+        "tags": ["Maps API"],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NamedMapTemplate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Named map template updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "template_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteNamedMap",
+        "summary": "Delete a named map template",
+        "description": "Delete an existing named map template.",
+        "tags": ["Maps API"],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Template deleted successfully"
+          }
+        }
+      }
+    },
+    "/api/v1/map/{layergroupid}/{z}/{x}/{y}.png": {
+      "get": {
+        "operationId": "getMapTile",
+        "summary": "Get a map tile",
+        "description": "Retrieve a rendered PNG map tile for a given layer group and tile coordinates.",
+        "tags": ["Maps API"],
+        "parameters": [
+          {
+            "name": "layergroupid",
+            "in": "path",
+            "required": true,
+            "description": "The layer group ID returned when creating a map",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "z",
+            "in": "path",
+            "required": true,
+            "description": "Zoom level",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "x",
+            "in": "path",
+            "required": true,
+            "description": "Tile X coordinate",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "y",
+            "in": "path",
+            "required": true,
+            "description": "Tile Y coordinate",
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map tile image",
+            "content": {
+              "image/png": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "404": {
+            "description": "Layer group not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/imports": {
+      "get": {
+        "operationId": "listImports",
+        "summary": "List recent imports",
+        "description": "List the most recent data imports for the authenticated user.",
+        "tags": ["Import API"],
+        "responses": {
+          "200": {
+            "description": "List of import IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "item_queue_id": { "type": "string" },
+                    "success": { "type": "boolean" },
+                    "imports": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createImport",
+        "summary": "Import a dataset",
+        "description": "Import a dataset from a file upload or a URL. Supports CSV, GeoJSON, Shapefile, KML, GPX, and other formats.",
+        "tags": ["Import API"],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The file to import"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL of the file to import"
+                  },
+                  "type_guessing": {
+                    "type": "boolean",
+                    "description": "Whether to guess data types",
+                    "default": true
+                  },
+                  "quoted_fields_guessing": {
+                    "type": "boolean",
+                    "description": "Whether to treat quoted fields as strings",
+                    "default": true
+                  },
+                  "content_guessing": {
+                    "type": "boolean",
+                    "description": "Whether to enable content guessing (geocoding)",
+                    "default": false
+                  },
+                  "privacy": {
+                    "type": "string",
+                    "description": "Privacy setting for the imported table",
+                    "enum": ["private", "public", "link"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import job created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ImportResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/imports/{import_id}": {
+      "get": {
+        "operationId": "getImport",
+        "summary": "Get import status",
+        "description": "Check the status of a specific import job.",
+        "tags": ["Import API"],
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "description": "The import job ID",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Import job status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ImportStatusResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Import not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SqlError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/api_keys": {
+      "get": {
+        "operationId": "listApiKeys",
+        "summary": "List API keys",
+        "description": "List all API keys for the authenticated user.",
+        "tags": ["Auth API"],
+        "responses": {
+          "200": {
+            "description": "List of API keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": { "type": "boolean" },
+                    "count": { "type": "integer" },
+                    "api_keys": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/ApiKey" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createApiKey",
+        "summary": "Create a new API key",
+        "description": "Create a new API key with specific permissions.",
+        "tags": ["Auth API"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "grants"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "A human-readable name for the API key"
+                  },
+                  "grants": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": ["database", "apis"]
+                        },
+                        "tables": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "schema": { "type": "string" },
+                              "name": { "type": "string" },
+                              "permissions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": ["select", "insert", "update", "delete"]
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "apis": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": ["sql", "maps"]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "API key created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiKey" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/api_keys/{name}": {
+      "delete": {
+        "operationId": "deleteApiKey",
+        "summary": "Delete an API key",
+        "description": "Revoke and delete an API key by name.",
+        "tags": ["Auth API"],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "description": "The API key name",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "API key deleted"
+          },
+          "404": {
+            "description": "API key not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "api_key",
+        "description": "CARTO API key. Required for write operations and access to private data. Obtain from your CARTO dashboard."
+      }
+    },
+    "schemas": {
+      "SqlResponse": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "description": "Array of result rows as JSON objects",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "time": {
+            "type": "number",
+            "description": "Query execution time in seconds"
+          },
+          "fields": {
+            "type": "object",
+            "description": "Column type information",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "pgtype": { "type": "string" }
+              }
+            }
+          },
+          "total_rows": {
+            "type": "integer",
+            "description": "Total number of rows returned"
+          }
+        }
+      },
+      "SqlError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "array",
+            "description": "Array of error messages",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "BatchJobResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "description": "Unique batch job identifier"
+          },
+          "user": { "type": "string" },
+          "status": {
+            "type": "string",
+            "description": "Job status",
+            "enum": ["pending", "running", "done", "failed", "cancelled", "unknown"]
+          },
+          "query": { "type": "string" },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MapConfig": {
+        "type": "object",
+        "description": "Map configuration with one or more layers",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "Map config version",
+            "default": "1.3.0"
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "Layer type",
+                  "enum": ["cartodb", "torque", "http", "mapnik", "plain"]
+                },
+                "options": {
+                  "type": "object",
+                  "properties": {
+                    "sql": {
+                      "type": "string",
+                      "description": "SQL query defining the layer data"
+                    },
+                    "cartocss": {
+                      "type": "string",
+                      "description": "CartoCSS styling for the layer"
+                    },
+                    "cartocss_version": {
+                      "type": "string",
+                      "description": "CartoCSS version"
+                    },
+                    "interactivity": {
+                      "type": "string",
+                      "description": "Comma-separated list of interactive column names"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "MapResponse": {
+        "type": "object",
+        "properties": {
+          "layergroupid": {
+            "type": "string",
+            "description": "Unique ID for the created map layer group, used to fetch tiles"
+          },
+          "last_updated": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of last data modification"
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "layers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": { "type": "string" },
+                    "meta": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "NamedMapTemplate": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string" },
+          "name": {
+            "type": "string",
+            "description": "Template name (must be unique per user)"
+          },
+          "auth": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": ["open", "token"],
+                "description": "Authentication method for instantiating this template"
+              },
+              "valid_tokens": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "placeholders": {
+            "type": "object",
+            "description": "Template placeholders with types and default values",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "default": { "type": "string" }
+              }
+            }
+          },
+          "layergroup": { "$ref": "#/components/schemas/MapConfig" },
+          "view": {
+            "type": "object",
+            "properties": {
+              "zoom": { "type": "integer" },
+              "center": {
+                "type": "object",
+                "properties": {
+                  "lng": { "type": "number" },
+                  "lat": { "type": "number" }
+                }
+              },
+              "bounds": {
+                "type": "object",
+                "properties": {
+                  "west": { "type": "number" },
+                  "south": { "type": "number" },
+                  "east": { "type": "number" },
+                  "north": { "type": "number" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ImportResponse": {
+        "type": "object",
+        "properties": {
+          "item_queue_id": {
+            "type": "string",
+            "description": "Unique identifier for the import job"
+          },
+          "success": { "type": "boolean" }
+        }
+      },
+      "ImportStatusResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "user_id": { "type": "string" },
+          "table_id": { "type": "string" },
+          "table_name": { "type": "string" },
+          "state": {
+            "type": "string",
+            "description": "Import state",
+            "enum": ["enqueued", "pending", "uploading", "importing", "guessing", "complete", "failure"]
+          },
+          "error_code": { "type": "integer" },
+          "queue_id": { "type": "string" },
+          "tables_created_count": { "type": "integer" },
+          "synchronization_id": { "type": "string" },
+          "type_guessing": { "type": "boolean" },
+          "quoted_fields_guessing": { "type": "boolean" },
+          "content_guessing": { "type": "boolean" },
+          "create_visualization": { "type": "boolean" },
+          "visualization_id": { "type": "string" },
+          "get_error_text": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "what_about": { "type": "string" }
+            }
+          },
+          "display_name": { "type": "string" },
+          "success": { "type": "boolean" }
+        }
+      },
+      "ApiKey": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "token": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["master", "default", "regular"]
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "tables": { "type": "array", "items": { "type": "object" } },
+                "apis": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}
