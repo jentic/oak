@@ -1,0 +1,620 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Cobot API",
+    "version": "1.0.0",
+    "description": "The Cobot API is a RESTful API for managing coworking spaces. It provides access to spaces, memberships, bookings, and more. Authentication uses OAuth 2.0 with defined scopes.\n\n**Base URL:** `https://{subdomain}.cobot.me/api`\n\n**Authentication:** OAuth 2.0. Public endpoints require no auth. Private endpoints require OAuth2 token with appropriate scope.\n\n**Rate Limit:** 60 requests/minute per user (some endpoints may differ).",
+    "contact": {
+      "name": "Cobot Support",
+      "url": "https://www.cobot.me/en/support"
+    },
+    "x-jentic-source-url": "https://dev.cobot.me/api-docs"
+  },
+  "servers": [
+    {
+      "url": "https://{subdomain}.cobot.me/api",
+      "variables": {
+        "subdomain": {
+          "default": "www",
+          "description": "Your coworking space subdomain"
+        }
+      }
+    },
+    {
+      "url": "https://www.cobot.me/api",
+      "description": "Global API endpoint"
+    }
+  ],
+  "security": [
+    { "OAuth2": ["read_memberships"] }
+  ],
+  "tags": [
+    { "name": "spaces", "description": "Coworking space management" },
+    { "name": "memberships", "description": "Member management" }
+  ],
+  "paths": {
+    "/spaces": {
+      "post": {
+        "operationId": "createSpace",
+        "tags": ["spaces"],
+        "summary": "Create a space",
+        "description": "Creates a new coworking space. Requires authentication with write scope.",
+        "security": [{ "OAuth2": ["write"] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SpaceRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Space created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Space" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "422": {
+            "description": "Unprocessable entity - validation error",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ValidationErrors" } } }
+          }
+        }
+      }
+    },
+    "/spaces/{subdomain}": {
+      "get": {
+        "operationId": "getSpaceDetails",
+        "tags": ["spaces"],
+        "summary": "Get space details",
+        "description": "Returns details for a coworking space. No authentication required.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "subdomain",
+            "in": "path",
+            "required": true,
+            "description": "Space subdomain",
+            "schema": { "type": "string" },
+            "example": "co-up"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Space details",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Space" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "put": {
+        "operationId": "updateSpace",
+        "tags": ["spaces"],
+        "summary": "Update a space",
+        "description": "Updates a coworking space. Requires authentication as admin with write scope.",
+        "security": [{ "OAuth2": ["write"] }],
+        "parameters": [
+          {
+            "name": "subdomain",
+            "in": "path",
+            "required": true,
+            "description": "Space subdomain",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SpaceUpdateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Space updated",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Space" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "422": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ValidationErrors" } } } }
+        }
+      }
+    },
+    "/spaces/{subdomain}/logo": {
+      "get": {
+        "operationId": "getSpaceLogo",
+        "tags": ["spaces"],
+        "summary": "Get space logo",
+        "description": "Redirects to the space's logo. Can be used within an img tag. Get different sizes by appending ?logo_size=<size> where size is 'default' (100x100) or 'pdf' (400x400). No auth required.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "subdomain",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "logo_size",
+            "in": "query",
+            "required": false,
+            "description": "Logo size: default (100x100) or pdf (400x400)",
+            "schema": { "type": "string", "enum": ["default", "pdf"] }
+          }
+        ],
+        "responses": {
+          "302": { "description": "Redirect to logo image" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/memberships": {
+      "get": {
+        "operationId": "listMemberships",
+        "tags": ["memberships"],
+        "summary": "List members",
+        "description": "Returns current members of a space. Requires admin access.\n\nOptional params:\n- `as_of`: Return members active at given date\n- `all=true`: Return all memberships (past, present, future)\n- `ids`: Comma-separated membership IDs\n- `attributes`: Comma-separated list of attributes to return",
+        "security": [{ "OAuth2": ["read_memberships"] }],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "description": "Return members active at this date",
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "description": "If true, return all memberships (past, present, future)",
+            "schema": { "type": "boolean" }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "description": "Comma-separated membership IDs to filter",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "attributes",
+            "in": "query",
+            "required": false,
+            "description": "Comma-separated list of attributes to return",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of memberships",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Membership" } } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "429": { "description": "Rate limit exceeded (6 rpm)" }
+        }
+      },
+      "post": {
+        "operationId": "createMembership",
+        "tags": ["memberships"],
+        "summary": "Create membership (admin)",
+        "description": "Creates a new membership as admin.",
+        "security": [{ "OAuth2": ["write_memberships"] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MembershipCreateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Membership created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Membership" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "409": { "description": "User already has a membership" }
+        }
+      }
+    },
+    "/memberships/{id}": {
+      "get": {
+        "operationId": "getMembership",
+        "tags": ["memberships"],
+        "summary": "Get membership details",
+        "description": "Returns a single membership by ID. Requires admin or the membership owner.",
+        "security": [{ "OAuth2": ["read_memberships"] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Membership ID",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Membership details",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Membership" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "put": {
+        "operationId": "updateMembership",
+        "tags": ["memberships"],
+        "summary": "Update membership",
+        "description": "Updates membership address, tax_id, billing email. Admins may also update email if not connected to a user.",
+        "security": [{ "OAuth2": ["write_memberships"] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MembershipUpdateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Membership updated",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Membership" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMembership",
+        "tags": ["memberships"],
+        "summary": "Delete membership",
+        "description": "Permanently deletes a membership. In most cases, prefer cancellation to preserve data. Returns 204 with empty body.",
+        "security": [{ "OAuth2": ["write_memberships"] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Membership deleted" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/memberships/{id}/cancellation": {
+      "post": {
+        "operationId": "cancelMembership",
+        "tags": ["memberships"],
+        "summary": "Cancel membership (admin)",
+        "description": "Cancels a membership at a given date as admin.",
+        "security": [{ "OAuth2": ["write_memberships"] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["date", "delete_all_bookings_on_cancellation"],
+                "properties": {
+                  "date": { "type": "string", "format": "date" },
+                  "delete_all_bookings_on_cancellation": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cancellation set",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Membership" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "operationId": "undoCancellation",
+        "tags": ["memberships"],
+        "summary": "Undo cancellation (admin)",
+        "description": "Undoes a membership cancellation.",
+        "security": [{ "OAuth2": ["write_memberships"] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation undone",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Membership" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/memberships/{id}/confirmation": {
+      "post": {
+        "operationId": "confirmMembership",
+        "tags": ["memberships"],
+        "summary": "Confirm membership",
+        "description": "Confirms a member at a space. Admin only.",
+        "security": [{ "OAuth2": ["write_memberships"] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirmation_date": { "type": "string", "format": "date" },
+                  "first_invoice_date": { "type": "string", "format": "date" },
+                  "prorate": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Membership confirmed",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Membership" } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/memberships/cancellations": {
+      "get": {
+        "operationId": "listCanceledMemberships",
+        "tags": ["memberships"],
+        "summary": "List canceled memberships",
+        "description": "Returns all members that canceled in the given timespan.",
+        "security": [{ "OAuth2": ["read_memberships"] }],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "description": "Start date (YYYY/MM/DD)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "description": "End date (YYYY/MM/DD)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Canceled memberships",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Membership" } } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "description": "OAuth 2.0 authentication. Scopes define what data can be accessed.",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://www.cobot.me/oauth/authorize",
+            "tokenUrl": "https://www.cobot.me/oauth/access_token",
+            "scopes": {
+              "read": "Read access",
+              "write": "Write access",
+              "read_memberships": "Read membership data",
+              "write_memberships": "Modify memberships",
+              "write_membership_picture": "Update membership pictures"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Space": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "id": { "type": "string" },
+          "url": { "type": "string" },
+          "email": { "type": "string" },
+          "created_at": { "type": "string" },
+          "description": { "type": "string" },
+          "owner_id": { "type": "string" },
+          "country": { "type": "string" },
+          "locale": { "type": "string" },
+          "in_eu": { "type": "boolean" },
+          "subdomain": { "type": "string" },
+          "tax_rate": { "type": "number" },
+          "price_display": { "type": "string" },
+          "time_zone_name": { "type": "string" },
+          "time_zone_offset": { "type": "integer" },
+          "hour_format": { "type": "integer", "enum": [12, 24] }
+        }
+      },
+      "SpaceRequest": {
+        "type": "object",
+        "required": ["name", "owner_name", "subdomain"],
+        "properties": {
+          "name": { "type": "string" },
+          "owner_name": { "type": "string" },
+          "description": { "type": "string" },
+          "subdomain": { "type": "string" },
+          "time_zone_name": { "type": "string" },
+          "country": { "type": "string" }
+        }
+      },
+      "SpaceUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "time_zone_name": { "type": "string" }
+        }
+      },
+      "Membership": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "phone": { "type": "string" },
+          "user": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "string" },
+              "email": { "type": "string" }
+            }
+          },
+          "picture": { "type": "string" },
+          "address": { "$ref": "#/components/schemas/Address" },
+          "billing_emails": { "type": "array", "items": { "type": "string" } },
+          "charge_taxes": { "type": "boolean" },
+          "customer_number": { "type": "string" },
+          "team_id": { "type": "string", "nullable": true },
+          "plan": { "$ref": "#/components/schemas/Plan" },
+          "upcoming_plan": { "$ref": "#/components/schemas/Plan", "nullable": true },
+          "payment_method": { "$ref": "#/components/schemas/PaymentMethod" },
+          "confirmed_at": { "type": "string" },
+          "starts_at": { "type": "string" },
+          "canceled_to": { "type": "string", "nullable": true },
+          "next_invoice_at": { "type": "string", "nullable": true },
+          "newsletter_approval": { "type": "boolean", "nullable": true }
+        }
+      },
+      "MembershipCreateRequest": {
+        "type": "object",
+        "properties": {
+          "address": { "$ref": "#/components/schemas/Address" },
+          "plan": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "extras": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "email": { "type": "string" },
+          "billing_email": { "type": "string" },
+          "phone": { "type": "string" },
+          "pre_approved": { "type": "boolean" },
+          "requested_starts_at": { "type": "string", "format": "date" },
+          "canceled_to": { "type": "string", "format": "date" },
+          "user": {
+            "type": "object",
+            "properties": { "id": { "type": "string" } }
+          },
+          "paying_membership_id": { "type": "string" }
+        }
+      },
+      "MembershipUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "address": { "$ref": "#/components/schemas/Address" },
+          "billing_email": { "type": "string" },
+          "tax_id": { "type": "string" },
+          "email": { "type": "string" },
+          "phone": { "type": "string" }
+        }
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "company": { "type": "string" },
+          "name": { "type": "string" },
+          "full_address": { "type": "string" },
+          "country": { "type": "string" }
+        }
+      },
+      "Plan": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "price_per_cycle_in_cents": { "type": "integer" },
+          "price_per_cycle": { "type": "string" },
+          "tax_rate": { "type": "string" },
+          "cycle_duration": { "type": "integer" },
+          "currency": { "type": "string" },
+          "cancellation_period": { "type": "integer" },
+          "canceled_to": { "type": "string", "nullable": true },
+          "total_price_per_cycle": { "type": "string" },
+          "extras": { "type": "array", "items": { "type": "object" } },
+          "time_passes": { "type": "array", "items": { "type": "object" } },
+          "booking_credits": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "PaymentMethod": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "automated": { "type": "boolean" },
+          "instructions": { "type": "string" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      },
+      "ValidationErrors": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
