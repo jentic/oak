@@ -1,0 +1,847 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Verifalia Email Verification API",
+    "version": "2.7",
+    "description": "Verifalia is a leading email verification and validation service. The REST API allows you to submit email validation jobs, retrieve results, manage credits, list users, and configure browser apps. Supports single email verification, batch validation with quality levels, deduplication, and callback notifications.",
+    "x-jentic-source-url": "https://verifalia.com/developers"
+  },
+  "servers": [
+    {
+      "url": "https://api.verifalia.com/v2.7"
+    }
+  ],
+  "paths": {
+    "/email-validations": {
+      "post": {
+        "operationId": "submitEmailValidation",
+        "summary": "Submit a new email validation job",
+        "description": "Submit one or more email addresses for validation. Supports quality levels (Standard, High, Extreme), deduplication options, data retention policies, and completion callbacks. For large batches, the API returns 202 Accepted with a job ID for polling.",
+        "tags": [
+          "Email Validations"
+        ],
+        "parameters": [
+          {
+            "name": "waitTime",
+            "in": "query",
+            "description": "Maximum wait time in format 'hh:mm:ss' for long polling. Use '00:00:00' for immediate return.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationJob"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Validation in progress - poll for results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "402": {
+            "description": "Insufficient credits"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listEmailValidations",
+        "summary": "List email validation jobs",
+        "description": "Retrieve a paginated list of previously submitted email validation jobs.",
+        "tags": [
+          "Email Validations"
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Cursor for pagination",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "description": "Sort direction",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "forward",
+                "backward"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum results per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of validation jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationJobList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/email-validations/{id}": {
+      "get": {
+        "operationId": "getEmailValidation",
+        "summary": "Get email validation job details",
+        "description": "Retrieve details and results of a specific validation job. Supports long-polling with the waitTime parameter.",
+        "tags": [
+          "Email Validations"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Validation job ID (GUID)",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "waitTime",
+            "in": "query",
+            "description": "Maximum wait time for long polling",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validation job details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationJob"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Still processing"
+          },
+          "404": {
+            "description": "Job not found"
+          },
+          "410": {
+            "description": "Job expired/deleted"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteEmailValidation",
+        "summary": "Delete an email validation job",
+        "description": "Delete a validation job and its results.",
+        "tags": [
+          "Email Validations"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Validation job ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job deleted"
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/email-validations/{id}/entries": {
+      "get": {
+        "operationId": "getValidationEntries",
+        "summary": "Get validation job entries/results",
+        "description": "Retrieve the individual email entries and their validation results for a specific job. Supports pagination and filtering by classification.",
+        "tags": [
+          "Email Validations"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "classification",
+            "in": "query",
+            "description": "Filter by classification",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Deliverable",
+                "Risky",
+                "Undeliverable",
+                "Unknown"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validation entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationEntryList"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/email-validations/export/{id}": {
+      "get": {
+        "operationId": "exportValidationResults",
+        "summary": "Export validation results",
+        "description": "Export the results of a validation job in CSV, Excel, or other formats.",
+        "tags": [
+          "Email Validations"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Export format",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "text/csv",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-excel"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Export data"
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/credits/balance": {
+      "get": {
+        "operationId": "getCreditsBalance",
+        "summary": "Get credits balance",
+        "description": "Retrieve the current credit balance for the account.",
+        "tags": [
+          "Credits"
+        ],
+        "responses": {
+          "200": {
+            "description": "Credits balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditsBalance"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/credits/daily-usage": {
+      "get": {
+        "operationId": "getCreditsDailyUsage",
+        "summary": "Get daily credits usage",
+        "description": "Retrieve daily credit usage history.",
+        "tags": [
+          "Credits"
+        ],
+        "parameters": [
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "description": "Start date (ISO 8601)",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "description": "End date (ISO 8601)",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily usage data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyUsage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "operationId": "listUsers",
+        "summary": "List account users",
+        "description": "Get a list of all users associated with the account.",
+        "tags": [
+          "Users"
+        ],
+        "responses": {
+          "200": {
+            "description": "User list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "operationId": "getUser",
+        "summary": "Get user details",
+        "description": "Retrieve details of a specific account user.",
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/browser-apps": {
+      "get": {
+        "operationId": "listBrowserApps",
+        "summary": "List browser apps",
+        "description": "Get a list of browser app configurations for the JavaScript widget integration.",
+        "tags": [
+          "Browser Apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "Browser apps list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BrowserApp"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ValidationRequest": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "inputData": {
+                  "type": "string",
+                  "description": "Email address to validate"
+                },
+                "custom": {
+                  "type": "string",
+                  "description": "Custom data attached to this entry"
+                }
+              },
+              "required": [
+                "inputData"
+              ]
+            }
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "Standard",
+              "High",
+              "Extreme"
+            ],
+            "description": "Verification quality level",
+            "default": "Standard"
+          },
+          "deduplication": {
+            "type": "string",
+            "enum": [
+              "Off",
+              "Safe",
+              "Relaxed"
+            ],
+            "description": "Deduplication mode",
+            "default": "Off"
+          },
+          "retention": {
+            "type": "string",
+            "description": "Data retention period (ISO 8601 duration, e.g. 'P7D' for 7 days)"
+          },
+          "callback": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "Callback URL for job completion notification"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "description": "Callback configuration for async notifications"
+          },
+          "name": {
+            "type": "string",
+            "description": "Optional name for the validation job"
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Job priority (0-255)",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "required": [
+          "entries"
+        ]
+      },
+      "ValidationJob": {
+        "type": "object",
+        "properties": {
+          "overview": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "InProgress",
+                  "Completed",
+                  "Expired",
+                  "Deleted"
+                ]
+              },
+              "noOfEntries": {
+                "type": "integer"
+              },
+              "quality": {
+                "type": "string"
+              },
+              "deduplication": {
+                "type": "string"
+              },
+              "submittedOn": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "completedOn": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "progress": {
+                "type": "object",
+                "properties": {
+                  "percentage": {
+                    "type": "number"
+                  },
+                  "estimatedTimeRemaining": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "entries": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ValidationEntry"
+                }
+              },
+              "meta": {
+                "type": "object",
+                "properties": {
+                  "cursor": {
+                    "type": "string"
+                  },
+                  "isTruncated": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ValidationJobList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "cursor": {
+                "type": "string"
+              },
+              "isTruncated": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "ValidationEntry": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer"
+          },
+          "inputData": {
+            "type": "string"
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "Deliverable",
+              "Risky",
+              "Undeliverable",
+              "Unknown"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "Detailed status code (e.g., Success, MailboxDoesNotExist, etc.)"
+          },
+          "emailAddress": {
+            "type": "string"
+          },
+          "emailAddressLocalPart": {
+            "type": "string"
+          },
+          "emailAddressDomainPart": {
+            "type": "string"
+          },
+          "isDisposableEmailAddress": {
+            "type": "boolean"
+          },
+          "isRoleAccount": {
+            "type": "boolean"
+          },
+          "isFreeEmailAddress": {
+            "type": "boolean"
+          },
+          "syntaxFailureIndex": {
+            "type": "integer",
+            "nullable": true
+          },
+          "duplicateOf": {
+            "type": "integer",
+            "nullable": true
+          },
+          "custom": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ValidationEntryList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationEntry"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "cursor": {
+                "type": "string"
+              },
+              "isTruncated": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "CreditsBalance": {
+        "type": "object",
+        "properties": {
+          "creditPacks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "freeCredits": {
+                  "type": "integer"
+                },
+                "purchaseDate": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "expirationDate": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "freeCreditsResetIn": {
+            "type": "string",
+            "description": "ISO 8601 duration until free credits reset"
+          }
+        }
+      },
+      "DailyUsage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "freeCreditsUsed": {
+                  "type": "integer"
+                },
+                "paidCreditsUsed": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "role": {
+            "type": "string"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BrowserApp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "origins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "HTTP Basic authentication using Verifalia account SID and auth token"
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Bearer token authentication"
+      }
+    }
+  },
+  "security": [
+    {
+      "basicAuth": []
+    },
+    {
+      "bearerAuth": []
+    }
+  ]
+}
