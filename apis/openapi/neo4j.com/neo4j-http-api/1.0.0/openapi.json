@@ -1,0 +1,811 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Neo4j HTTP API",
+    "version": "5.0.0",
+    "description": "The Neo4j HTTP API allows executing Cypher queries and managing transactions against a Neo4j database over HTTP. It supports both auto-commit (single request) transactions and explicit (multi-request) transactions with begin/commit/rollback semantics. Authentication uses HTTP Basic Auth with Neo4j credentials.",
+    "x-jentic-source-url": "https://neo4j.com/docs/http-api/current/"
+  },
+  "servers": [
+    {
+      "url": "http://{host}:{port}",
+      "variables": {
+        "host": {
+          "default": "localhost"
+        },
+        "port": {
+          "default": "7474"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "getDiscovery",
+        "summary": "Service discovery",
+        "description": "Returns discovery information about the Neo4j server including version, edition, and available endpoints.",
+        "tags": [
+          "Discovery"
+        ],
+        "responses": {
+          "200": {
+            "description": "Server discovery information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/db/{databaseName}/query/v2": {
+      "post": {
+        "operationId": "executeQuery",
+        "summary": "Execute a Cypher query (auto-commit)",
+        "description": "Execute a Cypher query in an auto-commit transaction. This is the simplest way to run queries - each request is a complete transaction.",
+        "tags": [
+          "Query"
+        ],
+        "parameters": [
+          {
+            "name": "databaseName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "neo4j"
+            },
+            "description": "Database name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CypherRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Query results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid Cypher syntax or parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database or transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/db/{databaseName}/tx": {
+      "post": {
+        "operationId": "beginTransaction",
+        "summary": "Begin a new transaction",
+        "description": "Begin a new explicit transaction. Optionally execute statements within the opening request. Returns a transaction ID in the Location header.",
+        "tags": [
+          "Transactions"
+        ],
+        "parameters": [
+          {
+            "name": "databaseName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "neo4j"
+            },
+            "description": "Database name"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transaction created",
+            "headers": {
+              "Location": {
+                "description": "URL of the new transaction",
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid Cypher syntax or parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database or transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/db/{databaseName}/tx/{txId}": {
+      "post": {
+        "operationId": "executeInTransaction",
+        "summary": "Execute statements in a transaction",
+        "description": "Execute one or more Cypher statements within an existing open transaction. Resets the transaction timeout.",
+        "tags": [
+          "Transactions"
+        ],
+        "parameters": [
+          {
+            "name": "databaseName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "neo4j"
+            }
+          },
+          {
+            "name": "txId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Transaction ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Statements executed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid Cypher syntax or parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database or transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "rollbackTransaction",
+        "summary": "Rollback a transaction",
+        "description": "Rollback an open transaction, discarding all changes made within it.",
+        "tags": [
+          "Transactions"
+        ],
+        "parameters": [
+          {
+            "name": "databaseName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "neo4j"
+            }
+          },
+          {
+            "name": "txId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Transaction ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction rolled back",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {}
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid Cypher syntax or parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database or transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/db/{databaseName}/tx/{txId}/commit": {
+      "post": {
+        "operationId": "commitTransaction",
+        "summary": "Commit a transaction",
+        "description": "Commit an open transaction, persisting all changes. Optionally execute final statements before committing.",
+        "tags": [
+          "Transactions"
+        ],
+        "parameters": [
+          {
+            "name": "databaseName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "neo4j"
+            }
+          },
+          {
+            "name": "txId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Transaction ID"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction committed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid Cypher syntax or parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database or transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/db/{databaseName}/tx/commit": {
+      "post": {
+        "operationId": "autoCommitTransaction",
+        "summary": "Execute and auto-commit in one request",
+        "description": "Begin a transaction, execute statements, and immediately commit - all in a single HTTP request. Equivalent to an implicit/auto-commit transaction.",
+        "tags": [
+          "Transactions"
+        ],
+        "parameters": [
+          {
+            "name": "databaseName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "neo4j"
+            },
+            "description": "Database name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Statements executed and committed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid Cypher syntax or parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Database or transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "Error classification code e.g. Neo.ClientError.Statement.SyntaxError"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Human-readable error description"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CypherRequest": {
+        "type": "object",
+        "required": [
+          "statement"
+        ],
+        "properties": {
+          "statement": {
+            "type": "string",
+            "description": "Cypher query string"
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Query parameters as key-value pairs"
+          }
+        }
+      },
+      "TransactionRequest": {
+        "type": "object",
+        "required": [
+          "statements"
+        ],
+        "properties": {
+          "statements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "statement"
+              ],
+              "properties": {
+                "statement": {
+                  "type": "string"
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "resultDataContents": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "row",
+                      "graph"
+                    ]
+                  },
+                  "description": "Result format: row data, graph elements, or both"
+                },
+                "includeStats": {
+                  "type": "boolean",
+                  "description": "Include query execution statistics"
+                }
+              }
+            }
+          }
+        }
+      },
+      "QueryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Column names"
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {}
+                },
+                "description": "Result rows"
+              }
+            }
+          },
+          "counters": {
+            "type": "object",
+            "properties": {
+              "containsUpdates": {
+                "type": "boolean"
+              },
+              "nodesCreated": {
+                "type": "integer"
+              },
+              "nodesDeleted": {
+                "type": "integer"
+              },
+              "relationshipsCreated": {
+                "type": "integer"
+              },
+              "relationshipsDeleted": {
+                "type": "integer"
+              },
+              "propertiesSet": {
+                "type": "integer"
+              },
+              "labelsAdded": {
+                "type": "integer"
+              },
+              "labelsRemoved": {
+                "type": "integer"
+              }
+            }
+          },
+          "bookmarks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Transaction bookmarks for causal consistency"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "TransactionResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "row": {
+                        "type": "array",
+                        "items": {}
+                      },
+                      "meta": {
+                        "type": "array",
+                        "items": {}
+                      },
+                      "graph": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "commit": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to commit this transaction"
+          },
+          "transaction": {
+            "type": "object",
+            "properties": {
+              "expires": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Transaction timeout"
+              }
+            }
+          }
+        }
+      },
+      "DiscoveryResponse": {
+        "type": "object",
+        "properties": {
+          "bolt_routing": {
+            "type": "string",
+            "format": "uri"
+          },
+          "bolt_direct": {
+            "type": "string",
+            "format": "uri"
+          },
+          "neo4j_version": {
+            "type": "string"
+          },
+          "neo4j_edition": {
+            "type": "string"
+          },
+          "transaction": {
+            "type": "string",
+            "format": "uri"
+          },
+          "db": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Neo4j username and password"
+      }
+    }
+  },
+  "security": [
+    {
+      "basicAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Discovery",
+      "description": "Server discovery and metadata"
+    },
+    {
+      "name": "Query",
+      "description": "Direct Cypher query execution (auto-commit)"
+    },
+    {
+      "name": "Transactions",
+      "description": "Explicit transaction management (begin, execute, commit, rollback)"
+    }
+  ]
+}

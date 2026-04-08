@@ -1,0 +1,2203 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Transloadit API",
+    "version": "1.0.0",
+    "description": "Transloadit is a file processing service for web and mobile applications. The API allows you to create and manage Assemblies (file processing jobs), Templates (reusable processing instructions), Template Credentials, Assembly Notifications, and billing information.",
+    "x-jentic-source-url": "https://transloadit.com/docs/api/"
+  },
+  "servers": [
+    {
+      "url": "https://api2.transloadit.com"
+    }
+  ],
+  "paths": {
+    "/assemblies": {
+      "post": {
+        "operationId": "createAssembly",
+        "summary": "Create a new Assembly",
+        "description": "Create a new file processing Assembly. Upload files and specify processing steps.",
+        "tags": [
+          "Assemblies"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "params",
+                  "signature"
+                ],
+                "properties": {
+                  "params": {
+                    "type": "string",
+                    "description": "JSON-encoded params with auth, steps, template_id, notify_url, fields"
+                  },
+                  "signature": {
+                    "type": "string",
+                    "description": "HMAC-SHA256 signature"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "File to upload"
+                  },
+                  "tus_num_expected_upload_files": {
+                    "type": "integer",
+                    "description": "Number of expected TUS uploads"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assembly created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listAssemblies",
+        "summary": "Retrieve a list of Assemblies",
+        "description": "List Assemblies for the account, sorted by creation date descending. Supports filtering and pagination.",
+        "tags": [
+          "Assemblies"
+        ],
+        "parameters": [
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "description": "HMAC-SHA256 signature",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "description": "JSON-encoded params object containing auth and other fields",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pagesize",
+            "in": "query",
+            "description": "Number of items per page",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filter by Assembly status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "failed",
+                "executing",
+                "uploading",
+                "canceled"
+              ]
+            }
+          },
+          {
+            "name": "fromdate",
+            "in": "query",
+            "description": "Filter assemblies created after this date",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "todate",
+            "in": "query",
+            "description": "Filter assemblies created before this date",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "keywords",
+            "in": "query",
+            "description": "Search keywords",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of Assemblies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assemblies/{assembly_id}": {
+      "get": {
+        "operationId": "getAssemblyStatus",
+        "summary": "Retrieve an Assembly Status",
+        "description": "Get the current status of an Assembly including upload progress, results, and processing state.",
+        "tags": [
+          "Assemblies"
+        ],
+        "parameters": [
+          {
+            "name": "assembly_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The Assembly ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Assembly status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "cancelAssembly",
+        "summary": "Cancel an Assembly",
+        "description": "Cancel a running Assembly. Only works for Assemblies in uploading or executing state.",
+        "tags": [
+          "Assemblies"
+        ],
+        "parameters": [
+          {
+            "name": "assembly_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The Assembly ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "params",
+                  "signature"
+                ],
+                "properties": {
+                  "params": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assembly cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssemblyStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assemblies/{assembly_id}/replay": {
+      "post": {
+        "operationId": "replayAssembly",
+        "summary": "Replay an Assembly",
+        "description": "Replay a crashed Assembly. Optionally override steps and notify_url.",
+        "tags": [
+          "Assemblies"
+        ],
+        "parameters": [
+          {
+            "name": "assembly_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The Assembly ID to replay"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "params",
+                  "signature"
+                ],
+                "properties": {
+                  "params": {
+                    "type": "string",
+                    "description": "JSON params with auth, optional steps, template_id, notify_url, reparse_template"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assembly replaying",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assemblies/{assembly_id}/notifications": {
+      "post": {
+        "operationId": "replayAssemblyNotification",
+        "summary": "Replay an Assembly Notification",
+        "description": "Replay the notification for a specific Assembly.",
+        "tags": [
+          "Notifications"
+        ],
+        "parameters": [
+          {
+            "name": "assembly_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "params",
+                  "signature"
+                ],
+                "properties": {
+                  "params": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string"
+                  },
+                  "notify_url": {
+                    "type": "string",
+                    "description": "Optional override URL"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notification replayed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listAssemblyNotifications",
+        "summary": "List notifications for an Assembly",
+        "description": "List all notification attempts for a specific Assembly.",
+        "tags": [
+          "Notifications"
+        ],
+        "parameters": [
+          {
+            "name": "assembly_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "description": "HMAC-SHA256 signature",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "description": "JSON-encoded params object containing auth and other fields",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "operationId": "listNotifications",
+        "summary": "List all Assembly Notifications",
+        "description": "Retrieve a list of all Assembly Notifications for the account.",
+        "tags": [
+          "Notifications"
+        ],
+        "parameters": [
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "description": "HMAC-SHA256 signature",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "description": "JSON-encoded params object containing auth and other fields",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pagesize",
+            "in": "query",
+            "description": "Items per page",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filter by type",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/templates": {
+      "post": {
+        "operationId": "createTemplate",
+        "summary": "Create a Template",
+        "description": "Create a new Template with Assembly Instructions.",
+        "tags": [
+          "Templates"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "params",
+                  "signature"
+                ],
+                "properties": {
+                  "params": {
+                    "type": "string",
+                    "description": "JSON params with auth, name, template (Assembly Instructions object), require_signature_auth"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Template created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "string"
+                    },
+                    "template_id": {
+                      "type": "string"
+                    },
+                    "template_name": {
+                      "type": "string"
+                    },
+                    "template_content": {
+                      "type": "object"
+                    },
+                    "require_signature_auth": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listTemplates",
+        "summary": "Retrieve a list of Templates",
+        "description": "List all Templates for the account, sorted by creation date descending.",
+        "tags": [
+          "Templates"
+        ],
+        "parameters": [
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "description": "HMAC-SHA256 signature",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "description": "JSON-encoded params object containing auth and other fields",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pagesize",
+            "in": "query",
+            "description": "Items per page",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort field",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Sort order",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "fromdate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "todate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/templates/{template_id}": {
+      "get": {
+        "operationId": "getTemplate",
+        "summary": "Retrieve a Template",
+        "description": "Retrieve a specific Template by ID.",
+        "tags": [
+          "Templates"
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "description": "HMAC-SHA256 signature",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "description": "JSON-encoded params object containing auth and other fields",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Template details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateTemplate",
+        "summary": "Update a Template",
+        "description": "Update an existing Template's name, content, or settings.",
+        "tags": [
+          "Templates"
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "params",
+                  "signature"
+                ],
+                "properties": {
+                  "params": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Template updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTemplate",
+        "summary": "Delete a Template",
+        "description": "Delete a Template by ID.",
+        "tags": [
+          "Templates"
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "params",
+                  "signature"
+                ],
+                "properties": {
+                  "params": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Template deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/template_credentials": {
+      "get": {
+        "operationId": "listTemplateCredentials",
+        "summary": "Retrieve list of Template Credentials",
+        "description": "List all Template Credentials for the account.",
+        "tags": [
+          "Template Credentials"
+        ],
+        "parameters": [
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "description": "HMAC-SHA256 signature",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "description": "JSON-encoded params object containing auth and other fields",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateCredentialListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createTemplateCredential",
+        "summary": "Create a Template Credential",
+        "description": "Create a new Template Credential for storing third-party service credentials.",
+        "tags": [
+          "Template Credentials"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "params",
+                  "signature"
+                ],
+                "properties": {
+                  "params": {
+                    "type": "string",
+                    "description": "JSON with auth, name, type, content"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credential created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "string"
+                    },
+                    "credential_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/template_credentials/{credential_id}": {
+      "get": {
+        "operationId": "getTemplateCredential",
+        "summary": "Retrieve a Template Credential",
+        "description": "Get details of a specific Template Credential.",
+        "tags": [
+          "Template Credentials"
+        ],
+        "parameters": [
+          {
+            "name": "credential_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "description": "HMAC-SHA256 signature",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "description": "JSON-encoded params object containing auth and other fields",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateCredential"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateTemplateCredential",
+        "summary": "Update a Template Credential",
+        "description": "Update an existing Template Credential.",
+        "tags": [
+          "Template Credentials"
+        ],
+        "parameters": [
+          {
+            "name": "credential_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "params",
+                  "signature"
+                ],
+                "properties": {
+                  "params": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credential updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTemplateCredential",
+        "summary": "Delete a Template Credential",
+        "description": "Delete a Template Credential by ID.",
+        "tags": [
+          "Template Credentials"
+        ],
+        "parameters": [
+          {
+            "name": "credential_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "params",
+                  "signature"
+                ],
+                "properties": {
+                  "params": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credential deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bill/{date}": {
+      "get": {
+        "operationId": "getBill",
+        "summary": "Retrieve a month's bill",
+        "description": "Retrieve billing data for the given month in YYYY-MM format.",
+        "tags": [
+          "Billing"
+        ],
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}$"
+            },
+            "description": "Billing month in YYYY-MM format"
+          },
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "description": "HMAC-SHA256 signature",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "description": "JSON-encoded params object containing auth and other fields",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Billing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/queues/{queue_name}": {
+      "get": {
+        "operationId": "getQueueJobs",
+        "summary": "Retrieve jobs in a queue",
+        "description": "Retrieve a list of jobs currently in the specified queue.",
+        "tags": [
+          "Queues"
+        ],
+        "parameters": [
+          {
+            "name": "queue_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Queue name"
+          },
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "description": "HMAC-SHA256 signature",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "params",
+            "in": "query",
+            "required": true,
+            "description": "JSON-encoded params object containing auth and other fields",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queue jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid auth key or signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "string",
+            "description": "Error status code"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message"
+          },
+          "assembly_id": {
+            "type": "string",
+            "description": "Assembly ID if applicable"
+          },
+          "error": {
+            "type": "string",
+            "description": "Error code"
+          }
+        }
+      },
+      "AuthParams": {
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Transloadit Auth Key"
+          },
+          "expires": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Expiry date for the signed request"
+          },
+          "nonce": {
+            "type": "string",
+            "description": "Unique value per request to prevent duplicates"
+          },
+          "referer": {
+            "type": "string",
+            "description": "Regex to match against HTTP referer"
+          },
+          "max_size": {
+            "type": "integer",
+            "description": "Maximum upload size in bytes"
+          }
+        }
+      },
+      "AssemblyStatus": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "string",
+            "description": "Status code e.g. ASSEMBLY_COMPLETED"
+          },
+          "message": {
+            "type": "string"
+          },
+          "assembly_id": {
+            "type": "string"
+          },
+          "assembly_ssl_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "assembly_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "update_stream_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "bytes_expected": {
+            "type": "integer"
+          },
+          "bytes_received": {
+            "type": "integer"
+          },
+          "bytes_usage": {
+            "type": "integer"
+          },
+          "execution_duration": {
+            "type": "number"
+          },
+          "execution_start": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "object"
+          },
+          "uploads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileInfo"
+            }
+          },
+          "results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/FileInfo"
+              }
+            }
+          },
+          "params": {
+            "type": "string"
+          },
+          "template_id": {
+            "type": "string"
+          },
+          "notify_url": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "string"
+          }
+        }
+      },
+      "FileInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "basename": {
+            "type": "string"
+          },
+          "ext": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "md5hash": {
+            "type": "string"
+          },
+          "original_id": {
+            "type": "string"
+          },
+          "ssl_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "meta": {
+            "type": "object"
+          }
+        }
+      },
+      "AssemblyListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssemblyStatus"
+            }
+          }
+        }
+      },
+      "Template": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "content": {
+            "type": "object",
+            "description": "Assembly Instructions JSON"
+          },
+          "require_signature_auth": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modified": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TemplateListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Template"
+            }
+          }
+        }
+      },
+      "TemplateCredential": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "content": {
+            "type": "object"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modified": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TemplateCredentialListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateCredential"
+            }
+          }
+        }
+      },
+      "NotificationListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationInfo"
+            }
+          }
+        }
+      },
+      "NotificationInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "assembly_id": {
+            "type": "string"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "response_code": {
+            "type": "integer"
+          },
+          "response_body": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "number"
+          }
+        }
+      },
+      "BillResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "string"
+          },
+          "invoice_id": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "month": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "price_per_month": {
+                "type": "number"
+              },
+              "gb_included": {
+                "type": "number"
+              },
+              "price_per_gb": {
+                "type": "number"
+              }
+            }
+          },
+          "used_gb": {
+            "type": "number"
+          },
+          "additional_gb": {
+            "type": "number"
+          },
+          "additional_gb_fee": {
+            "type": "number"
+          },
+          "sub_total": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        }
+      },
+      "QueueResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "signatureAuth": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "signature",
+        "description": "HMAC-SHA256 signature computed from auth secret and JSON-encoded params"
+      }
+    }
+  },
+  "security": [
+    {
+      "signatureAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Assemblies",
+      "description": "File processing jobs"
+    },
+    {
+      "name": "Templates",
+      "description": "Reusable Assembly Instructions"
+    },
+    {
+      "name": "Template Credentials",
+      "description": "Stored credentials for third-party services"
+    },
+    {
+      "name": "Notifications",
+      "description": "Assembly completion notifications"
+    },
+    {
+      "name": "Billing",
+      "description": "Account billing information"
+    },
+    {
+      "name": "Queues",
+      "description": "Job queue management"
+    }
+  ]
+}
