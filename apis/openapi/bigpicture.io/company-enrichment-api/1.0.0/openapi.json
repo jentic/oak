@@ -1,0 +1,811 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "BigPicture Company Enrichment API",
+    "version": "1.0.0",
+    "description": "The BigPicture API provides company enrichment data. It includes the Company API (lookup company data by domain name), the IP API (lookup an IP address and return the associated company), and the Name to Domain API (turn a company name into a domain name).",
+    "x-jentic-source-url": "https://bigpicture.io/docs/api"
+  },
+  "servers": [
+    {
+      "url": "https://company.bigpicture.io",
+      "description": "Company API and Name to Domain API"
+    },
+    {
+      "url": "https://ip.bigpicture.io",
+      "description": "IP API"
+    }
+  ],
+  "security": [
+    {
+      "apiKeyAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Company",
+      "description": "Look up company data by domain name"
+    },
+    {
+      "name": "Company Streaming",
+      "description": "Streaming version of company lookups (long-lived requests, up to 200 seconds)"
+    },
+    {
+      "name": "Name to Domain",
+      "description": "Turn a company name into a domain name (BETA)"
+    },
+    {
+      "name": "IP",
+      "description": "IP to company lookups"
+    }
+  ],
+  "paths": {
+    "/v1/companies/find": {
+      "get": {
+        "operationId": "findCompanyByDomain",
+        "summary": "Lookup company by domain",
+        "description": "Look up a company by its domain name. Returns company data if found (200), async created status if data needs to be fetched (202), or not found (404). Supports optional webhook for async notifications.",
+        "tags": ["Company"],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "query",
+            "required": true,
+            "description": "The domain to lookup (e.g. uber.com).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhookUrl",
+            "in": "query",
+            "required": false,
+            "description": "A webhook URL the results will be sent to via POST when processing is complete.",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "webhookId",
+            "in": "query",
+            "required": false,
+            "description": "An optional identifier for webhook request, included in the webhook response.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A match has been found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Company"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Async created. The data is not yet available; try again in a few minutes or use webhooks/streaming."
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized. Your API key is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests. Rate limit exceeded (600 requests per minute).",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "description": "Maximum requests per minute.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Requests remaining in current window.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Time at which the rate limit resets (UTC epoch seconds).",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/companies/find/stream": {
+      "get": {
+        "operationId": "findCompanyByDomainStream",
+        "summary": "Lookup company by domain (streaming)",
+        "description": "Streaming version of the company lookup. Holds the connection open (up to 200 seconds) until data is ready. Never returns a 202 status. Rate limited to 5 requests per minute.",
+        "tags": ["Company Streaming"],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "query",
+            "required": true,
+            "description": "The domain to lookup.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A match has been found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Company"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (5 requests per minute for streaming)."
+          }
+        }
+      }
+    },
+    "/v2/companies/search": {
+      "get": {
+        "operationId": "searchCompanyByName",
+        "summary": "Name to Domain lookup (BETA)",
+        "description": "Turn a company name into a domain name. Returns up to 3 matching results with confidence scores. Powered by a machine learning model.",
+        "tags": ["Name to Domain"],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "description": "The company name to lookup.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matches found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NameToDomainResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No match found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/companies/ip": {
+      "get": {
+        "operationId": "findCompanyByIp",
+        "summary": "IP to company lookup",
+        "description": "Takes an IP address (IPv4 or IPv6) and returns the company associated with that IP. Useful for identifying website traffic for sales, marketing, analytics, and personalization.",
+        "tags": ["IP"],
+        "servers": [
+          {
+            "url": "https://ip.bigpicture.io",
+            "description": "IP API server"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ip",
+            "in": "query",
+            "required": true,
+            "description": "The IP address to lookup (IPv4 or IPv6).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A match has been found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IpLookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No match found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "API key passed in the Authorization header. Obtain from https://app.bigpicture.io/api."
+      }
+    },
+    "schemas": {
+      "Company": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Internal ID"
+          },
+          "domain": {
+            "type": "string",
+            "description": "Domain name of company"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of company"
+          },
+          "legalName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Legal name of company"
+          },
+          "domainAliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Other domains associated with company"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Primary website URL"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Descriptive tags for the company"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Best description of the company"
+          },
+          "foundedYear": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Founding year of company"
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "description": "Formatted address of company"
+          },
+          "geo": {
+            "$ref": "#/components/schemas/Geo"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/Metrics"
+          },
+          "tech": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detected technology used by company"
+          },
+          "facebook": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "handle": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          },
+          "linkedin": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "handle": {
+                "type": "string",
+                "nullable": true
+              },
+              "industry": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          },
+          "twitter": {
+            "$ref": "#/components/schemas/Twitter"
+          },
+          "crunchbase": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "handle": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          },
+          "logo": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL logo for the company"
+          },
+          "emailProvider": {
+            "type": "boolean",
+            "description": "Whether this domain is an email provider"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true,
+            "description": "Company type: public, private, nonprofit, or government"
+          },
+          "ticker": {
+            "type": "string",
+            "nullable": true,
+            "description": "Ticker symbol for publicly traded companies"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Primary phone number"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Alternative names for the company"
+          },
+          "indexedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When this record was last indexed"
+          }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "sector": {
+            "type": "string",
+            "nullable": true,
+            "description": "Top level sector"
+          },
+          "industryGroup": {
+            "type": "string",
+            "nullable": true,
+            "description": "Industry group"
+          },
+          "industry": {
+            "type": "string",
+            "nullable": true,
+            "description": "Industry"
+          },
+          "subIndustry": {
+            "type": "string",
+            "nullable": true,
+            "description": "Sub industry"
+          },
+          "naicsCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "NAICS Code"
+          }
+        }
+      },
+      "Geo": {
+        "type": "object",
+        "properties": {
+          "streetNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "streetName": {
+            "type": "string",
+            "nullable": true
+          },
+          "subPremise": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "stateCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "countryCode": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Metrics": {
+        "type": "object",
+        "properties": {
+          "trancoRank": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Tranco ranking of the domain"
+          },
+          "alexaUsRank": {
+            "type": "integer",
+            "nullable": true,
+            "description": "US Alexa ranking"
+          },
+          "alexaGlobalRank": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Global Alexa ranking"
+          },
+          "employees": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Approximate number of employees"
+          },
+          "employeesRange": {
+            "type": "string",
+            "nullable": true,
+            "description": "Approximate employee range"
+          },
+          "marketCap": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Market capitalization"
+          },
+          "annualRevenue": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Approximate annual revenue"
+          },
+          "estimatedAnnualRevenue": {
+            "type": "string",
+            "nullable": true,
+            "description": "Approximate annual revenue range"
+          },
+          "raised": {
+            "type": "number",
+            "nullable": true,
+            "description": "Approximate amount of funding raised"
+          }
+        }
+      },
+      "Twitter": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "handle": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "followers": {
+            "type": "integer",
+            "nullable": true
+          },
+          "following": {
+            "type": "integer",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "site": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatar": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NameToDomainResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "description": "Up to 3 matching results.",
+            "items": {
+              "$ref": "#/components/schemas/NameToDomainMatch"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "Total number of matches"
+          }
+        }
+      },
+      "NameToDomainMatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of company"
+          },
+          "domain": {
+            "type": "string",
+            "description": "Domain name of company"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float",
+            "description": "Confidence score between 0 and 1"
+          }
+        }
+      },
+      "IpLookupResponse": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "description": "IP address that was requested"
+          },
+          "type": {
+            "type": "string",
+            "description": "Result type: business, isp, hosting"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float",
+            "description": "Confidence score between 0 and 1"
+          },
+          "fuzzy": {
+            "type": "boolean",
+            "description": "False if company has dedicated ASN/WHOIS, otherwise true"
+          },
+          "geo": {
+            "$ref": "#/components/schemas/IpGeo"
+          },
+          "company": {
+            "$ref": "#/components/schemas/Company"
+          },
+          "whois": {
+            "type": "object",
+            "properties": {
+              "domain": {
+                "type": "string",
+                "nullable": true,
+                "description": "Domain from WHOIS record"
+              },
+              "name": {
+                "type": "string",
+                "nullable": true,
+                "description": "Organization name from WHOIS"
+              }
+            }
+          },
+          "asn": {
+            "type": "object",
+            "properties": {
+              "asn": {
+                "type": "string",
+                "nullable": true,
+                "description": "Autonomous System Number"
+              },
+              "name": {
+                "type": "string",
+                "nullable": true,
+                "description": "Organization name for ASN"
+              },
+              "route": {
+                "type": "string",
+                "nullable": true,
+                "description": "Subnet for ASN"
+              }
+            }
+          }
+        }
+      },
+      "IpGeo": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "stateCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "countryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "continent": {
+            "type": "string",
+            "nullable": true
+          },
+          "continentCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "isEU": {
+            "type": "boolean",
+            "description": "Whether IP is in the EU"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Error type: bad_request, not_found, rate_limit, api_error, async_created"
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error message"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
