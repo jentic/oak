@@ -1,0 +1,538 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Intelligence X API",
+    "description": "Search engine and data archive API for OSINT (Open Source Intelligence). Supports searching by email, domain, URL, IP, phone number, Bitcoin address, and other strong selectors across leaked data, paste sites, and public records.",
+    "version": "2.0",
+    "contact": {
+      "name": "Intelligence X",
+      "email": "info@intelx.io",
+      "url": "https://intelx.io"
+    },
+    "license": {
+      "name": "Proprietary",
+      "url": "https://intelx.io/terms-of-service"
+    }
+  },
+  "externalDocs": {
+    "description": "Intelligence X SDK",
+    "url": "https://github.com/IntelligenceX/SDK"
+  },
+  "servers": [
+    {
+      "url": "https://public.intelx.io",
+      "description": "Intelligence X Public API (free tier)"
+    },
+    {
+      "url": "https://2.intelx.io",
+      "description": "Intelligence X API (paid tier)"
+    }
+  ],
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "paths": {
+    "/intelligent/search": {
+      "post": {
+        "operationId": "submitSearch",
+        "summary": "Submit a search request",
+        "description": "Initiates a search for the given selector (email, domain, IP, etc.). Returns a search ID to poll for results.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "term",
+                  "maxresults"
+                ],
+                "properties": {
+                  "term": {
+                    "type": "string",
+                    "description": "Search term (email, domain, URL, IP, etc.)"
+                  },
+                  "buckets": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Data source buckets to search"
+                  },
+                  "lookuplevel": {
+                    "type": "integer",
+                    "description": "Lookup depth level (0=fastest, higher=deeper)"
+                  },
+                  "maxresults": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return"
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "description": "Timeout in seconds"
+                  },
+                  "datefrom": {
+                    "type": "string",
+                    "description": "Start date filter (YYYY-MM-DD)"
+                  },
+                  "dateto": {
+                    "type": "string",
+                    "description": "End date filter (YYYY-MM-DD)"
+                  },
+                  "sort": {
+                    "type": "integer",
+                    "description": "Sort order: 0=relevance, 1=date asc, 2=date desc"
+                  },
+                  "media": {
+                    "type": "integer",
+                    "description": "Media type filter"
+                  },
+                  "terminate": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Termination IDs"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Search ID for polling results"
+                    },
+                    "status": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key"
+          }
+        }
+      }
+    },
+    "/intelligent/search/result": {
+      "get": {
+        "operationId": "getSearchResults",
+        "summary": "Get search results",
+        "description": "Poll for results of a previously submitted search.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "description": "Search ID from the submit search response",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Result offset for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum results to return",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "integer",
+                      "description": "0=done, 1=searching, 2=suspended, 3=no results"
+                    },
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SearchRecord"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key"
+          }
+        }
+      }
+    },
+    "/intelligent/search/terminate": {
+      "get": {
+        "operationId": "terminateSearch",
+        "summary": "Terminate an ongoing search",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search terminated"
+          }
+        }
+      }
+    },
+    "/file/read": {
+      "get": {
+        "operationId": "readFile",
+        "summary": "Read a file/record content",
+        "description": "Download the content of a specific record.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "description": "Content type (0=binary, 1=text/html preview)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "storageid",
+            "in": "query",
+            "required": true,
+            "description": "Storage ID of the record",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "query",
+            "required": true,
+            "description": "Bucket name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key"
+          }
+        }
+      }
+    },
+    "/file/view": {
+      "get": {
+        "operationId": "viewFile",
+        "summary": "View a file in browser-friendly format",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "storageid",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "f",
+            "in": "query",
+            "description": "Format (0=default, 1=preview)",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File content for viewing",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/authenticate/info": {
+      "get": {
+        "operationId": "getAccountInfo",
+        "summary": "Get API key account info",
+        "description": "Returns information about the current API key including remaining credits.",
+        "responses": {
+          "200": {
+            "description": "Account information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "CreditBalance": {
+                      "type": "integer"
+                    },
+                    "MaxSearchDepth": {
+                      "type": "integer"
+                    },
+                    "Paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key"
+          }
+        }
+      }
+    },
+    "/phonebook/search": {
+      "post": {
+        "operationId": "phonebookSearch",
+        "summary": "Phonebook-style lookup",
+        "description": "Search for selectors associated with a domain or email using the Phonebook API (phonebook.cz).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "term",
+                  "maxresults",
+                  "target"
+                ],
+                "properties": {
+                  "term": {
+                    "type": "string"
+                  },
+                  "maxresults": {
+                    "type": "integer"
+                  },
+                  "target": {
+                    "type": "integer",
+                    "description": "1=emails, 2=domains, 3=URLs"
+                  },
+                  "timeout": {
+                    "type": "integer"
+                  },
+                  "datefrom": {
+                    "type": "string"
+                  },
+                  "dateto": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Phonebook search initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/phonebook/search/result": {
+      "get": {
+        "operationId": "getPhonebookResults",
+        "summary": "Get phonebook search results",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Phonebook results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "selectors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "selectorvalue": {
+                            "type": "string"
+                          },
+                          "selectortypeh": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "name": "x-key",
+        "in": "header",
+        "description": "Intelligence X API key"
+      }
+    },
+    "schemas": {
+      "SearchRecord": {
+        "type": "object",
+        "properties": {
+          "systemid": {
+            "type": "string"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "keyvalues": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "storageid": {
+            "type": "string"
+          },
+          "mediah": {
+            "type": "string"
+          },
+          "media": {
+            "type": "integer"
+          },
+          "typeh": {
+            "type": "string"
+          },
+          "type": {
+            "type": "integer"
+          },
+          "added": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "simhash": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
