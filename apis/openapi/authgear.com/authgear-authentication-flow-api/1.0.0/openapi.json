@@ -1,0 +1,841 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Authgear Authentication Flow API",
+    "description": "Authgear is an authentication-as-a-service platform. The Authentication Flow API provides endpoints for building custom authentication UIs, supporting signup, login, account recovery, and re-authentication flows. Authgear also exposes standard OAuth 2.0/OIDC endpoints.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Authgear",
+      "url": "https://www.authgear.com"
+    },
+    "x-jentic-source-url": "https://docs.authgear.com/reference/apis"
+  },
+  "servers": [
+    {
+      "url": "https://{project}.authgear.cloud",
+      "description": "Authgear project endpoint",
+      "variables": {
+        "project": {
+          "default": "your-project",
+          "description": "Your Authgear project ID"
+        }
+      }
+    }
+  ],
+  "tags": [
+    { "name": "Authentication Flow", "description": "Custom authentication flow endpoints" },
+    { "name": "OAuth 2.0 / OIDC", "description": "Standard OAuth 2.0 and OpenID Connect endpoints" },
+    { "name": "User Import", "description": "Bulk user import API" },
+    { "name": "User Export", "description": "Bulk user export API" }
+  ],
+  "paths": {
+    "/api/v1/authentication_flows": {
+      "post": {
+        "operationId": "createAuthenticationFlow",
+        "summary": "Create an authentication flow",
+        "description": "Creates a new authentication flow. The type determines whether it is a signup, login, signup_login, account_recovery, or reauthenticate flow.",
+        "tags": ["Authentication Flow"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["signup", "login", "signup_login", "account_recovery", "reauthenticate"],
+                    "description": "The type of authentication flow to create"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Optional name to select a specific flow configured in authgear.yaml"
+                  },
+                  "url_query": {
+                    "type": "string",
+                    "description": "Query string from the original URL (for OAuth state handling)"
+                  },
+                  "batch_input": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    },
+                    "description": "Array of input objects to advance the flow immediately in batch"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Flow created successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthenticationFlowResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authentication_flows/states/input": {
+      "post": {
+        "operationId": "inputAuthenticationFlow",
+        "summary": "Provide input to an authentication flow",
+        "description": "Advances an authentication flow by providing the required input for the current step.",
+        "tags": ["Authentication Flow"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["state_token", "input"],
+                "properties": {
+                  "state_token": {
+                    "type": "string",
+                    "description": "The state token from the previous response"
+                  },
+                  "input": {
+                    "type": "object",
+                    "description": "The input for the current step. Structure depends on the step type.",
+                    "additionalProperties": true
+                  },
+                  "batch_input": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    },
+                    "description": "Array of input objects to advance multiple steps in batch"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Flow advanced successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthenticationFlowResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authentication_flows/states": {
+      "post": {
+        "operationId": "getAuthenticationFlowState",
+        "summary": "Get current state of an authentication flow",
+        "description": "Retrieves the current state of an in-progress authentication flow.",
+        "tags": ["Authentication Flow"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["state_token"],
+                "properties": {
+                  "state_token": {
+                    "type": "string",
+                    "description": "The state token of the flow"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Flow state retrieved",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthenticationFlowResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid state token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authentication_flows/ws": {
+      "get": {
+        "operationId": "websocketAuthenticationFlow",
+        "summary": "WebSocket endpoint for authentication flow",
+        "description": "WebSocket endpoint that delivers real-time updates when the authentication flow state changes (e.g. when the user finishes OAuth or passkey flow in another window).",
+        "tags": ["Authentication Flow"],
+        "parameters": [
+          {
+            "name": "Upgrade",
+            "in": "header",
+            "schema": { "type": "string", "enum": ["websocket"] },
+            "required": true
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "Switching Protocols to WebSocket"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth2/authorize": {
+      "get": {
+        "operationId": "oauthAuthorize",
+        "summary": "OAuth 2.0 Authorization Endpoint",
+        "description": "Standard OAuth 2.0 authorization endpoint. Initiates the authorization code flow.",
+        "tags": ["OAuth 2.0 / OIDC"],
+        "parameters": [
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["code", "none"] }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Space-separated list of scopes (e.g. openid offline_access)"
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "PKCE code challenge"
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["S256"] }
+          },
+          {
+            "name": "prompt",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["login", "none", "consent"] }
+          },
+          {
+            "name": "login_hint",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to login page or redirect_uri"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth2/token": {
+      "post": {
+        "operationId": "oauthToken",
+        "summary": "OAuth 2.0 Token Endpoint",
+        "description": "Exchange authorization code for access token, or refresh an access token.",
+        "tags": ["OAuth 2.0 / OIDC"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "enum": ["authorization_code", "refresh_token", "urn:authgear:params:oauth:grant-type:anonymous-request", "urn:authgear:params:oauth:grant-type:biometric-request", "urn:authgear:params:oauth:grant-type:id-token", "urn:authgear:params:oauth:grant-type:app2app-request", "urn:authgear:params:oauth:grant-type:settings-action"]
+                  },
+                  "code": { "type": "string" },
+                  "redirect_uri": { "type": "string" },
+                  "client_id": { "type": "string" },
+                  "code_verifier": { "type": "string" },
+                  "refresh_token": { "type": "string" }
+                },
+                "required": ["grant_type", "client_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token issued",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TokenResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OAuthError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth2/revoke": {
+      "post": {
+        "operationId": "oauthRevoke",
+        "summary": "OAuth 2.0 Token Revocation",
+        "description": "Revokes an access token or refresh token.",
+        "tags": ["OAuth 2.0 / OIDC"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["token"],
+                "properties": {
+                  "token": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Token revoked" },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OAuthError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth2/userinfo": {
+      "get": {
+        "operationId": "oauthUserInfo",
+        "summary": "OIDC UserInfo Endpoint",
+        "description": "Returns claims about the authenticated user.",
+        "tags": ["OAuth 2.0 / OIDC"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User info",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserInfo" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/openid-configuration": {
+      "get": {
+        "operationId": "oidcDiscovery",
+        "summary": "OIDC Discovery Document",
+        "description": "Returns the OpenID Connect discovery document.",
+        "tags": ["OAuth 2.0 / OIDC"],
+        "responses": {
+          "200": {
+            "description": "OIDC configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "issuer": { "type": "string" },
+                    "authorization_endpoint": { "type": "string" },
+                    "token_endpoint": { "type": "string" },
+                    "userinfo_endpoint": { "type": "string" },
+                    "jwks_uri": { "type": "string" },
+                    "scopes_supported": { "type": "array", "items": { "type": "string" } },
+                    "response_types_supported": { "type": "array", "items": { "type": "string" } },
+                    "grant_types_supported": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth2/jwks": {
+      "get": {
+        "operationId": "oidcJwks",
+        "summary": "OIDC JWKS Endpoint",
+        "description": "Returns the JSON Web Key Set used to sign tokens.",
+        "tags": ["OAuth 2.0 / OIDC"],
+        "responses": {
+          "200": {
+            "description": "JWKS",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kty": { "type": "string" },
+                          "kid": { "type": "string" },
+                          "use": { "type": "string" },
+                          "alg": { "type": "string" },
+                          "n": { "type": "string" },
+                          "e": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/_api/admin/users/import": {
+      "post": {
+        "operationId": "initiateUserImport",
+        "summary": "Initiate user import",
+        "description": "Initiates a bulk user import. Accepts a JSON body with an array of user records. Returns a task ID for tracking progress.",
+        "tags": ["User Import"],
+        "security": [{ "adminApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["identifier", "records"],
+                "properties": {
+                  "identifier": {
+                    "type": "string",
+                    "enum": ["email", "phone", "preferred_username"],
+                    "description": "The identifier type used for matching"
+                  },
+                  "records": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/UserImportRecord" },
+                    "description": "Array of user records to import"
+                  },
+                  "upsert": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "If true, update existing users; if false, skip existing users"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "description": "Task ID for tracking" },
+                    "status": { "type": "string", "enum": ["pending", "running", "completed", "failed"] },
+                    "created_at": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/_api/admin/users/import/{task_id}": {
+      "get": {
+        "operationId": "getUserImportStatus",
+        "summary": "Get user import task status",
+        "description": "Returns the status of a user import task.",
+        "tags": ["User Import"],
+        "security": [{ "adminApiKeyAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "status": { "type": "string", "enum": ["pending", "running", "completed", "failed"] },
+                    "created_at": { "type": "string", "format": "date-time" },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "total": { "type": "integer" },
+                        "inserted": { "type": "integer" },
+                        "updated": { "type": "integer" },
+                        "skipped": { "type": "integer" },
+                        "failed": { "type": "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/_api/admin/users/export": {
+      "post": {
+        "operationId": "initiateUserExport",
+        "summary": "Initiate user export",
+        "description": "Initiates a bulk user export. Returns a task ID for tracking progress.",
+        "tags": ["User Export"],
+        "security": [{ "adminApiKeyAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": ["ndjson", "csv"],
+                    "default": "ndjson",
+                    "description": "Export format"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Export initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "status": { "type": "string" },
+                    "created_at": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/_api/admin/users/export/{task_id}": {
+      "get": {
+        "operationId": "getUserExportStatus",
+        "summary": "Get user export task status",
+        "description": "Returns the status of a user export task. When completed, includes a download URL.",
+        "tags": ["User Export"],
+        "security": [{ "adminApiKeyAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "status": { "type": "string" },
+                    "created_at": { "type": "string", "format": "date-time" },
+                    "download_url": { "type": "string", "description": "Available when status is 'completed'" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "OAuth 2.0 access token"
+      },
+      "adminApiKeyAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Admin API JWT token generated from the Admin API section in the Authgear portal"
+      }
+    },
+    "schemas": {
+      "AuthenticationFlowResponse": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "state_token": { "type": "string", "description": "Token to reference this flow state" },
+              "type": { "type": "string", "enum": ["signup", "login", "signup_login", "account_recovery", "reauthenticate"] },
+              "name": { "type": "string" },
+              "action": {
+                "type": "object",
+                "properties": {
+                  "type": { "type": "string", "description": "Type of action (e.g. identify, authenticate, verify, create_authenticator, etc.)" },
+                  "data": {
+                    "type": "object",
+                    "description": "Step-specific data",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "finished": { "type": "boolean" },
+          "finish_redirect_uri": { "type": "string", "description": "URI to redirect to when flow is finished" }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": { "type": "string" },
+          "token_type": { "type": "string", "enum": ["Bearer"] },
+          "expires_in": { "type": "integer" },
+          "refresh_token": { "type": "string" },
+          "id_token": { "type": "string" },
+          "scope": { "type": "string" }
+        }
+      },
+      "UserInfo": {
+        "type": "object",
+        "properties": {
+          "sub": { "type": "string" },
+          "email": { "type": "string" },
+          "email_verified": { "type": "boolean" },
+          "phone_number": { "type": "string" },
+          "phone_number_verified": { "type": "boolean" },
+          "preferred_username": { "type": "string" },
+          "name": { "type": "string" },
+          "given_name": { "type": "string" },
+          "family_name": { "type": "string" },
+          "updated_at": { "type": "integer" }
+        }
+      },
+      "UserImportRecord": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "phone": { "type": "string" },
+          "preferred_username": { "type": "string" },
+          "name": { "type": "string" },
+          "given_name": { "type": "string" },
+          "family_name": { "type": "string" },
+          "password": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "enum": ["bcrypt", "password"] },
+              "password_hash": { "type": "string" }
+            }
+          },
+          "mfa": {
+            "type": "object",
+            "properties": {
+              "totp": {
+                "type": "object",
+                "properties": {
+                  "secret": { "type": "string" }
+                }
+              }
+            }
+          },
+          "disabled": { "type": "boolean" },
+          "email_verified": { "type": "boolean" },
+          "phone_verified": { "type": "boolean" },
+          "custom_attributes": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "roles": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "groups": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "OAuthError": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "error_description": { "type": "string" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "reason": { "type": "string" },
+              "message": { "type": "string" },
+              "code": { "type": "integer" },
+              "info": { "type": "object", "additionalProperties": true }
+            }
+          }
+        }
+      }
+    }
+  }
+}

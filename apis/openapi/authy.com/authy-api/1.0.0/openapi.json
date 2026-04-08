@@ -1,0 +1,381 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Authy API",
+    "description": "Authy API (by Twilio) provides two-factor authentication (2FA) services. The API supports user registration, TOTP verification, phone verification via SMS/voice, push authentication (OneTouch), and application management. Note: Authy has been deprecated since November 2022 in favor of Twilio Verify.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Twilio",
+      "url": "https://www.twilio.com/docs/authy/api"
+    },
+    "x-jentic-source-url": "https://www.twilio.com/docs/authy/api"
+  },
+  "servers": [
+    {
+      "url": "https://api.authy.com",
+      "description": "Authy production API"
+    }
+  ],
+  "security": [
+    {
+      "apiKeyHeader": []
+    }
+  ],
+  "tags": [
+    { "name": "Users", "description": "User registration and management" },
+    { "name": "Verification", "description": "TOTP and token verification" },
+    { "name": "Phone Verification", "description": "Phone number verification via SMS/voice" },
+    { "name": "OneTouch", "description": "Push authentication (OneTouch)" },
+    { "name": "Application", "description": "Application details and stats" }
+  ],
+  "paths": {
+    "/protected/json/users/new": {
+      "post": {
+        "operationId": "createUser",
+        "summary": "Register a user",
+        "description": "Creates a new Authy user. Returns an authy_id that should be stored for future verification requests.",
+        "tags": ["Users"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user"],
+                "properties": {
+                  "user": {
+                    "type": "object",
+                    "required": ["email", "cellphone", "country_code"],
+                    "properties": {
+                      "email": { "type": "string", "format": "email" },
+                      "cellphone": { "type": "string", "description": "Phone number without country code" },
+                      "country_code": { "type": "string", "description": "Country calling code (e.g. 1 for US)" }
+                    }
+                  },
+                  "send_install_link_via_sms": { "type": "boolean", "default": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "integer", "description": "The Authy user ID" }
+                      }
+                    },
+                    "success": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/protected/json/users/{authy_id}/status": {
+      "get": {
+        "operationId": "getUserStatus",
+        "summary": "Get user status",
+        "description": "Returns the status of a registered Authy user.",
+        "tags": ["Users"],
+        "parameters": [
+          { "name": "authy_id", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "The Authy user ID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "User status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "status": {
+                      "type": "object",
+                      "properties": {
+                        "authy_id": { "type": "integer" },
+                        "confirmed": { "type": "boolean" },
+                        "registered": { "type": "boolean" },
+                        "country_code": { "type": "integer" },
+                        "phone_number": { "type": "string" },
+                        "devices": { "type": "array", "items": { "type": "string" } },
+                        "has_hard_token": { "type": "boolean" },
+                        "account_disabled": { "type": "boolean" }
+                      }
+                    },
+                    "success": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "User not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/protected/json/users/{authy_id}/delete": {
+      "post": {
+        "operationId": "deleteUser",
+        "summary": "Delete a user",
+        "description": "Removes a user from the application.",
+        "tags": ["Users"],
+        "parameters": [
+          { "name": "authy_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_ip": { "type": "string", "description": "IP address of the user for audit logging" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User deleted",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" }, "success": { "type": "boolean" } } } } }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "User not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/protected/json/verify/{token}/{authy_id}": {
+      "get": {
+        "operationId": "verifyToken",
+        "summary": "Verify a token",
+        "description": "Verifies a TOTP token for a user.",
+        "tags": ["Verification"],
+        "parameters": [
+          { "name": "token", "in": "path", "required": true, "schema": { "type": "string" }, "description": "The TOTP token to verify" },
+          { "name": "authy_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "force", "in": "query", "schema": { "type": "boolean" }, "description": "Force verification even if user has not completed registration" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token verified",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" }, "token": { "type": "string" }, "success": { "type": "string" }, "device": { "type": "object", "properties": { "city": { "type": "string" }, "country": { "type": "string" }, "ip": { "type": "string" } } } } } } }
+          },
+          "401": { "description": "Unauthorized or invalid token", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/protected/json/sms/{authy_id}": {
+      "get": {
+        "operationId": "requestSmsToken",
+        "summary": "Request SMS token",
+        "description": "Sends an SMS with a verification token to the user.",
+        "tags": ["Verification"],
+        "parameters": [
+          { "name": "authy_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "force", "in": "query", "schema": { "type": "boolean" }, "description": "Force send even if user has the Authy app installed" },
+          { "name": "action", "in": "query", "schema": { "type": "string" }, "description": "Optional action string for context" },
+          { "name": "action_message", "in": "query", "schema": { "type": "string" }, "description": "Optional custom message" }
+        ],
+        "responses": {
+          "200": {
+            "description": "SMS sent",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" }, "cellphone": { "type": "string" }, "success": { "type": "boolean" } } } } }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/protected/json/call/{authy_id}": {
+      "get": {
+        "operationId": "requestPhoneCall",
+        "summary": "Request phone call",
+        "description": "Calls the user with a verification token.",
+        "tags": ["Verification"],
+        "parameters": [
+          { "name": "authy_id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "force", "in": "query", "schema": { "type": "boolean" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Call initiated",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" }, "cellphone": { "type": "string" }, "success": { "type": "boolean" } } } } }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/protected/json/phones/verification/start": {
+      "post": {
+        "operationId": "startPhoneVerification",
+        "summary": "Start phone verification",
+        "description": "Starts a phone verification via SMS or voice call. Sends a code to the phone number.",
+        "tags": ["Phone Verification"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["via", "phone_number", "country_code"],
+                "properties": {
+                  "via": { "type": "string", "enum": ["sms", "call"], "description": "Delivery method" },
+                  "phone_number": { "type": "string" },
+                  "country_code": { "type": "string" },
+                  "locale": { "type": "string", "description": "Language of the verification message" },
+                  "code_length": { "type": "integer", "enum": [4, 5, 6, 7, 8, 9, 10] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification started",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "carrier": { "type": "string" }, "is_cellphone": { "type": "boolean" }, "message": { "type": "string" }, "seconds_to_expire": { "type": "integer" }, "uuid": { "type": "string" }, "success": { "type": "boolean" } } } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/protected/json/phones/verification/check": {
+      "get": {
+        "operationId": "checkPhoneVerification",
+        "summary": "Check phone verification",
+        "description": "Checks the verification code entered by the user.",
+        "tags": ["Phone Verification"],
+        "parameters": [
+          { "name": "phone_number", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "country_code", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "verification_code", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification successful",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" }, "success": { "type": "boolean" } } } } }
+          },
+          "401": { "description": "Invalid code", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/onetouch/json/users/{authy_id}/approval_requests": {
+      "post": {
+        "operationId": "createApprovalRequest",
+        "summary": "Create OneTouch approval request",
+        "description": "Sends a push notification to the user's device for approval.",
+        "tags": ["OneTouch"],
+        "parameters": [
+          { "name": "authy_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message"],
+                "properties": {
+                  "message": { "type": "string", "maxLength": 144 },
+                  "details": { "type": "object", "additionalProperties": { "type": "string" } },
+                  "hidden_details": { "type": "object", "additionalProperties": { "type": "string" } },
+                  "logos": { "type": "array", "items": { "type": "object", "properties": { "res": { "type": "string" }, "url": { "type": "string" } } } },
+                  "seconds_to_expire": { "type": "integer", "default": 86400 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approval request created",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "approval_request": { "type": "object", "properties": { "uuid": { "type": "string" } } }, "success": { "type": "boolean" } } } } }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/onetouch/json/approval_requests/{uuid}": {
+      "get": {
+        "operationId": "getApprovalRequestStatus",
+        "summary": "Check OneTouch approval request status",
+        "description": "Checks the status of a OneTouch approval request.",
+        "tags": ["OneTouch"],
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Approval request status",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "approval_request": { "type": "object", "properties": { "_app_name": { "type": "string" }, "_app_serial_id": { "type": "integer" }, "_authy_id": { "type": "integer" }, "_id": { "type": "string" }, "_user_email": { "type": "string" }, "app_id": { "type": "string" }, "created_at": { "type": "string", "format": "date-time" }, "notified": { "type": "boolean" }, "processed_at": { "type": "string", "format": "date-time" }, "status": { "type": "string", "enum": ["pending", "approved", "denied", "expired"] }, "updated_at": { "type": "string", "format": "date-time" }, "uuid": { "type": "string" } } }, "success": { "type": "boolean" } } } } }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/protected/json/app/details": {
+      "get": {
+        "operationId": "getAppDetails",
+        "summary": "Get application details",
+        "description": "Returns details about the Authy application.",
+        "tags": ["Application"],
+        "responses": {
+          "200": {
+            "description": "Application details",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "app": { "type": "object", "properties": { "app_id": { "type": "integer" }, "name": { "type": "string" }, "plan": { "type": "string" }, "sms_enabled": { "type": "boolean" }, "phone_calls_enabled": { "type": "boolean" }, "onetouch_enabled": { "type": "boolean" } } }, "success": { "type": "boolean" }, "message": { "type": "string" } } } } }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/protected/json/app/stats": {
+      "get": {
+        "operationId": "getAppStats",
+        "summary": "Get application statistics",
+        "description": "Returns usage statistics for the application.",
+        "tags": ["Application"],
+        "responses": {
+          "200": {
+            "description": "Application stats",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "app_id": { "type": "integer" }, "count": { "type": "integer" }, "total_users": { "type": "integer" }, "message": { "type": "string" }, "success": { "type": "boolean" } } } } }
+          },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Authy-API-Key",
+        "description": "Authy API key from the Twilio Console"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "success": { "type": "boolean" },
+          "errors": { "type": "object", "additionalProperties": { "type": "string" } },
+          "error_code": { "type": "string" }
+        }
+      }
+    }
+  }
+}
