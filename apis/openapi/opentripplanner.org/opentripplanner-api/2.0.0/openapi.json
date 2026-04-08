@@ -1,0 +1,456 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OpenTripPlanner API",
+    "version": "2.0.0",
+    "description": "OpenTripPlanner (OTP) is an open-source multimodal trip planner providing REST API endpoints for planning routes, geocoding, and accessing transit information. OTP 2.x primarily uses GraphQL, but the legacy REST API is also available.",
+    "x-jentic-source-url": "https://docs.opentripplanner.org/en/latest/apis/GTFS-GraphQL-API/"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080/otp"
+    }
+  ],
+  "paths": {
+    "/routers/default/plan": {
+      "get": {
+        "operationId": "planTrip",
+        "summary": "Plan a trip",
+        "description": "Plans a trip from an origin to a destination using available transit modes, walking, cycling, and/or driving. Returns itineraries with step-by-step directions.",
+        "tags": ["Trip Planning"],
+        "parameters": [
+          {
+            "name": "fromPlace",
+            "in": "query",
+            "required": true,
+            "description": "Origin location as lat,lng or as a named place",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "toPlace",
+            "in": "query",
+            "required": true,
+            "description": "Destination location as lat,lng or as a named place",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "description": "Date of travel (MM-DD-YYYY)",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "time",
+            "in": "query",
+            "description": "Time of travel (HH:MM am/pm)",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "arriveBy",
+            "in": "query",
+            "description": "Whether the time is arrival (true) or departure (false) time",
+            "required": false,
+            "schema": { "type": "boolean", "default": false }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "description": "Comma-separated list of transport modes (WALK, BUS, TRAM, RAIL, SUBWAY, FERRY, BICYCLE, CAR, TRANSIT)",
+            "required": false,
+            "schema": { "type": "string", "default": "TRANSIT,WALK" }
+          },
+          {
+            "name": "maxWalkDistance",
+            "in": "query",
+            "description": "Maximum walking distance in meters",
+            "required": false,
+            "schema": { "type": "number" }
+          },
+          {
+            "name": "wheelchair",
+            "in": "query",
+            "description": "Whether to plan accessible trip for wheelchair users",
+            "required": false,
+            "schema": { "type": "boolean" }
+          },
+          {
+            "name": "numItineraries",
+            "in": "query",
+            "description": "Number of itineraries to return",
+            "required": false,
+            "schema": { "type": "integer", "default": 3 }
+          },
+          {
+            "name": "optimize",
+            "in": "query",
+            "description": "Optimization type",
+            "required": false,
+            "schema": { "type": "string", "enum": ["QUICK", "SAFE", "FLAT", "GREENWAYS", "TRIANGLE"] }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "Language locale for directions text",
+            "required": false,
+            "schema": { "type": "string", "default": "en" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trip plan response with itineraries",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TripPlanResponse" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" }
+        }
+      }
+    },
+    "/routers/default/index/routes": {
+      "get": {
+        "operationId": "listRoutes",
+        "summary": "List transit routes",
+        "description": "Returns a list of all transit routes in the graph.",
+        "tags": ["Transit Index"],
+        "responses": {
+          "200": {
+            "description": "List of routes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Route" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routers/default/index/stops": {
+      "get": {
+        "operationId": "listStops",
+        "summary": "List transit stops",
+        "description": "Returns a list of all transit stops in the graph.",
+        "tags": ["Transit Index"],
+        "responses": {
+          "200": {
+            "description": "List of stops",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Stop" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routers/default/index/stops/{stopId}": {
+      "get": {
+        "operationId": "getStop",
+        "summary": "Get stop details",
+        "description": "Returns details about a specific transit stop.",
+        "tags": ["Transit Index"],
+        "parameters": [
+          {
+            "name": "stopId",
+            "in": "path",
+            "required": true,
+            "description": "Stop ID in feed:id format",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stop details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Stop" }
+              }
+            }
+          },
+          "404": { "description": "Stop not found" }
+        }
+      }
+    },
+    "/routers/default/index/stops/{stopId}/stoptimes": {
+      "get": {
+        "operationId": "getStopTimes",
+        "summary": "Get upcoming departures at a stop",
+        "description": "Returns the next upcoming departures from a specific stop.",
+        "tags": ["Transit Index"],
+        "parameters": [
+          {
+            "name": "stopId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "startTime",
+            "in": "query",
+            "description": "Start time as epoch seconds",
+            "required": false,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "timeRange",
+            "in": "query",
+            "description": "Time range in seconds",
+            "required": false,
+            "schema": { "type": "integer", "default": 86400 }
+          },
+          {
+            "name": "numberOfDepartures",
+            "in": "query",
+            "description": "Max number of departures per pattern",
+            "required": false,
+            "schema": { "type": "integer", "default": 5 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stop times",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "type": "object" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routers/default/geocode": {
+      "get": {
+        "operationId": "geocode",
+        "summary": "Geocode a location",
+        "description": "Search for a location by name and return coordinates.",
+        "tags": ["Geocoding"],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "description": "Search query string",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "autocomplete",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "boolean", "default": false }
+          },
+          {
+            "name": "corners",
+            "in": "query",
+            "description": "Include nearby intersections",
+            "required": false,
+            "schema": { "type": "boolean" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Geocoding results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/GeocoderResult" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gtfs/v1": {
+      "post": {
+        "operationId": "graphqlQuery",
+        "summary": "GraphQL GTFS API",
+        "description": "Execute GraphQL queries against the GTFS data (OTP 2.x). This is the primary API for OTP 2.",
+        "tags": ["GraphQL"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": { "type": "string", "description": "GraphQL query string" },
+                  "operationName": { "type": "string" },
+                  "variables": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "GraphQL response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "object" },
+                    "errors": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TripPlanResponse": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "object",
+            "properties": {
+              "date": { "type": "integer", "description": "Date as epoch milliseconds" },
+              "from": { "$ref": "#/components/schemas/Place" },
+              "to": { "$ref": "#/components/schemas/Place" },
+              "itineraries": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/Itinerary" }
+              }
+            }
+          },
+          "requestParameters": { "type": "object" },
+          "error": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer" },
+              "msg": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      },
+      "Itinerary": {
+        "type": "object",
+        "properties": {
+          "duration": { "type": "integer", "description": "Total duration in seconds" },
+          "startTime": { "type": "integer", "description": "Start time as epoch ms" },
+          "endTime": { "type": "integer", "description": "End time as epoch ms" },
+          "walkTime": { "type": "integer" },
+          "transitTime": { "type": "integer" },
+          "waitingTime": { "type": "integer" },
+          "walkDistance": { "type": "number" },
+          "transfers": { "type": "integer" },
+          "legs": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Leg" }
+          }
+        }
+      },
+      "Leg": {
+        "type": "object",
+        "properties": {
+          "startTime": { "type": "integer" },
+          "endTime": { "type": "integer" },
+          "departureDelay": { "type": "integer" },
+          "arrivalDelay": { "type": "integer" },
+          "realTime": { "type": "boolean" },
+          "distance": { "type": "number" },
+          "mode": { "type": "string" },
+          "route": { "type": "string" },
+          "routeShortName": { "type": "string" },
+          "routeLongName": { "type": "string" },
+          "agencyName": { "type": "string" },
+          "from": { "$ref": "#/components/schemas/Place" },
+          "to": { "$ref": "#/components/schemas/Place" },
+          "legGeometry": {
+            "type": "object",
+            "properties": {
+              "points": { "type": "string", "description": "Encoded polyline" },
+              "length": { "type": "integer" }
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/WalkStep" }
+          }
+        }
+      },
+      "Place": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "stopId": { "type": "string" },
+          "stopCode": { "type": "string" },
+          "lon": { "type": "number" },
+          "lat": { "type": "number" },
+          "arrival": { "type": "integer" },
+          "departure": { "type": "integer" },
+          "vertexType": { "type": "string" }
+        }
+      },
+      "WalkStep": {
+        "type": "object",
+        "properties": {
+          "distance": { "type": "number" },
+          "relativeDirection": { "type": "string" },
+          "streetName": { "type": "string" },
+          "absoluteDirection": { "type": "string" },
+          "stayOn": { "type": "boolean" },
+          "bogusName": { "type": "boolean" },
+          "lon": { "type": "number" },
+          "lat": { "type": "number" }
+        }
+      },
+      "Route": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "agencyName": { "type": "string" },
+          "shortName": { "type": "string" },
+          "longName": { "type": "string" },
+          "mode": { "type": "string" },
+          "color": { "type": "string" },
+          "textColor": { "type": "string" }
+        }
+      },
+      "Stop": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "lat": { "type": "number" },
+          "lon": { "type": "number" },
+          "code": { "type": "string" },
+          "desc": { "type": "string" },
+          "zoneId": { "type": "string" },
+          "url": { "type": "string" },
+          "locationType": { "type": "integer" },
+          "parentStation": { "type": "string" },
+          "wheelchairBoarding": { "type": "integer" },
+          "routes": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Route" }
+          }
+        }
+      },
+      "GeocoderResult": {
+        "type": "object",
+        "properties": {
+          "lat": { "type": "number" },
+          "lng": { "type": "number" },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}

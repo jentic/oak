@@ -1,0 +1,715 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CAPE Sandbox API",
+    "version": "2.0.0",
+    "description": "CAPE (Config And Payload Extraction) Sandbox REST API for automated malware analysis. Supports submitting samples (files and URLs), retrieving analysis reports, screenshots, PCAP files, and managing analysis machines.",
+    "x-jentic-source-url": "https://capev2.readthedocs.io/en/latest/usage/api.html"
+  },
+  "servers": [
+    {
+      "url": "https://capesandbox.com/apiv2"
+    }
+  ],
+  "paths": {
+    "/tasks/create/file/": {
+      "post": {
+        "operationId": "createFileTask",
+        "summary": "Submit a file for analysis",
+        "description": "Adds a file to the list of pending tasks to be processed and analyzed. Returns the ID of the newly created task.",
+        "tags": ["Tasks"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary", "description": "Sample file to analyze" },
+                  "package": { "type": "string", "description": "Analysis package to use" },
+                  "timeout": { "type": "integer", "description": "Analysis timeout in seconds" },
+                  "priority": { "type": "integer", "description": "Task priority (1-3)", "minimum": 1, "maximum": 3 },
+                  "options": { "type": "string", "description": "Options to pass to the analysis package" },
+                  "machine": { "type": "string", "description": "ID of the analysis machine to use" },
+                  "platform": { "type": "string", "description": "Platform name (e.g., windows)" },
+                  "tags": { "type": "string", "description": "Comma-separated machine tags" },
+                  "custom": { "type": "string", "description": "Custom string to pass to processing modules" },
+                  "memory": { "type": "boolean", "description": "Enable full memory dump" },
+                  "enforce_timeout": { "type": "boolean", "description": "Enforce full timeout execution" },
+                  "clock": { "type": "string", "description": "Virtual machine clock (format: %m-%d-%Y %H:%M:%S)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task created successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaskCreateResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/create/url/": {
+      "post": {
+        "operationId": "createUrlTask",
+        "summary": "Submit a URL for analysis",
+        "description": "Adds a URL to the list of pending tasks to be processed and analyzed.",
+        "tags": ["Tasks"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": { "type": "string", "format": "uri", "description": "URL to analyze" },
+                  "package": { "type": "string" },
+                  "timeout": { "type": "integer" },
+                  "priority": { "type": "integer", "minimum": 1, "maximum": 3 },
+                  "options": { "type": "string" },
+                  "machine": { "type": "string" },
+                  "platform": { "type": "string" },
+                  "tags": { "type": "string" },
+                  "custom": { "type": "string" },
+                  "memory": { "type": "boolean" },
+                  "enforce_timeout": { "type": "boolean" },
+                  "clock": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task created successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaskCreateResponse" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/tasks/list/": {
+      "get": {
+        "operationId": "listTasks",
+        "summary": "List analysis tasks",
+        "description": "Returns a list of tasks stored in the database.",
+        "tags": ["Tasks"],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of returned tasks",
+            "required": false,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Data offset",
+            "required": false,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tasks",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaskListResponse" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/tasks/view/{id}/": {
+      "get": {
+        "operationId": "viewTask",
+        "summary": "View task details",
+        "description": "Returns details on the task associated with the specified ID.",
+        "tags": ["Tasks"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaskViewResponse" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Task not found" }
+        }
+      }
+    },
+    "/tasks/delete/{id}/": {
+      "get": {
+        "operationId": "deleteTask",
+        "summary": "Delete a task",
+        "description": "Removes the given task from the database and deletes the results.",
+        "tags": ["Tasks"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Task deleted" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Task not found" },
+          "500": { "description": "Unable to delete the task" }
+        }
+      }
+    },
+    "/tasks/report/{id}/": {
+      "get": {
+        "operationId": "getTaskReport",
+        "summary": "Get analysis report",
+        "description": "Returns the report generated from the analysis. Defaults to JSON format.",
+        "tags": ["Tasks"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analysis report",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          },
+          "400": { "description": "Invalid report format" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Report not found" }
+        }
+      }
+    },
+    "/tasks/report/{id}/{format}/": {
+      "get": {
+        "operationId": "getTaskReportFormatted",
+        "summary": "Get analysis report in specific format",
+        "description": "Returns the report in the specified format (json, html, maec, metadata, all, dropped).",
+        "tags": ["Tasks"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "format",
+            "in": "path",
+            "required": true,
+            "description": "Report format",
+            "schema": {
+              "type": "string",
+              "enum": ["json", "html", "maec", "metadata", "all", "dropped"]
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Analysis report in requested format" },
+          "400": { "description": "Invalid report format" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Report not found" }
+        }
+      }
+    },
+    "/tasks/screenshots/{id}/": {
+      "get": {
+        "operationId": "getTaskScreenshots",
+        "summary": "Get task screenshots",
+        "description": "Retrieves all screenshots associated with a given analysis task ID.",
+        "tags": ["Tasks"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Screenshots archive",
+            "content": {
+              "application/zip": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "404": { "description": "File or folder not found" }
+        }
+      }
+    },
+    "/tasks/screenshots/{id}/{screenshot}/": {
+      "get": {
+        "operationId": "getTaskScreenshot",
+        "summary": "Get a specific screenshot",
+        "description": "Retrieves a specific screenshot by its numerical identifier.",
+        "tags": ["Tasks"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "screenshot",
+            "in": "path",
+            "required": true,
+            "description": "Screenshot number (e.g., 0001)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Screenshot image",
+            "content": {
+              "image/jpeg": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "404": { "description": "File not found" }
+        }
+      }
+    },
+    "/files/view/md5/{md5}/": {
+      "get": {
+        "operationId": "viewFileByMd5",
+        "summary": "View file details by MD5",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "md5",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileViewResponse" }
+              }
+            }
+          },
+          "400": { "description": "Invalid lookup term" },
+          "404": { "description": "File not found" }
+        }
+      }
+    },
+    "/files/view/sha256/{sha256}/": {
+      "get": {
+        "operationId": "viewFileBySha256",
+        "summary": "View file details by SHA256",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "sha256",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileViewResponse" }
+              }
+            }
+          },
+          "400": { "description": "Invalid lookup term" },
+          "404": { "description": "File not found" }
+        }
+      }
+    },
+    "/files/view/id/{id}/": {
+      "get": {
+        "operationId": "viewFileById",
+        "summary": "View file details by ID",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileViewResponse" }
+              }
+            }
+          },
+          "400": { "description": "Invalid lookup term" },
+          "404": { "description": "File not found" }
+        }
+      }
+    },
+    "/files/get/{sha256}/": {
+      "get": {
+        "operationId": "downloadFile",
+        "summary": "Download file by SHA256",
+        "description": "Returns the binary content of the file matching the specified SHA256 hash.",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "sha256",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File binary content",
+            "content": {
+              "application/octet-stream": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "404": { "description": "File not found" }
+        }
+      }
+    },
+    "/pcap/get/{task}/": {
+      "get": {
+        "operationId": "downloadPcap",
+        "summary": "Download PCAP file",
+        "description": "Returns the network capture (PCAP) associated with the given task.",
+        "tags": ["Files"],
+        "parameters": [
+          {
+            "name": "task",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PCAP file content",
+            "content": {
+              "application/vnd.tcpdump.pcap": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "404": { "description": "File not found" }
+        }
+      }
+    },
+    "/machines/list/": {
+      "get": {
+        "operationId": "listMachines",
+        "summary": "List analysis machines",
+        "description": "Returns a list with details on the analysis machines available.",
+        "tags": ["Machines"],
+        "responses": {
+          "200": {
+            "description": "List of machines",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MachineListResponse" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/machines/view/{name}/": {
+      "get": {
+        "operationId": "viewMachine",
+        "summary": "View machine details",
+        "description": "Returns details on the analysis machine associated with the given name.",
+        "tags": ["Machines"],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Machine details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MachineViewResponse" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Machine not found" }
+        }
+      }
+    },
+    "/cuckoo/status/": {
+      "get": {
+        "operationId": "getStatus",
+        "summary": "Get sandbox status",
+        "description": "Returns the basic status of the sandbox, including version and tasks overview.",
+        "tags": ["Status"],
+        "responses": {
+          "200": {
+            "description": "Sandbox status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StatusResponse" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api-token-auth/": {
+      "post": {
+        "operationId": "getToken",
+        "summary": "Get authentication token",
+        "description": "Authenticate and retrieve an API token using username and password.",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": { "type": "string" },
+                  "password": { "type": "string", "format": "password" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid credentials" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TaskCreateResponse": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "integer", "description": "ID of the newly created task" }
+        }
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "category": { "type": "string", "description": "Task category (file, url)" },
+          "target": { "type": "string", "description": "Analysis target (file path or URL)" },
+          "machine": { "type": "string" },
+          "package": { "type": "string" },
+          "sample_id": { "type": "integer" },
+          "guest": { "type": "object" },
+          "custom": { "type": "string" },
+          "priority": { "type": "integer" },
+          "platform": { "type": "string" },
+          "options": { "type": "string" },
+          "status": { "type": "string", "description": "Task status (pending, running, completed, reported)" },
+          "enforce_timeout": { "type": "boolean" },
+          "timeout": { "type": "integer" },
+          "memory": { "type": "boolean" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "errors": { "type": "array", "items": { "type": "string" } },
+          "added_on": { "type": "string", "format": "date-time" },
+          "completed_on": { "type": "string", "format": "date-time" }
+        }
+      },
+      "TaskListResponse": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Task" }
+          }
+        }
+      },
+      "TaskViewResponse": {
+        "type": "object",
+        "properties": {
+          "task": { "$ref": "#/components/schemas/Task" }
+        }
+      },
+      "FileViewResponse": {
+        "type": "object",
+        "properties": {
+          "sample": { "$ref": "#/components/schemas/Sample" }
+        }
+      },
+      "Sample": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "md5": { "type": "string" },
+          "sha1": { "type": "string" },
+          "sha256": { "type": "string" },
+          "sha512": { "type": "string" },
+          "crc32": { "type": "string" },
+          "ssdeep": { "type": "string" },
+          "file_size": { "type": "integer" },
+          "file_type": { "type": "string" }
+        }
+      },
+      "Machine": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "label": { "type": "string" },
+          "ip": { "type": "string" },
+          "platform": { "type": "string" },
+          "status": { "type": "string" },
+          "locked": { "type": "boolean" },
+          "locked_changed_on": { "type": "string" },
+          "status_changed_on": { "type": "string" },
+          "resultserver_ip": { "type": "string" },
+          "resultserver_port": { "type": "string" },
+          "interface": { "type": "string" },
+          "snapshot": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "MachineListResponse": {
+        "type": "object",
+        "properties": {
+          "machines": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Machine" }
+          }
+        }
+      },
+      "MachineViewResponse": {
+        "type": "object",
+        "properties": {
+          "machine": { "$ref": "#/components/schemas/Machine" }
+        }
+      },
+      "StatusResponse": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string" },
+          "protocol_version": { "type": "integer" },
+          "hostname": { "type": "string" },
+          "tasks": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "pending": { "type": "integer" },
+              "running": { "type": "integer" },
+              "completed": { "type": "integer" },
+              "reported": { "type": "integer" }
+            }
+          },
+          "machines": {
+            "type": "object",
+            "properties": {
+              "total": { "type": "integer" },
+              "available": { "type": "integer" }
+            }
+          },
+          "tools": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "securitySchemes": {
+      "tokenAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Token authentication. Prefix with 'Token ' (e.g., 'Token abc123')"
+      }
+    }
+  },
+  "security": [
+    {
+      "tokenAuth": []
+    }
+  ]
+}
