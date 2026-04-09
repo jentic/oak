@@ -1,0 +1,339 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CyberGordon API",
+    "version": "0.22.1",
+    "description": "CyberGordon is a cyber reputation check service that aggregates threat and risk information about observables (IP addresses, domains, URLs, file hashes, emails) from multiple security intelligence engines. Submit observables for analysis and retrieve aggregated results from engines including IPinfo, AbuseIPDB, VirusTotal, urlscan.io, Google Safe Browsing, GreyNoise, Pulsedive, and more. Results include risk assessment with suspicious/malicious indicators and links to original sources. Results are retained for 7 days.",
+    "x-jentic-source-url": "https://cybergordon.com",
+    "contact": {
+      "name": "Marc-Henry GEAY",
+      "url": "https://cybergordon.com/about.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://cybergordon.com",
+      "description": "CyberGordon Production"
+    }
+  ],
+  "paths": {
+    "/request/{observable}": {
+      "get": {
+        "operationId": "submitObservable",
+        "summary": "Submit an observable for analysis",
+        "description": "Submit an observable (IPv4, IPv6, FQDN, URL, MD5, SHA1, SHA256, or EMAIL) for reputation analysis across multiple security intelligence engines. The request is processed asynchronously. The response redirects to the result page with a unique request ID.",
+        "tags": ["Analysis"],
+        "parameters": [
+          {
+            "name": "observable",
+            "in": "path",
+            "required": true,
+            "description": "The observable to analyze. Can be an IP address, domain name, URL, file hash (MD5, SHA1, SHA256), or email address.",
+            "schema": {
+              "type": "string"
+            },
+            "examples": {
+              "ipv4": { "value": "8.8.8.8", "summary": "Google DNS IPv4" },
+              "domain": { "value": "example.com", "summary": "Domain name" },
+              "sha256": { "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "summary": "SHA256 hash" }
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to result page with request ID",
+            "headers": {
+              "Location": {
+                "description": "URL of the result page: /result.html?id={requestId}",
+                "schema": { "type": "string" }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied - rate limit exceeded or blocked"
+          }
+        }
+      }
+    },
+    "/request/form": {
+      "post": {
+        "operationId": "submitObservableForm",
+        "summary": "Submit observable(s) via form",
+        "description": "Submit one or more observables for analysis via form POST. Can also accept a previous request ID to retrieve existing results.",
+        "tags": ["Analysis"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["obs"],
+                "properties": {
+                  "obs": {
+                    "type": "string",
+                    "description": "Observable(s) to analyze (one per line) or a previous request ID."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {
+            "description": "Redirect to result page"
+          },
+          "403": {
+            "description": "Access denied"
+          }
+        }
+      }
+    },
+    "/get-request/{requestId}/info": {
+      "get": {
+        "operationId": "getRequestInfo",
+        "summary": "Get request metadata",
+        "description": "Retrieve metadata about a submitted analysis request, including creation time, expiry time, observable count, and type breakdown.",
+        "tags": ["Results"],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "description": "UUID of the analysis request.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Request info",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RequestInfoResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorStatusResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Request not found or expired"
+          }
+        }
+      }
+    },
+    "/get-request/{requestId}/results": {
+      "get": {
+        "operationId": "getRequestResults",
+        "summary": "Get analysis results",
+        "description": "Retrieve the full analysis results for a submitted request. Results include findings from each engine, risk assessments, and links to original sources. Results may be incomplete if the analysis is still processing - poll periodically until complete.",
+        "tags": ["Results"],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "description": "UUID of the analysis request.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analysis results",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ResultsResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "404": {
+            "description": "Request not found or expired"
+          }
+        }
+      }
+    },
+    "/assets/json/engine_list.fddb0.json": {
+      "get": {
+        "operationId": "getEngineList",
+        "summary": "Get list of analysis engines",
+        "description": "Returns the static list of all analysis engines with their supported observable types, descriptions, and risk assessment capabilities.",
+        "tags": ["Engines"],
+        "responses": {
+          "200": {
+            "description": "List of engines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Engine" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RequestInfoResponse": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "string",
+            "enum": ["success", "error"],
+            "description": "Response status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "exp": {
+                "type": "number",
+                "description": "Expiry timestamp (Unix epoch seconds). Results are available for 7 days."
+              },
+              "cre": {
+                "type": "number",
+                "description": "Creation timestamp (Unix epoch seconds)."
+              },
+              "obs_qty": {
+                "type": "number",
+                "description": "Total number of observables in this request."
+              },
+              "obs_qty_typ": {
+                "type": "object",
+                "additionalProperties": { "type": "number" },
+                "description": "Breakdown of observable count by type (e.g. {'ipv4': 1, 'fqdn': 2})."
+              }
+            }
+          }
+        }
+      },
+      "ResultsResponse": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "string",
+            "enum": ["success", "error"],
+            "description": "Response status."
+          },
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EngineResult" },
+            "description": "Array of engine analysis results."
+          }
+        }
+      },
+      "EngineResult": {
+        "type": "object",
+        "properties": {
+          "obs": {
+            "type": "string",
+            "description": "The observable that was analyzed."
+          },
+          "type": {
+            "type": "string",
+            "enum": ["IPV4", "IPV6", "FQDN", "URL", "MD5", "SHA1", "SHA256", "EMAIL"],
+            "description": "Type of the observable."
+          },
+          "engine": {
+            "type": "string",
+            "description": "Engine identifier and name (e.g. '[E1] IPinfo')."
+          },
+          "result": {
+            "type": "string",
+            "description": "Analysis result text from this engine."
+          },
+          "link": {
+            "type": "string",
+            "description": "URL to the original result on the source website."
+          },
+          "malicious": {
+            "type": "boolean",
+            "description": "Whether the observable is assessed as malicious by this engine."
+          },
+          "suspicious": {
+            "type": "boolean",
+            "description": "Whether the observable is assessed as suspicious by this engine."
+          }
+        }
+      },
+      "Engine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Engine identifier number."
+          },
+          "name": {
+            "type": "string",
+            "description": "Engine name."
+          },
+          "website": {
+            "type": "string",
+            "format": "uri",
+            "description": "Engine source website."
+          },
+          "obs_type": {
+            "type": "string",
+            "description": "Comma-separated list of supported observable types."
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the information this engine provides."
+          },
+          "assessment": {
+            "type": "boolean",
+            "description": "Whether this engine provides risk assessment (suspicious/malicious)."
+          },
+          "remark": {
+            "type": "string",
+            "description": "Additional remarks or limitations."
+          },
+          "tier": {
+            "type": "integer",
+            "description": "Engine tier (1 or 2)."
+          }
+        }
+      },
+      "ErrorStatusResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "HTTP status code."
+          },
+          "response": {
+            "type": "string",
+            "enum": ["error"],
+            "description": "Error response indicator."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "type": "string",
+                  "description": "Error message."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
