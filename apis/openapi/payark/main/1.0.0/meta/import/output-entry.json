@@ -1,0 +1,444 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PayArk API",
+    "version": "1.0.0",
+    "description": "PayArk is a payment API platform for Nepal that provides a unified interface for multiple payment providers including eSewa, Khalti, and HamroPay. The API enables merchants to create checkout sessions, manage payments, and receive webhook notifications with API key-based authentication and automatic retry logic.",
+    "x-jentic-source-url": "https://www.payark.dev/",
+    "contact": {
+      "name": "PayArk Support",
+      "url": "https://www.payark.dev"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.payark.dev",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/checkout": {
+      "post": {
+        "operationId": "createCheckout",
+        "summary": "Create checkout session",
+        "description": "Creates a new checkout session for payment processing. Returns a checkout URL where customers can complete payment using the specified provider (eSewa, Khalti, or HamroPay). Supports automatic idempotency to prevent duplicate transactions.",
+        "tags": [
+          "Checkout"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCheckoutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Checkout session created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments": {
+      "get": {
+        "operationId": "listPayments",
+        "summary": "List payments",
+        "description": "Retrieves a paginated list of payments for the project. Returns up to 100 payments per request with total count metadata.",
+        "tags": [
+          "Payments"
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of records to return (1-100)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Number of records to skip for pagination",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payments retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments/{id}": {
+      "get": {
+        "operationId": "retrievePayment",
+        "summary": "Retrieve payment",
+        "description": "Retrieves details of a specific payment by its identifier. Payment IDs follow the format 'pay_...'.",
+        "tags": [
+          "Payments"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Payment identifier (format: pay_...)",
+            "schema": {
+              "type": "string",
+              "pattern": "^pay_"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid payment ID format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Payment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "API key authentication using Bearer token. Use 'sk_test_...' prefix for sandbox environment or 'sk_live_...' prefix for production."
+      }
+    },
+    "schemas": {
+      "CreateCheckoutRequest": {
+        "type": "object",
+        "required": [
+          "amount",
+          "provider",
+          "returnUrl"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "Payment amount in base currency unit",
+            "minimum": 0
+          },
+          "provider": {
+            "type": "string",
+            "description": "Payment provider to use",
+            "enum": [
+              "esewa",
+              "khalti",
+              "hamropay"
+            ]
+          },
+          "returnUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to redirect customer after payment completion"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO currency code",
+            "default": "NPR",
+            "example": "NPR"
+          },
+          "cancelUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to redirect customer if payment is cancelled"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Custom key-value pairs for storing additional information"
+          }
+        }
+      },
+      "CheckoutSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique checkout session identifier"
+          },
+          "checkout_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL where customer should be redirected to complete payment"
+          },
+          "payment_method": {
+            "type": "object",
+            "description": "Payment method configuration details",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "esewa",
+                  "khalti",
+                  "hamropay"
+                ],
+                "description": "Payment provider type"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "description": "Provider-specific payment URL"
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "GET",
+                  "POST"
+                ],
+                "description": "HTTP method for payment submission"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Form fields required for payment submission"
+              }
+            }
+          }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique payment identifier (format: pay_...)"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Payment amount"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code"
+          },
+          "status": {
+            "type": "string",
+            "description": "Payment status",
+            "enum": [
+              "pending",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "provider": {
+            "type": "string",
+            "description": "Payment provider used",
+            "enum": [
+              "esewa",
+              "khalti",
+              "hamropay"
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Custom metadata attached to payment"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Payment creation timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Payment last update timestamp"
+          }
+        }
+      },
+      "PaymentList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Payment"
+            },
+            "description": "Array of payment objects"
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total number of payments available"
+              }
+            }
+          }
+        }
+      },
+      "WebhookEvent": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Event type",
+            "enum": [
+              "payment.succeeded",
+              "payment.failed",
+              "payment.cancelled"
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Payment"
+          }
+        },
+        "description": "Webhook event payload verified using X-PayArk-Signature header with HMAC validation"
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Error code category",
+            "enum": [
+              "authentication_error",
+              "permission_error",
+              "invalid_request_error",
+              "not_found_error",
+              "rate_limit_error",
+              "api_error"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message"
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "HTTP status code"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "apiKeyAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Checkout",
+      "description": "Checkout session creation and management"
+    },
+    {
+      "name": "Payments",
+      "description": "Payment retrieval and listing operations"
+    },
+    {
+      "name": "Webhooks",
+      "description": "Webhook event verification"
+    }
+  ]
+}
