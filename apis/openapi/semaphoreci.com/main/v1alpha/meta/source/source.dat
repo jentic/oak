@@ -1,0 +1,1333 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Semaphore CI",
+    "version": "v1alpha",
+    "description": "Semaphore CI/CD API for managing workflows, pipelines, jobs, promotions, deployment targets, self-hosted agents, and artifact retention policies.",
+    "x-jentic-source-url": "https://docs.semaphore.io/reference/api"
+  },
+  "servers": [
+    {
+      "url": "https://{organization}.semaphoreci.com/api/v1alpha",
+      "variables": {
+        "organization": {
+          "default": "myorg",
+          "description": "Your Semaphore organization name"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "apiToken": []
+    }
+  ],
+  "paths": {
+    "/plumber-workflows": {
+      "get": {
+        "operationId": "listWorkflows",
+        "summary": "List workflows",
+        "tags": ["Workflows"],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "branch_name",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "created_after",
+            "in": "query",
+            "schema": { "type": "integer", "description": "Unix timestamp" }
+          },
+          {
+            "name": "created_before",
+            "in": "query",
+            "schema": { "type": "integer", "description": "Unix timestamp" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of workflows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Workflow" }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "runWorkflow",
+        "summary": "Run a new workflow",
+        "tags": ["Workflows"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["project_id", "reference"],
+                "properties": {
+                  "project_id": { "type": "string" },
+                  "reference": { "type": "string" },
+                  "commit_sha": { "type": "string" },
+                  "pipeline_file": { "type": "string" },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Workflow started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workflow_id": { "type": "string" },
+                    "pipeline_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/plumber-workflows/{workflow_id}": {
+      "get": {
+        "operationId": "describeWorkflow",
+        "summary": "Describe a workflow",
+        "tags": ["Workflows"],
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workflow details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Workflow" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/plumber-workflows/{workflow_id}/reschedule": {
+      "post": {
+        "operationId": "rerunWorkflow",
+        "summary": "Rerun a workflow",
+        "tags": ["Workflows"],
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "request_token",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workflow rescheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "wf_id": { "type": "string" },
+                    "ppl_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/plumber-workflows/{workflow_id}/terminate": {
+      "post": {
+        "operationId": "stopWorkflow",
+        "summary": "Stop a workflow",
+        "tags": ["Workflows"],
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Workflow stopped" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/pipelines": {
+      "get": {
+        "operationId": "listPipelines",
+        "summary": "List pipelines",
+        "tags": ["Pipelines"],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "wf_id",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "branch_name",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "yml_file_path",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "created_after",
+            "in": "query",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "created_before",
+            "in": "query",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "done_after",
+            "in": "query",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "done_before",
+            "in": "query",
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of pipelines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Pipeline" }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/pipelines/{pipeline_id}": {
+      "get": {
+        "operationId": "describePipeline",
+        "summary": "Describe a pipeline",
+        "tags": ["Pipelines"],
+        "parameters": [
+          {
+            "name": "pipeline_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "detailed",
+            "in": "query",
+            "schema": { "type": "boolean" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pipeline details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Pipeline" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "patch": {
+        "operationId": "stopPipeline",
+        "summary": "Stop a pipeline",
+        "tags": ["Pipelines"],
+        "parameters": [
+          {
+            "name": "pipeline_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "terminate_request": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Pipeline stopped" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/pipelines/{pipeline_id}/partial_rebuild": {
+      "post": {
+        "operationId": "rebuildFailedBlocks",
+        "summary": "Rebuild failed blocks in a pipeline",
+        "tags": ["Pipelines"],
+        "parameters": [
+          {
+            "name": "pipeline_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "x-semaphore-user-id",
+            "in": "header",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["request_token"],
+                "properties": {
+                  "request_token": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rebuild started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pipeline_id": { "type": "string" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/yaml": {
+      "post": {
+        "operationId": "validatePipelineYaml",
+        "summary": "Validate pipeline YAML definition",
+        "tags": ["Pipelines"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["yaml_definition"],
+                "properties": {
+                  "yaml_definition": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pipeline_id": { "type": "string" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/promotions": {
+      "get": {
+        "operationId": "listPromotions",
+        "summary": "List promotions for a pipeline",
+        "tags": ["Promotions"],
+        "parameters": [
+          {
+            "name": "pipeline_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of promotions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Promotion" }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "triggerPromotion",
+        "summary": "Trigger a promotion",
+        "tags": ["Promotions"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["pipeline_id", "name"],
+                "properties": {
+                  "pipeline_id": { "type": "string" },
+                  "name": { "type": "string" },
+                  "override": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Promotion triggered" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/tasks/{task_id}/run_now": {
+      "post": {
+        "operationId": "triggerTask",
+        "summary": "Trigger a scheduled task",
+        "tags": ["Tasks"],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reference": { "type": "string" },
+                  "pipeline_file": { "type": "string" },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Task triggered" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "operationId": "describeJob",
+        "summary": "Describe a job",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Job" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/jobs/{job_id}/stop": {
+      "post": {
+        "operationId": "stopJob",
+        "summary": "Stop a job",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Job stopped" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/logs/{job_id}": {
+      "get": {
+        "operationId": "getJobLogs",
+        "summary": "Get job logs",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job log events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "event": { "type": "string" },
+                          "timestamp": { "type": "integer" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/self_hosted_agent_types": {
+      "get": {
+        "operationId": "listAgentTypes",
+        "summary": "List self-hosted agent types",
+        "tags": ["Self-Hosted Agents"],
+        "responses": {
+          "200": {
+            "description": "List of agent types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agent_types": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AgentType" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "createAgentType",
+        "summary": "Create a self-hosted agent type",
+        "tags": ["Self-Hosted Agents"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AgentTypeInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent type created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AgentType" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/self_hosted_agent_types/{agent_type_name}": {
+      "get": {
+        "operationId": "describeAgentType",
+        "summary": "Describe a self-hosted agent type",
+        "tags": ["Self-Hosted Agents"],
+        "parameters": [
+          {
+            "name": "agent_type_name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent type details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AgentType" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "patch": {
+        "operationId": "updateAgentType",
+        "summary": "Update a self-hosted agent type",
+        "tags": ["Self-Hosted Agents"],
+        "parameters": [
+          {
+            "name": "agent_type_name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AgentTypeInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent type updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AgentType" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAgentType",
+        "summary": "Delete a self-hosted agent type",
+        "tags": ["Self-Hosted Agents"],
+        "parameters": [
+          {
+            "name": "agent_type_name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent type deleted",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/self_hosted_agent_types/{agent_type_name}/disable_all": {
+      "post": {
+        "operationId": "disableAgents",
+        "summary": "Disable all agents of a type",
+        "tags": ["Self-Hosted Agents"],
+        "parameters": [
+          {
+            "name": "agent_type_name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "only_idle",
+            "in": "query",
+            "schema": { "type": "boolean" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agents disabled",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/agents": {
+      "get": {
+        "operationId": "listAgents",
+        "summary": "List self-hosted agents",
+        "tags": ["Self-Hosted Agents"],
+        "parameters": [
+          {
+            "name": "agent_type",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of agents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agents": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Agent" }
+                    },
+                    "cursor": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/agents/{agent_name}": {
+      "get": {
+        "operationId": "describeAgent",
+        "summary": "Describe a self-hosted agent",
+        "tags": ["Self-Hosted Agents"],
+        "parameters": [
+          {
+            "name": "agent_name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Agent" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/deployment_targets": {
+      "get": {
+        "operationId": "listDeploymentTargets",
+        "summary": "List deployment targets",
+        "tags": ["Deployment Targets"],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "target_name",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of deployment targets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/DeploymentTarget" }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "createDeploymentTarget",
+        "summary": "Create a deployment target",
+        "tags": ["Deployment Targets"],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DeploymentTargetInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deployment target created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DeploymentTarget" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/deployment_targets/{target_id}": {
+      "get": {
+        "operationId": "describeDeploymentTarget",
+        "summary": "Describe a deployment target",
+        "tags": ["Deployment Targets"],
+        "parameters": [
+          {
+            "name": "target_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deployment target details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DeploymentTarget" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "patch": {
+        "operationId": "updateDeploymentTarget",
+        "summary": "Update a deployment target",
+        "tags": ["Deployment Targets"],
+        "parameters": [
+          {
+            "name": "target_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DeploymentTargetInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deployment target updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DeploymentTarget" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteDeploymentTarget",
+        "summary": "Delete a deployment target",
+        "tags": ["Deployment Targets"],
+        "parameters": [
+          {
+            "name": "target_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "unique_token",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deployment target deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "target_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/deployment_targets/{target_id}/deactivate": {
+      "patch": {
+        "operationId": "deactivateDeploymentTarget",
+        "summary": "Deactivate a deployment target",
+        "tags": ["Deployment Targets"],
+        "parameters": [
+          {
+            "name": "target_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Target deactivated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "target_id": { "type": "string" },
+                    "cordoned": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/deployment_targets/{target_id}/activate": {
+      "patch": {
+        "operationId": "activateDeploymentTarget",
+        "summary": "Activate a deployment target",
+        "tags": ["Deployment Targets"],
+        "parameters": [
+          {
+            "name": "target_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Target activated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "target_id": { "type": "string" },
+                    "cordoned": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/deployment_targets/{target_id}/history": {
+      "get": {
+        "operationId": "getDeploymentHistory",
+        "summary": "Get deployment history for a target",
+        "tags": ["Deployment Targets"],
+        "parameters": [
+          {
+            "name": "target_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "cursor_type",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "cursor_value",
+            "in": "query",
+            "schema": { "type": "integer", "description": "Unix microseconds" }
+          },
+          {
+            "name": "git_ref_type",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "git_ref_label",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "triggered_by",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deployment history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deployments": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    },
+                    "cursor_before": { "type": "integer" },
+                    "cursor_after": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/artifacts_retention_policies": {
+      "post": {
+        "operationId": "configureRetentionPolicy",
+        "summary": "Configure artifact retention policy",
+        "tags": ["Artifact Retention"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["project_id"],
+                "properties": {
+                  "project_id": { "type": "string" },
+                  "project_level_retention_policies": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/RetentionPolicy" }
+                  },
+                  "workflow_level_retention_policies": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/RetentionPolicy" }
+                  },
+                  "job_level_retention_policies": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/RetentionPolicy" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Retention policy configured" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/artifacts_retention_policies/{project_id}": {
+      "get": {
+        "operationId": "describeRetentionPolicy",
+        "summary": "Describe artifact retention policy",
+        "tags": ["Artifact Retention"],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Retention policy details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "project_id": { "type": "string" },
+                    "project_level_retention_policies": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/RetentionPolicy" }
+                    },
+                    "workflow_level_retention_policies": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/RetentionPolicy" }
+                    },
+                    "job_level_retention_policies": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/RetentionPolicy" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Token-based auth. Format: Token {api_token}"
+      }
+    },
+    "schemas": {
+      "Workflow": {
+        "type": "object",
+        "properties": {
+          "workflow_id": { "type": "string" },
+          "pipeline_id": { "type": "string" },
+          "project_id": { "type": "string" },
+          "branch_name": { "type": "string" },
+          "commit_sha": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Pipeline": {
+        "type": "object",
+        "properties": {
+          "pipeline_id": { "type": "string" },
+          "workflow_id": { "type": "string" },
+          "project_id": { "type": "string" },
+          "branch_name": { "type": "string" },
+          "yml_file_path": { "type": "string" },
+          "state": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "done_at": { "type": "string", "format": "date-time" },
+          "blocks": {
+            "type": "array",
+            "items": { "type": "object" }
+          }
+        }
+      },
+      "Promotion": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "pipeline_id": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string" },
+          "agent": { "type": "object" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "finished_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AgentType": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "agent_name_settings": { "type": "object" },
+          "registration_token": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AgentTypeInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "agent_name_settings": { "type": "object" }
+        }
+      },
+      "Agent": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "agent_type": { "type": "string" },
+          "status": { "type": "string" },
+          "connected_at": { "type": "string", "format": "date-time" },
+          "ip_address": { "type": "string" }
+        }
+      },
+      "DeploymentTarget": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "project_id": { "type": "string" },
+          "unique_token": { "type": "string" },
+          "cordoned": { "type": "boolean" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "DeploymentTargetInput": {
+        "type": "object",
+        "required": ["name", "unique_token"],
+        "properties": {
+          "name": { "type": "string" },
+          "unique_token": { "type": "string" },
+          "description": { "type": "string" },
+          "url": { "type": "string" },
+          "bookmark_parameter1": { "type": "string" },
+          "bookmark_parameter2": { "type": "string" },
+          "bookmark_parameter3": { "type": "string" }
+        }
+      },
+      "RetentionPolicy": {
+        "type": "object",
+        "properties": {
+          "selector": { "type": "string" },
+          "age": { "type": "string" }
+        }
+      }
+    }
+  }
+}
