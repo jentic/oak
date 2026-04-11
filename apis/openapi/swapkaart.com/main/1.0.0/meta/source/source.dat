@@ -1,0 +1,254 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Swapkaart API",
+    "description": "Swapkaart is a digital business card platform for sales driven companies. This API provides access to authentication, contact management, and user information via Zapier integration endpoints.",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://www.swapkaart.com/api-zapier"
+  },
+  "servers": [
+    {
+      "url": "https://europe-west1-codebooth-a4b70.cloudfunctions.net/swapkaartzappierTEWMgRuJQntORtwn",
+      "description": "Swapkaart Zapier API Server"
+    }
+  ],
+  "tags": [
+    { "name": "Authentication", "description": "User authentication and token management" },
+    { "name": "Contacts", "description": "Contact management" },
+    { "name": "Users", "description": "User information" }
+  ],
+  "paths": {
+    "/zappier/login": {
+      "get": {
+        "operationId": "loginRedirect",
+        "summary": "Login redirect for OAuth flow",
+        "description": "Redirects the user to the Swapkaart login page for OAuth authentication.",
+        "tags": ["Authentication"],
+        "parameters": [
+          {
+            "name": "user_password",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "User password"
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "OAuth client identifier"
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "OAuth state parameter for CSRF protection"
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "uri" },
+            "description": "URI to redirect to after authentication"
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "OAuth response type"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to authentication page"
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/zappier/auth": {
+      "post": {
+        "operationId": "authenticateUser",
+        "summary": "Authenticate user and exchange credentials for tokens",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AuthRequest" }
+            }
+          }
+        },
+        "responses": {
+          "302": {
+            "description": "Redirect with state, code, and uid parameters"
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/zappier/access": {
+      "post": {
+        "operationId": "getAccessToken",
+        "summary": "Exchange token for access and refresh tokens",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AccessTokenRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Access token response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AccessTokenResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/zappier/contacts": {
+      "get": {
+        "operationId": "listContacts",
+        "summary": "Fetch all contacts for the authenticated user",
+        "tags": ["Contacts"],
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Authenticated user ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of contacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Contact" }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "getAuthenticatedUser",
+        "summary": "Get authenticated user information",
+        "tags": ["Users"],
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Authenticated user ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated user details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Firebase ID token passed as Bearer token in Authorization header"
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request - invalid or missing parameters"
+      },
+      "Unauthorized": {
+        "description": "Unauthorized - invalid or expired authentication token"
+      }
+    },
+    "schemas": {
+      "AuthRequest": {
+        "type": "object",
+        "properties": {
+          "uid": { "type": "string", "description": "User ID" },
+          "redirect_uri": { "type": "string", "format": "uri", "description": "OAuth redirect URI" },
+          "state": { "type": "string", "description": "OAuth state parameter" },
+          "customer_token": { "type": "string", "description": "Customer authentication token" },
+          "refresh_token": { "type": "string", "description": "Refresh token" }
+        },
+        "required": ["uid", "redirect_uri", "state", "customer_token"]
+      },
+      "AccessTokenRequest": {
+        "type": "object",
+        "properties": {
+          "client_id": { "type": "string", "description": "OAuth client identifier" },
+          "token": { "type": "string", "description": "Authorization code or refresh token" }
+        },
+        "required": ["client_id", "token"]
+      },
+      "AccessTokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": { "type": "string", "description": "Access token for API requests" },
+          "refresh_token": { "type": "string", "description": "Refresh token for obtaining new access tokens" },
+          "uid": { "type": "string", "description": "Authenticated user ID" }
+        }
+      },
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Unique contact identifier" },
+          "name": { "type": "string", "description": "Contact full name" },
+          "email": { "type": "string", "format": "email", "description": "Contact email address" },
+          "phone": { "type": "string", "description": "Contact phone number" },
+          "company": { "type": "string", "description": "Contact company name" },
+          "notes": { "type": "string", "description": "Notes about the contact" },
+          "timestamp": { "type": "string", "format": "date-time", "description": "Contact creation or last update timestamp" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "Account status" },
+          "email": { "type": "string", "format": "email", "description": "User email address" },
+          "displayName": { "type": "string", "description": "User display name" }
+        }
+      }
+    }
+  }
+}
