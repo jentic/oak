@@ -1,0 +1,1365 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Minimo API",
+    "description": "API for managing contacts, custom fields, and sending messages via email and WhatsApp channels.",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://docs.minimo.it"
+  },
+  "servers": [
+    {
+      "url": "https://api.minimo.it",
+      "description": "New API server (Contacts, WhatsApp, Custom Fields)"
+    },
+    {
+      "url": "https://app.minimo.it",
+      "description": "Legacy API server (Email templates, Messages)"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/public/v1/contacts": {
+      "post": {
+        "operationId": "upsertcontact",
+        "summary": "Create or update contact",
+        "description": "Insert or update a contact via upsert. Matches by email first, then phone; creates a new record if no match exists.",
+        "tags": [
+          "Contacts"
+        ],
+        "servers": [
+          {
+            "url": "https://api.minimo.it"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ContactUpsertRequest"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ContactUpsertRequest"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact(s) created or updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContactUpsertResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/v1/contacts/by-email/{email}": {
+      "get": {
+        "operationId": "getcontactbyemail",
+        "summary": "Get contact by email",
+        "description": "Retrieve a contact's full data by their email address. Returns 404 if the contact does not exist or is soft-deleted.",
+        "tags": [
+          "Contacts"
+        ],
+        "servers": [
+          {
+            "url": "https://api.minimo.it"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "description": "Email address of the contact",
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contact"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid email format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/v1/contacts/{id}": {
+      "put": {
+        "operationId": "updatecontactbyid",
+        "summary": "Update contact by ID",
+        "description": "Modify an existing contact record. Only provided fields are updated; custom fields undergo deep merging.",
+        "tags": [
+          "Contacts"
+        ],
+        "servers": [
+          {
+            "url": "https://api.minimo.it"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Contact ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deletecontact",
+        "summary": "Delete contact",
+        "description": "Soft-delete a contact. The contact remains in the database and can be restored via upsert or update.",
+        "tags": [
+          "Contacts"
+        ],
+        "servers": [
+          {
+            "url": "https://api.minimo.it"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Contact ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean",
+                  "example": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contact not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/v1/custom-fields": {
+      "get": {
+        "operationId": "listcustomfields",
+        "summary": "List custom fields",
+        "description": "Retrieve all custom fields configured for your account, with optional grouping by category.",
+        "tags": [
+          "Custom Fields"
+        ],
+        "servers": [
+          {
+            "url": "https://api.minimo.it"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "groupBy",
+            "in": "query",
+            "description": "Group results by specified field (only 'category' is supported)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "category"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Custom fields retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomFieldsListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createcustomfield",
+        "summary": "Create custom field",
+        "description": "Create a new custom field to store additional contact data.",
+        "tags": [
+          "Custom Fields"
+        ],
+        "servers": [
+          {
+            "url": "https://api.minimo.it"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomFieldCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Custom field created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomFieldResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates/email": {
+      "get": {
+        "operationId": "listemailtemplates",
+        "summary": "List email templates",
+        "description": "Retrieve all email templates created in your Minimo account.",
+        "tags": [
+          "Email"
+        ],
+        "servers": [
+          {
+            "url": "https://app.minimo.it"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email templates retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTemplateListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates/email/send": {
+      "post": {
+        "operationId": "sendemailtemplate",
+        "summary": "Send email template",
+        "description": "Send a transactional or automated email using a predefined template with dynamic variable substitution.",
+        "tags": [
+          "Email"
+        ],
+        "servers": [
+          {
+            "url": "https://app.minimo.it"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SendEmailRequest"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SendEmailRequest"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/templates/email/{id}/stats": {
+      "get": {
+        "operationId": "getemailtemplatestats",
+        "summary": "Get email template stats",
+        "description": "Retrieve transactional detail and statistics for a specific email template.",
+        "tags": [
+          "Email"
+        ],
+        "servers": [
+          {
+            "url": "https://app.minimo.it"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The unique ID of the email template",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stats retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailTemplateStats"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/v1/templates/whatsapp": {
+      "get": {
+        "operationId": "listwhatsapptemplates",
+        "summary": "List WhatsApp templates",
+        "description": "Retrieve all WhatsApp templates associated with your Minimo account.",
+        "tags": [
+          "WhatsApp"
+        ],
+        "servers": [
+          {
+            "url": "https://api.minimo.it"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "WhatsApp templates retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatsAppTemplateListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/v1/templates/whatsapp/send": {
+      "post": {
+        "operationId": "sendwhatsapptemplate",
+        "summary": "Send WhatsApp template message",
+        "description": "Send a WhatsApp message using a Meta-approved template or plain text.",
+        "tags": [
+          "WhatsApp"
+        ],
+        "servers": [
+          {
+            "url": "https://api.minimo.it"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendWhatsAppRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Bearer token in format: mn-API_CLIENT_ID-API_KEY"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "NotFoundResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Contact not found"
+          }
+        }
+      },
+      "StatusResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "example": 200
+          }
+        }
+      },
+      "ContactUpsertRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address of the contact"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Phone number in E.164 format"
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Key-value pairs for custom data"
+          },
+          "marketingConsent": {
+            "$ref": "#/components/schemas/MarketingConsent"
+          }
+        }
+      },
+      "ContactUpsertResponse": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string",
+            "description": "Identifier for the created/updated contact"
+          }
+        }
+      },
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "custom_fields": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "company": {
+            "type": "integer",
+            "nullable": true
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "external_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "external_connection_id": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "ContactUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "marketingConsent": {
+            "$ref": "#/components/schemas/MarketingConsent"
+          }
+        }
+      },
+      "ContactUpdateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "phone": {
+            "type": "string"
+          }
+        }
+      },
+      "MarketingConsent": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "boolean",
+            "description": "Email marketing consent"
+          },
+          "whatsapp": {
+            "type": "boolean",
+            "description": "WhatsApp marketing consent"
+          }
+        }
+      },
+      "CustomFieldCreateRequest": {
+        "type": "object",
+        "required": [
+          "key",
+          "displayName",
+          "type"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Unique identifier, auto-converted to uppercase"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Human-readable label"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "boolean",
+              "date",
+              "datetime",
+              "select",
+              "json"
+            ],
+            "description": "Field data type"
+          },
+          "category": {
+            "type": "string",
+            "description": "Groups related fields"
+          },
+          "acceptableValues": {
+            "type": "object",
+            "description": "Permitted values for select/enum types"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Supplementary information"
+          },
+          "visibility": {
+            "type": "boolean",
+            "default": false,
+            "description": "UI display setting"
+          }
+        }
+      },
+      "CustomField": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "boolean",
+              "date",
+              "datetime",
+              "select",
+              "json"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "acceptableValues": {
+            "type": "object",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          },
+          "visibility": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CustomFieldResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CustomField"
+          }
+        }
+      },
+      "CustomFieldsListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CustomField"
+                      }
+                    }
+                  }
+                }
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "EmailTemplate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "draft",
+              "archived"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "transactional",
+              "marketing",
+              "automated"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "variables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "EmailTemplateListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmailTemplate"
+            }
+          }
+        }
+      },
+      "SendEmailRequest": {
+        "type": "object",
+        "required": [
+          "recipient",
+          "uid"
+        ],
+        "properties": {
+          "recipient": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address of the recipient"
+          },
+          "uid": {
+            "type": "string",
+            "description": "UID identifier for the transactional email"
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Dynamic key-value pairs matching template variables"
+          }
+        }
+      },
+      "EmailTemplateStats": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string"
+          },
+          "templateName": {
+            "type": "string"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSent": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totalMessagesSent": {
+            "type": "integer"
+          },
+          "openRate": {
+            "type": "string"
+          },
+          "clickRate": {
+            "type": "string"
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "sent": {
+                "type": "integer"
+              },
+              "delivered": {
+                "type": "integer"
+              },
+              "bounced": {
+                "type": "integer"
+              },
+              "opened": {
+                "type": "integer"
+              },
+              "clicked": {
+                "type": "integer"
+              },
+              "unsubscribed": {
+                "type": "integer"
+              },
+              "complained": {
+                "type": "integer"
+              }
+            }
+          },
+          "rates": {
+            "type": "object",
+            "properties": {
+              "deliveryRate": {
+                "type": "string"
+              },
+              "bounceRate": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "WhatsAppTemplate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "APPROVED",
+              "PENDING",
+              "REJECTED",
+              "DISABLED"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "AUTHENTICATION",
+              "MARKETING",
+              "UTILITY"
+            ]
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "qualityScore": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "string",
+                "enum": [
+                  "UNKNOWN",
+                  "GREEN",
+                  "YELLOW",
+                  "RED"
+                ]
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "nullable": true
+              }
+            }
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WhatsAppTemplateComponent"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WhatsAppTemplateComponent": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "HEADER",
+              "BODY",
+              "FOOTER",
+              "BUTTONS"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "IMAGE",
+              "VIDEO",
+              "DOCUMENT"
+            ]
+          },
+          "example": {
+            "type": "object",
+            "properties": {
+              "body_text": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "WhatsAppTemplateListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WhatsAppTemplate"
+            }
+          }
+        }
+      },
+      "SendWhatsAppRequest": {
+        "type": "object",
+        "required": [
+          "recipient",
+          "type"
+        ],
+        "properties": {
+          "recipient": {
+            "type": "string",
+            "description": "Phone number with country code (e.g. 393471234567)"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "template"
+            ],
+            "description": "Message type"
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text content (used when type is 'text')"
+          },
+          "template": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Template identifier"
+              },
+              "components": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "Component type (BODY, HEADER, FOOTER, BUTTONS)"
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "description": "Parameter type (text, image, video, document, currency, date_time, payload)"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Contacts",
+      "description": "Operations related to Contacts"
+    },
+    {
+      "name": "Custom Fields",
+      "description": "Operations related to Custom Fields"
+    },
+    {
+      "name": "Email",
+      "description": "Operations related to Email"
+    },
+    {
+      "name": "WhatsApp",
+      "description": "Operations related to WhatsApp"
+    }
+  ]
+}
