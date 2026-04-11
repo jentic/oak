@@ -1,0 +1,705 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "XPay Payment Gateway API",
+    "description": "Nexi XPay payment gateway API for e-commerce payments including hosted payment pages, pay-by-link, 3-step payments, card verification, Google Pay, back-office operations (refunds, captures, cancellations), and disputeless hospitality features.",
+    "version": "1.0",
+    "x-jentic-source-url": "https://developer.nexi.it/en"
+  },
+  "servers": [
+    {
+      "url": "https://xpay.nexigroup.com/api/phoenix-0.0/psp/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "https://xpaysandbox.nexigroup.com/api/phoenix-0.0/psp/api/v1",
+      "description": "Sandbox"
+    }
+  ],
+  "paths": {
+    "/orders/hpp": {
+      "post": {
+        "operationId": "createHostedPaymentPage",
+        "summary": "Create hosted payment page order",
+        "description": "Initializes a payment via hosted payment page redirect.",
+        "tags": ["Payments"],
+        "parameters": [
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "Unique request identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/HppOrderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Hosted payment page URL returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hostedPage": { "type": "string", "description": "URL of the hosted payment page" },
+                    "securityToken": { "type": "string", "description": "Token for validating notifications" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "operationId": "getOrder",
+        "summary": "Retrieve order details",
+        "tags": ["Back Office"],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "maxLength": 18 },
+            "description": "Merchant order identifier"
+          },
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrderStatus" }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Order not found" }
+        }
+      }
+    },
+    "/orders": {
+      "get": {
+        "operationId": "listOrders",
+        "summary": "Retrieve all orders",
+        "tags": ["Back Office"],
+        "parameters": [
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "List of orders" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/operations/{operationId}/refunds": {
+      "post": {
+        "operationId": "refundOperation",
+        "summary": "Process a refund",
+        "tags": ["Back Office"],
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount", "currency"],
+                "properties": {
+                  "amount": { "type": "string", "description": "Amount in smallest currency unit" },
+                  "currency": { "type": "string", "description": "ISO 4217 currency code" },
+                  "description": { "type": "string", "maxLength": 255 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refund processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operationId": { "type": "string" },
+                    "operationTime": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Operation not found" }
+        }
+      }
+    },
+    "/operations/{operationId}/captures": {
+      "post": {
+        "operationId": "captureOperation",
+        "summary": "Capture a payment",
+        "tags": ["Back Office"],
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount", "currency"],
+                "properties": {
+                  "amount": { "type": "string" },
+                  "currency": { "type": "string" },
+                  "description": { "type": "string", "maxLength": 255 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Capture successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operationId": { "type": "string" },
+                    "operationTime": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/operations/{operationId}/cancels": {
+      "post": {
+        "operationId": "cancelOperation",
+        "summary": "Cancel an operation",
+        "tags": ["Back Office"],
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "description": { "type": "string", "maxLength": 255 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operationId": { "type": "string" },
+                    "operationTime": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/operations": {
+      "get": {
+        "operationId": "listOperations",
+        "summary": "Retrieve all operations",
+        "tags": ["Back Office"],
+        "parameters": [
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "List of operations" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/operations/{operationId}": {
+      "get": {
+        "operationId": "getOperation",
+        "summary": "Retrieve a specific operation",
+        "tags": ["Back Office"],
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Operation details" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/operations/{operationId}/actions": {
+      "get": {
+        "operationId": "getOperationActions",
+        "summary": "List available actions for an operation",
+        "tags": ["Back Office"],
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Available actions" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/v2/orders/paybylink": {
+      "post": {
+        "operationId": "createPayByLinkV2",
+        "summary": "Create a pay-by-link (v2)",
+        "tags": ["Pay by Link"],
+        "parameters": [
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PayByLinkRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Pay-by-link created" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/orders/paybylink": {
+      "get": {
+        "operationId": "listPayByLinks",
+        "summary": "List all pay-by-link orders",
+        "tags": ["Pay by Link"],
+        "parameters": [
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "List of pay-by-link orders" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/orders/paybylink/{linkId}": {
+      "get": {
+        "operationId": "getPayByLink",
+        "summary": "Retrieve a specific pay-by-link",
+        "tags": ["Pay by Link"],
+        "parameters": [
+          {
+            "name": "linkId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Pay-by-link details" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/paybylink/{linkId}/cancels": {
+      "post": {
+        "operationId": "cancelPayByLink",
+        "summary": "Cancel a pay-by-link",
+        "tags": ["Pay by Link"],
+        "parameters": [
+          {
+            "name": "linkId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Pay-by-link cancelled" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/contracts/customers/{customerId}": {
+      "get": {
+        "operationId": "getCustomerContracts",
+        "summary": "Retrieve customer contracts",
+        "tags": ["Contracts"],
+        "parameters": [
+          {
+            "name": "customerId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "maxLength": 27 }
+          },
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Customer contracts" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/contracts/{contractId}/deactivation": {
+      "post": {
+        "operationId": "deactivateContract",
+        "summary": "Deactivate a contract",
+        "tags": ["Contracts"],
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Contract deactivated" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/payment_methods": {
+      "get": {
+        "operationId": "listPaymentMethods",
+        "summary": "List available payment methods",
+        "tags": ["Payment Methods"],
+        "parameters": [
+          {
+            "name": "Correlation-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Payment methods list" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key",
+        "description": "API key in UUID format for authentication"
+      }
+    },
+    "schemas": {
+      "HppOrderRequest": {
+        "type": "object",
+        "required": ["order", "paymentSession"],
+        "properties": {
+          "order": { "$ref": "#/components/schemas/Order" },
+          "paymentSession": { "$ref": "#/components/schemas/PaymentSession" },
+          "customerInfo": { "$ref": "#/components/schemas/CustomerInfo" },
+          "recurrence": { "$ref": "#/components/schemas/Recurrence" }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "required": ["orderId", "amount", "currency"],
+        "properties": {
+          "orderId": { "type": "string", "maxLength": 18, "description": "Merchant order ID, unique in the merchant domain" },
+          "amount": { "type": "string", "description": "Transaction amount in smallest currency unit" },
+          "currency": { "type": "string", "description": "ISO 4217 currency code" },
+          "customerId": { "type": "string", "maxLength": 27 },
+          "description": { "type": "string", "maxLength": 255 },
+          "customField": { "type": "string", "maxLength": 255 }
+        }
+      },
+      "PaymentSession": {
+        "type": "object",
+        "required": ["actionType", "amount", "language", "resultUrl", "cancelUrl"],
+        "properties": {
+          "actionType": { "type": "string", "enum": ["PAY", "VERIFY", "PREAUTH"] },
+          "amount": { "type": "string", "description": "First payment amount" },
+          "language": { "type": "string", "description": "ISO 639-2 language code", "default": "ita" },
+          "resultUrl": { "type": "string", "maxLength": 2048, "description": "Redirect URL after payment" },
+          "cancelUrl": { "type": "string", "maxLength": 2048, "description": "Redirect URL on abandonment" },
+          "notificationUrl": { "type": "string", "maxLength": 2048, "description": "Server-to-server webhook URL" },
+          "paymentService": { "type": "string", "description": "Restrict to specific payment circuit" }
+        }
+      },
+      "CustomerInfo": {
+        "type": "object",
+        "properties": {
+          "cardHolderName": { "type": "string", "maxLength": 255 },
+          "cardHolderEmail": { "type": "string", "maxLength": 255 },
+          "billingAddress": { "$ref": "#/components/schemas/Address" },
+          "shippingAddress": { "$ref": "#/components/schemas/Address" }
+        }
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "street": { "type": "string" },
+          "additionalInfo": { "type": "string" },
+          "city": { "type": "string" },
+          "postCode": { "type": "string" },
+          "province": { "type": "string" },
+          "country": { "type": "string", "description": "ISO 3166-1 alpha-3" }
+        }
+      },
+      "Recurrence": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "enum": ["NO_RECURRING", "SUBSEQUENT_PAYMENT", "CONTRACT_CREATION", "CARD_SUBSTITUTION"] },
+          "contractId": { "type": "string" },
+          "contractType": { "type": "string", "enum": ["MIT_UNSCHEDULED", "MIT_SCHEDULED", "CIT"] },
+          "contractExpiryDate": { "type": "string" },
+          "contractFrequency": { "type": "string", "description": "Days between charges" },
+          "captureType": { "type": "string", "enum": ["IMPLICIT", "EXPLICIT"] },
+          "exemptions": { "type": "string", "enum": ["NO_PREFERENCE", "CHALLENGE_REQUESTED"] }
+        }
+      },
+      "PayByLinkRequest": {
+        "type": "object",
+        "required": ["order"],
+        "properties": {
+          "order": { "$ref": "#/components/schemas/Order" }
+        }
+      },
+      "OrderStatus": {
+        "type": "object",
+        "properties": {
+          "orderStatus": {
+            "type": "object",
+            "properties": {
+              "order": { "$ref": "#/components/schemas/Order" },
+              "operations": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/Operation" }
+              }
+            }
+          }
+        }
+      },
+      "Operation": {
+        "type": "object",
+        "properties": {
+          "operationId": { "type": "string" },
+          "operationType": { "type": "string" },
+          "operationResult": { "type": "string" },
+          "operationTime": { "type": "string", "format": "date-time" },
+          "paymentMethod": { "type": "string", "enum": ["CARD", "APM"] },
+          "paymentCircuit": { "type": "string" },
+          "operationAmount": { "type": "string" },
+          "operationCurrency": { "type": "string" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "string" },
+                "description": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    { "apiKey": [] }
+  ]
+}
