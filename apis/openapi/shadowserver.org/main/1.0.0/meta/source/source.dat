@@ -1,0 +1,827 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Shadowserver Foundation API",
+    "description": "Shadowserver Foundation provides APIs for querying ASN/network routing data, malware information, honeypot statistics, and security reports.",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://github.com/The-Shadowserver-Foundation/api_utils/wiki"
+  },
+  "servers": [
+    {
+      "url": "https://api.shadowserver.org",
+      "description": "Shadowserver API server"
+    }
+  ],
+  "paths": {
+    "/net/asn": {
+      "get": {
+        "operationId": "queryAsnOrigin",
+        "summary": "Query ASN origin for IP addresses",
+        "description": "Returns the originating ASN and ASN name for specified IP addresses. Supports up to 1,000 IPs per call.",
+        "tags": ["ASN"],
+        "parameters": [
+          {
+            "name": "origin",
+            "in": "query",
+            "description": "Comma-separated IP addresses to look up ASN origin (up to 1000)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "peer",
+            "in": "query",
+            "description": "Comma-separated IP addresses to look up BGP peers (up to 1000)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "prefix",
+            "in": "query",
+            "description": "ASN number to query routed CIDRs",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "description": "ASN number to get details about",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "v",
+            "in": "query",
+            "description": "IP version (4 or 6) for prefix queries",
+            "schema": {
+              "type": "integer",
+              "enum": [4, 6]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AsnOriginResult"
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/AsnQueryResult"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "429": {
+            "description": "Rate limit exceeded (10 queries per second)"
+          }
+        }
+      }
+    },
+    "/malware/info": {
+      "get": {
+        "operationId": "getMalwareInfo",
+        "summary": "Get malware sample information",
+        "description": "Returns static details about malware samples including AV vendor signatures. Supports up to 1,000 samples per call. Requires malware group membership.",
+        "tags": ["Malware"],
+        "parameters": [
+          {
+            "name": "sample",
+            "in": "query",
+            "required": true,
+            "description": "Comma-separated MD5 hashes of malware samples (up to 1000)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Malware information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MalwareInfo"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized - not a member of the malware group"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/honeypot/common-vulnerabilities": {
+      "post": {
+        "operationId": "getCommonVulnerabilities",
+        "summary": "Get honeypot CVE statistics",
+        "description": "Returns honeypot CVE statistics for a given date or date range. Requires honeypot group membership.",
+        "tags": ["Honeypot"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoneypotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vulnerability statistics (JSON Lines)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VulnerabilityStats"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/honeypot/exploited-vulnerabilities": {
+      "post": {
+        "operationId": "getExploitedVulnerabilities",
+        "summary": "Get exploited vulnerability statistics",
+        "description": "Lists honeypot exploited vulnerabilities in descending order by number of IPs for a given day.",
+        "tags": ["Honeypot"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExploitedVulnRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exploited vulnerability statistics (JSON Lines)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExploitedVulnerability"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/honeypot/vulnerability-count": {
+      "post": {
+        "operationId": "getVulnerabilityCount",
+        "summary": "Get vulnerability count",
+        "description": "Returns vulnerability count statistics from honeypot data.",
+        "tags": ["Honeypot"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoneypotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vulnerability count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/reports/subscribed": {
+      "post": {
+        "operationId": "getSubscribedReports",
+        "summary": "List subscribed report lists",
+        "description": "Returns the lists the user is subscribed to. Requires reports group membership.",
+        "tags": ["Reports"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "List of subscribed report lists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/reports/types": {
+      "post": {
+        "operationId": "getReportTypes",
+        "summary": "List available report types",
+        "description": "Lists all types of reports available for the subscriber.",
+        "tags": ["Reports"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportTypesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "List of report types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ReportTypeDetail"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/reports/list": {
+      "post": {
+        "operationId": "listReports",
+        "summary": "List available reports",
+        "description": "Returns a list of actual reports that can be downloaded.",
+        "tags": ["Reports"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportListRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "List of reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReportListItem"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/reports/query": {
+      "post": {
+        "operationId": "queryReports",
+        "summary": "Query stored report data",
+        "description": "Returns a list of events matching query parameters from stored reports.",
+        "tags": ["Reports"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportQueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Matching report events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/reports/stats": {
+      "post": {
+        "operationId": "getReportStats",
+        "summary": "Get report statistics",
+        "description": "Returns statistics for the subscriber's reports.",
+        "tags": ["Reports"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AsnOriginResult": {
+        "type": "object",
+        "properties": {
+          "asn": {
+            "type": "integer"
+          },
+          "asn_name": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "peer": {
+            "type": "string"
+          }
+        }
+      },
+      "AsnQueryResult": {
+        "type": "object",
+        "properties": {
+          "asn": {
+            "type": "string"
+          },
+          "asn_name": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "geo": {
+            "type": "string"
+          },
+          "nic": {
+            "type": "string"
+          }
+        }
+      },
+      "MalwareInfo": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string"
+          },
+          "first_seen": {
+            "type": "string"
+          },
+          "last_seen": {
+            "type": "string"
+          },
+          "md5": {
+            "type": "string"
+          },
+          "sha1": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "sha512": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "filesize": {
+            "type": "string"
+          },
+          "magic": {
+            "type": "string"
+          },
+          "tlsh": {
+            "type": "string"
+          },
+          "import_hash": {
+            "type": "string"
+          },
+          "pehash": {
+            "type": "string"
+          },
+          "entropic": {
+            "type": "string"
+          },
+          "adobe_malware_classifier": {
+            "type": "string"
+          },
+          "anti_virus": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AntiVirusResult"
+            }
+          }
+        }
+      },
+      "AntiVirusResult": {
+        "type": "object",
+        "properties": {
+          "md5": {
+            "type": "string"
+          },
+          "vendor": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        }
+      },
+      "HoneypotRequest": {
+        "type": "object",
+        "required": ["apikey"],
+        "properties": {
+          "apikey": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "description": "Date (YYYY-MM-DD) or range (YYYY-MM-DD:YYYY-MM-DD)"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        }
+      },
+      "ExploitedVulnRequest": {
+        "type": "object",
+        "required": ["apikey"],
+        "properties": {
+          "apikey": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "iot": {
+            "type": "string",
+            "enum": ["yes", "no"]
+          },
+          "kev": {
+            "type": "string",
+            "enum": ["yes", "no"]
+          },
+          "geo": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "limit": {
+            "type": "integer"
+          }
+        }
+      },
+      "VulnerabilityStats": {
+        "type": "object",
+        "properties": {
+          "class": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "product": {
+            "type": "string"
+          },
+          "vulnerability": {
+            "type": "string"
+          },
+          "vendor": {
+            "type": "string"
+          },
+          "unique_ips": {
+            "type": "integer"
+          },
+          "date": {
+            "type": "string"
+          }
+        }
+      },
+      "ExploitedVulnerability": {
+        "type": "object",
+        "properties": {
+          "vulnerability": {
+            "type": "string"
+          },
+          "vulnerability_severity": {
+            "type": "string"
+          },
+          "vulnerability_score": {
+            "type": "number",
+            "nullable": true
+          },
+          "vulnerability_class": {
+            "type": "string",
+            "nullable": true
+          },
+          "vendor": {
+            "type": "string"
+          },
+          "product": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "connections": {
+            "type": "integer"
+          },
+          "unique_ips": {
+            "type": "integer"
+          },
+          "cisa_kev": {
+            "type": "string"
+          },
+          "iot": {
+            "type": "string"
+          },
+          "1d": {
+            "type": "string"
+          },
+          "7d_avg": {
+            "type": "integer"
+          },
+          "30d_avg": {
+            "type": "integer"
+          },
+          "90d_avg": {
+            "type": "integer"
+          }
+        }
+      },
+      "ApiKeyRequest": {
+        "type": "object",
+        "required": ["apikey"],
+        "properties": {
+          "apikey": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportTypesRequest": {
+        "type": "object",
+        "required": ["apikey"],
+        "properties": {
+          "apikey": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReportTypeDetail": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportListRequest": {
+        "type": "object",
+        "required": ["apikey"],
+        "properties": {
+          "apikey": {
+            "type": "string"
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "date": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        }
+      },
+      "ReportListItem": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "report": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportQueryRequest": {
+        "type": "object",
+        "required": ["apikey", "query"],
+        "properties": {
+          "apikey": {
+            "type": "string"
+          },
+          "query": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "sort": {
+            "type": "string",
+            "enum": ["ascending", "descending"]
+          },
+          "date": {
+            "type": "string"
+          },
+          "facet": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          }
+        }
+      },
+      "ApiResponse": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "apikey",
+        "description": "Shadowserver API key passed as a request parameter"
+      }
+    }
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "ASN",
+      "description": "ASN and network routing queries"
+    },
+    {
+      "name": "Malware",
+      "description": "Malware sample information queries"
+    },
+    {
+      "name": "Honeypot",
+      "description": "Honeypot vulnerability statistics"
+    },
+    {
+      "name": "Reports",
+      "description": "Security reports query and management"
+    }
+  ]
+}
