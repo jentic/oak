@@ -1,0 +1,643 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Proxmox VE API",
+    "version": "1.0.0",
+    "description": "Proxmox VE uses a REST-like API for managing virtual machines, containers, storage, networking, clusters, and access control. The API supports JSON as the primary data format and uses JSON Schema for formal definition.",
+    "x-jentic-source-url": "https://pve.proxmox.com/wiki/Proxmox_VE_API"
+  },
+  "servers": [
+    {
+      "url": "https://{host}:8006/api2/json",
+      "variables": {
+        "host": {
+          "default": "pve.example.com",
+          "description": "Proxmox VE server hostname or IP"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/access/ticket": {
+      "post": {
+        "operationId": "createTicket",
+        "summary": "Create authentication ticket",
+        "description": "Authenticate and obtain a ticket cookie and CSRF prevention token for subsequent API calls.",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {"type": "string", "description": "User name with realm (e.g., root@pam)"},
+                  "password": {"type": "string", "description": "User password"},
+                  "realm": {"type": "string", "description": "Authentication realm"},
+                  "otp": {"type": "string", "description": "One-time password for two-factor auth"}
+                },
+                "required": ["username", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ticket": {"type": "string"},
+                        "CSRFPreventionToken": {"type": "string"},
+                        "username": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        },
+        "security": []
+      }
+    },
+    "/": {
+      "get": {
+        "operationId": "getApiIndex",
+        "summary": "Get API index",
+        "description": "List available top-level API resources.",
+        "tags": ["Index"],
+        "responses": {
+          "200": {
+            "description": "List of API subdirectories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "subdir": {"type": "string"}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "operationId": "getVersion",
+        "summary": "Get Proxmox VE version",
+        "description": "Return the current Proxmox VE version and other version-related info.",
+        "tags": ["Index"],
+        "responses": {
+          "200": {
+            "description": "Version information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "version": {"type": "string"},
+                        "release": {"type": "string"},
+                        "repoid": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/nodes": {
+      "get": {
+        "operationId": "listNodes",
+        "summary": "List cluster nodes",
+        "description": "List all nodes in the cluster.",
+        "tags": ["Nodes"],
+        "responses": {
+          "200": {
+            "description": "List of nodes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Node"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/nodes/{node}/qemu": {
+      "get": {
+        "operationId": "listVMs",
+        "summary": "List virtual machines",
+        "description": "List all QEMU/KVM virtual machines on a node.",
+        "tags": ["Virtual Machines"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"},
+            "description": "Node name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of VMs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/VM"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      },
+      "post": {
+        "operationId": "createVM",
+        "summary": "Create a virtual machine",
+        "description": "Create a new QEMU/KVM virtual machine on the specified node.",
+        "tags": ["Virtual Machines"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "vmid": {"type": "integer", "description": "VM ID"},
+                  "name": {"type": "string", "description": "VM name"},
+                  "memory": {"type": "integer", "description": "Memory in MB"},
+                  "cores": {"type": "integer", "description": "Number of CPU cores"},
+                  "sockets": {"type": "integer", "description": "Number of CPU sockets"},
+                  "ostype": {"type": "string", "description": "OS type"},
+                  "storage": {"type": "string", "description": "Storage ID"}
+                },
+                "required": ["vmid"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "VM creation task started",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/TaskResponse"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/nodes/{node}/qemu/{vmid}/status/start": {
+      "post": {
+        "operationId": "startVM",
+        "summary": "Start a virtual machine",
+        "description": "Start the specified virtual machine.",
+        "tags": ["Virtual Machines"],
+        "parameters": [
+          {"name": "node", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "vmid", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Start task initiated",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/TaskResponse"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/nodes/{node}/qemu/{vmid}/status/stop": {
+      "post": {
+        "operationId": "stopVM",
+        "summary": "Stop a virtual machine",
+        "description": "Stop the specified virtual machine.",
+        "tags": ["Virtual Machines"],
+        "parameters": [
+          {"name": "node", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "vmid", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Stop task initiated",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/TaskResponse"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/nodes/{node}/qemu/{vmid}/status/current": {
+      "get": {
+        "operationId": "getVMStatus",
+        "summary": "Get VM status",
+        "description": "Get the current status of a virtual machine.",
+        "tags": ["Virtual Machines"],
+        "parameters": [
+          {"name": "node", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "vmid", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "VM status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"$ref": "#/components/schemas/VMStatus"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/nodes/{node}/qemu/{vmid}": {
+      "delete": {
+        "operationId": "deleteVM",
+        "summary": "Delete a virtual machine",
+        "description": "Delete the specified virtual machine.",
+        "tags": ["Virtual Machines"],
+        "parameters": [
+          {"name": "node", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "vmid", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete task initiated",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/TaskResponse"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/nodes/{node}/lxc": {
+      "get": {
+        "operationId": "listContainers",
+        "summary": "List LXC containers",
+        "description": "List all LXC containers on a node.",
+        "tags": ["Containers"],
+        "parameters": [
+          {"name": "node", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of containers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Container"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      },
+      "post": {
+        "operationId": "createContainer",
+        "summary": "Create an LXC container",
+        "description": "Create a new LXC container on the specified node.",
+        "tags": ["Containers"],
+        "parameters": [
+          {"name": "node", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "vmid": {"type": "integer"},
+                  "ostemplate": {"type": "string", "description": "OS template (e.g., local:vztmpl/debian-11-standard_11.3-1_amd64.tar.zst)"},
+                  "hostname": {"type": "string"},
+                  "memory": {"type": "integer"},
+                  "swap": {"type": "integer"},
+                  "storage": {"type": "string"},
+                  "rootfs": {"type": "string"},
+                  "password": {"type": "string"},
+                  "net0": {"type": "string", "description": "Network config"}
+                },
+                "required": ["vmid", "ostemplate"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Container creation task started",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/TaskResponse"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/storage": {
+      "get": {
+        "operationId": "listStorage",
+        "summary": "List storage",
+        "description": "List all available storage.",
+        "tags": ["Storage"],
+        "responses": {
+          "200": {
+            "description": "List of storage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/Storage"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/cluster": {
+      "get": {
+        "operationId": "getClusterIndex",
+        "summary": "Get cluster index",
+        "description": "List cluster resources.",
+        "tags": ["Cluster"],
+        "responses": {
+          "200": {
+            "description": "Cluster resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"type": "array", "items": {"type": "object"}}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/pools": {
+      "get": {
+        "operationId": "listPools",
+        "summary": "List resource pools",
+        "description": "List all resource pools.",
+        "tags": ["Pools"],
+        "responses": {
+          "200": {
+            "description": "List of pools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"type": "array", "items": {"type": "object"}}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/access": {
+      "get": {
+        "operationId": "getAccessIndex",
+        "summary": "Get access control index",
+        "description": "List access control resources.",
+        "tags": ["Access Control"],
+        "responses": {
+          "200": {
+            "description": "Access control resources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {"type": "array", "items": {"type": "object"}}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Node": {
+        "type": "object",
+        "properties": {
+          "node": {"type": "string"},
+          "status": {"type": "string"},
+          "cpu": {"type": "number"},
+          "maxcpu": {"type": "integer"},
+          "mem": {"type": "integer"},
+          "maxmem": {"type": "integer"},
+          "disk": {"type": "integer"},
+          "maxdisk": {"type": "integer"},
+          "uptime": {"type": "integer"}
+        }
+      },
+      "VM": {
+        "type": "object",
+        "properties": {
+          "vmid": {"type": "integer"},
+          "name": {"type": "string"},
+          "status": {"type": "string"},
+          "mem": {"type": "integer"},
+          "maxmem": {"type": "integer"},
+          "cpu": {"type": "number"},
+          "maxcpu": {"type": "integer"},
+          "disk": {"type": "integer"},
+          "maxdisk": {"type": "integer"},
+          "uptime": {"type": "integer"}
+        }
+      },
+      "VMStatus": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "string"},
+          "vmid": {"type": "integer"},
+          "name": {"type": "string"},
+          "qmpstatus": {"type": "string"},
+          "pid": {"type": "integer"},
+          "mem": {"type": "integer"},
+          "maxmem": {"type": "integer"},
+          "cpu": {"type": "number"},
+          "cpus": {"type": "integer"},
+          "uptime": {"type": "integer"}
+        }
+      },
+      "Container": {
+        "type": "object",
+        "properties": {
+          "vmid": {"type": "integer"},
+          "name": {"type": "string"},
+          "status": {"type": "string"},
+          "mem": {"type": "integer"},
+          "maxmem": {"type": "integer"},
+          "cpu": {"type": "number"},
+          "maxcpu": {"type": "integer"},
+          "disk": {"type": "integer"},
+          "maxdisk": {"type": "integer"},
+          "uptime": {"type": "integer"}
+        }
+      },
+      "Storage": {
+        "type": "object",
+        "properties": {
+          "storage": {"type": "string"},
+          "type": {"type": "string"},
+          "content": {"type": "string"},
+          "active": {"type": "integer"},
+          "shared": {"type": "integer"},
+          "used": {"type": "integer"},
+          "avail": {"type": "integer"},
+          "total": {"type": "integer"}
+        }
+      },
+      "TaskResponse": {
+        "type": "object",
+        "properties": {
+          "data": {"type": "string", "description": "Task UPID"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "errors": {"type": "object"},
+          "message": {"type": "string"}
+        }
+      }
+    },
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "PVEAuthCookie",
+        "description": "PVE authentication ticket cookie"
+      },
+      "csrfToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "CSRFPreventionToken",
+        "description": "CSRF prevention token required for POST/PUT/DELETE requests"
+      },
+      "apiTokenAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "API token: PVEAPIToken=USER@REALM!TOKENID=UUID"
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication required",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {"cookieAuth": [], "csrfToken": []},
+    {"apiTokenAuth": []}
+  ]
+}
