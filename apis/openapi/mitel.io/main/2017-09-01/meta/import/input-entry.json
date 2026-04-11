@@ -1,0 +1,5691 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "version": "2017-09-01",
+    "title": "platform-api-admin-token",
+    "description": "A loosely [OAuth 2.0](https://tools.ietf.org/html/rfc6749) compliant authentication service used to obtain bearer tokens for use with the CloudLink Platform micro-service APIs.\n\n# Endpoints\n- /token is for [OAuth 2.0](https://tools.ietf.org/html/rfc6749) grants.\n- /assume-role/token can be used to switch account or role (subject to permissions) for a logged in user or client.\n- /guest/token can be used to obtain an anonymous user access token with limited access rights (guest level access).\n- /authorize can be used by a registered client application to initiate an [Authorization Code Grant](https://tools.ietf.org/html/rfc6749#section-4.1) authorization flow.\n- /policy-test can be used to test a set of resources against a user's access policy.\n- /applications can be used to manage the application registry.\n- /credentials is an internal API that can be used to perform actions on stored credentials.\n- /.well-known/jwks is the JSON Web Key Set endpoint for an account.\n- /trusted-issuers is used to configure the trusted token issuers for an account.\n# Supported OAuth 2.0 grants\n- password - [Resource Owner Password Credentials Flow](https://tools.ietf.org/html/rfc6749#section-4.3)\n- client_credentials - [Client Credentials Flow](https://tools.ietf.org/html/rfc6749#section-4.4)\n- refresh_token - [Refreshing an Access Token](https://tools.ietf.org/html/rfc6749#page-47)\n- authorization_code - [Authorization Code Grant](https://tools.ietf.org/html/rfc6749#section-4.1)\n- urn:ietf:params:oauth:grant-type:token-exchange - [OAuth 2.0 Token Exchange](https://tools.ietf.org/html/rfc8693) - For Zoom clients\n\nInput arguments may be passed either as `application/x-www-form-urlencoded` pairs in the request body and/or in a basic auth header.\n# OAuth 2.0 Grants\nOAuth 2.0 requests are handled by the `/token` endpoint.\n## Login using username and password\nDuring user login, the platform checks that the user and account are active and that the password is valid.\n\nThe username identifies the user, it is matched against the user's `userId`, `uniqueUserId`, `email`, `mobile` or `loginId` properties.\n\nExample:\n\n`grant_type=password&username=jsmith%40somecompany.com&password=****`\n\nIf the request is successful the response is `201 (Created)` and access/refresh tokens are returned.  If the username or password are incorrect then the response is `401 (Unauthorized)`.\n## Login using username, password and account ID\nIf the `/token` endpoint returns 409 (Conflict) the username may be present in more than one account.  Provide the account ID to select which account to log the user into:\n\n`grant_type=password&username=jsmith%40somecompany.com&password=****&account_id=4321`\n\nIf the request is successful the response is `201 (Created)` and access/refresh tokens are returned.  If the username or password are incorrect then the response is `401 (Unauthorized)`.\n## Refresh token to obtain fresh tokens\nAccess tokens are valid for (by default) 1 hour, the platform also returns a fresh token which is valid for (by default) 14 days and can be used to obtain fresh access and refresh tokens.  During refresh, the platform checks that the account and user are still active.\n\n`grant_type=refresh_token&refresh_token=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`\n\nIf the request is successful the response is `201 (Created)` and access/refresh tokens are returned.  If the token is not valid then the response is `401 (Unauthorized)`.  If the user or account is not active then the response is `403 (Forbidden)`.\n## Client login using client ID and secret\nDuring client login, the platform checks that the client and account are active and that the client secret is valid.\n\n`grant_type=client_credentials&client_id=9552c9497d624b75a7399fdb494abb1e&client_secret=******`\n\nIf the request is successful the response is `201 (Created)` and access/refresh tokens are returned.  If the client ID or secret are incorrect then the response is `401 (Unauthorized)`.\n## Client login with basic auth header\nClients in possession of a client password MAY use the HTTP Basic authentication scheme as defined in [RFC2617](https://tools.ietf.org/html/rfc6749#section-2.3.1) to authenticate with the authorization server.  The client identifier is encoded using the `application/x-www-form-urlencoded` encoding algorithm, and the encoded value is used as the username; the client password is encoded using the same algorithm and used as the password.\n\nheader:\n\n`Authorization: 'Basic bXfecHB1UTIyNA=='`\n\nbody:\n\n`grant_type=client_credentials`\n\nIf the encoded username and password are valid and the request is successful then the response is `201 (Created)` and access/refresh tokens are returned.  If the username or password are invalid then the response is `401 (Unauthorized)`.\n\n# Authorization Code Grant Flow\nAuthorization is initiated using the `/authorize` endpooint.  In order to use this route, the application must be registered in the platform and a client ID created for the application.  Also any redirect URL(s) which are valid for the application need to be pre-registered.\n\nThe application wishing to log in a user and obtain a user token begins by redirecting the user agent (browser) to an authentication portal such as the Mitel global auth portal, providing client ID, response type, redirect URI, state and application name:\n\n```\n  HTTP 1.1 302 Found\n  https://auth.mitel.io/authorize?\n  client_id=bca4584614724174b8290bdd6c7d5967\n  &response_type=code\n  &redirect_uri=https://some.app.mitel.io\n  &state=abc\n  &app_name=SomeApp\n```\n\nThe authentication portal will ask the user for thier username, password and possibly thier account ID if the username is present in multiple accounts.  It will then initiate Oauth authorization by sending a POST request to the /authorize endpoint with the following parameters:\n\n- client_id is the pre-registered client ID for the application.\n- response_type: code is the only currently supported response type.\n- username will be used to identify the user.\n- password is the user's password.\n- account_id can be provided if the platform returns 409 (Conflict) because the username exists in more that one account.\n- redirect_uri is the URI to re-direct the user agent to, after successful login.\n\nThe platform then logs the user in by generating access and refresh tokens, they are stored ready to be retrieved by the application and an authorization code is returned to the auth portal, to pass along to the calling application.\n\nDuring user login, the platform checks that the user and account are active and that the password is valid.\n\nThe username identifies the user, it is matched against the user's `userId`, `uniqueUserId`, `email`, `mobile` or `loginId` properties.\n\nExample (posted to /authorize):\n\n`client_id=bc81084614724174b8290bdd6c7d5967&response_type=code&username=jsmith%40somecompany.com&password=****&account_id=1234&redirect_uri=https%3A%2F%2Faccounts.dev.mitel.io`\n\nThe application will then send the auth code to the `/token` endpoint using the authorization_code flow.\n\nExample (posted to /token):\n\n`grant_type=authorization_code&client_id=bc81084614724174b8290bdd6c7d5967&code=d09fea34-d053-4b80-9bdc-f7d0ffd3b2bd&scope=abc`\n\nNote that auth codes are only stored in the auth service for a period of time.   If the application waits too long, the auth code may have expired.\n\nIf the request is successful the response is `201 (Created)` and access/refresh tokens are returned.  If the code is not valid or has expired then the response is `401 (Unauthorized)`.  If the user or account is not active then the response is `403 (Forbidden)`.\n# Assume Role Feature\nIt is often useful for a partner administrator to switch accounts, to one of the accounts that they administer, as an account administrator, or for an account administrator to assume a user role to limit the effect of unintended requests.  The platform provides an authenticated route for this purpose, served by the `/assume-role/token` endpoint.\n\nA logged in administrator can use this route to issue a token in a different account or with a lower role (depending on thier permissions).\n\nA logged in client can use this route to issue an anonymous user token in a different account or with a lower role (depending on thier permissions).\n\n## Administrator assuming a user role in a different account\nExample:\n\n```\n{\n    \"accountId\": \"1234\",\n  \"role\": \"USER\"\n}\n```\n\n## Guest Access\nGuest access allows an unauthenticated client to obtain access to an account with extremely limited usage rights.  Guest access must be explicitly enabled by turning on an account policy.  The client simply provides a guest principal ID (which can be anything, a generated UUID would be a good choice) and the name of the user to the `/guest/token` route.\n\nExample:\n\n```\n{\n    \"principalId\": \"7688c81e-c6ea-4777-a1a2-8163ed318a19\",\n  \"accountId\": \"1234\",\n  \"name\": \"Guest User One\"\n}\n```\n\nIf the request is successful the response is `201 (Created)` and access/refresh tokens are returned.  If the account is not active, if the principal ID identifies a legitimate platform user or the account is not enabled with the guest access policy then the response is `403 (Forbidden)` (user impersonation is not allowed by any route).",
+    "termsOfService": "https://mitel.io/terms-of-service",
+    "contact": {
+      "name": "CloudLink support",
+      "email": "cloudlink.support@mitel.io",
+      "url": "https://mitel.io/support"
+    },
+    "license": {
+      "name": "Mitel",
+      "url": "https://www.mitel.com/legal"
+    },
+    "x-jentic-source-url": "https://authentication.api.mitel.io/2017-09-01/_spec"
+  },
+  "servers": [
+    {
+      "url": "https://authentication.api.mitel.io/2017-09-01"
+    }
+  ],
+  "paths": {
+    "/token": {
+      "get": {
+        "tags": [
+          "Token"
+        ],
+        "summary": "Get/validate a token",
+        "description": "Used to validate/decode the passed in token to the authorization header.\n\rCan be used as a Who Am I call or a simple auth check.",
+        "operationId": "getClaims",
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/claims"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingAuthToken",
+                        "MissingRequestContext"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingClaims"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AuthenticationFailure"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "UnregisteredRoute"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500 response"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Token"
+        ],
+        "summary": "Create a token -> authenticate",
+        "description": "Request an access token (OAuth 2.0 with extensions)",
+        "operationId": "createToken",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "enum": [
+                      "password",
+                      "client_credentials",
+                      "refresh_token",
+                      "authorization_code",
+                      "urn:ietf:params:oauth:grant-type:token-exchange"
+                    ],
+                    "description": "This is used to specify the type of OAuth 2.0 flow that is being requested."
+                  },
+                  "account_id": {
+                    "type": "string",
+                    "description": "The accountId or accountNumber registered on the platform. Required if the username is present in more than one account."
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'password', username & password are the login credentials for the user"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'password', username & password are the login credentials for the user"
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', client_id & client_secret are the login credentials for the client. Also when the grant_type = 'authorization_code', it is the client application making the request"
+                  },
+                  "client_secret": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', client_id & client_secret are the login credentials for the client"
+                  },
+                  "token": {
+                    "type": "string",
+                    "description": "(Deprecated) Use refresh_token instead. Used when the grant_type = 'refresh_token', this is the refresh token which will be used to generate a fresh set of tokens"
+                  },
+                  "refresh_token": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'refresh_token', this is the refresh token which will be used to generate a fresh set of tokens"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'authorization_code' which is the code that was sent in the authorization code response"
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "Optionally used when the grant_type = 'authorization_code' to match the redirect_uri in the create authorization_code request"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "description": "Request for access to additional resource(s). Space delimited scope identifiers (eg: gauth). For grant_type = 'authorization_code', the scope items must match one of the scopes that was provided in create authorization_code request.\n\n Supported scope values: openid, gauth, abc, profile, read_write"
+                  },
+                  "principalId": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim, must not identify a real user"
+                  },
+                  "uniqueUserId": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim, must not identify a real user"
+                  },
+                  "userId": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim, must not identify a real user"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim."
+                  },
+                  "role": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim. The role cannot be higher than the client's own role"
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim (verified), must not identify a real user"
+                  },
+                  "emailVerified": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with an unverified email."
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim (verified)."
+                  },
+                  "phoneVerified": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with an unverified phone"
+                  },
+                  "mobile": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim (verified), must not identify a real user"
+                  },
+                  "mobileVerified": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with an unverified mobile"
+                  },
+                  "extension": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim (verified)"
+                  },
+                  "extensionVerified": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with an unverified extension"
+                  },
+                  "photoUrl": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim"
+                  },
+                  "profileHeaderUrl": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim"
+                  },
+                  "languageCode": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim"
+                  },
+                  "loginId": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim (verified), must not identify a real user"
+                  },
+                  "siteId": {
+                    "type": "string",
+                    "description": "Used when the grant_type = 'client_credentials', will issue an anonymous user token with this claim"
+                  },
+                  "code_verifier": {
+                    "type": "string",
+                    "description": "PKCE code verifier"
+                  },
+                  "subject_token_type": {
+                    "type": "string",
+                    "description": "Used for token-exchange flow, indicates the type of subject_token provided"
+                  },
+                  "subject_token": {
+                    "type": "string",
+                    "description": "In token-exchange flow, represents the identity of the requestor"
+                  },
+                  "requested_subject": {
+                    "type": "string",
+                    "description": "In token-exchange flow, represents an identity being requested"
+                  },
+                  "audience": {
+                    "type": "string",
+                    "description": "In token-exchange flow, represents a target application for the new token"
+                  }
+                },
+                "required": [
+                  "grant_type"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "201 response containing access and refresh tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/token"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingParameters",
+                        "InvalidGrantType",
+                        "InactiveAccount",
+                        "InvalidScope",
+                        "MissingAuthToken",
+                        "InvalidLoginCredentials",
+                        "InvalidPrincipals",
+                        "MissingBodyInRequest"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InvalidLoginCredentials",
+                        "InvalidVerifier",
+                        "ClientSecretMismatch",
+                        "ClientNotActive"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "UnknownAuthError",
+                        "AuthenticationFailure",
+                        "UserNotActive",
+                        "FailedImpersonation",
+                        "ImpersonationNotAllowed",
+                        "InvalidOrigin",
+                        "InvalidClient"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound",
+                        "ClientNotFound",
+                        "UserNotFound",
+                        "UnregisteredRoute"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "error code indicating failure reason.\n401 - Account locked\n451 - Password change needed\n452 - Password does not meet requirements"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500 response"
+          }
+        }
+      }
+    },
+    "/guest/token": {
+      "post": {
+        "tags": [
+          "Token"
+        ],
+        "summary": "Create a guest token -> authenticate for guest access",
+        "description": "Request a guest bearer token.  Only valid for those accounts with guest access enabled.",
+        "operationId": "createGuestToken",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "accountId": {
+                    "type": "string",
+                    "description": "The account for which the guest token will be issued.  Provide this value if known."
+                  },
+                  "accessCode": {
+                    "type": "string",
+                    "description": "The meeting access code which will be used to determine the account for which the guest token will be issued."
+                  },
+                  "principalId": {
+                    "type": "string",
+                    "description": "How this client will be identified within the system (e.g. when chat messages get stored), cannot conflict with an existing principalId.  One will be generated if not provided"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The name of this guest user"
+                  },
+                  "guestEmail": {
+                    "type": "string",
+                    "description": "The email address of this guest user"
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "description": "The client application requesting this guest token"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "201 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/token"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountMissing",
+                        "PrincipalMissing",
+                        "NameInvalid",
+                        "AccountNotFound",
+                        "EmailInvalid"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden, account does not allow guest access or is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InactiveAccount",
+                        "NotAllowed"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Account Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/assume-role/token": {
+      "post": {
+        "tags": [
+          "Token"
+        ],
+        "summary": "Create a token with alternate role",
+        "description": "Request a bearer token with assumed role.  The target role must be the same or lower than current role.",
+        "operationId": "createTokenWithAssumedRole",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/assumeRoleTokenPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "201 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/token"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MalformedJSON",
+                        "MissingBodyInRequest",
+                        "MissingRoleInRequest",
+                        "InvalidRole",
+                        "AssumeRoleHigh",
+                        "IncorrectClaims"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "ClientNotActive"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions",
+                        "MissingPartnerIdInClaims",
+                        "UnknownAuthError",
+                        "AuthenticationFailure",
+                        "InactiveAccount",
+                        "ImpersonationNotAllowed"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound",
+                        "UnregisteredRoute"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500 response"
+          }
+        }
+      }
+    },
+    "/authorize": {
+      "post": {
+        "tags": [
+          "Authorize"
+        ],
+        "summary": "Create an Authorizatione Code",
+        "description": "Request an Authorization Code for OAuth 2.0 Authorization Code Grant.  Supports PKCE (RFC 7636) to prevent interception attacks.",
+        "operationId": "createAuthorizationCode",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "client_id": {
+                    "type": "string",
+                    "description": "Application Identifier"
+                  },
+                  "response_type": {
+                    "type": "string",
+                    "description": "return type"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "description": "Allow access to particular scope. Multiple scopes can be used by creating a space-delimited, case sensitive list of scope values.\n\n Supported scope values(description): gauth(Issues a Connect Cloud Token in addtion to a CloudLink Token)"
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "username of user"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "password for user"
+                  },
+                  "account_id": {
+                    "type": "string",
+                    "description": "Account identifier for the user. If the username exists in multiple accounts, the Account Id will be used to uniquely identify a user."
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "uri which the code will eventually be returned to"
+                  },
+                  "nonce": {
+                    "type": "string",
+                    "description": "nonce for the session state"
+                  },
+                  "session_state": {
+                    "type": "string",
+                    "description": "session state"
+                  },
+                  "code_challenge_method": {
+                    "type": "string",
+                    "description": "PKCE code verifier transformation method. Only S256 is supported."
+                  },
+                  "code_challenge": {
+                    "type": "string",
+                    "description": "PKCE code challenge"
+                  },
+                  "id_token_hint": {
+                    "type": "string",
+                    "description": "the token to exchange for an authorization code"
+                  },
+                  "target_client_id": {
+                    "type": "string",
+                    "description": "the destination client application identifier meant to receive this authorization code"
+                  }
+                },
+                "required": [
+                  "client_id",
+                  "response_type"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "201 Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/authCode"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingBodyInRequest"
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_request"
+                      ]
+                    },
+                    "error_description": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InvalidLoginCredentials"
+                      ]
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "error_description": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "ClientNotActive",
+                        "InvalidClient",
+                        "InvalidRedirectUri",
+                        "UnconfiguredRedirectUri"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound",
+                        "NoneMatching",
+                        "InactiveAccount"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500 response"
+          }
+        }
+      }
+    },
+    "/saml2/start": {
+      "post": {
+        "tags": [
+          "IdentityProviders"
+        ],
+        "summary": "Initiate SAML2.0 based authentication",
+        "description": "Generate a SAML Request for a user",
+        "operationId": "saml2Start",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "client_id": {
+                    "type": "string"
+                  },
+                  "redirect_uri": {
+                    "type": "string"
+                  },
+                  "account_id": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "force_authn": {
+                    "type": "boolean"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "code_challenge": {
+                    "type": "string"
+                  },
+                  "code_challenge_method": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username",
+                  "client_id",
+                  "redirect_uri"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success response containing redirection URL towards identity provider"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingBodyInRequest",
+                        "MissingMandatoryParams"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InvalidLoginCredentials"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InactiveAccount",
+                        "InactiveIdentityProvider"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "NoneMatching",
+                        "AccountNotFound",
+                        "IdentityProviderNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failure response"
+          }
+        }
+      }
+    },
+    "/saml2/{accountId}/cs": {
+      "post": {
+        "tags": [
+          "IdentityProviders"
+        ],
+        "summary": "Process SAML claims from 3rd party Identity Providers",
+        "description": "Exchange SAML claims from an Identity Provider and issue an authorization code",
+        "operationId": "saml2Response",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "SAMLResponse": {
+                    "type": "string"
+                  },
+                  "RelayState": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "SAMLResponse",
+                  "RelayState"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {
+            "description": "Redirection response with result of SAML response processing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SamlResponse"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "URL to initiate with SAML authentication with identity provider",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingBodyInRequest"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/saml2/logout": {
+      "post": {
+        "tags": [
+          "IdentityProviders"
+        ],
+        "summary": "Logout of Identity Provider",
+        "description": "Implements the SAML Logout",
+        "operationId": "saml2Logout",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "account_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingMandatoryParams"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "NoneMatching",
+                        "IdentityProviderNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "Conflict"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failure response"
+          }
+        }
+      }
+    },
+    "/_spec": {
+      "get": {
+        "summary": "Get spec",
+        "description": "Retrieve the specification in swagger format for this api",
+        "operationId": "getSpec",
+        "responses": {
+          "200": {
+            "description": "Ok"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/policy-test": {
+      "post": {
+        "tags": [
+          "Policy"
+        ],
+        "summary": "Evaluate a policy against a set of actions and resources",
+        "description": "Evaluate an access policy and get a list of effects that indicate whether the specified action(s) are allowed on the specified resource(s)",
+        "operationId": "evaluatePolicy",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/policyTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The effects of the policy statements, whether the specified action(s) are allowed to the specified resource(s)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/policyTestResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingResource",
+                        "MultipleTypesNotSupported"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedBaseResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/sso": {
+      "get": {
+        "tags": [
+          "SSO"
+        ],
+        "summary": "Gets the sso providers configured on the platform",
+        "description": "This route is deprecated as the funtionality is no longer supported.  A default empty set will be returned.",
+        "operationId": "getSsoProviders",
+        "parameters": [
+          {
+            "name": "client_id",
+            "in": "query",
+            "description": "Request a specific set of sso providers based on the supported client_id. Defaults to 'default' on the platform side.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ssoProviderResults"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500 response"
+          }
+        }
+      }
+    },
+    "/sso/{providerId}": {
+      "get": {
+        "tags": [
+          "SSO"
+        ],
+        "summary": "This route is deprecated as the funtionality is no longer supported.",
+        "description": "This route is deprecated as the funtionality is no longer supported.",
+        "operationId": "loginSsoProvider",
+        "parameters": [
+          {
+            "name": "providerId",
+            "in": "path",
+            "description": "The sso provider to trigger the flow, for instance google or facebook",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "description": "A registered client_id / application in the admin system.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "description": "The url to redirect back to upon success or failure. Success redirects look like <redirect_uri>?code=abc123... and failure redirects look like <redirect_uri>?error=errorCode?info=info",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "The action to perform upon successful validation by an SSO provider. Login does an authenticate against our system, sign-up will create a user in an account and link will allow this third party to be linked to an existing identity. Guest will allow a guest access on the given account. Defaults to 'login'.  Link is not supported yet.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "login",
+                "sign-up",
+                "link",
+                "guest"
+              ]
+            }
+          },
+          {
+            "name": "scopes",
+            "in": "query",
+            "description": "Additional scopes to include in the sign-on process. Comma separated",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/accountIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/userIdParam"
+          },
+          {
+            "name": "accessCode",
+            "in": "query",
+            "description": "accessCode is REQUIRED when dealing with the 'link' flow only. If you are linking a user account you must provide and accountId, userId, and accessCode to link.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/accountIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/userIdParam"
+          }
+        ],
+        "responses": {
+          "410": {
+            "description": "410 Gone"
+          },
+          "500": {
+            "description": "500 Internal Server Error"
+          }
+        }
+      }
+    },
+    "/sso/{providerId}/callback": {
+      "get": {
+        "tags": [
+          "SSO"
+        ],
+        "summary": "This route is deprecated as the funtionality is no longer supported.",
+        "description": "This route is deprecated as the funtionality is no longer supported.",
+        "operationId": "loginSsoProviderCallback",
+        "parameters": [
+          {
+            "name": "providerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "410": {
+            "description": "410 Gone"
+          },
+          "500": {
+            "description": "500 Internal Server Error"
+          }
+        }
+      }
+    },
+    "/applications": {
+      "get": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Get Application data corresponding to client_id",
+        "description": "Returns the Application metadata for the specified client_id",
+        "operationId": "getApplicationByClientId",
+        "parameters": [
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application Metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/legacyApplication"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingMandatoryParams"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Client",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InvalidClient"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Create Client Application",
+        "description": "Creates a client application.  Must be GLOBAL_ADMIN (global application) or PARTNER_ADMIN (3rd-party application). Differences in requirements are described in #/definitions/applicationsPostRequest",
+        "operationId": "createClientApplication",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/applicationsPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful creation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/application"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingParamInRequest"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingAccountIdInClaims",
+                        "InsufficientPermissions",
+                        "InactiveAccount"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "name of the unprocessable entity"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "detailed error message"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/apps": {
+      "get": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Gets application data for given token",
+        "description": "Returns all applications registered to an account or can be filtered for all application registries for a given application Id in different accounts.",
+        "operationId": "getApplications",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/filterParam"
+          },
+          {
+            "$ref": "#/components/parameters/skipTokenParam"
+          },
+          {
+            "$ref": "#/components/parameters/topParam"
+          },
+          {
+            "$ref": "#/components/parameters/expandParam"
+          },
+          {
+            "$ref": "#/components/parameters/filterParam"
+          },
+          {
+            "$ref": "#/components/parameters/skipTokenParam"
+          },
+          {
+            "$ref": "#/components/parameters/topParam"
+          },
+          {
+            "$ref": "#/components/parameters/expandParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of Application Metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/applicationCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingMandatoryParams",
+                        "UnsupportedQueryParameters"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingAccountIdInClaims",
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/applications/{applicationId}": {
+      "get": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Get application data corresponding to client_id",
+        "description": "Returns the application metadata given a client_id for the accountId specified in the token",
+        "operationId": "getApplicationAccountInfoByClientId",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "description": "The client application ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/expandParam"
+          },
+          {
+            "$ref": "#/components/parameters/expandParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/application"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingAccountIdInClaims",
+                        "InsufficientPermissions",
+                        "InactiveAccount"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "ApplicationNotFound",
+                        "AccountNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Update client application",
+        "description": "Updates a client application for the account in the token.  Must be ACCOUNT_ADMIN or higher.",
+        "operationId": "updateClientApplication",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "description": "The client application ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/applicationPutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/application"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingParamInRequest",
+                        "InvalidRequest"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingAccountIdInClaims",
+                        "InsufficientPermissions",
+                        "InactiveAccount"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "ApplicationNotFound",
+                        "AccountNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Delete client application",
+        "description": "Deletes a client's application settings for an account when called by PARTNER_ADMIN or ACCOUNT_ADMIN, or deletes an entire client application for GLOBAL_ADMIN",
+        "operationId": "deleteClientApplication",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "description": "The client application ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/applicationDeleteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/200"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingAccountIdInClaims",
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "ApplicationNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/applications/{applicationId}/tags": {
+      "get": {
+        "tags": [
+          "Tags"
+        ],
+        "summary": "Get application tags",
+        "description": "Get all application tags for a specific applicationId in the account in the token.",
+        "operationId": "getApplicationTags",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/applicationIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/applicationIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/applicationTagCollection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tags"
+        ],
+        "summary": "Create an application tag",
+        "description": "Create an application tag for a specific applicationId in the account in the token.",
+        "operationId": "createApplicationTag",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/applicationIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/applicationIdParam"
+          }
+        ],
+        "requestBody": {
+          "description": "Application tag POST request object",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/applicationTagPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/applicationTag"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/applications/{applicationId}/tags/{tagId}": {
+      "get": {
+        "tags": [
+          "Tags"
+        ],
+        "summary": "Gets an application tag",
+        "description": "Gets the application tag for a specific applicationId in the account in the token.",
+        "operationId": "getApplicationTag",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/applicationIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/tagIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/applicationIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/tagIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/applicationTag"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Tags"
+        ],
+        "summary": "Update an application tag",
+        "description": "Updates the application tag for a specific applicationId in the account in the token.",
+        "operationId": "updateApplicationTag",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/applicationIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/tagIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/applicationIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/tagIdParam"
+          }
+        ],
+        "requestBody": {
+          "description": "Application tag PUT request object",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/applicationTagPutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/applicationTag"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tags"
+        ],
+        "summary": "Delete an application tag",
+        "description": "Deletes the application tag for a specific applicationId in the account in the token.",
+        "operationId": "deleteApplicationTag",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/applicationIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/tagIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/applicationIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/tagIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/200"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/_status": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Get microservice status",
+        "description": "Provides the status of the auth microservice including error rates and response times.",
+        "operationId": "getStatus",
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/statusGetResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/_failover": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Get failover status",
+        "description": "Get the current failover status of the auth micro",
+        "operationId": "getFailoverStatus",
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/failoverStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/failoverStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/identityProviders": {
+      "get": {
+        "tags": [
+          "IdentityProviders"
+        ],
+        "summary": "Get identity providers",
+        "description": "Retrieves the identity providers for SSO for the account.  Currently an account can have only one configured identity provier. This is only available for ACCOUNT_ADMIN or higher role.",
+        "operationId": "getIdentityProviders",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/identityProviderCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "IdentityProviders"
+        ],
+        "summary": "Create identity provider",
+        "description": "Creates an SSO identity provider.  Must be ACCOUNT_ADMIN or higher.",
+        "operationId": "createIdentityProvider",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/identityProviderPostRequest"
+              }
+            },
+            "application/xml": {
+              "schema": {
+                "$ref": "#/components/schemas/identityProviderPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful creation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/identityProvider"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound",
+                        "MissingParamInRequest",
+                        "InvalidLoginUrl",
+                        "InvalidCertificates"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/identityProviders/{identityProviderId}": {
+      "get": {
+        "tags": [
+          "IdentityProviders"
+        ],
+        "summary": "Get identity provider",
+        "description": "Retrieves the identity provider for SSO for the account.  Currently an account can have only one configured identity provier. This is only available for ACCOUNT_ADMIN or higher role.",
+        "operationId": "getIdentityProvider",
+        "parameters": [
+          {
+            "name": "identityProviderId",
+            "in": "path",
+            "description": "Identity Provider ID - accountId of the account of the identity provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/identityProvider"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound",
+                        "IdentityProviderNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "NotFound"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "IdentityProviderNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "IdentityProviders"
+        ],
+        "summary": "Update identity provider",
+        "description": "Updates the identity provider for SSO for the account.  This is only available for ACCOUNT_ADMIN or higher role.",
+        "operationId": "updateIdentityProvider",
+        "parameters": [
+          {
+            "name": "identityProviderId",
+            "in": "path",
+            "description": "Identity Provider ID - accountId of the account of the identity provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/identityProviderPutRequest"
+              }
+            },
+            "application/xml": {
+              "schema": {
+                "$ref": "#/components/schemas/identityProviderPutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/identityProvider"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound",
+                        "IdentityProviderNotFound",
+                        "MissingParamInRequest",
+                        "InvalidLoginUrl",
+                        "InvalidCertificates"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "NotFound"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "IdentityProviderNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "IdentityProviders"
+        ],
+        "summary": "Delete identity provider",
+        "description": "Deletes an SSO identity provider",
+        "operationId": "deleteIdentityProvider",
+        "parameters": [
+          {
+            "name": "identityProviderId",
+            "in": "path",
+            "description": "Identity Provider ID - accountId of the account of the identity provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/200"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound",
+                        "IdentityProviderNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "AccountNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/credentials": {
+      "get": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Get all credentials",
+        "description": "Returns an array of credential metadata.  Use $expand=jwks for the case where the credential types are a json web key set",
+        "operationId": "getCredentials",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/filterParam"
+          },
+          {
+            "$ref": "#/components/parameters/expandParam"
+          },
+          {
+            "$ref": "#/components/parameters/topParam"
+          },
+          {
+            "$ref": "#/components/parameters/skipTokenParam"
+          },
+          {
+            "$ref": "#/components/parameters/filterParam"
+          },
+          {
+            "$ref": "#/components/parameters/expandParam"
+          },
+          {
+            "$ref": "#/components/parameters/topParam"
+          },
+          {
+            "$ref": "#/components/parameters/skipTokenParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of credential metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/credentialCollection"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Create a credential",
+        "description": "Create a credential.  Private portion of credentials are not returned in responses.",
+        "operationId": "createCredentials",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/credentialsPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful creation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/credential"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingParamInRequest"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingAccountIdInClaims",
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "name of the unprocessable entity"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "detailed error message"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/credentials": {
+      "get": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Get all credentials for the supplied account ID",
+        "description": "Returns an array of credential metadata.  The account ID must be the same of that of the claims unless this is a microservice. Use $expand=jwks for the case where the credential types are a json web key set",
+        "operationId": "getCredentialsByAccount",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/filterParam"
+          },
+          {
+            "$ref": "#/components/parameters/expandParam"
+          },
+          {
+            "$ref": "#/components/parameters/topParam"
+          },
+          {
+            "$ref": "#/components/parameters/skipTokenParam"
+          },
+          {
+            "$ref": "#/components/parameters/filterParam"
+          },
+          {
+            "$ref": "#/components/parameters/expandParam"
+          },
+          {
+            "$ref": "#/components/parameters/topParam"
+          },
+          {
+            "$ref": "#/components/parameters/skipTokenParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of credential metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/credentialCollection"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/credentials/{credentialId}": {
+      "get": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Get credential data corresponding to the given id",
+        "description": "Returns the credential metadata of the id given, must be called by USER role or higher",
+        "operationId": "getCredentialById",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/credentialIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/credentialIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/credential"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingMandatoryParams"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "CredentialNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Update the given credential. Private portion of credentials are not returned in responses.",
+        "operationId": "updateCredential",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/credentialIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/credentialIdParam"
+          }
+        ],
+        "requestBody": {
+          "description": "Contains the relevant updates to be made on the given credential",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/credentialPutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the action taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/credential"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Remove the given credential",
+        "operationId": "deleteCredential",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/credentialIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/credentialIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/200"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Execute an action on the given credential",
+        "operationId": "credentialCommand",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/credentialIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/credentialIdParam"
+          }
+        ],
+        "requestBody": {
+          "description": "Contains the relevant contents and action to be taken on the given credential",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/credentialCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the action taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/credentialCommandResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The result of the action taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/credentialCommandResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/.well-known/jwks.json": {
+      "get": {
+        "tags": [
+          "JWKS"
+        ],
+        "summary": "Retrieve the json web key set for the specified account",
+        "description": "Returns the current set of public keys used to verify CloudLink tokens for the specified account",
+        "operationId": "getJsonWebKeySet",
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/jsonWebKeySet"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500 response"
+          }
+        }
+      }
+    },
+    "/.well-known/openid-configuration": {
+      "get": {
+        "tags": [
+          "Token"
+        ],
+        "summary": "Gets OAuth authorization server metadata",
+        "description": "Gets the supported OAuth authorization server metadata following RFC 8414",
+        "operationId": "getOpenIdConfiguration",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/accountIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/accountIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/oauthMetadata"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500 response"
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-authorization-server": {
+      "get": {
+        "tags": [
+          "Token"
+        ],
+        "summary": "Gets OAuth authorization server metadata",
+        "description": "Gets the supported OAuth authorization server metadata following RFC 8414",
+        "operationId": "getAuthorizationServer",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/accountIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/accountIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/oauthMetadata"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500 response"
+          }
+        }
+      }
+    },
+    "/.well-known/mitel/hydra": {
+      "get": {
+        "tags": [
+          "Token"
+        ],
+        "summary": "Gets the Mitel Hydra client discovery meta data",
+        "description": "Gets the Mitel Hydra client discovery meta data",
+        "operationId": "getHydraDiscoveryMetadata",
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/hydraDiscoveryMetadata"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500 response"
+          }
+        }
+      }
+    },
+    "/trusted-issuers": {
+      "get": {
+        "tags": [
+          "Trusted Issuers"
+        ],
+        "summary": "Get all trusted issuers for the account",
+        "description": "Returns an array of trusted issuer metadata.  This includes both account-specific and global issuers.  Must be called by ACCOUNT_ADMIN role or higher.",
+        "operationId": "getTrustedIssuers",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/filterParam"
+          },
+          {
+            "$ref": "#/components/parameters/topParam"
+          },
+          {
+            "$ref": "#/components/parameters/skipTokenParam"
+          },
+          {
+            "$ref": "#/components/parameters/filterParam"
+          },
+          {
+            "$ref": "#/components/parameters/topParam"
+          },
+          {
+            "$ref": "#/components/parameters/skipTokenParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of trusted issuer metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/trustedIssuerCollection"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Trusted Issuers"
+        ],
+        "summary": "Create a trusted issuer",
+        "description": "Create a trusted issuer for the account in the token claims.",
+        "operationId": "createTrustedIssuer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/trustedIssuerPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful creation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/trustedIssuer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingParamInRequest",
+                        "MissingJwksUri"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "name of the unprocessable entity"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "detailed error message"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/trusted-issuers": {
+      "get": {
+        "tags": [
+          "Trusted Issuers"
+        ],
+        "summary": "Get all trusted issuers for the supplied account ID",
+        "description": "Returns an array of trusted issuer metadata.  The account ID must be the same of that of the claims, or '*', unless this is a microservice",
+        "operationId": "getTrustedIssuersByAccount",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/filterParam"
+          },
+          {
+            "$ref": "#/components/parameters/topParam"
+          },
+          {
+            "$ref": "#/components/parameters/skipTokenParam"
+          },
+          {
+            "$ref": "#/components/parameters/filterParam"
+          },
+          {
+            "$ref": "#/components/parameters/topParam"
+          },
+          {
+            "$ref": "#/components/parameters/skipTokenParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of trusted issuer metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/trustedIssuerCollection"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trusted-issuers/{issuerId}": {
+      "get": {
+        "tags": [
+          "Trusted Issuers"
+        ],
+        "summary": "Get trusted issuer data corresponding to the given id",
+        "description": "Returns the trusted issuer metadata of the id given, must be called by ACCOUNT_ADMIN role or higher",
+        "operationId": "getTrustedIssuerById",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/issuerIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/issuerIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trusted Issuer Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/trustedIssuer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "MissingMandatoryParams"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Forbidden"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "InsufficientPermissions"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "enum": [
+                        "CredentialNotFound"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Trusted Issuers"
+        ],
+        "summary": "Update the given trusted issuer",
+        "operationId": "updateTrustedIssuer",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/issuerIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/issuerIdParam"
+          }
+        ],
+        "requestBody": {
+          "description": "Contains the relevant updates to be made on the given trusted issuer",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/trustedIssuerPutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The result of the action taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/trustedIssuer"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Trusted Issuers"
+        ],
+        "summary": "Remove the given trusted issuer",
+        "operationId": "deleteTrustedIssuer",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/issuerIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/issuerIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/200"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "token": {
+        "type": "object",
+        "required": [
+          "token_type",
+          "expires_in",
+          "access_token",
+          "refresh_token",
+          "scope"
+        ],
+        "properties": {
+          "token_type": {
+            "type": "string",
+            "description": "The type of the token, typically bearer"
+          },
+          "expires_in": {
+            "type": "number",
+            "description": "The lifetime in seconds of the access_token"
+          },
+          "access_token": {
+            "type": "string",
+            "description": "The access token used to authenticate against secure resources"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "A token used to obtain a new access token without re-authenticating"
+          },
+          "scope": {
+            "type": "string",
+            "description": "The scope of the access_token"
+          },
+          "gauth": {
+            "type": "string"
+          },
+          "sso": {
+            "type": "object",
+            "description": "Additional sso tokens for social media sign-on",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "description": "The name of the social media provider"
+              },
+              "accessToken": {
+                "type": "string",
+                "description": "The access token used to authenticate against the given provider"
+              },
+              "refreshToken": {
+                "type": "string",
+                "description": "The refresh token used to authenticate against the given provider"
+              }
+            }
+          },
+          "issued_token_type": {
+            "type": "string",
+            "description": "For token-exchange flow this indicates the returned token type"
+          }
+        }
+      },
+      "claims": {
+        "type": "object",
+        "required": [
+          "principalId",
+          "accountId",
+          "role",
+          "exp"
+        ],
+        "properties": {
+          "principalId": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "GLOBAL_ADMIN",
+              "PARTNER_ADMIN",
+              "ACCOUNT_ADMIN",
+              "USER",
+              "GUEST"
+            ]
+          },
+          "exp": {
+            "type": "string"
+          }
+        }
+      },
+      "oauthClientConfig": {
+        "type": "object",
+        "required": [
+          "clientId"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "string"
+          },
+          "pkce": {
+            "type": "string",
+            "enum": [
+              "plain",
+              "S256"
+            ]
+          }
+        }
+      },
+      "resource": {
+        "type": "object",
+        "properties": {
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "modifiedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modifiedBy": {
+            "type": "string"
+          },
+          "_links": {
+            "type": "object",
+            "description": "hypermedia links",
+            "required": [
+              "self"
+            ],
+            "properties": {
+              "self": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "resourceCollection": {
+        "type": "object",
+        "required": [
+          "_links"
+        ],
+        "properties": {
+          "_links": {
+            "type": "object",
+            "description": "hypermedia links",
+            "required": [
+              "self"
+            ],
+            "properties": {
+              "self": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "assumeRoleTokenPostRequest": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "Assume role to this account."
+          },
+          "role": {
+            "type": "string",
+            "description": "Role to be assumed."
+          },
+          "policyId": {
+            "type": "string",
+            "description": "The policy to be assumed (used in assume-policy flow)."
+          }
+        }
+      },
+      "authCode": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Authorization code"
+          }
+        }
+      },
+      "ConflictResponse": {
+        "type": "object",
+        "required": [
+          "message",
+          "name"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "enum": [
+              "ConditionalCheckFailedException",
+              "MultipleMatching"
+            ]
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SamlResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Authorization code"
+          },
+          "state": {
+            "type": "string",
+            "description": "Application State"
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "invalid_request",
+              "access_denied"
+            ]
+          },
+          "error_description": {
+            "type": "string"
+          }
+        }
+      },
+      "UnauthorizedBaseResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Unauthorized"
+          },
+          "name": {
+            "type": "string",
+            "enum": [
+              "MissingContext"
+            ]
+          }
+        }
+      },
+      "ForbiddenBaseResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Insufficient Permissions"
+          },
+          "name": {
+            "type": "string",
+            "enum": [
+              "InsufficientPermissions"
+            ]
+          }
+        }
+      },
+      "policyTestCriteria": {
+        "type": "object",
+        "required": [
+          "resource"
+        ],
+        "description": "Test criteria which describes the access desired (an action, applied to a resource)",
+        "properties": {
+          "resource": {
+            "type": "string",
+            "description": "a resource to access"
+          },
+          "action": {
+            "type": "string",
+            "description": "an action to perform on the resource. default * = any"
+          },
+          "accountId": {
+            "type": "string",
+            "description": "an alternate account ID to run policy against."
+          },
+          "context": {
+            "type": "string",
+            "description": "additional context to use in evaluating policies with conditions."
+          }
+        }
+      },
+      "policyTestRequest": {
+        "type": "object",
+        "required": [
+          "resources"
+        ],
+        "properties": {
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/policyTestCriteria"
+            }
+          },
+          "principalId": {
+            "type": "string",
+            "description": "an alternate identity of a user in our system to run policy against"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A list of policy types on the account that will be included in the policy test. Currently only a single additional type is supported. If omitted the default system, account, and principal policies will be tested."
+          }
+        }
+      },
+      "policyTestResult": {
+        "type": "object",
+        "required": [
+          "resource",
+          "effect",
+          "policyName",
+          "version"
+        ],
+        "description": "The effect granted by a  policy statement, whether specified action is allowed on the specified resource",
+        "properties": {
+          "resource": {
+            "type": "string",
+            "description": "a resource to access"
+          },
+          "action": {
+            "type": "string",
+            "description": "an action to perform on the resource. default * = any"
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "ExplicitAllow",
+              "ExplicitDeny",
+              "ImplicitAllow",
+              "ImplicitDeny"
+            ],
+            "description": "policy statement effect"
+          },
+          "statementId": {
+            "type": "string",
+            "description": "the statement that caused the effect"
+          },
+          "policyName": {
+            "type": "string",
+            "description": "the policy document name that contained the statement"
+          },
+          "version": {
+            "type": "number",
+            "description": "the policy document version that contained the statement"
+          },
+          "accountId": {
+            "type": "string",
+            "description": "the alternate account ID that the policy was run against"
+          },
+          "limit": {
+            "type": "number",
+            "description": "An optional field indicating the limit associated with this resource. The limit is only returned when making a request with action \"limit\" and if it is present on the statement that set the returned effect."
+          }
+        }
+      },
+      "policyTestResponse": {
+        "type": "object",
+        "properties": {
+          "principalId": {
+            "type": "string",
+            "description": "the principalId for which the policy was evaluated for"
+          },
+          "results": {
+            "type": "array",
+            "description": "an array of results based on the input statements to evaluate",
+            "items": {
+              "$ref": "#/components/schemas/policyTestResult"
+            }
+          }
+        },
+        "required": [
+          "principalId",
+          "results"
+        ]
+      },
+      "ssoProvider": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "description": "The named provider used to authenticate"
+          },
+          "signonUrl": {
+            "type": "string",
+            "description": "The url used during login in to create an <a href... link to trigger the authentication flow"
+          },
+          "scopes": {
+            "type": "array",
+            "description": "The default scopes that will be requested in the authentication flow",
+            "items": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string",
+            "description": "The label name for the provider button"
+          },
+          "signupUrl": {
+            "type": "string",
+            "description": "The url used during signup to create an <a href... link to trigger the authentication flow"
+          }
+        },
+        "required": [
+          "providerId",
+          "signonUrl",
+          "scopes"
+        ]
+      },
+      "ssoProviderResults": {
+        "type": "object",
+        "properties": {
+          "providers": {
+            "type": "array",
+            "description": "An array of sso providers based on the requesting profile",
+            "items": {
+              "$ref": "#/components/schemas/ssoProvider"
+            }
+          }
+        }
+      },
+      "ssoProviderRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ssoProvider"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "clientId": {
+                "type": "string",
+                "description": "The 3rd party client application ID for the SSO provider"
+              },
+              "clientSecret": {
+                "type": "string",
+                "description": "The 3rd party client application secret for the SSO provider"
+              },
+              "callbackUrl": {
+                "type": "string",
+                "description": "The url used during signon for the sso provider to call back into"
+              }
+            }
+          }
+        ]
+      },
+      "legacyApplication": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the application"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Application is active or not"
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "The Application Logo URL"
+          },
+          "providers": {
+            "type": "array",
+            "description": "An array of sso providers based on the requesting profile",
+            "items": {
+              "$ref": "#/components/schemas/ssoProvider"
+            }
+          },
+          "theme": {
+            "type": "string",
+            "description": "Theme used to render the Auth Portal"
+          },
+          "links": {
+            "type": "array",
+            "description": "An array of links associated with this application. For example, Support or Legal links",
+            "items": {
+              "$ref": "#/components/schemas/appLink"
+            }
+          },
+          "passwordRules": {
+            "type": "array",
+            "description": "Set of password rules for this application",
+            "items": {
+              "$ref": "#/components/schemas/passwordRule"
+            }
+          },
+          "requiredAttributes": {
+            "type": "array",
+            "description": "An array of user attributes required for the users of this application other than name or email.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "optionalAttributes": {
+            "type": "array",
+            "description": "An array of user attributes that are optional for the users of this application other than name or email.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "supportedCountries": {
+            "type": "array",
+            "description": "An array of supported countries in ISO 3166-1 alpha-2 format for this application",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requestCountry": {
+            "type": "string",
+            "description": "The cloudfront viewer country of the requestor if available"
+          }
+        }
+      },
+      "application": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          },
+          {
+            "type": "object",
+            "required": [
+              "applicationId",
+              "accountId",
+              "partnerId",
+              "active"
+            ],
+            "properties": {
+              "applicationId": {
+                "type": "string",
+                "description": "The client application identifier"
+              },
+              "accountId": {
+                "type": "string",
+                "description": "The account ID of this application data"
+              },
+              "partnerId": {
+                "type": "string",
+                "description": "The partner ID of this application data"
+              },
+              "name": {
+                "type": "string",
+                "description": "The name of the application"
+              },
+              "description": {
+                "type": "string",
+                "description": "The description of this application"
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Application is active or not"
+              },
+              "redirectUris": {
+                "type": "array",
+                "description": "An array of URIs for the given application",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "applicationCollection": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resourceCollection"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "_embedded": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "description": "Used for embedded objects",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/application"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "appLink": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the link"
+          },
+          "url": {
+            "type": "string",
+            "description": "The url of the link"
+          },
+          "version": {
+            "type": "string",
+            "description": "The version of the link needed for certain applications to reference a version of a particular url."
+          },
+          "disableAutoNavigate": {
+            "type": "boolean",
+            "default": false,
+            "description": "Indicates if the auto-forwarding capability of the portal should be disabled."
+          }
+        }
+      },
+      "passwordRule": {
+        "type": "object",
+        "properties": {
+          "minLength": {
+            "type": "number",
+            "description": "Minimum length of password"
+          },
+          "maxLength": {
+            "type": "number",
+            "description": "Maximum length of password"
+          },
+          "mustContain": {
+            "type": "array",
+            "description": "The password must contain at least one of these characters",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mustContainNumber": {
+            "type": "boolean",
+            "description": "Whether the password must contain a number or not"
+          },
+          "mustContainLetter": {
+            "type": "boolean",
+            "description": "Whether the password must contain a letter or not"
+          },
+          "mustContainUpperAndLowercaseLetters": {
+            "type": "boolean",
+            "description": "The password must contain at least one lower and one upper case letter"
+          },
+          "mustNotContainSpaces": {
+            "type": "boolean",
+            "description": "Whether the password must not contain a space or not"
+          }
+        }
+      },
+      "statusGetResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "Red",
+              "Yellow",
+              "Green"
+            ],
+            "description": "Overall status of the microservice."
+          },
+          "errorRate": {
+            "type": "object",
+            "description": "Provides the error count for the microservice in a given time period",
+            "properties": {
+              "last15Minutes": {
+                "type": "number",
+                "description": "Provides the error count for the microservice in the last 15 minutes"
+              }
+            }
+          },
+          "responseTime": {
+            "type": "object",
+            "description": "Provides the average response time for the microservice in a given time period",
+            "properties": {
+              "last15Minutes": {
+                "type": "number",
+                "description": "Provides the error count for the microservice in the last 15 minutes"
+              }
+            }
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of messages to be returned providing more detail on the status of the service."
+          }
+        },
+        "required": [
+          "status",
+          "errorRate",
+          "responseTime",
+          "messages"
+        ],
+        "additionalProperties": false
+      },
+      "identityProvider": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          },
+          {
+            "type": "object",
+            "required": [
+              "accountId"
+            ],
+            "properties": {
+              "accountId": {
+                "type": "string",
+                "description": "the Cloudlink account ID of the identity provider"
+              },
+              "identityProviderId": {
+                "type": "string",
+                "description": "an identifier for the given identity provider"
+              },
+              "active": {
+                "type": "boolean",
+                "description": "indicates if the identity provider is active or not"
+              },
+              "type": {
+                "type": "string",
+                "description": "the type identity provider, e.g. AZURE or OKTA"
+              },
+              "saml": {
+                "$ref": "#/components/schemas/samlIdentityProvider"
+              }
+            }
+          }
+        ]
+      },
+      "identityProviderCollection": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resourceCollection"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "_embedded": {
+                "type": "object",
+                "description": "Used for embedded objects",
+                "required": [
+                  "items"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/identityProvider"
+                    }
+                  }
+                }
+              },
+              "count": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "samlIdentityProvider": {
+        "type": "object",
+        "required": [
+          "issuerId",
+          "serviceProviderIssuerId",
+          "serviceProviderReplyUrl",
+          "loginUrl",
+          "certificates"
+        ],
+        "properties": {
+          "issuerId": {
+            "type": "string",
+            "description": "the issuer ID of the identity provider (Azure AD Identifier)"
+          },
+          "serviceProviderIssuerId": {
+            "type": "string",
+            "description": "the issuer ID of the service provider (Entity ID)"
+          },
+          "serviceProviderReplyUrl": {
+            "type": "string",
+            "description": "the reply URL of the service provider (Assertion Consumer Service URL)"
+          },
+          "loginUrl": {
+            "type": "string",
+            "description": "the login URL specified by the identity provider"
+          },
+          "logoutUrl": {
+            "type": "string",
+            "description": "the logout URL specified by the identity provider"
+          },
+          "certificates": {
+            "type": "array",
+            "description": "the Base64 encoded X.509 SAML Signing Certificates",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "identityProviderPostRequest": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Type of identity provider e.g. AZURE or OKTA"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "indicates if the identity provider is active or not"
+          },
+          "saml": {
+            "type": "object",
+            "required": [
+              "issuerId",
+              "serviceProviderIssuerId",
+              "serviceProviderReplyUrl",
+              "loginUrl",
+              "certificates"
+            ],
+            "properties": {
+              "issuerId": {
+                "type": "string",
+                "description": "the issuer ID of the identity provider (Azure AD Identifier)"
+              },
+              "serviceProviderIssuerId": {
+                "type": "string",
+                "description": "the issuer ID of the service provider (Entity ID)"
+              },
+              "serviceProviderReplyUrl": {
+                "type": "string",
+                "description": "the reply URL of the service provider (Assertion Consumer Service URL)"
+              },
+              "loginUrl": {
+                "type": "string",
+                "description": "the login URL specified by the identity provider"
+              },
+              "logoutUrl": {
+                "type": "string",
+                "description": "the logout URL specified by the identity provider"
+              },
+              "certificates": {
+                "type": "string",
+                "description": "the Base64 encoded X.509 SAML Signing Certificates in PEM format"
+              }
+            }
+          }
+        }
+      },
+      "identityProviderPutRequest": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Type of identity provider e.g. AZURE or OKTA"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "indicates if the identity provider is active or not"
+          },
+          "saml": {
+            "type": "object",
+            "properties": {
+              "issuerId": {
+                "type": "string",
+                "description": "the issuer ID of the identity provider (Azure AD Identifier)"
+              },
+              "serviceProviderIssuerId": {
+                "type": "string",
+                "description": "the issuer ID of the service provider (Entity ID)"
+              },
+              "serviceProviderReplyUrl": {
+                "type": "string",
+                "description": "the reply URL of the service provider (Assertion Consumer Service URL)"
+              },
+              "loginUrl": {
+                "type": "string",
+                "description": "the login URL specified by the identity provider"
+              },
+              "logoutUrl": {
+                "type": "string",
+                "description": "the logout URL specified by the identity provider"
+              },
+              "certificates": {
+                "type": "string",
+                "description": "the Base64 encoded X.509 SAML Signing Certificates in PEM format"
+              }
+            }
+          }
+        }
+      },
+      "applicationsPostRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "properties": {
+          "applicationId": {
+            "type": "string",
+            "description": "The client application Id. For 3rd-party application, it is generated and not allowed to be assigned."
+          },
+          "accountId": {
+            "type": "string",
+            "description": "The account Id for this set of application data"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the application"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Application is active or not. For 3rd-party application, it is always set to false until approved for use."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description of this application"
+          },
+          "resource": {
+            "type": "string",
+            "description": "The resource of this application. It is required to be supplied by user for global application. However, it's not required for 3rd-party application and always set to https://mitel.io/auth/3pa-${applicationid}"
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "The Application Logo URL"
+          },
+          "redirectUris": {
+            "type": "array",
+            "description": "An array of URIs for the given application",
+            "items": {
+              "type": "string"
+            }
+          },
+          "theme": {
+            "type": "string",
+            "description": "Theme used to render the Auth Portal"
+          },
+          "appLinks": {
+            "type": "array",
+            "description": "An array of links associated with this application. For example, Support or Legal links",
+            "items": {
+              "$ref": "#/components/schemas/appLink"
+            }
+          },
+          "passwordRules": {
+            "type": "array",
+            "description": "Set of password rules for this application. For 3rd-party application, this is defaulted to the following: length 8-128, containing one of number, lower and upper case.",
+            "items": {
+              "$ref": "#/components/schemas/passwordRule"
+            }
+          },
+          "requiredAttributes": {
+            "type": "array",
+            "description": "An array of user attributes required for the users of this application other than name or email.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "optionalAttributes": {
+            "type": "array",
+            "description": "An array of user attributes that are optional for the users of this application other than name or email.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "supportedCountries": {
+            "type": "array",
+            "description": "An array of supported countries in ISO 3166-1 alpha-2 format for this application",
+            "items": {
+              "type": "string"
+            }
+          },
+          "providers": {
+            "type": "array",
+            "description": "An array of sso providers based on the requesting profile",
+            "items": {
+              "$ref": "#/components/schemas/ssoProviderRequest"
+            }
+          },
+          "rules": {
+            "type": "object",
+            "properties": {
+              "enforceRedirectUris": {
+                "type": "boolean",
+                "description": "Indicates whether this application will enforce redirect URI. This field is defaulted to true for 3rd-party application."
+              }
+            }
+          }
+        }
+      },
+      "applicationPutRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the application"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Indicates if the application is active or not."
+          },
+          "redirectUris": {
+            "type": "array",
+            "description": "An array of URIs for the given application",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "applicationDeleteRequest": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The client application info for this account to delete.  AccountId is taken from the claims if not supplied"
+          }
+        }
+      },
+      "applicationTagPostRequest": {
+        "type": "object",
+        "required": [
+          "id",
+          "value"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "applicationTagPutRequest": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "applicationTag": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          },
+          {
+            "type": "object",
+            "required": [
+              "applicationId",
+              "accountId",
+              "id",
+              "value"
+            ],
+            "properties": {
+              "applicationId": {
+                "type": "string"
+              },
+              "accountId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "applicationTagCollection": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resourceCollection"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "_embedded": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "description": "Used for embedded objects",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/applicationTag"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "dnsResponse": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "txtRecord": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "txtRecord"
+        ],
+        "additionalProperties": false
+      },
+      "failoverStatusResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Failover status of the microservice. Possible values: failover, noFailover"
+          },
+          "message": {
+            "type": "string",
+            "description": "A message providing more detail on the failover status of the service."
+          },
+          "region": {
+            "type": "string",
+            "description": "The region where the Lambda function is executed."
+          },
+          "dnsResponses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/dnsResponse"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "message",
+          "region"
+        ],
+        "additionalProperties": false
+      },
+      "TooManyRequestsResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "credential": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          },
+          {
+            "type": "object",
+            "required": [
+              "credentialId",
+              "type",
+              "owner"
+            ],
+            "properties": {
+              "credentialId": {
+                "type": "string",
+                "description": "The credential identifier, it is also the key id of the key pair"
+              },
+              "accountId": {
+                "type": "string",
+                "description": "The account ID of the credential"
+              },
+              "name": {
+                "type": "string",
+                "description": "The name of the credential"
+              },
+              "type": {
+                "type": "string",
+                "description": "The type of credential specified",
+                "enum": [
+                  "jwk",
+                  "oauthToken",
+                  "token",
+                  "clientCredentials"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "description": "The intended target (destination) of the credential. Refers to the system that the credential applies to.",
+                "example": "https://mitel.io"
+              },
+              "owner": {
+                "type": "string",
+                "description": "The owner of the credential"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "inactive",
+                  "pendingDeletion"
+                ],
+                "description": "The status of this credential"
+              },
+              "accessRestriction": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "account",
+                  "principal",
+                  "owner"
+                ],
+                "description": "The access restriction applied to the credential refers to the level of access required to manage or to be returned the private portion of the given credential.  global - those with system credentials, account - those with admin access within the account, principal - those with principal (user) access within the account, owner - only the owner."
+              },
+              "expiry": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The intended expiry of this credential, if any"
+              },
+              "linkedCredentialId": {
+                "type": "string",
+                "description": "A reference to another credential ID in the account to which this credential is dependent upon. For instance, the oauthToken may depend on the clientCredentials for certain operations."
+              },
+              "publicKey": {
+                "type": "object",
+                "description": "The public portion of the credential"
+              },
+              "privateKey": {
+                "type": "object",
+                "description": "The private portion of the credential.  Only returned for those with sufficient priveledge to view"
+              }
+            }
+          }
+        ]
+      },
+      "credentialCollection": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resourceCollection"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "_embedded": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "description": "Used for embedded objects",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/credential"
+                    }
+                  },
+                  "expand": {
+                    "type": "object",
+                    "properties": {
+                      "keys": {
+                        "type": "array",
+                        "description": "The set of json web keys",
+                        "items": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "credentialCommand": {
+        "type": "object",
+        "required": [
+          "action",
+          "options"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "encode",
+              "decode",
+              "authorize"
+            ]
+          },
+          "options": {
+            "type": "object",
+            "description": "The command options corresponding to the requested action.  \nFor encoding jwt actions a 'payload' object is supplied containing the supported fields 'subject' (string), 'audience' (array of strings), 'scope' (string), and 'expiryDate' (date-time).\nFor decoding jwt type actions a 'token' (string) field would contain the jwt to decode"
+          }
+        }
+      },
+      "credentialCommandResponse": {
+        "type": "object",
+        "description": "The response of the credential command.  For encoding a jwk type credential this would include the property 'jwt' as string.  For decoding a jwk type credential this would include the property 'jwt' as object."
+      },
+      "credentialsPostRequest": {
+        "type": "object",
+        "required": [
+          "type",
+          "accessRestriction"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The account ID for this credential. Can only be specified by GLOBAL_ADMIN role."
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the credential"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "The status of this credential",
+            "default": "active"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "jwk",
+              "oauthToken",
+              "token",
+              "clientCredentials"
+            ],
+            "description": "The type of this credential"
+          },
+          "target": {
+            "type": "string",
+            "description": "The intended target (destination) of the credential. Refers to the system that the credential applies to.",
+            "example": "https://mitel.io"
+          },
+          "accessRestriction": {
+            "type": "string",
+            "enum": [
+              "global",
+              "account",
+              "principal",
+              "owner"
+            ],
+            "description": "The access restriction applied to the credential refers to the level of access required to manage or to be returned the private portion of the given credential.  global - those with system credentials, account - those with admin access within the account, principal - those with principal (user) access within the account, owner - only the owner."
+          },
+          "publicKey": {
+            "type": "object",
+            "description": "The public portion of the given credential if any"
+          },
+          "privateKey": {
+            "type": "object",
+            "description": "The private portion of the given credential if any"
+          },
+          "linkedCredentialId": {
+            "type": "string",
+            "description": "A reference to another credential ID in the account to which this credential is dependent upon. For instance, the oauthToken may depend on the clientCredentials for certain operations."
+          }
+        },
+        "additionalProperties": false
+      },
+      "credentialPutRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the credential"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive",
+              "pendingDeletion"
+            ],
+            "description": "The status of this credential"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "jwk",
+              "oauthToken",
+              "token",
+              "clientCredentials"
+            ],
+            "description": "The type of this credential"
+          },
+          "target": {
+            "type": "string",
+            "description": "The intended target (destination) of the credential. Refers to the system that the credential applies to.",
+            "example": "https://mitel.io"
+          },
+          "accessRestriction": {
+            "type": "string",
+            "enum": [
+              "global",
+              "account",
+              "principal",
+              "owner"
+            ],
+            "description": "The access restriction applied to the credential refers to the level of access required to manage or to be returned the private portion of the given credential.  global - those with system credentials, account - those with admin access within the account, principal - those with principal (user) access within the account, owner - only the owner."
+          },
+          "publicKey": {
+            "type": "object",
+            "description": "The public portion of the given credential if any"
+          },
+          "privateKey": {
+            "type": "object",
+            "description": "The private portion of the given credential if any"
+          },
+          "linkedCredentialId": {
+            "type": "string",
+            "description": "A reference to another credential ID in the account to which this credential is dependent upon. For instance, the oauthToken may depend on the clientCredentials for certain operations."
+          }
+        },
+        "additionalProperties": false
+      },
+      "credentialDeleteRequest": {
+        "type": "object",
+        "properties": {
+          "credentialId": {
+            "type": "string",
+            "description": "The credential to delete"
+          }
+        }
+      },
+      "trustedIssuer": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resource"
+          },
+          {
+            "type": "object",
+            "required": [
+              "issuerId",
+              "accountId"
+            ],
+            "properties": {
+              "issuerId": {
+                "type": "string",
+                "description": "The trusted issuer identifier"
+              },
+              "accountId": {
+                "type": "string",
+                "description": "The account ID of the trusted issuer.  Issuers that are valid across all accounts will be set to '*'"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The name of the trusted issuer"
+              },
+              "description": {
+                "type": "string",
+                "description": "A description for the given trusted issuer"
+              },
+              "iss": {
+                "type": "string",
+                "description": "The iss claim that will be used by the trusted issuer, and trusted in this CloudLink account."
+              },
+              "jwksUri": {
+                "type": "string",
+                "description": "The URL of the JSON Web Key Set for the trusted issuer"
+              }
+            }
+          }
+        ]
+      },
+      "trustedIssuerCollection": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/resourceCollection"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "_embedded": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "description": "Used for embedded objects",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/trustedIssuer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "trustedIssuerPostRequest": {
+        "type": "object",
+        "required": [
+          "iss",
+          "jwksUri"
+        ],
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "The name of the trusted issuer"
+          },
+          "description": {
+            "type": "string",
+            "description": "A description for the given trusted issuer"
+          },
+          "iss": {
+            "type": "string",
+            "description": "The iss claim that will be used by the trusted issuer, and trusted in this CloudLink account."
+          },
+          "jwksUri": {
+            "type": "string",
+            "description": "The URL of the JSON Web Key Set for the trusted issuer."
+          },
+          "accountId": {
+            "type": "string",
+            "description": "The account ID for this trusted issuer. Can only be specified by microservice."
+          }
+        },
+        "additionalProperties": false
+      },
+      "trustedIssuerPutRequest": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "The name of the trusted issuer"
+          },
+          "description": {
+            "type": "string",
+            "description": "A description for the given trusted issuer"
+          },
+          "iss": {
+            "type": "string",
+            "description": "The iss claim that will be used by the trusted issuer, and trusted in this CloudLink account."
+          },
+          "jwksUri": {
+            "type": "string",
+            "description": "The URL of the JSON Web Key Set for the trusted issuer."
+          }
+        },
+        "additionalProperties": false
+      },
+      "trustedIssuerDeleteRequest": {
+        "type": "object",
+        "properties": {
+          "issuerId": {
+            "type": "string",
+            "description": "The trusted issuer to delete"
+          }
+        }
+      },
+      "jsonWebKeySet": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "description": "The set of json web keys",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "oauthMetadata": {
+        "type": "object",
+        "description": "OAuth 2.0 Authorization Server Metadata as defined in RFC 8414",
+        "required": [
+          "issuer"
+        ],
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "description": "The authorization server's issuer identifier",
+            "example": "https://authentication.api.mitel.io/cloudlink"
+          },
+          "authorization_endpoint": {
+            "type": "string",
+            "description": "URL of the authorization server's authorization endpoint",
+            "example": "https://auth.mitel.io/authorize"
+          },
+          "token_endpoint": {
+            "type": "string",
+            "description": "URL of the authorization server's token endpoint",
+            "example": "https://authentication.api.mitel.io/token"
+          },
+          "jwks_uri": {
+            "type": "string",
+            "description": "URL of the authorization server's JWK Set document for the given account",
+            "example": "https://authentication.api.mitel.io/accounts/acc1234/.well-known/jwks.json"
+          },
+          "response_types_supported": {
+            "type": "array",
+            "description": "JSON array containing a list of the OAuth 2.0 response_type supported by this authorization server",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "code",
+              "token"
+            ]
+          },
+          "grant_types_supported": {
+            "type": "array",
+            "description": "JSON array containing a list of the OAuth 2.0 grant types supported by this authorization server",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "authorization_code",
+              "implicit",
+              "password",
+              "client_credentials",
+              "refresh_token",
+              "urn:ietf:params:oauth:grant-type:token-exchange"
+            ]
+          },
+          "token_endpoint_auth_methods_supported": {
+            "type": "array",
+            "description": "JSON array containing a list of client authentication methods supported by this token endpoint",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "none"
+            ]
+          },
+          "service_documentation": {
+            "type": "string",
+            "description": "URL of a page containing human-readable information that developers might want or need to know when using the authorization server",
+            "example": "https://developer.mitel.io/guides-resources/api-guides#authentication-api-guide"
+          },
+          "ui_locales_supported": {
+            "type": "array",
+            "description": "Languages and scripts supported for the user interface",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "en-US",
+              "en-GB",
+              "en-CA",
+              "fr-FR",
+              "fr-CA"
+            ]
+          },
+          "op_policy_uri": {
+            "type": "string",
+            "description": "URL that the authorization server provides to the person registering the client to read about the authorization server's requirements on how the client can use the data provided by the authorization server",
+            "example": "https://www.mitel.com/legal/mitel-cloud-services-terms-and-conditions"
+          },
+          "op_tos_uri": {
+            "type": "string",
+            "description": "URL that the authorization server provides to the person registering the client to read about the authorization server's terms of service",
+            "example": "https://www.mitel.com/legal/mitel-cloud-services-terms-and-conditions"
+          },
+          "code_challenge_methods_supported": {
+            "type": "array",
+            "description": "JSON array containing a list of the OAuth 2.0 code challenge methods supported by this authorization server",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "plain",
+              "S256"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "hydraDiscoveryMetadata": {
+        "type": "object",
+        "description": "Hydra client discovery metadata",
+        "required": [
+          "apiUrl",
+          "auth"
+        ],
+        "properties": {
+          "apiUrl": {
+            "type": "string",
+            "description": "The discovery url for the server implementation of the hydra client API",
+            "example": "https://app-proxy.api.mitel.io"
+          },
+          "auth": {
+            "type": "object",
+            "description": "The discovery urls for the oauth urls",
+            "required": [
+              "discoveryUrl",
+              "tokenUrl",
+              "authenticationUrl"
+            ],
+            "properties": {
+              "discoveryUrl": {
+                "type": "string",
+                "description": "The oauth discovery endpoint",
+                "example": "https://authentication.api.mitel.io/.well-known/openid-configuration"
+              },
+              "tokenUrl": {
+                "type": "string",
+                "description": "The token endpoint for the oauth flow",
+                "example": "https://authentication.api.mitel.io/token"
+              },
+              "authorizationUrl": {
+                "type": "string",
+                "description": "The authorization endpoint for the oauth flow",
+                "example": "https://auth.mitel.io/authorize"
+              },
+              "oauthClientConfigs": {
+                "type": "array",
+                "description": "The oauth client config hydra application variants",
+                "items": {
+                  "$ref": "#/components/schemas/oauthClientConfig"
+                }
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
