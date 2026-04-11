@@ -1,0 +1,306 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Telenor Connexion Managed IoT Cloud REST API",
+    "description": "REST API for Telenor Connexion's Managed IoT Cloud (MIC) platform. Provides endpoints for authentication, thing management, thing types, and data reporting.",
+    "version": "2.95.0",
+    "x-jentic-source-url": "https://docs.telenorconnexion.com/mic/getting-started/cloud-rest-api/"
+  },
+  "servers": [
+    {
+      "url": "https://{apiGatewayHost}/prod",
+      "description": "MIC API Gateway (instance-specific)",
+      "variables": {
+        "apiGatewayHost": {
+          "default": "195cms8yb6.execute-api.eu-west-1.amazonaws.com",
+          "description": "API Gateway host from your MIC instance metadata manifest"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": [],
+      "apiKeyAuth": []
+    }
+  ],
+  "tags": [
+    {"name": "Authentication", "description": "User authentication and login"},
+    {"name": "Thing Types", "description": "Thing type (category) management"},
+    {"name": "Things", "description": "IoT thing management and data reporting"},
+    {"name": "Metadata", "description": "API configuration and manifest"}
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Authenticate user",
+        "description": "Authenticate a user and obtain access token and credentials for subsequent API calls.",
+        "tags": ["Authentication"],
+        "security": [
+          {"apiKeyAuth": []}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["userName", "password"],
+                "properties": {
+                  "userName": {"type": "string", "description": "User login name"},
+                  "password": {"type": "string", "description": "User password"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {"$ref": "#/components/schemas/User"},
+                    "credentials": {
+                      "type": "object",
+                      "properties": {
+                        "token": {"type": "string", "description": "Access token for Bearer authentication"},
+                        "refreshToken": {"type": "string", "description": "Token for refreshing the access token"},
+                        "identityId": {"type": "string", "description": "Cognito identity ID"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed"
+          }
+        }
+      }
+    },
+    "/thingtypes": {
+      "post": {
+        "operationId": "createThingType",
+        "summary": "Create a thing type",
+        "description": "Create a new thing type (category/group). Requires ReadWrite role and ThingType.CREATE privilege on the domain.",
+        "tags": ["Thing Types"],
+        "security": [
+          {"bearerAuth": [], "apiKeyAuth": []}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["id", "domain", "label"],
+                "properties": {
+                  "id": {"type": "string", "pattern": "^[a-z0-9-_]+$", "description": "Thing type identifier"},
+                  "domain": {"type": "string", "description": "Domain ID"},
+                  "label": {"type": "string", "description": "Display name"},
+                  "description": {"type": "string", "description": "Thing type description"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Thing type created successfully",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ThingType"}
+              }
+            }
+          },
+          "401": {"description": "Unauthorized"},
+          "403": {"description": "Forbidden - insufficient privileges"}
+        }
+      }
+    },
+    "/things": {
+      "get": {
+        "operationId": "getThing",
+        "summary": "Get thing details",
+        "description": "Retrieve details of a thing. Requires Read role and Things privilege.",
+        "tags": ["Things"],
+        "security": [
+          {"bearerAuth": [], "apiKeyAuth": []}
+        ],
+        "parameters": [
+          {"name": "thingName", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Thing identifier"},
+          {"name": "attributes", "in": "query", "schema": {"type": "string"}, "description": "Comma-separated list of attributes to include (e.g., 'shadow')"}
+        ],
+        "responses": {
+          "200": {
+            "description": "Thing details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Thing"}
+              }
+            }
+          },
+          "404": {"description": "Thing not found"}
+        }
+      },
+      "post": {
+        "operationId": "createThing",
+        "summary": "Create a thing",
+        "description": "Creates a new thing and a corresponding thing certificate. Requires ReadWrite role.",
+        "tags": ["Things"],
+        "security": [
+          {"bearerAuth": [], "apiKeyAuth": []}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["thingName", "thingType", "domain"],
+                "properties": {
+                  "thingName": {"type": "string", "description": "Thing identifier"},
+                  "thingType": {"type": "string", "description": "Associated thing type ID"},
+                  "domain": {"type": "string", "description": "Domain ID"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Thing created successfully",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Thing"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/things/resources": {
+      "put": {
+        "operationId": "reportThingData",
+        "summary": "Report data to a thing",
+        "description": "Report resource data to a thing via REST API (alternative to MQTT). Requires ReadWrite role.",
+        "tags": ["Things"],
+        "security": [
+          {"bearerAuth": [], "apiKeyAuth": []}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["thingName", "thingType", "resources"],
+                "properties": {
+                  "thingName": {"type": "string", "description": "Thing identifier"},
+                  "thingType": {"type": "string", "description": "Associated thing type ID"},
+                  "resources": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["name", "value"],
+                      "properties": {
+                        "name": {"type": "string", "description": "Resource identifier"},
+                        "value": {"description": "Resource value to set"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Data reported successfully"
+          }
+        }
+      }
+    },
+    "/metadata/manifest": {
+      "get": {
+        "operationId": "getManifest",
+        "summary": "Get API configuration manifest",
+        "description": "Retrieve API configuration and keys for the MIC instance.",
+        "tags": ["Metadata"],
+        "security": [
+          {"apiKeyAuth": []}
+        ],
+        "responses": {
+          "200": {
+            "description": "Manifest retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ApiGatewayRootUrl": {"type": "string"},
+                    "Region": {"type": "string"},
+                    "UserPoolId": {"type": "string"},
+                    "ClientId": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Bearer token obtained from /auth/login endpoint"
+      },
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "API key for the MIC instance"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "userName": {"type": "string"},
+          "email": {"type": "string", "format": "email"},
+          "role": {"type": "string"},
+          "domain": {"type": "string"}
+        }
+      },
+      "ThingType": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "domain": {"type": "string"},
+          "label": {"type": "string"},
+          "description": {"type": "string"}
+        }
+      },
+      "Thing": {
+        "type": "object",
+        "properties": {
+          "thingName": {"type": "string"},
+          "thingType": {"type": "string"},
+          "domain": {"type": "string"},
+          "domainTopic": {"type": "string"},
+          "shadow": {"type": "object"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "createdBy": {"type": "string"}
+        }
+      }
+    }
+  }
+}
