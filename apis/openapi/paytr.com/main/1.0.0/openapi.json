@@ -1,0 +1,818 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PayTR Payment API",
+    "description": "PayTR payment processing API for status inquiries, refunds, BIN lookups, installment rates, and payment reports.",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://dev.paytr.com/en"
+  },
+  "servers": [
+    {
+      "url": "https://www.paytr.com",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/odeme/durum-sorgu": {
+      "post": {
+        "operationId": "getPaymentStatus",
+        "summary": "Query payment status",
+        "description": "Retrieve the status and details of a payment by order number.",
+        "tags": [
+          "Payment Status"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "merchant_id",
+                  "merchant_oid",
+                  "paytr_token"
+                ],
+                "properties": {
+                  "merchant_id": {
+                    "type": "string",
+                    "description": "Store number"
+                  },
+                  "merchant_oid": {
+                    "type": "string",
+                    "description": "Order number"
+                  },
+                  "paytr_token": {
+                    "type": "string",
+                    "description": "HMAC-SHA256 hash of merchant_id + merchant_oid + merchant_salt, encoded in base64"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "success",
+                        "error",
+                        "failed"
+                      ]
+                    },
+                    "payment_amount": {
+                      "type": "string",
+                      "description": "Order amount"
+                    },
+                    "payment_total": {
+                      "type": "string",
+                      "description": "Amount paid by customer"
+                    },
+                    "payment_date": {
+                      "type": "string",
+                      "description": "Transaction date (YYYY-MM-DD hh:mm:ss)"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "enum": [
+                        "TL",
+                        "TRY",
+                        "EUR",
+                        "USD",
+                        "GBP",
+                        "RUB"
+                      ]
+                    },
+                    "taksit": {
+                      "type": "string",
+                      "description": "Installment count (0, 2-12)"
+                    },
+                    "kart_marka": {
+                      "type": "string",
+                      "description": "Card brand"
+                    },
+                    "masked_pan": {
+                      "type": "string",
+                      "description": "Masked card number"
+                    },
+                    "odeme_tipi": {
+                      "type": "string",
+                      "enum": [
+                        "CART",
+                        "EFT"
+                      ],
+                      "description": "Payment type"
+                    },
+                    "test_mode": {
+                      "type": "string",
+                      "enum": [
+                        "0",
+                        "1"
+                      ],
+                      "description": "0 = live, 1 = test"
+                    },
+                    "returns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "return_amount": {
+                            "type": "string"
+                          },
+                          "reference_no": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "description": "Refund details if applicable"
+                    },
+                    "err_no": {
+                      "type": "string"
+                    },
+                    "err_msg": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "hmacToken": []
+          }
+        ]
+      }
+    },
+    "/odeme/iade": {
+      "post": {
+        "operationId": "refundPayment",
+        "summary": "Refund a payment",
+        "description": "Process a full or partial refund for a completed payment.",
+        "tags": [
+          "Refunds"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "merchant_id",
+                  "merchant_oid",
+                  "return_amount",
+                  "paytr_token"
+                ],
+                "properties": {
+                  "merchant_id": {
+                    "type": "integer",
+                    "description": "Store number"
+                  },
+                  "merchant_oid": {
+                    "type": "string",
+                    "description": "Order number"
+                  },
+                  "return_amount": {
+                    "type": "number",
+                    "description": "Refund amount (period as decimal delimiter, e.g., 10.25)"
+                  },
+                  "paytr_token": {
+                    "type": "string",
+                    "description": "HMAC-SHA256 hash of merchant_id + merchant_oid + return_amount + merchant_salt, encoded in base64"
+                  },
+                  "reference_no": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "description": "Optional reference number from Status Query service"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refund result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "success",
+                        "error",
+                        "failed"
+                      ]
+                    },
+                    "is_test": {
+                      "type": "integer",
+                      "description": "1 if test refund"
+                    },
+                    "merchant_oid": {
+                      "type": "string"
+                    },
+                    "return_amount": {
+                      "type": "string"
+                    },
+                    "reference_no": {
+                      "type": "string"
+                    },
+                    "err_no": {
+                      "type": "string"
+                    },
+                    "err_msg": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "hmacToken": []
+          }
+        ]
+      }
+    },
+    "/odeme/api/bin-detail": {
+      "post": {
+        "operationId": "lookupBin",
+        "summary": "BIN lookup service",
+        "description": "Look up card details by the first 6 or 8 digits of the card number.",
+        "tags": [
+          "Card Services"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "merchant_id",
+                  "bin_number",
+                  "paytr_token"
+                ],
+                "properties": {
+                  "merchant_id": {
+                    "type": "integer",
+                    "description": "Store number provided by PayTR"
+                  },
+                  "bin_number": {
+                    "type": "string",
+                    "description": "First 6 or 8 digits of card number; 8 digits recommended"
+                  },
+                  "paytr_token": {
+                    "type": "string",
+                    "description": "HMAC-SHA256 hash of bin_number + merchant_id + merchant_salt, encoded in base64"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "BIN lookup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "success",
+                        "error",
+                        "failed"
+                      ]
+                    },
+                    "cardType": {
+                      "type": "string",
+                      "enum": [
+                        "credit",
+                        "debit"
+                      ]
+                    },
+                    "businessCard": {
+                      "type": "string",
+                      "enum": [
+                        "y",
+                        "n"
+                      ],
+                      "description": "Company card indicator"
+                    },
+                    "bank": {
+                      "type": "string",
+                      "description": "Card issuing bank name"
+                    },
+                    "brand": {
+                      "type": "string",
+                      "description": "Program partnership identifier (axess, bonus, etc.)"
+                    },
+                    "schema": {
+                      "type": "string",
+                      "enum": [
+                        "VISA",
+                        "MASTERCARD",
+                        "AMEX",
+                        "TROY",
+                        "OTHER"
+                      ],
+                      "description": "Card network"
+                    },
+                    "bankCode": {
+                      "type": "integer",
+                      "description": "Bank identifier code"
+                    },
+                    "allow_non3d": {
+                      "type": "string",
+                      "enum": [
+                        "Y",
+                        "N"
+                      ],
+                      "description": "Non-3D transaction capability"
+                    },
+                    "err_msg": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "hmacToken": []
+          }
+        ]
+      }
+    },
+    "/odeme/taksit-oranlari": {
+      "post": {
+        "operationId": "getInstallmentRates",
+        "summary": "Query installment rates",
+        "description": "Retrieve available installment rates by card type.",
+        "tags": [
+          "Card Services"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "merchant_id",
+                  "request_id",
+                  "paytr_token"
+                ],
+                "properties": {
+                  "merchant_id": {
+                    "type": "string",
+                    "description": "Merchant identifier provided by PayTR"
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "maxLength": 32,
+                    "description": "Unique request identifier"
+                  },
+                  "paytr_token": {
+                    "type": "string",
+                    "description": "HMAC-SHA256 hash encoded in base64"
+                  },
+                  "single_ratio": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1
+                    ],
+                    "description": "Send 1 for single-shot rates"
+                  },
+                  "abroad_ratio": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1
+                    ],
+                    "description": "Send 1 for overseas rates"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Installment rates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "success",
+                        "error"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "err_msg": {
+                      "type": "string"
+                    },
+                    "max_inst_non_bus": {
+                      "type": "integer",
+                      "description": "Maximum installment count"
+                    },
+                    "rates": {
+                      "type": "object",
+                      "description": "Installment rates by card type",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "installment": {
+                              "type": "integer"
+                            },
+                            "rate": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "hmacToken": []
+          }
+        ]
+      }
+    },
+    "/rapor/odeme-dokumu/": {
+      "post": {
+        "operationId": "getPaymentStatement",
+        "summary": "Get payment statement report",
+        "description": "Retrieve payment summary report for a date range.",
+        "tags": [
+          "Reports"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "merchant_id",
+                  "start_date",
+                  "end_date",
+                  "paytr_token"
+                ],
+                "properties": {
+                  "merchant_id": {
+                    "type": "string",
+                    "description": "Merchant identification number"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Beginning date (YYYY-MM-DD)"
+                  },
+                  "end_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Ending date (YYYY-MM-DD)"
+                  },
+                  "paytr_token": {
+                    "type": "string",
+                    "description": "HMAC-SHA256 hash of merchant_id + start_date + end_date + merchant_salt, encoded in base64"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment statement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "success",
+                        "failed",
+                        "error"
+                      ]
+                    },
+                    "date_paid": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "sales": {
+                      "type": "number"
+                    },
+                    "return": {
+                      "type": "number"
+                    },
+                    "net": {
+                      "type": "number"
+                    },
+                    "merchant_iban": {
+                      "type": "string"
+                    },
+                    "err_msg": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "hmacToken": []
+          }
+        ]
+      }
+    },
+    "/rapor/odeme-detayi/": {
+      "post": {
+        "operationId": "getPaymentDetail",
+        "summary": "Get payment detail report",
+        "description": "Retrieve detailed payment report for a specific date.",
+        "tags": [
+          "Reports"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "merchant_id",
+                  "date",
+                  "paytr_token"
+                ],
+                "properties": {
+                  "merchant_id": {
+                    "type": "string",
+                    "description": "Merchant identification number"
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Query date (YYYY-MM-DD)"
+                  },
+                  "paytr_token": {
+                    "type": "string",
+                    "description": "HMAC-SHA256 hash of merchant_id + date + merchant_salt, encoded in base64"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment detail report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "success",
+                        "failed",
+                        "error"
+                      ]
+                    },
+                    "merchant_oid": {
+                      "type": "string"
+                    },
+                    "merchant_iban": {
+                      "type": "string"
+                    },
+                    "merchant_name": {
+                      "type": "string"
+                    },
+                    "payment": {
+                      "type": "number"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "amount": {
+                      "type": "number",
+                      "description": "Marketplace seller payout amount"
+                    },
+                    "transfer": {
+                      "type": "string",
+                      "description": "Marketplace seller IBAN and name"
+                    },
+                    "err_msg": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "hmacToken": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "error",
+              "failed"
+            ]
+          },
+          "err_no": {
+            "type": "string"
+          },
+          "err_msg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "hmacToken": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "paytr_token",
+        "description": "HMAC-SHA256 token generated from merchant credentials (merchant_id, merchant_key, merchant_salt) and request parameters, encoded in base64"
+      }
+    }
+  },
+  "security": [
+    {
+      "hmacToken": []
+    }
+  ]
+}
