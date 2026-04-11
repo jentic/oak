@@ -1,0 +1,250 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OneCompiler Code Execution API",
+    "description": "The OneCompiler Code Execution API allows you to execute code programmatically in various programming languages. Supports batch execution with multiple inputs.",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://www.onecompiler.com/apis/code-execution"
+  },
+  "servers": [
+    {
+      "url": "https://api.onecompiler.com/v1",
+      "description": "Production API"
+    }
+  ],
+  "paths": {
+    "/run": {
+      "post": {
+        "operationId": "executeCode",
+        "summary": "Execute code",
+        "description": "Executes code programmatically from backend servers. Supports batch execution by passing stdin as an array of inputs, receiving an array of response objects.",
+        "tags": ["Code Execution"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteCodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Code executed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteCodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (e.g., unsupported language, STDIN exceeds character limits)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/languages": {
+      "get": {
+        "operationId": "listSupportedLanguages",
+        "summary": "Get supported languages",
+        "description": "Retrieve a list of all supported programming languages with their IDs, names, types, and supported compiler/runtime flags.",
+        "tags": ["Languages"],
+        "responses": {
+          "200": {
+            "description": "Successful response with list of supported languages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Language"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key for authentication. Obtain from your OneCompiler dashboard."
+      }
+    },
+    "schemas": {
+      "ExecuteCodeRequest": {
+        "type": "object",
+        "required": ["language", "files"],
+        "properties": {
+          "language": {
+            "type": "string",
+            "description": "Programming language identifier (e.g., python, javascript, java, cpp, rust)"
+          },
+          "stdin": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Standard input for the program as a single string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Array of inputs for batch execution. Each entry runs the program separately."
+              }
+            ],
+            "description": "Standard input. Pass as array for batch execution with multiple inputs. Max 1,000,000 characters (10,000 for marketplace APIs)."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodeFile"
+            },
+            "description": "Array of source code files to execute"
+          }
+        }
+      },
+      "CodeFile": {
+        "type": "object",
+        "required": ["name", "content"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "File name with extension (e.g., main.py, index.js, Solution.java)"
+          },
+          "content": {
+            "type": "string",
+            "description": "Source code content of the file"
+          }
+        }
+      },
+      "ExecuteCodeResponse": {
+        "type": "object",
+        "properties": {
+          "stdout": {
+            "type": "string",
+            "description": "Program standard output"
+          },
+          "stderr": {
+            "type": "string",
+            "description": "Program error output (compiler warnings, runtime errors)"
+          },
+          "exception": {
+            "type": "string",
+            "description": "Execution exception details (timeout, compilation failure, runtime error)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["success", "failed"],
+            "description": "Overall execution status"
+          },
+          "compilationTime": {
+            "type": "number",
+            "description": "Time spent compiling in milliseconds (for compiled languages)"
+          },
+          "executionTime": {
+            "type": "number",
+            "description": "Time spent executing in milliseconds"
+          },
+          "memoryUsed": {
+            "type": "number",
+            "description": "Memory used during execution in kilobytes"
+          },
+          "limitRemaining": {
+            "type": "integer",
+            "description": "Number of remaining API calls in the current quota period"
+          }
+        }
+      },
+      "Language": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Language identifier used in the execute request"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable language display name"
+          },
+          "languageType": {
+            "type": "string",
+            "description": "Category of the language",
+            "enum": ["programming", "web", "database"]
+          },
+          "supportedFlags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Supported compiler/runtime flags and formatting options"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Error code: E001 (timeout), E002 (quota exceeded), E003 (invalid token), E004 (missing token), E005 (STDIN exceeds limits), E006 (unsupported language)"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ]
+}
