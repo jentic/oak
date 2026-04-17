@@ -1,0 +1,1 @@
+../../apis/openapi/console.olivya.io

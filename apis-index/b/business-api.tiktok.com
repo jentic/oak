@@ -1,0 +1,1 @@
+../../apis/openapi/business-api.tiktok.com

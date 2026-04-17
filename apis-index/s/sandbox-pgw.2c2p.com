@@ -1,0 +1,1 @@
+../../apis/openapi/sandbox-pgw.2c2p.com

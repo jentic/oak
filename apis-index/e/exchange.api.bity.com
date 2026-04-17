@@ -1,0 +1,1 @@
+../../apis/openapi/exchange.api.bity.com

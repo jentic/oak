@@ -1,0 +1,1 @@
+../../apis/openapi/techy-api.vercel.app

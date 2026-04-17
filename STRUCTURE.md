@@ -12,6 +12,10 @@ The repository uses a structured approach to organize:
 
 ```
 .
+├── apis-index                                            # Alphabetical symlink index into apis/openapi
+│   ├── a/ ... z/                                         # APIs grouped by first letter (lowercased)
+│   ├── 0/ ... 9/                                         # APIs starting with digits
+│   └── ~rest/                                            # APIs starting with non-alphanumeric characters
 ├── apis                                                  # All API-related files
 │   └── openapi                                           # OpenAPI specifications
 │       ├── vendor1.com                                   # Vendor directory (usually domain name)

@@ -1,0 +1,1 @@
+../../apis/openapi/api-sxkan78ybekjjaveh1lcig.teamhood.com

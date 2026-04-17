@@ -1,0 +1,1 @@
+../../apis/openapi/psd2.api.commerzbank.com

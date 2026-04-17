@@ -1,0 +1,1 @@
+../../apis/openapi/{user_domain}.procurify.com

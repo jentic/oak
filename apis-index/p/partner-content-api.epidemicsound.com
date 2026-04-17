@@ -1,0 +1,1 @@
+../../apis/openapi/partner-content-api.epidemicsound.com

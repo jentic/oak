@@ -1,0 +1,1 @@
+../../apis/openapi/apiproxy.shared.lumessetalentlink.com

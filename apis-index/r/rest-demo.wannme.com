@@ -1,0 +1,1 @@
+../../apis/openapi/rest-demo.wannme.com

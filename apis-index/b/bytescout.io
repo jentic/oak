@@ -1,0 +1,1 @@
+../../apis/openapi/bytescout.io

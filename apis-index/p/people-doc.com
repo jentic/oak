@@ -1,0 +1,1 @@
+../../apis/openapi/people-doc.com

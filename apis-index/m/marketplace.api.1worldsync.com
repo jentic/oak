@@ -1,0 +1,1 @@
+../../apis/openapi/marketplace.api.1worldsync.com

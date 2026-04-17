@@ -1,0 +1,1 @@
+../../apis/openapi/eu-api.legalesign.com

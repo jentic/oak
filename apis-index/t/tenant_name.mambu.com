@@ -1,0 +1,1 @@
+../../apis/openapi/tenant_name.mambu.com

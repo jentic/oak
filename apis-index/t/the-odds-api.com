@@ -1,0 +1,1 @@
+../../apis/openapi/the-odds-api.com

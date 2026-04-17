@@ -1,0 +1,1 @@
+../../apis/openapi/pyrus.com

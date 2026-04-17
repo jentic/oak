@@ -1,0 +1,1 @@
+../../apis/openapi/app.clicktime.com

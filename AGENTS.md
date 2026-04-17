@@ -14,7 +14,7 @@ This repository contains OpenAPI specifications and Arazzo workflows for 1,500+ 
 
 When working with this repository:
 
-1. **Finding specs**: Search `/apis/openapi/` by vendor name. Each vendor folder contains versioned API specifications.
+1. **Finding specs**: Search `/apis/openapi/` by vendor name. Each vendor folder contains versioned API specifications. Use `/apis-index/{letter}/` for alphabetical browsing via symlinks.
 
 2. **Finding workflows**: Arazzo workflows are in `/workflows/` and reference OpenAPI specs via `sourceDescriptions`.
 

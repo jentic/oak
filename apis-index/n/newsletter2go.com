@@ -1,0 +1,1 @@
+../../apis/openapi/newsletter2go.com

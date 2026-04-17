@@ -1,0 +1,1 @@
+../../apis/openapi/hacker-news.firebaseio.com

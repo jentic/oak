@@ -1,0 +1,1 @@
+../../apis/openapi/m3o.com

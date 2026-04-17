@@ -1,0 +1,1 @@
+../../apis/openapi/ricoh360.com

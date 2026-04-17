@@ -1,0 +1,1 @@
+../../apis/openapi/miataru.com

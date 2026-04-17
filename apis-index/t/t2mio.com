@@ -1,0 +1,1 @@
+../../apis/openapi/t2mio.com

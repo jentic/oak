@@ -1,0 +1,1 @@
+../../apis/openapi/allianz-trade.com

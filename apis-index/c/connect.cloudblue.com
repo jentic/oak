@@ -1,0 +1,1 @@
+../../apis/openapi/connect.cloudblue.com

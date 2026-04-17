@@ -1,0 +1,1 @@
+../../apis/openapi/mojotxt.com

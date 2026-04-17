@@ -1,0 +1,1 @@
+../../apis/openapi/simplecdn.com

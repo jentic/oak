@@ -1,0 +1,1 @@
+../../apis/openapi/terminal49.com

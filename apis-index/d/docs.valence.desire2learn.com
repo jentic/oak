@@ -1,0 +1,1 @@
+../../apis/openapi/docs.valence.desire2learn.com

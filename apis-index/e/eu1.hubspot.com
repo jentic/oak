@@ -1,0 +1,1 @@
+../../apis/openapi/eu1.hubspot.com

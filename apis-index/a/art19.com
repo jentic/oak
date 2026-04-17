@@ -1,0 +1,1 @@
+../../apis/openapi/art19.com

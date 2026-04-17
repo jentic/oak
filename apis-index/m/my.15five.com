@@ -1,0 +1,1 @@
+../../apis/openapi/my.15five.com

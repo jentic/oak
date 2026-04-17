@@ -1,0 +1,1 @@
+../../apis/openapi/portal.1naturalway.com

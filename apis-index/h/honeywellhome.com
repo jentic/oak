@@ -1,0 +1,1 @@
+../../apis/openapi/honeywellhome.com

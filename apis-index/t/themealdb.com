@@ -1,0 +1,1 @@
+../../apis/openapi/themealdb.com

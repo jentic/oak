@@ -1,0 +1,1 @@
+../../apis/openapi/developer.riotgames.com

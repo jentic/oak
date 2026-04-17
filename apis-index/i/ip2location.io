@@ -1,0 +1,1 @@
+../../apis/openapi/ip2location.io

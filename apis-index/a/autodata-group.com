@@ -1,0 +1,1 @@
+../../apis/openapi/autodata-group.com

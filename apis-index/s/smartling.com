@@ -1,0 +1,1 @@
+../../apis/openapi/smartling.com

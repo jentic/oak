@@ -1,0 +1,1 @@
+../../apis/openapi/slopepay.com

@@ -1,0 +1,1 @@
+../../apis/openapi/sales-api.postoo.io

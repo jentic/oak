@@ -1,0 +1,1 @@
+../../apis/openapi/cnab-online.herokuapp.com

@@ -1,0 +1,1 @@
+../../apis/openapi/snipe-it.readme.io

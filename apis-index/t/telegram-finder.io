@@ -1,0 +1,1 @@
+../../apis/openapi/telegram-finder.io

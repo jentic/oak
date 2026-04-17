@@ -1,0 +1,1 @@
+../../apis/openapi/portfoliopilot.com

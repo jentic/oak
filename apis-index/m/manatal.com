@@ -1,0 +1,1 @@
+../../apis/openapi/manatal.com

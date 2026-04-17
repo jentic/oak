@@ -1,0 +1,1 @@
+../../apis/openapi/sales.app.redkik.com

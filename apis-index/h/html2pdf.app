@@ -1,0 +1,1 @@
+../../apis/openapi/html2pdf.app

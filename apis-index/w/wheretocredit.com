@@ -1,0 +1,1 @@
+../../apis/openapi/wheretocredit.com

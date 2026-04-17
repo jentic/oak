@@ -1,0 +1,1 @@
+../../apis/openapi/przelewy24.pl

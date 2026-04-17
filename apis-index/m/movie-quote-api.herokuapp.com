@@ -1,0 +1,1 @@
+../../apis/openapi/movie-quote-api.herokuapp.com

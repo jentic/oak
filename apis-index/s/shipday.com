@@ -1,0 +1,1 @@
+../../apis/openapi/shipday.com

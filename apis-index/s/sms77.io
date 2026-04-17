@@ -1,0 +1,1 @@
+../../apis/openapi/sms77.io

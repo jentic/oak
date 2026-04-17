@@ -1,0 +1,1 @@
+../../apis/openapi/open.weibo.com

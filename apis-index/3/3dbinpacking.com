@@ -1,0 +1,1 @@
+../../apis/openapi/3dbinpacking.com

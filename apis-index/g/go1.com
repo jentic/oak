@@ -1,0 +1,1 @@
+../../apis/openapi/go1.com

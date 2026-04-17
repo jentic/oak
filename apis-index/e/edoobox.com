@@ -1,0 +1,1 @@
+../../apis/openapi/edoobox.com

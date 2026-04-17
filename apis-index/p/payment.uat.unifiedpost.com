@@ -1,0 +1,1 @@
+../../apis/openapi/payment.uat.unifiedpost.com
