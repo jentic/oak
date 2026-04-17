@@ -1,1 +1,0 @@
-../../apis/openapi/json2video.com

@@ -1,1 +1,0 @@
-../../apis/openapi/8x8.com

@@ -1,1 +1,0 @@
-../../apis/openapi/7digital.com

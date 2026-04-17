@@ -1,1 +1,0 @@
-../../apis/openapi/ivvycode.com

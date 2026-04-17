@@ -1,1 +1,0 @@
-../../apis/openapi/chain49.com

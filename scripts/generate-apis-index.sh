@@ -17,7 +17,10 @@ for digit in {0..9}; do
 done
 mkdir -p "$INDEX_DIR/~rest"
 
-# Create symlinks
+# Collect APIs into buckets
+declare -A BUCKETS
+total=0
+
 for api_dir in "$SOURCE_DIR"/*/; do
     api_name="$(basename "$api_dir")"
     first_char="${api_name:0:1}"
@@ -31,15 +34,46 @@ for api_dir in "$SOURCE_DIR"/*/; do
         bucket="~rest"
     fi
 
-    ln -s "../../apis/openapi/$api_name" "$INDEX_DIR/$bucket/$api_name"
+    BUCKETS[$bucket]+="- [$api_name](../../apis/openapi/$api_name)"$'\n'
+    total=$((total + 1))
 done
 
-# Summary
-total_symlinks=$(find "$INDEX_DIR" -type l | wc -l)
-total_source=$(find "$SOURCE_DIR" -maxdepth 1 -mindepth 1 -type d | wc -l)
-echo "Created $total_symlinks symlinks for $total_source API directories"
+# Generate README.md for each bucket
+total_links=0
+for bucket_dir in "$INDEX_DIR"/*/; do
+    bucket="$(basename "$bucket_dir")"
+    readme="$bucket_dir/README.md"
 
-if [ "$total_symlinks" -ne "$total_source" ]; then
-    echo "WARNING: symlink count ($total_symlinks) does not match source count ($total_source)"
+    if [[ -n "${BUCKETS[$bucket]:-}" ]]; then
+        count=$(echo -n "${BUCKETS[$bucket]}" | grep -c '^')
+        total_links=$((total_links + count))
+
+        if [[ "$bucket" == "~rest" ]]; then
+            description="$count APIs starting with non-alphanumeric characters."
+        else
+            description="$count APIs starting with \`$bucket\`."
+        fi
+
+        cat > "$readme" <<HEREDOC
+# APIs: $bucket
+
+$description
+
+${BUCKETS[$bucket]}
+HEREDOC
+    else
+        cat > "$readme" <<HEREDOC
+# APIs: $bucket
+
+No APIs currently start with \`$bucket\`.
+HEREDOC
+    fi
+done
+
+total_source=$(find "$SOURCE_DIR" -maxdepth 1 -mindepth 1 -type d | wc -l)
+echo "Created $total_links links across $(ls -d "$INDEX_DIR"/*/ | wc -l) buckets for $total_source API directories"
+
+if [ "$total_links" -ne "$total_source" ]; then
+    echo "WARNING: link count ($total_links) does not match source count ($total_source)"
     exit 1
 fi

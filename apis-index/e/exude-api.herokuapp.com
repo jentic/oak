@@ -1,1 +1,0 @@
-../../apis/openapi/exude-api.herokuapp.com

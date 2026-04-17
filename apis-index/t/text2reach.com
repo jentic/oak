@@ -1,1 +1,0 @@
-../../apis/openapi/text2reach.com

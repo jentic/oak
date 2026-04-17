@@ -1,1 +1,0 @@
-../../apis/openapi/flashswitch.flash-group.com

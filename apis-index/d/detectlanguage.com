@@ -1,1 +1,0 @@
-../../apis/openapi/detectlanguage.com

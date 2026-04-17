@@ -1,1 +1,0 @@
-../../apis/openapi/classe365.com

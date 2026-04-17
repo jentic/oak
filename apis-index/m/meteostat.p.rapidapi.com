@@ -1,1 +1,0 @@
-../../apis/openapi/meteostat.p.rapidapi.com

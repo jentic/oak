@@ -1,1 +1,0 @@
-../../apis/openapi/iva-api.com

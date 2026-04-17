@@ -1,1 +1,0 @@
-../../apis/openapi/api-v3.mojepanstwo.pl

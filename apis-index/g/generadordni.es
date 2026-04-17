@@ -1,1 +1,0 @@
-../../apis/openapi/generadordni.es

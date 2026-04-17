@@ -1,1 +1,0 @@
-../../apis/openapi/3scri.be

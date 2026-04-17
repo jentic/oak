@@ -1,1 +1,0 @@
-../../apis/openapi/analytics-metrics.jwplayer.com

@@ -1,1 +1,0 @@
-../../apis/openapi/sandboxreportingapi.connexpay.com

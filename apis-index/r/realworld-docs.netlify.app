@@ -1,1 +1,0 @@
-../../apis/openapi/realworld-docs.netlify.app

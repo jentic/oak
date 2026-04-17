@@ -1,1 +1,0 @@
-../../apis/openapi/airport-web.appspot.com

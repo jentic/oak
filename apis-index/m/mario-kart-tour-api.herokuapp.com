@@ -1,1 +1,0 @@
-../../apis/openapi/mario-kart-tour-api.herokuapp.com

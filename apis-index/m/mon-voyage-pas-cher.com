@@ -1,1 +1,0 @@
-../../apis/openapi/mon-voyage-pas-cher.com

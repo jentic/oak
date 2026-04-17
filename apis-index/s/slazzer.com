@@ -1,1 +1,0 @@
-../../apis/openapi/slazzer.com

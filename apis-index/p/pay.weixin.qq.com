@@ -1,1 +1,0 @@
-../../apis/openapi/pay.weixin.qq.com

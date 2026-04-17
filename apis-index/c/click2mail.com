@@ -1,1 +1,0 @@
-../../apis/openapi/click2mail.com

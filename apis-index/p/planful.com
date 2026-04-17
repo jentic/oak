@@ -1,1 +1,0 @@
-../../apis/openapi/planful.com

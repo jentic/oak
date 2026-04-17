@@ -1,1 +1,0 @@
-../../apis/openapi/{account}.assets.tagger.opecloud.com

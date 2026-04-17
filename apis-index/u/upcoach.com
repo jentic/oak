@@ -1,1 +1,0 @@
-../../apis/openapi/upcoach.com

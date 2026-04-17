@@ -1,1 +1,0 @@
-../../apis/openapi/buddypt.com

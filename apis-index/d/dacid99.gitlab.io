@@ -1,1 +1,0 @@
-../../apis/openapi/dacid99.gitlab.io

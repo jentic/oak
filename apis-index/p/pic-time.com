@@ -1,1 +1,0 @@
-../../apis/openapi/pic-time.com

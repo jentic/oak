@@ -1,1 +1,0 @@
-../../apis/openapi/partner-api.payfit.com

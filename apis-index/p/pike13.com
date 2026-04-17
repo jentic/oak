@@ -1,1 +1,0 @@
-../../apis/openapi/pike13.com

@@ -1,1 +1,0 @@
-../../apis/openapi/graph.microsoft.com

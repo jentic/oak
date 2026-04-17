@@ -1,1 +1,0 @@
-../../apis/openapi/beds24.com

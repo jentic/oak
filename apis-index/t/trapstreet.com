@@ -1,1 +1,0 @@
-../../apis/openapi/trapstreet.com

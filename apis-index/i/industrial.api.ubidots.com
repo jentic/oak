@@ -1,1 +1,0 @@
-../../apis/openapi/industrial.api.ubidots.com

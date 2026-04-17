@@ -1,1 +1,0 @@
-../../apis/openapi/ip2whois.com

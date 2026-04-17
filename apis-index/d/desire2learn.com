@@ -1,1 +1,0 @@
-../../apis/openapi/desire2learn.com

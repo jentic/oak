@@ -1,1 +1,0 @@
-../../apis/openapi/authress.io

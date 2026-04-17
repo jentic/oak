@@ -1,1 +1,0 @@
-../../apis/openapi/us-app.lexopulus.com

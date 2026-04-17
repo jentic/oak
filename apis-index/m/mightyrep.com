@@ -1,1 +1,0 @@
-../../apis/openapi/mightyrep.com

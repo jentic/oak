@@ -1,1 +1,0 @@
-../../apis/openapi/judge0.com

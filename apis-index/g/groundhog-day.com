@@ -1,1 +1,0 @@
-../../apis/openapi/groundhog-day.com

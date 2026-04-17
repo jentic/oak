@@ -1,1 +1,0 @@
-../../apis/openapi/staging.api.ekklo.com

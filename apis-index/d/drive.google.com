@@ -1,1 +1,0 @@
-../../apis/openapi/drive.google.com

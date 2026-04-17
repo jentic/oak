@@ -1,1 +1,0 @@
-../../apis/openapi/origin-api.utilihub.io

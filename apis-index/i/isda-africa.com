@@ -1,1 +1,0 @@
-../../apis/openapi/isda-africa.com

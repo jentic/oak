@@ -1,1 +1,0 @@
-../../apis/openapi/mtaa-api.herokuapp.com

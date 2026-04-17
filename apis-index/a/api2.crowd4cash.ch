@@ -1,1 +1,0 @@
-../../apis/openapi/api2.crowd4cash.ch

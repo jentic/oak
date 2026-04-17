@@ -1,1 +1,0 @@
-../../apis/openapi/tools.keycdn.com

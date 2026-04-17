@@ -1,1 +1,0 @@
-../../apis/openapi/bud-financial.thisisbud.com

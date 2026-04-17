@@ -1,1 +1,0 @@
-../../apis/openapi/sandbox.api.starkbank.com

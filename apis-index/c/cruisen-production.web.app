@@ -1,1 +1,0 @@
-../../apis/openapi/cruisen-production.web.app

@@ -1,1 +1,0 @@
-../../apis/openapi/p2p.mirotalk.com

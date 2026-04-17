@@ -1,1 +1,0 @@
-../../apis/openapi/g2.com

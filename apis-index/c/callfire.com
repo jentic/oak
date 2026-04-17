@@ -1,1 +1,0 @@
-../../apis/openapi/callfire.com

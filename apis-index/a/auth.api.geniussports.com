@@ -1,1 +1,0 @@
-../../apis/openapi/auth.api.geniussports.com

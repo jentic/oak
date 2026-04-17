@@ -1,1 +1,0 @@
-../../apis/openapi/robtex.com

@@ -1,1 +1,0 @@
-../../apis/openapi/ship24.com

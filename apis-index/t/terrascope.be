@@ -1,1 +1,0 @@
-../../apis/openapi/terrascope.be

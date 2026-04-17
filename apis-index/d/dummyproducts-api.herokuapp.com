@@ -1,1 +1,0 @@
-../../apis/openapi/dummyproducts-api.herokuapp.com

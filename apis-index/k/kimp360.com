@@ -1,1 +1,0 @@
-../../apis/openapi/kimp360.com

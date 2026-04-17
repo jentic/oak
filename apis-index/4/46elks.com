@@ -1,1 +1,0 @@
-../../apis/openapi/46elks.com

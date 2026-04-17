@@ -1,1 +1,0 @@
-../../apis/openapi/back4app.com

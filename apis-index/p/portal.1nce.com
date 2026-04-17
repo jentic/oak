@@ -1,1 +1,0 @@
-../../apis/openapi/portal.1nce.com

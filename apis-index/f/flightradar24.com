@@ -1,1 +1,0 @@
-../../apis/openapi/flightradar24.com

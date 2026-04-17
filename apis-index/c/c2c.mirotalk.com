@@ -1,1 +1,0 @@
-../../apis/openapi/c2c.mirotalk.com

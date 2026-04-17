@@ -1,1 +1,0 @@
-../../apis/openapi/gocardless.com

@@ -1,1 +1,0 @@
-../../apis/openapi/{vanity-name}.api.visier.io

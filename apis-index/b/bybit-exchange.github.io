@@ -1,1 +1,0 @@
-../../apis/openapi/bybit-exchange.github.io

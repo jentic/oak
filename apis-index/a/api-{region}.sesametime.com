@@ -1,1 +1,0 @@
-../../apis/openapi/api-{region}.sesametime.com

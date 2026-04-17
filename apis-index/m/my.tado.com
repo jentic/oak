@@ -1,1 +1,0 @@
-../../apis/openapi/my.tado.com

@@ -1,1 +1,0 @@
-../../apis/openapi/text2vip.messagingchannel.com

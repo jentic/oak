@@ -1,1 +1,0 @@
-../../apis/openapi/api.us2.sumologic.com

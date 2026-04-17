@@ -1,1 +1,0 @@
-../../apis/openapi/clouddocs.f5.com

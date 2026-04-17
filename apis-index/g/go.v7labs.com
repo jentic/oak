@@ -1,1 +1,0 @@
-../../apis/openapi/go.v7labs.com

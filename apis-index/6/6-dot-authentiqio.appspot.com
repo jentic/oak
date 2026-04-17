@@ -1,1 +1,0 @@
-../../apis/openapi/6-dot-authentiqio.appspot.com

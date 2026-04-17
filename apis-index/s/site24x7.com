@@ -1,1 +1,0 @@
-../../apis/openapi/site24x7.com

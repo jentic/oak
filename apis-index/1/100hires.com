@@ -1,1 +1,0 @@
-../../apis/openapi/100hires.com

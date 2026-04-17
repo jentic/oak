@@ -1,1 +1,0 @@
-../../apis/openapi/2captcha.com

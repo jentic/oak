@@ -1,1 +1,0 @@
-../../apis/openapi/dntly.com

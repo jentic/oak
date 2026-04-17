@@ -1,1 +1,0 @@
-../../apis/openapi/beamable.com

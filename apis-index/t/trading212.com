@@ -1,1 +1,0 @@
-../../apis/openapi/trading212.com

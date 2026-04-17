@@ -1,1 +1,0 @@
-../../apis/openapi/noviams.com

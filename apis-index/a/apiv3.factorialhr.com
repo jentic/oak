@@ -1,1 +1,0 @@
-../../apis/openapi/apiv3.factorialhr.com

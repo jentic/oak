@@ -1,1 +1,0 @@
-../../apis/openapi/rapid7.com

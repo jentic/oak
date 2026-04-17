@@ -1,1 +1,0 @@
-../../apis/openapi/ns1.com

@@ -1,1 +1,0 @@
-../../apis/openapi/skynewz-api-fortnite.herokuapp.com

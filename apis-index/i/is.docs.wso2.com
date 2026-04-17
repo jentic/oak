@@ -1,1 +1,0 @@
-../../apis/openapi/is.docs.wso2.com

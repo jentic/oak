@@ -1,1 +1,0 @@
-../../apis/openapi/shopify.com

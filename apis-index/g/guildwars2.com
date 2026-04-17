@@ -1,1 +1,0 @@
-../../apis/openapi/guildwars2.com

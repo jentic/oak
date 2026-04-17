@@ -1,1 +1,0 @@
-../../apis/openapi/climate.api.nvidia.com

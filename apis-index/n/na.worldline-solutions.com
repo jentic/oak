@@ -1,1 +1,0 @@
-../../apis/openapi/na.worldline-solutions.com

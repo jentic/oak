@@ -1,1 +1,0 @@
-../../apis/openapi/qr-code-generator.com
