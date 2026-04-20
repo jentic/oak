@@ -1,0 +1,414 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Maxio (Chargify) API",
+    "version": "1.0.0",
+    "description": "Maxio (formerly Chargify) is a subscription management and recurring billing platform. The API provides endpoints for managing subscriptions, customers, products, components, payments, invoices, and more. All API requests use JSON format.",
+    "x-jentic-source-url": "https://developer.maxio.com/"
+  },
+  "servers": [
+    {
+      "url": "https://{subdomain}.chargify.com",
+      "description": "Maxio Chargify API",
+      "variables": {
+        "subdomain": {"default": "yoursite", "description": "Your Chargify subdomain"}
+      }
+    }
+  ],
+  "security": [
+    {"basicAuth": []}
+  ],
+  "tags": [
+    {"name": "Subscriptions", "description": "Subscription management"},
+    {"name": "Customers", "description": "Customer management"},
+    {"name": "Products", "description": "Product catalog"},
+    {"name": "Product Families", "description": "Product family management"},
+    {"name": "Components", "description": "Metered and quantity-based components"},
+    {"name": "Invoices", "description": "Invoice management"},
+    {"name": "Payments", "description": "Payment management"}
+  ],
+  "paths": {
+    "/subscriptions.json": {
+      "get": {
+        "operationId": "listSubscriptions",
+        "summary": "List subscriptions",
+        "description": "Returns a paginated list of all subscriptions.",
+        "tags": ["Subscriptions"],
+        "parameters": [
+          {"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}, "description": "Page number"},
+          {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20, "maximum": 200}, "description": "Results per page"},
+          {"name": "state", "in": "query", "schema": {"type": "string", "enum": ["active", "canceled", "expired", "on_hold", "past_due", "soft_failure", "trialing", "trial_ended", "unpaid"]}, "description": "Filter by subscription state"},
+          {"name": "product", "in": "query", "schema": {"type": "integer"}, "description": "Filter by product ID"},
+          {"name": "date_field", "in": "query", "schema": {"type": "string", "enum": ["current_period_ends_at", "current_period_starts_at", "created_at", "activated_at", "canceled_at", "expires_at", "trial_started_at", "trial_ended_at", "updated_at"]}, "description": "Date field to filter on"},
+          {"name": "start_date", "in": "query", "schema": {"type": "string", "format": "date"}, "description": "Filter start date"},
+          {"name": "end_date", "in": "query", "schema": {"type": "string", "format": "date"}, "description": "Filter end date"},
+          {"name": "sort", "in": "query", "schema": {"type": "string", "enum": ["signup_date", "period_start", "period_end", "next_assessment", "state", "created_at", "updated_at"]}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of subscriptions",
+            "content": {"application/json": {"schema": {"type": "array", "items": {"type": "object", "properties": {"subscription": {"$ref": "#/components/schemas/Subscription"}}}}}}
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "post": {
+        "operationId": "createSubscription",
+        "summary": "Create a subscription",
+        "description": "Creates a new subscription for a customer.",
+        "tags": ["Subscriptions"],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"type": "object", "properties": {"subscription": {"$ref": "#/components/schemas/CreateSubscriptionRequest"}}}}}
+        },
+        "responses": {
+          "201": {"description": "Subscription created", "content": {"application/json": {"schema": {"type": "object", "properties": {"subscription": {"$ref": "#/components/schemas/Subscription"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "422": {"description": "Unprocessable entity", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/subscriptions/{subscription_id}.json": {
+      "get": {
+        "operationId": "getSubscription",
+        "summary": "Get a subscription",
+        "tags": ["Subscriptions"],
+        "parameters": [{"name": "subscription_id", "in": "path", "required": true, "schema": {"type": "integer"}}],
+        "responses": {
+          "200": {"description": "Subscription details", "content": {"application/json": {"schema": {"type": "object", "properties": {"subscription": {"$ref": "#/components/schemas/Subscription"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "put": {
+        "operationId": "updateSubscription",
+        "summary": "Update a subscription",
+        "tags": ["Subscriptions"],
+        "parameters": [{"name": "subscription_id", "in": "path", "required": true, "schema": {"type": "integer"}}],
+        "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"subscription": {"$ref": "#/components/schemas/UpdateSubscriptionRequest"}}}}}},
+        "responses": {
+          "200": {"description": "Subscription updated", "content": {"application/json": {"schema": {"type": "object", "properties": {"subscription": {"$ref": "#/components/schemas/Subscription"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "delete": {
+        "operationId": "cancelSubscription",
+        "summary": "Cancel a subscription",
+        "tags": ["Subscriptions"],
+        "parameters": [{"name": "subscription_id", "in": "path", "required": true, "schema": {"type": "integer"}}],
+        "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"subscription": {"type": "object", "properties": {"cancellation_message": {"type": "string"}, "reason_code": {"type": "string"}}}}}}}},
+        "responses": {
+          "200": {"description": "Subscription cancelled"},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/customers.json": {
+      "get": {
+        "operationId": "listCustomers",
+        "summary": "List customers",
+        "tags": ["Customers"],
+        "parameters": [
+          {"name": "page", "in": "query", "schema": {"type": "integer"}},
+          {"name": "per_page", "in": "query", "schema": {"type": "integer"}},
+          {"name": "date_field", "in": "query", "schema": {"type": "string", "enum": ["created_at", "updated_at"]}},
+          {"name": "start_date", "in": "query", "schema": {"type": "string", "format": "date"}},
+          {"name": "end_date", "in": "query", "schema": {"type": "string", "format": "date"}},
+          {"name": "q", "in": "query", "schema": {"type": "string"}, "description": "Search query for name, email, reference, or organization"}
+        ],
+        "responses": {
+          "200": {"description": "List of customers", "content": {"application/json": {"schema": {"type": "array", "items": {"type": "object", "properties": {"customer": {"$ref": "#/components/schemas/Customer"}}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "post": {
+        "operationId": "createCustomer",
+        "summary": "Create a customer",
+        "tags": ["Customers"],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {"customer": {"$ref": "#/components/schemas/CreateCustomerRequest"}}}}}},
+        "responses": {
+          "201": {"description": "Customer created", "content": {"application/json": {"schema": {"type": "object", "properties": {"customer": {"$ref": "#/components/schemas/Customer"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/customers/{customer_id}.json": {
+      "get": {
+        "operationId": "getCustomer",
+        "summary": "Get a customer",
+        "tags": ["Customers"],
+        "parameters": [{"name": "customer_id", "in": "path", "required": true, "schema": {"type": "integer"}}],
+        "responses": {
+          "200": {"description": "Customer details", "content": {"application/json": {"schema": {"type": "object", "properties": {"customer": {"$ref": "#/components/schemas/Customer"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "put": {
+        "operationId": "updateCustomer",
+        "summary": "Update a customer",
+        "tags": ["Customers"],
+        "parameters": [{"name": "customer_id", "in": "path", "required": true, "schema": {"type": "integer"}}],
+        "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"customer": {"$ref": "#/components/schemas/CreateCustomerRequest"}}}}}},
+        "responses": {
+          "200": {"description": "Customer updated", "content": {"application/json": {"schema": {"type": "object", "properties": {"customer": {"$ref": "#/components/schemas/Customer"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "delete": {
+        "operationId": "deleteCustomer",
+        "summary": "Delete a customer",
+        "tags": ["Customers"],
+        "parameters": [{"name": "customer_id", "in": "path", "required": true, "schema": {"type": "integer"}}],
+        "responses": {
+          "204": {"description": "Customer deleted"},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/product_families.json": {
+      "get": {
+        "operationId": "listProductFamilies",
+        "summary": "List product families",
+        "tags": ["Product Families"],
+        "responses": {
+          "200": {"description": "Product families", "content": {"application/json": {"schema": {"type": "array", "items": {"type": "object", "properties": {"product_family": {"$ref": "#/components/schemas/ProductFamily"}}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "post": {
+        "operationId": "createProductFamily",
+        "summary": "Create a product family",
+        "tags": ["Product Families"],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "properties": {"product_family": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}, "description": {"type": "string"}}}}}}}},
+        "responses": {
+          "201": {"description": "Product family created", "content": {"application/json": {"schema": {"type": "object", "properties": {"product_family": {"$ref": "#/components/schemas/ProductFamily"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/products.json": {
+      "get": {
+        "operationId": "listProducts",
+        "summary": "List products",
+        "tags": ["Products"],
+        "parameters": [
+          {"name": "page", "in": "query", "schema": {"type": "integer"}},
+          {"name": "per_page", "in": "query", "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {"description": "List of products", "content": {"application/json": {"schema": {"type": "array", "items": {"type": "object", "properties": {"product": {"$ref": "#/components/schemas/Product"}}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/products/{product_id}.json": {
+      "get": {
+        "operationId": "getProduct",
+        "summary": "Get a product",
+        "tags": ["Products"],
+        "parameters": [{"name": "product_id", "in": "path", "required": true, "schema": {"type": "integer"}}],
+        "responses": {
+          "200": {"description": "Product details", "content": {"application/json": {"schema": {"type": "object", "properties": {"product": {"$ref": "#/components/schemas/Product"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/invoices.json": {
+      "get": {
+        "operationId": "listInvoices",
+        "summary": "List invoices",
+        "tags": ["Invoices"],
+        "parameters": [
+          {"name": "page", "in": "query", "schema": {"type": "integer"}},
+          {"name": "per_page", "in": "query", "schema": {"type": "integer"}},
+          {"name": "status", "in": "query", "schema": {"type": "string", "enum": ["draft", "open", "paid", "pending", "voided"]}}
+        ],
+        "responses": {
+          "200": {"description": "List of invoices", "content": {"application/json": {"schema": {"type": "object", "properties": {"invoices": {"type": "array", "items": {"$ref": "#/components/schemas/Invoice"}}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/subscriptions/{subscription_id}/payments.json": {
+      "post": {
+        "operationId": "createPayment",
+        "summary": "Record a payment for a subscription",
+        "tags": ["Payments"],
+        "parameters": [{"name": "subscription_id", "in": "path", "required": true, "schema": {"type": "integer"}}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"type": "object", "properties": {"payment": {"type": "object", "required": ["amount", "memo"], "properties": {"amount": {"type": "string", "description": "Payment amount as string (e.g., '10.00')"}, "memo": {"type": "string"}}}}}}}
+        },
+        "responses": {
+          "200": {"description": "Payment recorded"},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "HTTP Basic authentication using your Chargify API key as the username with 'x' as the password."
+      }
+    },
+    "schemas": {
+      "Subscription": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "state": {"type": "string", "enum": ["active", "canceled", "expired", "on_hold", "past_due", "soft_failure", "trialing", "trial_ended", "unpaid"]},
+          "customer": {"$ref": "#/components/schemas/Customer"},
+          "product": {"$ref": "#/components/schemas/Product"},
+          "balance_in_cents": {"type": "integer"},
+          "total_revenue_in_cents": {"type": "integer"},
+          "product_price_in_cents": {"type": "integer"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "activated_at": {"type": "string", "format": "date-time", "nullable": true},
+          "canceled_at": {"type": "string", "format": "date-time", "nullable": true},
+          "current_period_started_at": {"type": "string", "format": "date-time"},
+          "current_period_ends_at": {"type": "string", "format": "date-time"},
+          "trial_started_at": {"type": "string", "format": "date-time", "nullable": true},
+          "trial_ended_at": {"type": "string", "format": "date-time", "nullable": true},
+          "next_assessment_at": {"type": "string", "format": "date-time"},
+          "payment_collection_method": {"type": "string"},
+          "currency": {"type": "string"},
+          "coupon_code": {"type": "string", "nullable": true}
+        }
+      },
+      "CreateSubscriptionRequest": {
+        "type": "object",
+        "required": ["product_id"],
+        "properties": {
+          "product_id": {"type": "integer"},
+          "customer_id": {"type": "integer"},
+          "customer_attributes": {"$ref": "#/components/schemas/CreateCustomerRequest"},
+          "payment_collection_method": {"type": "string", "enum": ["automatic", "invoice"]},
+          "coupon_code": {"type": "string"},
+          "next_billing_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "UpdateSubscriptionRequest": {
+        "type": "object",
+        "properties": {
+          "product_id": {"type": "integer"},
+          "next_billing_at": {"type": "string", "format": "date-time"},
+          "payment_collection_method": {"type": "string"}
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "first_name": {"type": "string"},
+          "last_name": {"type": "string"},
+          "email": {"type": "string"},
+          "organization": {"type": "string"},
+          "reference": {"type": "string"},
+          "address": {"type": "string"},
+          "address_2": {"type": "string"},
+          "city": {"type": "string"},
+          "state": {"type": "string"},
+          "zip": {"type": "string"},
+          "country": {"type": "string"},
+          "phone": {"type": "string"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "CreateCustomerRequest": {
+        "type": "object",
+        "required": ["first_name", "last_name", "email"],
+        "properties": {
+          "first_name": {"type": "string"},
+          "last_name": {"type": "string"},
+          "email": {"type": "string"},
+          "organization": {"type": "string"},
+          "reference": {"type": "string"},
+          "address": {"type": "string"},
+          "address_2": {"type": "string"},
+          "city": {"type": "string"},
+          "state": {"type": "string"},
+          "zip": {"type": "string"},
+          "country": {"type": "string"},
+          "phone": {"type": "string"}
+        }
+      },
+      "ProductFamily": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "handle": {"type": "string"},
+          "accounting_code": {"type": "string", "nullable": true}
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "name": {"type": "string"},
+          "handle": {"type": "string"},
+          "description": {"type": "string"},
+          "price_in_cents": {"type": "integer"},
+          "interval": {"type": "integer"},
+          "interval_unit": {"type": "string", "enum": ["month", "day"]},
+          "trial_price_in_cents": {"type": "integer", "nullable": true},
+          "trial_interval": {"type": "integer", "nullable": true},
+          "trial_interval_unit": {"type": "string", "nullable": true},
+          "initial_charge_in_cents": {"type": "integer", "nullable": true},
+          "expiration_interval": {"type": "integer", "nullable": true},
+          "expiration_interval_unit": {"type": "string", "nullable": true},
+          "product_family": {"$ref": "#/components/schemas/ProductFamily"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "archived_at": {"type": "string", "format": "date-time", "nullable": true}
+        }
+      },
+      "Invoice": {
+        "type": "object",
+        "properties": {
+          "uid": {"type": "string"},
+          "site_id": {"type": "integer"},
+          "customer_id": {"type": "integer"},
+          "subscription_id": {"type": "integer"},
+          "number": {"type": "string"},
+          "status": {"type": "string", "enum": ["draft", "open", "paid", "pending", "voided"]},
+          "currency": {"type": "string"},
+          "total_amount": {"type": "string"},
+          "paid_amount": {"type": "string"},
+          "due_amount": {"type": "string"},
+          "issue_date": {"type": "string", "format": "date"},
+          "due_date": {"type": "string", "format": "date"},
+          "paid_date": {"type": "string", "format": "date", "nullable": true},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "errors": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}
