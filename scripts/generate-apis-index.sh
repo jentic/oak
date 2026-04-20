@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-INDEX_DIR="$REPO_ROOT/apis-index"
+INDEX_DIR="$REPO_ROOT/index/apis/openapi"
 SOURCE_DIR="$REPO_ROOT/apis/openapi"
 
 # Clean any existing index
@@ -43,17 +43,17 @@ for api_dir in "$SOURCE_DIR"/*/; do
         if [[ -n "$sub_links" ]]; then
             sub_links+=" · "
         fi
-        sub_links+="[$sub_name](../../apis/openapi/$api_name/$sub_name)"
+        sub_links+="[$sub_name](../../../../apis/openapi/$api_name/$sub_name)"
         sub_count=$((sub_count + 1))
     done
 
     if [[ "$sub_count" -gt 5 ]]; then
-        apis_cell="[$sub_count APIs](../../apis/openapi/$api_name)"
+        apis_cell="[$sub_count APIs](../../../../apis/openapi/$api_name)"
     else
         apis_cell="$sub_links"
     fi
 
-    BUCKETS[$bucket]+="| [$api_name](../../apis/openapi/$api_name) | $apis_cell |"$'\n'
+    BUCKETS[$bucket]+="| [$api_name](../../../../apis/openapi/$api_name) | $apis_cell |"$'\n'
     total=$((total + 1))
 done
 
