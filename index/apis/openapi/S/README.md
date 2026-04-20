@@ -6,6 +6,7 @@ Browsing 653 APIs starting with **S**.
 
 | Vendor | APIs |
 |--------|------|
+| [Sonarr](../../../../apis/openapi/Sonarr) | [main](../../../../apis/openapi/Sonarr/main) |
 | [s15socialannex.net](../../../../apis/openapi/s15socialannex.net) | [main](../../../../apis/openapi/s15socialannex.net/main) |
 | [saasquatch.com](../../../../apis/openapi/saasquatch.com) | [main](../../../../apis/openapi/saasquatch.com/main) |
 | [safaricom.et](../../../../apis/openapi/safaricom.et) | [main](../../../../apis/openapi/safaricom.et/main) |
@@ -29,21 +30,21 @@ Browsing 653 APIs starting with **S**.
 | [samsara.com](../../../../apis/openapi/samsara.com) | [main](../../../../apis/openapi/samsara.com/main) |
 | [sandbox-65ebc.chico.ai](../../../../apis/openapi/sandbox-65ebc.chico.ai) | [main](../../../../apis/openapi/sandbox-65ebc.chico.ai/main) |
 | [sandbox-api.kenjo.io](../../../../apis/openapi/sandbox-api.kenjo.io) | [kenjo](../../../../apis/openapi/sandbox-api.kenjo.io/kenjo) |
+| [sandbox-dbs.larciergroup.com](../../../../apis/openapi/sandbox-dbs.larciergroup.com) | [main](../../../../apis/openapi/sandbox-dbs.larciergroup.com/main) |
+| [sandbox-pgw.2c2p.com](../../../../apis/openapi/sandbox-pgw.2c2p.com) | [2-c-2-p](../../../../apis/openapi/sandbox-pgw.2c2p.com/2-c-2-p) |
 | [sandbox.api.starkbank.com](../../../../apis/openapi/sandbox.api.starkbank.com) | [stark-bank](../../../../apis/openapi/sandbox.api.starkbank.com/stark-bank) |
 | [sandbox.belvo.com](../../../../apis/openapi/sandbox.belvo.com) | [belvo](../../../../apis/openapi/sandbox.belvo.com/belvo) |
-| [sandbox-dbs.larciergroup.com](../../../../apis/openapi/sandbox-dbs.larciergroup.com) | [main](../../../../apis/openapi/sandbox-dbs.larciergroup.com/main) |
 | [sandbox.echelonpay.com](../../../../apis/openapi/sandbox.echelonpay.com) | [main](../../../../apis/openapi/sandbox.echelonpay.com/main) |
 | [sandbox.linkcy.cloud](../../../../apis/openapi/sandbox.linkcy.cloud) | [linkcy](../../../../apis/openapi/sandbox.linkcy.cloud/linkcy) |
 | [sandbox.moffin.mx](../../../../apis/openapi/sandbox.moffin.mx) | [main](../../../../apis/openapi/sandbox.moffin.mx/main) |
-| [sandbox-pgw.2c2p.com](../../../../apis/openapi/sandbox-pgw.2c2p.com) | [2-c-2-p](../../../../apis/openapi/sandbox-pgw.2c2p.com/2-c-2-p) |
-| [sandboxreportingapi.connexpay.com](../../../../apis/openapi/sandboxreportingapi.connexpay.com) | [connexpay](../../../../apis/openapi/sandboxreportingapi.connexpay.com/connexpay) |
 | [sandbox.tripadd.com](../../../../apis/openapi/sandbox.tripadd.com) | [main](../../../../apis/openapi/sandbox.tripadd.com/main) |
 | [sandbox.volt.io](../../../../apis/openapi/sandbox.volt.io) | [main](../../../../apis/openapi/sandbox.volt.io/main) |
 | [sandbox.withterminal.com](../../../../apis/openapi/sandbox.withterminal.com) | [main](../../../../apis/openapi/sandbox.withterminal.com/main) |
+| [sandboxreportingapi.connexpay.com](../../../../apis/openapi/sandboxreportingapi.connexpay.com) | [connexpay](../../../../apis/openapi/sandboxreportingapi.connexpay.com/connexpay) |
 | [sanity.io](../../../../apis/openapi/sanity.io) | [main](../../../../apis/openapi/sanity.io/main) |
 | [santanderconsumer.se](../../../../apis/openapi/santanderconsumer.se) | [main](../../../../apis/openapi/santanderconsumer.se/main) |
-| [sarbacane.com](../../../../apis/openapi/sarbacane.com) | [main](../../../../apis/openapi/sarbacane.com/main) |
 | [sarbacane-engage](../../../../apis/openapi/sarbacane-engage) | [main](../../../../apis/openapi/sarbacane-engage/main) |
+| [sarbacane.com](../../../../apis/openapi/sarbacane.com) | [main](../../../../apis/openapi/sarbacane.com/main) |
 | [satellogic.com](../../../../apis/openapi/satellogic.com) | [main](../../../../apis/openapi/satellogic.com/main) |
 | [satispay.com](../../../../apis/openapi/satispay.com) | [satispay](../../../../apis/openapi/satispay.com/satispay) |
 | [satr.jp](../../../../apis/openapi/satr.jp) | [main](../../../../apis/openapi/satr.jp/main) |
@@ -72,13 +73,13 @@ Browsing 653 APIs starting with **S**.
 | [scrapingant.com](../../../../apis/openapi/scrapingant.com) | [main](../../../../apis/openapi/scrapingant.com/main) |
 | [scrapingdog.com](../../../../apis/openapi/scrapingdog.com) | [main](../../../../apis/openapi/scrapingdog.com/main) |
 | [screenpi.pe](../../../../apis/openapi/screenpi.pe) | [main](../../../../apis/openapi/screenpi.pe/main) |
-| [screenshotbase.com](../../../../apis/openapi/screenshotbase.com) | [main](../../../../apis/openapi/screenshotbase.com/main) |
 | [screenshot.fyi](../../../../apis/openapi/screenshot.fyi) | [main](../../../../apis/openapi/screenshot.fyi/main) |
+| [screenshotbase.com](../../../../apis/openapi/screenshotbase.com) | [main](../../../../apis/openapi/screenshotbase.com/main) |
 | [screenshotmachinecom](../../../../apis/openapi/screenshotmachinecom) | [main](../../../../apis/openapi/screenshotmachinecom/main) |
 | [scribblemaps.com](../../../../apis/openapi/scribblemaps.com) | [main](../../../../apis/openapi/scribblemaps.com/main) |
+| [search.dip.bundestag.de](../../../../apis/openapi/search.dip.bundestag.de) | [main](../../../../apis/openapi/search.dip.bundestag.de/main) |
 | [searchapi.io](../../../../apis/openapi/searchapi.io) | [main](../../../../apis/openapi/searchapi.io/main) |
 | [searchcode.com](../../../../apis/openapi/searchcode.com) | [main](../../../../apis/openapi/searchcode.com/main) |
-| [search.dip.bundestag.de](../../../../apis/openapi/search.dip.bundestag.de) | [main](../../../../apis/openapi/search.dip.bundestag.de/main) |
 | [searchify.com](../../../../apis/openapi/searchify.com) | [main](../../../../apis/openapi/searchify.com/main) |
 | [seatable.io](../../../../apis/openapi/seatable.io) | [main](../../../../apis/openapi/seatable.io/main) |
 | [seatgeek.com](../../../../apis/openapi/seatgeek.com) | [main](../../../../apis/openapi/seatgeek.com/main) |
@@ -90,8 +91,8 @@ Browsing 653 APIs starting with **S**.
 | [securityscorecard.io](../../../../apis/openapi/securityscorecard.io) | [main](../../../../apis/openapi/securityscorecard.io/main) |
 | [seebot.run](../../../../apis/openapi/seebot.run) | [main](../../../../apis/openapi/seebot.run/main) |
 | [seektable.com](../../../../apis/openapi/seektable.com) | [main](../../../../apis/openapi/seektable.com/main) |
-| [segmentapis.com](../../../../apis/openapi/segmentapis.com) | [main](../../../../apis/openapi/segmentapis.com/main) |
 | [segment.com](../../../../apis/openapi/segment.com) | [main](../../../../apis/openapi/segment.com/main) |
+| [segmentapis.com](../../../../apis/openapi/segmentapis.com) | [main](../../../../apis/openapi/segmentapis.com/main) |
 | [seldon.local](../../../../apis/openapi/seldon.local) | [engine](../../../../apis/openapi/seldon.local/engine) · [wrapper](../../../../apis/openapi/seldon.local/wrapper) |
 | [selectpdf.com](../../../../apis/openapi/selectpdf.com) | [main](../../../../apis/openapi/selectpdf.com/main) |
 | [seller.flipkart.com](../../../../apis/openapi/seller.flipkart.com) | [main](../../../../apis/openapi/seller.flipkart.com/main) |
@@ -153,15 +154,15 @@ Browsing 653 APIs starting with **S**.
 | [shireburn.com](../../../../apis/openapi/shireburn.com) | [main](../../../../apis/openapi/shireburn.com/main) |
 | [shlink.io](../../../../apis/openapi/shlink.io) | [main](../../../../apis/openapi/shlink.io/main) |
 | [shodan.io](../../../../apis/openapi/shodan.io) | [main](../../../../apis/openapi/shodan.io/main) |
+| [shop-pro.jp](../../../../apis/openapi/shop-pro.jp) | [main](../../../../apis/openapi/shop-pro.jp/main) |
 | [shop.app](../../../../apis/openapi/shop.app) | [main](../../../../apis/openapi/shop.app/main) |
 | [shopee.com](../../../../apis/openapi/shopee.com) | [main](../../../../apis/openapi/shopee.com/main) |
 | [shopify.com](../../../../apis/openapi/shopify.com) | [main](../../../../apis/openapi/shopify.com/main) |
-| [shop-pro.jp](../../../../apis/openapi/shop-pro.jp) | [main](../../../../apis/openapi/shop-pro.jp/main) |
-| [shoprocketapi](../../../../apis/openapi/shoprocketapi) | [main](../../../../apis/openapi/shoprocketapi/main) |
 | [shoprocket.co](../../../../apis/openapi/shoprocket.co) | [main](../../../../apis/openapi/shoprocket.co/main) |
+| [shoprocketapi](../../../../apis/openapi/shoprocketapi) | [main](../../../../apis/openapi/shoprocketapi/main) |
 | [shopware.com](../../../../apis/openapi/shopware.com) | [main](../../../../apis/openapi/shopware.com/main) · [shopware](../../../../apis/openapi/shopware.com/shopware) |
-| [shorten.rest](../../../../apis/openapi/shorten.rest) | [main](../../../../apis/openapi/shorten.rest/main) |
 | [short.io](../../../../apis/openapi/short.io) | [main](../../../../apis/openapi/short.io/main) |
+| [shorten.rest](../../../../apis/openapi/shorten.rest) | [main](../../../../apis/openapi/shorten.rest/main) |
 | [shortmenu.com](../../../../apis/openapi/shortmenu.com) | [short-menu-api](../../../../apis/openapi/shortmenu.com/short-menu-api) |
 | [shortpixel.com](../../../../apis/openapi/shortpixel.com) | [main](../../../../apis/openapi/shortpixel.com/main) |
 | [shotstack](../../../../apis/openapi/shotstack) | [main](../../../../apis/openapi/shotstack/main) |
@@ -231,15 +232,15 @@ Browsing 653 APIs starting with **S**.
 | [slopepay.com](../../../../apis/openapi/slopepay.com) | [main](../../../../apis/openapi/slopepay.com/main) |
 | [slottable.app](../../../../apis/openapi/slottable.app) | [main](../../../../apis/openapi/slottable.app/main) |
 | [slybroadcast.com](../../../../apis/openapi/slybroadcast.com) | [main](../../../../apis/openapi/slybroadcast.com/main) |
+| [smart-glocal.com](../../../../apis/openapi/smart-glocal.com) | [main](../../../../apis/openapi/smart-glocal.com/main) |
+| [smart-me.com](../../../../apis/openapi/smart-me.com) | [main](../../../../apis/openapi/smart-me.com/main) · [smart-me](../../../../apis/openapi/smart-me.com/smart-me) |
 | [smartapi.angelbroking.com](../../../../apis/openapi/smartapi.angelbroking.com) | [main](../../../../apis/openapi/smartapi.angelbroking.com/main) |
 | [smartcar.com](../../../../apis/openapi/smartcar.com) | [main](../../../../apis/openapi/smartcar.com/main) |
-| [smart-glocal.com](../../../../apis/openapi/smart-glocal.com) | [main](../../../../apis/openapi/smart-glocal.com/main) |
 | [smartling.com](../../../../apis/openapi/smartling.com) | [smartling-api](../../../../apis/openapi/smartling.com/smartling-api) |
 | [smartlookcom](../../../../apis/openapi/smartlookcom) | [main](../../../../apis/openapi/smartlookcom/main) |
-| [smart-me.com](../../../../apis/openapi/smart-me.com) | [main](../../../../apis/openapi/smart-me.com/main) · [smart-me](../../../../apis/openapi/smart-me.com/smart-me) |
 | [smartrecruiters.com](../../../../apis/openapi/smartrecruiters.com) | [smartrecruiters](../../../../apis/openapi/smartrecruiters.com/smartrecruiters) |
-| [smartsheetapi](../../../../apis/openapi/smartsheetapi) | [main](../../../../apis/openapi/smartsheetapi/main) |
 | [smartsheet.com](../../../../apis/openapi/smartsheet.com) | [main](../../../../apis/openapi/smartsheet.com/main) |
+| [smartsheetapi](../../../../apis/openapi/smartsheetapi) | [main](../../../../apis/openapi/smartsheetapi/main) |
 | [smartsuite.com](../../../../apis/openapi/smartsuite.com) | [main](../../../../apis/openapi/smartsuite.com/main) |
 | [smartsurvey.io](../../../../apis/openapi/smartsurvey.io) | [main](../../../../apis/openapi/smartsurvey.io/main) |
 | [smarttask.io](../../../../apis/openapi/smarttask.io) | [main](../../../../apis/openapi/smarttask.io/main) |
@@ -269,10 +270,9 @@ Browsing 653 APIs starting with **S**.
 | [solcast.com.au](../../../../apis/openapi/solcast.com.au) | [main](../../../../apis/openapi/solcast.com.au/main) |
 | [soldo.com](../../../../apis/openapi/soldo.com) | [main](../../../../apis/openapi/soldo.com/main) |
 | [solidtime.io](../../../../apis/openapi/solidtime.io) | [main](../../../../apis/openapi/solidtime.io/main) |
+| [sonar.trading](../../../../apis/openapi/sonar.trading) | [main](../../../../apis/openapi/sonar.trading/main) · [sonar-trading](../../../../apis/openapi/sonar.trading/sonar-trading) · [sonar-trading-api](../../../../apis/openapi/sonar.trading/sonar-trading-api) |
 | [sonarcloud.io](../../../../apis/openapi/sonarcloud.io) | [main](../../../../apis/openapi/sonarcloud.io/main) |
 | [sonarqube.org](../../../../apis/openapi/sonarqube.org) | [main](../../../../apis/openapi/sonarqube.org/main) |
-| [Sonarr](../../../../apis/openapi/Sonarr) | [main](../../../../apis/openapi/Sonarr/main) |
-| [sonar.trading](../../../../apis/openapi/sonar.trading) | [main](../../../../apis/openapi/sonar.trading/main) · [sonar-trading](../../../../apis/openapi/sonar.trading/sonar-trading) · [sonar-trading-api](../../../../apis/openapi/sonar.trading/sonar-trading-api) |
 | [sondar.io](../../../../apis/openapi/sondar.io) | [main](../../../../apis/openapi/sondar.io/main) |
 | [songkick.com](../../../../apis/openapi/songkick.com) | [api](../../../../apis/openapi/songkick.com/api) · [songkick](../../../../apis/openapi/songkick.com/songkick) |
 | [sonix.ai](../../../../apis/openapi/sonix.ai) | [sonix](../../../../apis/openapi/sonix.ai/sonix) · [sonix-api](../../../../apis/openapi/sonix.ai/sonix-api) |
@@ -285,9 +285,9 @@ Browsing 653 APIs starting with **S**.
 | [soundstripe.com](../../../../apis/openapi/soundstripe.com) | [main](../../../../apis/openapi/soundstripe.com/main) |
 | [sourcewhale.app](../../../../apis/openapi/sourcewhale.app) | [main](../../../../apis/openapi/sourcewhale.app/main) |
 | [southpole.com](../../../../apis/openapi/southpole.com) | [main](../../../../apis/openapi/southpole.com/main) |
+| [space-track.org](../../../../apis/openapi/space-track.org) | [main](../../../../apis/openapi/space-track.org/main) |
 | [spaceb.in](../../../../apis/openapi/spaceb.in) | [main](../../../../apis/openapi/spaceb.in/main) |
 | [spaceinvoices.com](../../../../apis/openapi/spaceinvoices.com) | [main](../../../../apis/openapi/spaceinvoices.com/main) |
-| [space-track.org](../../../../apis/openapi/space-track.org) | [main](../../../../apis/openapi/space-track.org/main) |
 | [spacetraders.io](../../../../apis/openapi/spacetraders.io) | [spacetraders-api](../../../../apis/openapi/spacetraders.io/spacetraders-api) |
 | [spacexdata.com](../../../../apis/openapi/spacexdata.com) | [spacex-api](../../../../apis/openapi/spacexdata.com/spacex-api) |
 | [spamcheck.ai](../../../../apis/openapi/spamcheck.ai) | [main](../../../../apis/openapi/spamcheck.ai/main) |
@@ -317,9 +317,9 @@ Browsing 653 APIs starting with **S**.
 | [sportmonks.com](../../../../apis/openapi/sportmonks.com) | [main](../../../../apis/openapi/sportmonks.com/main) |
 | [sportsdata](../../../../apis/openapi/sportsdata) | [main](../../../../apis/openapi/sportsdata/main) |
 | [sportsdata.io](../../../../apis/openapi/sportsdata.io) | [main](../../../../apis/openapi/sportsdata.io/main) |
+| [spot.io](../../../../apis/openapi/spot.io) | [main](../../../../apis/openapi/spot.io/main) |
 | [spotdraft.com](../../../../apis/openapi/spotdraft.com) | [main](../../../../apis/openapi/spotdraft.com/main) |
 | [spotify.com](../../../../apis/openapi/spotify.com) | [sonallux](../../../../apis/openapi/spotify.com/sonallux) |
-| [spot.io](../../../../apis/openapi/spot.io) | [main](../../../../apis/openapi/spot.io/main) |
 | [spotsense.io](../../../../apis/openapi/spotsense.io) | [main](../../../../apis/openapi/spotsense.io/main) · [spotsense](../../../../apis/openapi/spotsense.io/spotsense) |
 | [spream.co](../../../../apis/openapi/spream.co) | [main](../../../../apis/openapi/spream.co/main) |
 | [spreedly.com](../../../../apis/openapi/spreedly.com) | [main](../../../../apis/openapi/spreedly.com/main) |
@@ -329,7 +329,7 @@ Browsing 653 APIs starting with **S**.
 | [spyse.com](../../../../apis/openapi/spyse.com) | [main](../../../../apis/openapi/spyse.com/main) |
 | [sqala.tech](../../../../apis/openapi/sqala.tech) | [sqala](../../../../apis/openapi/sqala.tech/sqala) |
 | [squadcast.fm](../../../../apis/openapi/squadcast.fm) | [squadcast-api](../../../../apis/openapi/squadcast.fm/squadcast-api) |
-| [square.com](../../../../apis/openapi/square.com) | [square](../../../../apis/openapi/square.com/square) |
+| [square.com](../../../../apis/openapi/square.com) |  |
 | [squarespace.com](../../../../apis/openapi/squarespace.com) | [squarespace-commerce-api](../../../../apis/openapi/squarespace.com/squarespace-commerce-api) |
 | [squareup.com](../../../../apis/openapi/squareup.com) | [main](../../../../apis/openapi/squareup.com/main) · [square-connect-api](../../../../apis/openapi/squareup.com/square-connect-api) |
 | [squidex.io](../../../../apis/openapi/squidex.io) | [main](../../../../apis/openapi/squidex.io/main) |
@@ -342,8 +342,8 @@ Browsing 653 APIs starting with **S**.
 | [stadiamaps.com](../../../../apis/openapi/stadiamaps.com) | [stadiamaps-geospatial-api](../../../../apis/openapi/stadiamaps.com/stadiamaps-geospatial-api) |
 | [staffviz.com](../../../../apis/openapi/staffviz.com) | [main](../../../../apis/openapi/staffviz.com/main) |
 | [stafiz.net](../../../../apis/openapi/stafiz.net) | [main](../../../../apis/openapi/stafiz.net/main) |
-| [staging.api.ekklo.com](../../../../apis/openapi/staging.api.ekklo.com) | [main](../../../../apis/openapi/staging.api.ekklo.com/main) |
 | [staging-biz.coinprofile.co](../../../../apis/openapi/staging-biz.coinprofile.co) | [partna](../../../../apis/openapi/staging-biz.coinprofile.co/partna) |
+| [staging.api.ekklo.com](../../../../apis/openapi/staging.api.ekklo.com) | [main](../../../../apis/openapi/staging.api.ekklo.com/main) |
 | [stammer.ai](../../../../apis/openapi/stammer.ai) | [api](../../../../apis/openapi/stammer.ai/api) |
 | [stamps.com](../../../../apis/openapi/stamps.com) | [main](../../../../apis/openapi/stamps.com/main) |
 | [standardnotes.com](../../../../apis/openapi/standardnotes.com) | [main](../../../../apis/openapi/standardnotes.com/main) |
@@ -355,8 +355,8 @@ Browsing 653 APIs starting with **S**.
 | [stathatcom](../../../../apis/openapi/stathatcom) | [main](../../../../apis/openapi/stathatcom/main) |
 | [stats.com](../../../../apis/openapi/stats.com) | [main](../../../../apis/openapi/stats.com/main) |
 | [statsig.com](../../../../apis/openapi/statsig.com) | [main](../../../../apis/openapi/statsig.com/main) |
-| [statuscake.com](../../../../apis/openapi/statuscake.com) | [statuscake-api](../../../../apis/openapi/statuscake.com/statuscake-api) |
 | [status.io](../../../../apis/openapi/status.io) | [main](../../../../apis/openapi/status.io/main) |
+| [statuscake.com](../../../../apis/openapi/statuscake.com) | [statuscake-api](../../../../apis/openapi/statuscake.com/statuscake-api) |
 | [statuspage.io](../../../../apis/openapi/statuspage.io) | [main](../../../../apis/openapi/statuspage.io/main) |
 | [stax.com](../../../../apis/openapi/stax.com) | [main](../../../../apis/openapi/stax.com/main) |
 | [stc.com.sa](../../../../apis/openapi/stc.com.sa) | [stc](../../../../apis/openapi/stc.com.sa/stc) |
@@ -390,8 +390,8 @@ Browsing 653 APIs starting with **S**.
 | [submittable.com](../../../../apis/openapi/submittable.com) | [main](../../../../apis/openapi/submittable.com/main) |
 | [subscribe.linphone.org](../../../../apis/openapi/subscribe.linphone.org) | [main](../../../../apis/openapi/subscribe.linphone.org/main) |
 | [sugarcrm.com](../../../../apis/openapi/sugarcrm.com) | [main](../../../../apis/openapi/sugarcrm.com/main) |
-| [suiteboxmeetingreque](../../../../apis/openapi/suiteboxmeetingreque) | [main](../../../../apis/openapi/suiteboxmeetingreque/main) |
 | [suitebox.suitebox.co.nz](../../../../apis/openapi/suitebox.suitebox.co.nz) | [main](../../../../apis/openapi/suitebox.suitebox.co.nz/main) |
+| [suiteboxmeetingreque](../../../../apis/openapi/suiteboxmeetingreque) | [main](../../../../apis/openapi/suiteboxmeetingreque/main) |
 | [sumit.co.il](../../../../apis/openapi/sumit.co.il) | [sumit](../../../../apis/openapi/sumit.co.il/sumit) |
 | [sumizy.com](../../../../apis/openapi/sumizy.com) | [main](../../../../apis/openapi/sumizy.com/main) |
 | [sumoquote.com](../../../../apis/openapi/sumoquote.com) | [main](../../../../apis/openapi/sumoquote.com/main) |
@@ -420,7 +420,8 @@ Browsing 653 APIs starting with **S**.
 | [survser.com](../../../../apis/openapi/survser.com) | [main](../../../../apis/openapi/survser.com/main) |
 | [svix.com](../../../../apis/openapi/svix.com) | [main](../../../../apis/openapi/svix.com/main) |
 | [swagger-api](../../../../apis/openapi/swagger-api) | [petstore](../../../../apis/openapi/swagger-api/petstore) |
-| [swaggerhub.2023sl93091](../../../../apis/openapi/swaggerhub.2023sl93091) | [assignment2](../../../../apis/openapi/swaggerhub.2023sl93091/assignment2) · [assignment-3](../../../../apis/openapi/swaggerhub.2023sl93091/assignment-3) |
+| [swagger.io](../../../../apis/openapi/swagger.io) | [generator](../../../../apis/openapi/swagger.io/generator) |
+| [swaggerhub.2023sl93091](../../../../apis/openapi/swaggerhub.2023sl93091) | [assignment-3](../../../../apis/openapi/swaggerhub.2023sl93091/assignment-3) · [assignment2](../../../../apis/openapi/swaggerhub.2023sl93091/assignment2) |
 | [swaggerhub.5centscdn](../../../../apis/openapi/swaggerhub.5centscdn) | [5centscdn-livestream](../../../../apis/openapi/swaggerhub.5centscdn/5centscdn-livestream) · [5centscdn-zones](../../../../apis/openapi/swaggerhub.5centscdn/5centscdn-zones) |
 | [swaggerhub.5centscdninc](../../../../apis/openapi/swaggerhub.5centscdninc) | [5centscdn-accounts](../../../../apis/openapi/swaggerhub.5centscdninc/5centscdn-accounts) · [5centscdn-transcoding](../../../../apis/openapi/swaggerhub.5centscdninc/5centscdn-transcoding) |
 | [swaggerhub.8697715](../../../../apis/openapi/swaggerhub.8697715) | [api](../../../../apis/openapi/swaggerhub.8697715/api) · [apineg](../../../../apis/openapi/swaggerhub.8697715/apineg) |
@@ -435,7 +436,7 @@ Browsing 653 APIs starting with **S**.
 | [swaggerhub.afterbanks](../../../../apis/openapi/swaggerhub.afterbanks) | [afterbanks-api-extendida](../../../../apis/openapi/swaggerhub.afterbanks/afterbanks-api-extendida) · [afterbanks-psd2-en](../../../../apis/openapi/swaggerhub.afterbanks/afterbanks-psd2-en) · [afterbanks-psd2-es](../../../../apis/openapi/swaggerhub.afterbanks/afterbanks-psd2-es) · [afterbanks-sofinco](../../../../apis/openapi/swaggerhub.afterbanks/afterbanks-sofinco) |
 | [swaggerhub.airactive](../../../../apis/openapi/swaggerhub.airactive) | [airactiveapi](../../../../apis/openapi/swaggerhub.airactive/airactiveapi) · [airactivepro](../../../../apis/openapi/swaggerhub.airactive/airactivepro) |
 | [swaggerhub.airvantage-team](../../../../apis/openapi/swaggerhub.airvantage-team) | [av-controller-ufone](../../../../apis/openapi/swaggerhub.airvantage-team/av-controller-ufone) · [av-integration-mtc-api](../../../../apis/openapi/swaggerhub.airvantage-team/av-integration-mtc-api) · [av-microservice-finance](../../../../apis/openapi/swaggerhub.airvantage-team/av-microservice-finance) · [av-microservice-gatekeeper](../../../../apis/openapi/swaggerhub.airvantage-team/av-microservice-gatekeeper) |
-| [swaggerhub.aituringco](../../../../apis/openapi/swaggerhub.aituringco) | [aitradeapi](../../../../apis/openapi/swaggerhub.aituringco/aitradeapi) · [aitradeapi-development](../../../../apis/openapi/swaggerhub.aituringco/aitradeapi-development) · [aitrade-development-multi](../../../../apis/openapi/swaggerhub.aituringco/aitrade-development-multi) · [aitrademoon](../../../../apis/openapi/swaggerhub.aituringco/aitrademoon) · [aituringcoprod](../../../../apis/openapi/swaggerhub.aituringco/aituringcoprod) |
+| [swaggerhub.aituringco](../../../../apis/openapi/swaggerhub.aituringco) | [aitrade-development-multi](../../../../apis/openapi/swaggerhub.aituringco/aitrade-development-multi) · [aitradeapi](../../../../apis/openapi/swaggerhub.aituringco/aitradeapi) · [aitradeapi-development](../../../../apis/openapi/swaggerhub.aituringco/aitradeapi-development) · [aitrademoon](../../../../apis/openapi/swaggerhub.aituringco/aitrademoon) · [aituringcoprod](../../../../apis/openapi/swaggerhub.aituringco/aituringcoprod) |
 | [swaggerhub.alayacare](../../../../apis/openapi/swaggerhub.alayacare) | [7 APIs](../../../../apis/openapi/swaggerhub.alayacare) |
 | [swaggerhub.alexfv1603](../../../../apis/openapi/swaggerhub.alexfv1603) | [api-products](../../../../apis/openapi/swaggerhub.alexfv1603/api-products) |
 | [swaggerhub.alfah](../../../../apis/openapi/swaggerhub.alfah) | [ap-mag-service-api](../../../../apis/openapi/swaggerhub.alfah/ap-mag-service-api) · [ap-supplier-order-service-api](../../../../apis/openapi/swaggerhub.alfah/ap-supplier-order-service-api) |
@@ -449,7 +450,7 @@ Browsing 653 APIs starting with **S**.
 | [swaggerhub.asis-9cb](../../../../apis/openapi/swaggerhub.asis-9cb) | [asisportalauth](../../../../apis/openapi/swaggerhub.asis-9cb/asisportalauth) · [asisportalplannedshipment](../../../../apis/openapi/swaggerhub.asis-9cb/asisportalplannedshipment) |
 | [swaggerhub.assecogeorgia](../../../../apis/openapi/swaggerhub.assecogeorgia) | [agentsapi](../../../../apis/openapi/swaggerhub.assecogeorgia/agentsapi) · [borderpolice](../../../../apis/openapi/swaggerhub.assecogeorgia/borderpolice) · [borderpolicesecurity](../../../../apis/openapi/swaggerhub.assecogeorgia/borderpolicesecurity) |
 | [swaggerhub.asuite-developers](../../../../apis/openapi/swaggerhub.asuite-developers) | [admin](../../../../apis/openapi/swaggerhub.asuite-developers/admin) · [admin-swagger](../../../../apis/openapi/swaggerhub.asuite-developers/admin-swagger) |
-| [swaggerhub.atlasrtx](../../../../apis/openapi/swaggerhub.atlasrtx) | [atlasmobileapi](../../../../apis/openapi/swaggerhub.atlasrtx/atlasmobileapi) · [atlas-rtxv-1](../../../../apis/openapi/swaggerhub.atlasrtx/atlas-rtxv-1) |
+| [swaggerhub.atlasrtx](../../../../apis/openapi/swaggerhub.atlasrtx) | [atlas-rtxv-1](../../../../apis/openapi/swaggerhub.atlasrtx/atlas-rtxv-1) · [atlasmobileapi](../../../../apis/openapi/swaggerhub.atlasrtx/atlasmobileapi) |
 | [swaggerhub.attentive-060](../../../../apis/openapi/swaggerhub.attentive-060) | [attentive-api](../../../../apis/openapi/swaggerhub.attentive-060/attentive-api) · [attentive-provisioning-api](../../../../apis/openapi/swaggerhub.attentive-060/attentive-provisioning-api) |
 | [swaggerhub.au-hackathon8](../../../../apis/openapi/swaggerhub.au-hackathon8) | [accounts](../../../../apis/openapi/swaggerhub.au-hackathon8/accounts) · [add-new-account](../../../../apis/openapi/swaggerhub.au-hackathon8/add-new-account) · [add-new-au](../../../../apis/openapi/swaggerhub.au-hackathon8/add-new-au) |
 | [swaggerhub.axeta](../../../../apis/openapi/swaggerhub.axeta) | [auth-backend](../../../../apis/openapi/swaggerhub.axeta/auth-backend) · [axeta-auth-app](../../../../apis/openapi/swaggerhub.axeta/axeta-auth-app) |
@@ -461,7 +462,7 @@ Browsing 653 APIs starting with **S**.
 | [swaggerhub.bnsf-logistics](../../../../apis/openapi/swaggerhub.bnsf-logistics) | [blumelogistics](../../../../apis/openapi/swaggerhub.bnsf-logistics/blumelogistics) |
 | [swaggerhub.bo-integration](../../../../apis/openapi/swaggerhub.bo-integration) | [1c-dms](../../../../apis/openapi/swaggerhub.bo-integration/1c-dms) |
 | [swaggerhub.bookaway](../../../../apis/openapi/swaggerhub.bookaway) | [b2b](../../../../apis/openapi/swaggerhub.bookaway/b2b) · [bookaway-supply-api](../../../../apis/openapi/swaggerhub.bookaway/bookaway-supply-api) |
-| [swaggerhub.bookingexpertapi](../../../../apis/openapi/swaggerhub.bookingexpertapi) | [bebe-access](../../../../apis/openapi/swaggerhub.bookingexpertapi/bebe-access) · [be-connectapi](../../../../apis/openapi/swaggerhub.bookingexpertapi/be-connectapi) · [be-identity](../../../../apis/openapi/swaggerhub.bookingexpertapi/be-identity) · [be-ws](../../../../apis/openapi/swaggerhub.bookingexpertapi/be-ws) |
+| [swaggerhub.bookingexpertapi](../../../../apis/openapi/swaggerhub.bookingexpertapi) | [be-connectapi](../../../../apis/openapi/swaggerhub.bookingexpertapi/be-connectapi) · [be-identity](../../../../apis/openapi/swaggerhub.bookingexpertapi/be-identity) · [be-ws](../../../../apis/openapi/swaggerhub.bookingexpertapi/be-ws) · [bebe-access](../../../../apis/openapi/swaggerhub.bookingexpertapi/bebe-access) |
 | [swaggerhub.bringin-a9e](../../../../apis/openapi/swaggerhub.bringin-a9e) | [bringin-ap-is](../../../../apis/openapi/swaggerhub.bringin-a9e/bringin-ap-is) · [bringin-offramp](../../../../apis/openapi/swaggerhub.bringin-a9e/bringin-offramp) |
 | [swaggerhub.buencamino](../../../../apis/openapi/swaggerhub.buencamino) | [buencamino](../../../../apis/openapi/swaggerhub.buencamino/buencamino) · [buencamino1080p](../../../../apis/openapi/swaggerhub.buencamino/buencamino1080p) · [buencaminoinstreamingita](../../../../apis/openapi/swaggerhub.buencamino/buencaminoinstreamingita) |
 | [swaggerhub.cetaqua](../../../../apis/openapi/swaggerhub.cetaqua) | [aquasost](../../../../apis/openapi/swaggerhub.cetaqua/aquasost) · [aquasost-pi](../../../../apis/openapi/swaggerhub.cetaqua/aquasost-pi) |
@@ -552,7 +553,7 @@ Browsing 653 APIs starting with **S**.
 | [swaggerhub.lic](../../../../apis/openapi/swaggerhub.lic) | [animal-bootstrap-feed-api](../../../../apis/openapi/swaggerhub.lic/animal-bootstrap-feed-api) · [animal-identity-service-boundary](../../../../apis/openapi/swaggerhub.lic/animal-identity-service-boundary) |
 | [swaggerhub.linogemdat](../../../../apis/openapi/swaggerhub.linogemdat) | [bewirtschaftung-immo-adapter](../../../../apis/openapi/swaggerhub.linogemdat/bewirtschaftung-immo-adapter) |
 | [swaggerhub.lmorenoo](../../../../apis/openapi/swaggerhub.lmorenoo) | [apuestasapi](../../../../apis/openapi/swaggerhub.lmorenoo/apuestasapi) · [bienesraicesapi](../../../../apis/openapi/swaggerhub.lmorenoo/bienesraicesapi) |
-| [swaggerhub.luis.lopez3](../../../../apis/openapi/swaggerhub.luis.lopez3) | [afficoascendingbull](../../../../apis/openapi/swaggerhub.luis.lopez3/afficoascendingbull) · [affico.fxtrategy](../../../../apis/openapi/swaggerhub.luis.lopez3/affico.fxtrategy) · [affico.inverlion](../../../../apis/openapi/swaggerhub.luis.lopez3/affico.inverlion) |
+| [swaggerhub.luis.lopez3](../../../../apis/openapi/swaggerhub.luis.lopez3) | [affico.fxtrategy](../../../../apis/openapi/swaggerhub.luis.lopez3/affico.fxtrategy) · [affico.inverlion](../../../../apis/openapi/swaggerhub.luis.lopez3/affico.inverlion) · [afficoascendingbull](../../../../apis/openapi/swaggerhub.luis.lopez3/afficoascendingbull) |
 | [swaggerhub.mashakroichuk](../../../../apis/openapi/swaggerhub.mashakroichuk) | [api-tbank](../../../../apis/openapi/swaggerhub.mashakroichuk/api-tbank) · [api-tochka-credits](../../../../apis/openapi/swaggerhub.mashakroichuk/api-tochka-credits) |
 | [swaggerhub.microsoftpichet](../../../../apis/openapi/swaggerhub.microsoftpichet) | [ardv](../../../../apis/openapi/swaggerhub.microsoftpichet/ardv) · [basemandat](../../../../apis/openapi/swaggerhub.microsoftpichet/basemandat) |
 | [swaggerhub.mkhisa7](../../../../apis/openapi/swaggerhub.mkhisa7) | [account-api](../../../../apis/openapi/swaggerhub.mkhisa7/account-api) · [auth](../../../../apis/openapi/swaggerhub.mkhisa7/auth) |
@@ -566,7 +567,7 @@ Browsing 653 APIs starting with **S**.
 | [swaggerhub.northwestern](../../../../apis/openapi/swaggerhub.northwestern) | [ado-caesar-getstudentenrollments](../../../../apis/openapi/swaggerhub.northwestern/ado-caesar-getstudentenrollments) · [ado-caesar-postgradechange](../../../../apis/openapi/swaggerhub.northwestern/ado-caesar-postgradechange) |
 | [swaggerhub.om-labs](../../../../apis/openapi/swaggerhub.om-labs) | [bifrost-emr](../../../../apis/openapi/swaggerhub.om-labs/bifrost-emr) · [bifrost-fofo](../../../../apis/openapi/swaggerhub.om-labs/bifrost-fofo) · [bifrost-om](../../../../apis/openapi/swaggerhub.om-labs/bifrost-om) · [bifrost-telemedicine](../../../../apis/openapi/swaggerhub.om-labs/bifrost-telemedicine) |
 | [swaggerhub.omlabs](../../../../apis/openapi/swaggerhub.omlabs) | [bifrost-fundus](../../../../apis/openapi/swaggerhub.omlabs/bifrost-fundus) · [bifrost-fundus-cameras](../../../../apis/openapi/swaggerhub.omlabs/bifrost-fundus-cameras) |
-| [swaggerhub.onlgs](../../../../apis/openapi/swaggerhub.onlgs) | [allmember-app-api](../../../../apis/openapi/swaggerhub.onlgs/allmember-app-api) · [all-member-gateway-inquiry-profile](../../../../apis/openapi/swaggerhub.onlgs/all-member-gateway-inquiry-profile) |
+| [swaggerhub.onlgs](../../../../apis/openapi/swaggerhub.onlgs) | [all-member-gateway-inquiry-profile](../../../../apis/openapi/swaggerhub.onlgs/all-member-gateway-inquiry-profile) · [allmember-app-api](../../../../apis/openapi/swaggerhub.onlgs/allmember-app-api) |
 | [swaggerhub.openpayments](../../../../apis/openapi/swaggerhub.openpayments) | [accountinformationservice](../../../../apis/openapi/swaggerhub.openpayments/accountinformationservice) · [aspspinformationservice](../../../../apis/openapi/swaggerhub.openpayments/aspspinformationservice) |
 | [swaggerhub.pailkun](../../../../apis/openapi/swaggerhub.pailkun) | [api-config](../../../../apis/openapi/swaggerhub.pailkun/api-config) · [api-indicator](../../../../apis/openapi/swaggerhub.pailkun/api-indicator) |
 | [swaggerhub.palace](../../../../apis/openapi/swaggerhub.palace) | [advertising-integration](../../../../apis/openapi/swaggerhub.palace/advertising-integration) · [agreement-integration](../../../../apis/openapi/swaggerhub.palace/agreement-integration) |
@@ -622,7 +623,7 @@ Browsing 653 APIs starting with **S**.
 | [swaggerhub.visanetperu](../../../../apis/openapi/swaggerhub.visanetperu) | [28 APIs](../../../../apis/openapi/swaggerhub.visanetperu) |
 | [swaggerhub.volute](../../../../apis/openapi/swaggerhub.volute) | [analytics](../../../../apis/openapi/swaggerhub.volute/analytics) · [apis](../../../../apis/openapi/swaggerhub.volute/apis) |
 | [swaggerhub.vonix-tecnologia](../../../../apis/openapi/swaggerhub.vonix-tecnologia) | [api-billing-calls](../../../../apis/openapi/swaggerhub.vonix-tecnologia/api-billing-calls) · [api-summaries](../../../../apis/openapi/swaggerhub.vonix-tecnologia/api-summaries) |
-| [swaggerhub.waikit-1](../../../../apis/openapi/swaggerhub.waikit-1) | [apiv](../../../../apis/openapi/swaggerhub.waikit-1/apiv) · [api-v1](../../../../apis/openapi/swaggerhub.waikit-1/api-v1) |
+| [swaggerhub.waikit-1](../../../../apis/openapi/swaggerhub.waikit-1) | [api-v1](../../../../apis/openapi/swaggerhub.waikit-1/api-v1) · [apiv](../../../../apis/openapi/swaggerhub.waikit-1/apiv) |
 | [swaggerhub.wikigioco](../../../../apis/openapi/swaggerhub.wikigioco) | [backoffice](../../../../apis/openapi/swaggerhub.wikigioco/backoffice) · [bo-auth](../../../../apis/openapi/swaggerhub.wikigioco/bo-auth) |
 | [swaggerhub.willianchan](../../../../apis/openapi/swaggerhub.willianchan) | [api-milenio-bus-radartona](../../../../apis/openapi/swaggerhub.willianchan/api-milenio-bus-radartona) |
 | [swaggerhub.wunderbon-io](../../../../apis/openapi/swaggerhub.wunderbon-io) | [api](../../../../apis/openapi/swaggerhub.wunderbon-io/api) · [api-internal](../../../../apis/openapi/swaggerhub.wunderbon-io/api-internal) |
@@ -630,13 +631,12 @@ Browsing 653 APIs starting with **S**.
 | [swaggerhub.wwwadzapi](../../../../apis/openapi/swaggerhub.wwwadzapi) | [api-mod-materials](../../../../apis/openapi/swaggerhub.wwwadzapi/api-mod-materials) · [api-mod-nsi-3](../../../../apis/openapi/swaggerhub.wwwadzapi/api-mod-nsi-3) |
 | [swaggerhub.xvrbovskym](../../../../apis/openapi/swaggerhub.xvrbovskym) | [b-vsa-semestralny-projekt-2](../../../../apis/openapi/swaggerhub.xvrbovskym/b-vsa-semestralny-projekt-2) · [b-vsa-semestralny-projekt-2-correct](../../../../apis/openapi/swaggerhub.xvrbovskym/b-vsa-semestralny-projekt-2-correct) |
 | [swaggerhub.zeyos](../../../../apis/openapi/swaggerhub.zeyos) | [api-kickz](../../../../apis/openapi/swaggerhub.zeyos/api-kickz) · [api-spontent](../../../../apis/openapi/swaggerhub.zeyos/api-spontent) · [api-stockly](../../../../apis/openapi/swaggerhub.zeyos/api-stockly) · [api-top4sports](../../../../apis/openapi/swaggerhub.zeyos/api-top4sports) |
-| [swagger.io](../../../../apis/openapi/swagger.io) | [generator](../../../../apis/openapi/swagger.io/generator) |
 | [swapi.dev](../../../../apis/openapi/swapi.dev) | [main](../../../../apis/openapi/swapi.dev/main) |
 | [swapkaart.com](../../../../apis/openapi/swapkaart.com) | [main](../../../../apis/openapi/swapkaart.com/main) |
 | [swarmnode.ai](../../../../apis/openapi/swarmnode.ai) | [main](../../../../apis/openapi/swarmnode.ai/main) |
 | [swarmtix.com](../../../../apis/openapi/swarmtix.com) | [main](../../../../apis/openapi/swarmtix.com/main) |
 | [swatle.ai](../../../../apis/openapi/swatle.ai) | [main](../../../../apis/openapi/swatle.ai/main) |
-| [sweatpals.com](../../../../apis/openapi/sweatpals.com) | [sweatpals-api](../../../../apis/openapi/sweatpals.com/sweatpals-api) |
+| [sweatpals.com](../../../../apis/openapi/sweatpals.com) |  |
 | [swedbank.no](../../../../apis/openapi/swedbank.no) | [main](../../../../apis/openapi/swedbank.no/main) |
 | [swetrix.com](../../../../apis/openapi/swetrix.com) | [main](../../../../apis/openapi/swetrix.com/main) |
 | [swiftfoxcrm.com](../../../../apis/openapi/swiftfoxcrm.com) | [swiftfox-api](../../../../apis/openapi/swiftfoxcrm.com/swiftfox-api) |

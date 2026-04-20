@@ -71,6 +71,6 @@ Browsing 67 APIs starting with **W**.
 | [wrangle.io](../../../../apis/openapi/wrangle.io) | [main](../../../../apis/openapi/wrangle.io/main) |
 | [wufoo.com](../../../../apis/openapi/wufoo.com) | [main](../../../../apis/openapi/wufoo.com/main) |
 | [www.callfire.com](../../../../apis/openapi/www.callfire.com) | [main](../../../../apis/openapi/www.callfire.com/main) |
-| [www.leaflink.com](../../../../apis/openapi/www.leaflink.com) | [leaflink](../../../../apis/openapi/www.leaflink.com/leaflink) |
+| [www.leaflink.com](../../../../apis/openapi/www.leaflink.com) |  |
 | [wyjyt-geo-calculate.azurewebsites.net](../../../../apis/openapi/wyjyt-geo-calculate.azurewebsites.net) | [main](../../../../apis/openapi/wyjyt-geo-calculate.azurewebsites.net/main) |
 

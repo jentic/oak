@@ -6,8 +6,8 @@ Browsing 4 APIs starting with **4**.
 
 | Vendor | APIs |
 |--------|------|
+| [4.events](../../../../apis/openapi/4.events) | [main](../../../../apis/openapi/4.events/main) |
 | [46elks.com](../../../../apis/openapi/46elks.com) | [main](../../../../apis/openapi/46elks.com/main) |
 | [4cdn.org](../../../../apis/openapi/4cdn.org) | [main](../../../../apis/openapi/4cdn.org/main) |
 | [4dem.it](../../../../apis/openapi/4dem.it) | [main](../../../../apis/openapi/4dem.it/main) |
-| [4.events](../../../../apis/openapi/4.events) | [main](../../../../apis/openapi/4.events/main) |
 

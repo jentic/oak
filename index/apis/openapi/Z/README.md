@@ -37,11 +37,11 @@ Browsing 40 APIs starting with **Z**.
 | [zocdoc.com](../../../../apis/openapi/zocdoc.com) | [main](../../../../apis/openapi/zocdoc.com/main) |
 | [zocks.io](../../../../apis/openapi/zocks.io) | [main](../../../../apis/openapi/zocks.io/main) |
 | [zoho.com](../../../../apis/openapi/zoho.com) | [8 APIs](../../../../apis/openapi/zoho.com) |
-| [zoomconnect.com](../../../../apis/openapi/zoomconnect.com) | [www.zoomconnect.com](../../../../apis/openapi/zoomconnect.com/www.zoomconnect.com) |
 | [zoom.us](../../../../apis/openapi/zoom.us) | [contact-center](../../../../apis/openapi/zoom.us/contact-center) · [meetings](../../../../apis/openapi/zoom.us/meetings) · [phone](../../../../apis/openapi/zoom.us/phone) · [video-sdk](../../../../apis/openapi/zoom.us/video-sdk) |
-| [zoom.us~contactcenter](../../../../apis/openapi/zoom.us~contactcenter) | [main](../../../../apis/openapi/zoom.us~contactcenter/main) |
-| [zoom.us~meetings.json](../../../../apis/openapi/zoom.us~meetings.json) | [main](../../../../apis/openapi/zoom.us~meetings.json/main) |
-| [zoom.us~videoSDK](../../../../apis/openapi/zoom.us~videoSDK) | [main](../../../../apis/openapi/zoom.us~videoSDK/main) |
+| [zoom.us~contactcenter](../../../../apis/openapi/zoom.us~contactcenter) |  |
+| [zoom.us~meetings.json](../../../../apis/openapi/zoom.us~meetings.json) |  |
+| [zoom.us~videoSDK](../../../../apis/openapi/zoom.us~videoSDK) |  |
+| [zoomconnect.com](../../../../apis/openapi/zoomconnect.com) | [www.zoomconnect.com](../../../../apis/openapi/zoomconnect.com/www.zoomconnect.com) |
 | [zube.io](../../../../apis/openapi/zube.io) | [main](../../../../apis/openapi/zube.io/main) |
 | [zulip.com](../../../../apis/openapi/zulip.com) | [zulip](../../../../apis/openapi/zulip.com/zulip) |
 | [zuora.com](../../../../apis/openapi/zuora.com) | [main](../../../../apis/openapi/zuora.com/main) |
