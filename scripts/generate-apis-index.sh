@@ -74,7 +74,8 @@ build_nav() {
         if [[ "$b" == "$current" ]]; then
             nav+="**$b**"
         else
-            nav+="[$b](../$b#readme)"
+            anchor="$(echo "$b" | tr '[:upper:]' '[:lower:]' | sed 's/~//g')"
+            nav+="[$b](../$b#apis--$anchor)"
         fi
     done
     echo "$nav"
