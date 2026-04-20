@@ -8,8 +8,8 @@ SOURCE_DIR="$REPO_ROOT/apis/openapi"
 # Clean any existing index
 rm -rf "$INDEX_DIR"
 
-# Create bucket directories: a-z, 0-9, ~rest
-for letter in {a..z}; do
+# Create bucket directories: A-Z, 0-9, ~rest
+for letter in {A..Z}; do
     mkdir -p "$INDEX_DIR/$letter"
 done
 for digit in {0..9}; do
@@ -24,12 +24,12 @@ total=0
 for api_dir in "$SOURCE_DIR"/*/; do
     api_name="$(basename "$api_dir")"
     first_char="${api_name:0:1}"
-    first_char_lower="$(echo "$first_char" | tr '[:upper:]' '[:lower:]')"
+    first_char_upper="$(echo "$first_char" | tr '[:lower:]' '[:upper:]')"
 
-    if [[ "$first_char_lower" =~ ^[a-z]$ ]]; then
-        bucket="$first_char_lower"
-    elif [[ "$first_char_lower" =~ ^[0-9]$ ]]; then
-        bucket="$first_char_lower"
+    if [[ "$first_char_upper" =~ ^[A-Z]$ ]]; then
+        bucket="$first_char_upper"
+    elif [[ "$first_char" =~ ^[0-9]$ ]]; then
+        bucket="$first_char"
     else
         bucket="~rest"
     fi
