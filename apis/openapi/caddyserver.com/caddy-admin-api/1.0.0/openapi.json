@@ -1,0 +1,596 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Caddy Admin API",
+    "version": "1.0.0",
+    "description": "Caddy's administration endpoint provides a RESTful API for managing and configuring the Caddy web server at runtime. The API allows loading configurations, stopping the server, traversing and modifying configuration, adapting config formats, and managing PKI certificates.",
+    "x-jentic-source-url": "https://caddyserver.com/docs/api"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:2019",
+      "description": "Caddy admin API (default local binding)"
+    }
+  ],
+  "tags": [
+    {"name": "Configuration", "description": "Load and manage Caddy configuration"},
+    {"name": "Server", "description": "Server lifecycle operations"},
+    {"name": "Config Traversal", "description": "Traverse and modify configuration tree"},
+    {"name": "PKI", "description": "PKI and certificate management"},
+    {"name": "Reverse Proxy", "description": "Reverse proxy status"}
+  ],
+  "paths": {
+    "/load": {
+      "post": {
+        "operationId": "loadConfig",
+        "summary": "Load configuration",
+        "description": "Sets Caddy's configuration, overriding any previous configuration. The Content-Type header determines the format of the body: application/json for JSON, text/caddyfile for Caddyfile, or any supported config adapter format.",
+        "tags": ["Configuration"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaddyConfig"
+              }
+            },
+            "text/caddyfile": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration loaded successfully"
+          },
+          "400": {
+            "description": "Bad request - invalid configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/stop": {
+      "post": {
+        "operationId": "stopServer",
+        "summary": "Stop the server",
+        "description": "Gracefully shuts down the server and exits the process. To only unload the configuration but leave the process running, use DELETE /config/.",
+        "tags": ["Server"],
+        "responses": {
+          "200": {
+            "description": "Server stopping"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/config/{path}": {
+      "get": {
+        "operationId": "getConfigAtPath",
+        "summary": "Get configuration at path",
+        "description": "Exports the config at the named path. Returns a JSON body of the value at the given path. If the path is empty, the full current configuration is returned.",
+        "tags": ["Config Traversal"],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "Config path (e.g., 'apps/http/servers'). Use empty string for root.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configuration value at the given path",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "setConfigAtPath",
+        "summary": "Set or append configuration at path",
+        "description": "Sets or appends a value at the named path. If the path targets an array, POST appends the value to the array. If it targets an object, POST sets the value at the given key.",
+        "tags": ["Config Traversal"],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "Config path to set",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration updated successfully"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "operationId": "replaceConfigAtPath",
+        "summary": "Replace configuration at path",
+        "description": "Creates or replaces the value at the named path. If the path targets an array, PUT replaces the value at the given index.",
+        "tags": ["Config Traversal"],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "Config path to replace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration replaced successfully"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchConfigAtPath",
+        "summary": "Patch configuration at path",
+        "description": "Replaces an existing object at the named path with the keys from the provided body, preserving existing keys that are not set in the request.",
+        "tags": ["Config Traversal"],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "Config path to patch",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration patched successfully"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteConfigAtPath",
+        "summary": "Delete configuration at path",
+        "description": "Removes the value at the named path. Deleting /config/ unloads the entire configuration but keeps the server running.",
+        "tags": ["Config Traversal"],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "Config path to delete",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configuration deleted successfully"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/id/{id}": {
+      "get": {
+        "operationId": "getConfigById",
+        "summary": "Get configuration by @id",
+        "description": "Traverses the current configuration to find the value with the given @id tag and returns it.",
+        "tags": ["Config Traversal"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The @id value to look up in the config",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configuration value with the given @id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/adapt": {
+      "post": {
+        "operationId": "adaptConfig",
+        "summary": "Adapt configuration",
+        "description": "Adapts a configuration to JSON without loading or running it. The Content-Type header is used to determine which adapter to use. For example, use text/caddyfile to adapt a Caddyfile to JSON.",
+        "tags": ["Configuration"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/caddyfile": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Adapted JSON configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdaptResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/pki/ca/{id}": {
+      "get": {
+        "operationId": "getCertificateAuthority",
+        "summary": "Get CA information",
+        "description": "Returns information about the certificate authority (CA) with the given ID. If the ID is 'local', returns the default/local CA.",
+        "tags": ["PKI"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the certificate authority (e.g., 'local')",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Certificate authority information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertificateAuthority"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/pki/ca/{id}/certificates": {
+      "get": {
+        "operationId": "getCACertificates",
+        "summary": "Get CA certificates",
+        "description": "Returns the certificate chain for the certificate authority with the given ID in PEM format.",
+        "tags": ["PKI"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the certificate authority (e.g., 'local')",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PEM-encoded certificate chain",
+            "content": {
+              "application/pem-certificate-chain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/reverse_proxy/upstreams": {
+      "get": {
+        "operationId": "getReverseProxyUpstreams",
+        "summary": "Get reverse proxy upstreams",
+        "description": "Returns the current status of all configured reverse proxy upstreams (backends) as a JSON array, including their address and number of active requests.",
+        "tags": ["Reverse Proxy"],
+        "responses": {
+          "200": {
+            "description": "List of reverse proxy upstreams",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Upstream"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CaddyConfig": {
+        "type": "object",
+        "description": "Caddy server configuration object",
+        "properties": {
+          "admin": {
+            "type": "object",
+            "description": "Admin endpoint configuration",
+            "properties": {
+              "listen": {"type": "string", "description": "Address to bind the admin API to"},
+              "enforce_origin": {"type": "boolean"},
+              "origins": {"type": "array", "items": {"type": "string"}}
+            }
+          },
+          "logging": {
+            "type": "object",
+            "description": "Logging configuration"
+          },
+          "storage": {
+            "type": "object",
+            "description": "Storage configuration"
+          },
+          "apps": {
+            "type": "object",
+            "description": "App configurations (http, tls, pki, etc.)"
+          }
+        }
+      },
+      "AdaptResponse": {
+        "type": "object",
+        "description": "Response from the adapt endpoint",
+        "properties": {
+          "result": {
+            "type": "object",
+            "description": "Adapted JSON configuration"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "directive": {"type": "string"},
+                "message": {"type": "string"}
+              }
+            }
+          }
+        }
+      },
+      "CertificateAuthority": {
+        "type": "object",
+        "description": "Certificate authority information",
+        "properties": {
+          "id": {"type": "string", "description": "CA identifier"},
+          "name": {"type": "string", "description": "CA name"},
+          "root_common_name": {"type": "string", "description": "Root certificate common name"},
+          "intermediate_common_name": {"type": "string", "description": "Intermediate certificate common name"},
+          "root_certificate": {"type": "string", "description": "PEM-encoded root certificate"},
+          "intermediate_certificate": {"type": "string", "description": "PEM-encoded intermediate certificate"}
+        }
+      },
+      "Upstream": {
+        "type": "object",
+        "description": "Reverse proxy upstream status",
+        "properties": {
+          "address": {"type": "string", "description": "Upstream address"},
+          "num_requests": {"type": "integer", "description": "Number of active requests"},
+          "fails": {"type": "integer", "description": "Number of recent failures"},
+          "healthy": {"type": "boolean", "description": "Whether the upstream is considered healthy"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Error response from the Caddy admin API",
+        "properties": {
+          "error": {"type": "string", "description": "Error message"}
+        }
+      }
+    }
+  }
+}
