@@ -4,37 +4,39 @@ Browsing 31 APIs starting with **J**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · **J** · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
-| Vendor | APIs |
-|--------|------|
-| [jamendo.com](../../apis/openapi/jamendo.com) | [main](../../apis/openapi/jamendo.com/main) |
-| [jamf.com](../../apis/openapi/jamf.com) | [main](../../apis/openapi/jamf.com/main) |
-| [jammedapp.com](../../apis/openapi/jammedapp.com) | [main](../../apis/openapi/jammedapp.com/main) |
-| [javatpoint.com](../../apis/openapi/javatpoint.com) | [main](../../apis/openapi/javatpoint.com/main) |
-| [jcdecaux.com](../../apis/openapi/jcdecaux.com) | [main](../../apis/openapi/jcdecaux.com/main) |
-| [jellyfin.local](../../apis/openapi/jellyfin.local) | [main](../../apis/openapi/jellyfin.local/main) |
-| [jentic.com](../../apis/openapi/jentic.com) | [main](../../apis/openapi/jentic.com/main) |
-| [jibble.io](../../apis/openapi/jibble.io) | [main](../../apis/openapi/jibble.io/main) |
-| [jina.ai](../../apis/openapi/jina.ai) | [jina-ai](../../apis/openapi/jina.ai/jina-ai) |
-| [jirafe.com](../../apis/openapi/jirafe.com) | [jirafe-events](../../apis/openapi/jirafe.com/jirafe-events) · [main](../../apis/openapi/jirafe.com/main) |
-| [jobadderapi](../../apis/openapi/jobadderapi) | [main](../../apis/openapi/jobadderapi/main) |
-| [jobadder.com](../../apis/openapi/jobadder.com) | [main](../../apis/openapi/jobadder.com/main) |
-| [jobicy.com](../../apis/openapi/jobicy.com) | [main](../../apis/openapi/jobicy.com/main) |
-| [joinblink.com](../../apis/openapi/joinblink.com) | [main](../../apis/openapi/joinblink.com/main) |
-| [joinmastodon.org](../../apis/openapi/joinmastodon.org) | [main](../../apis/openapi/joinmastodon.org/main) |
-| [join.me](../../apis/openapi/join.me) | [main](../../apis/openapi/join.me/main) |
-| [joinroot.com](../../apis/openapi/joinroot.com) | [main](../../apis/openapi/joinroot.com/main) |
-| [jokes.one](../../apis/openapi/jokes.one) | [main](../../apis/openapi/jokes.one/main) |
-| [joshuaproject.net](../../apis/openapi/joshuaproject.net) | [main](../../apis/openapi/joshuaproject.net/main) |
-| [jotform.com](../../apis/openapi/jotform.com) | [main](../../apis/openapi/jotform.com/main) |
-| [journy.io](../../apis/openapi/journy.io) | [main](../../apis/openapi/journy.io/main) |
-| [json2video.com](../../apis/openapi/json2video.com) | [main](../../apis/openapi/json2video.com/main) |
-| [judge0.com](../../apis/openapi/judge0.com) | [main](../../apis/openapi/judge0.com/main) |
-| [jumio.ai](../../apis/openapi/jumio.ai) | [main](../../apis/openapi/jumio.ai/main) |
-| [jumppl.com](../../apis/openapi/jumppl.com) | [main](../../apis/openapi/jumppl.com/main) |
-| [jumpseller.com](../../apis/openapi/jumpseller.com) | [main](../../apis/openapi/jumpseller.com/main) |
-| [junglescout.com](../../apis/openapi/junglescout.com) | [main](../../apis/openapi/junglescout.com/main) |
-| [jurny.com](../../apis/openapi/jurny.com) | [main](../../apis/openapi/jurny.com/main) |
-| [juro.com](../../apis/openapi/juro.com) | [main](../../apis/openapi/juro.com/main) |
-| [just-eat.co.uk](../../apis/openapi/just-eat.co.uk) | [just-eat-uk](../../apis/openapi/just-eat.co.uk/just-eat-uk) · [main](../../apis/openapi/just-eat.co.uk/main) |
-| [jvzoo.com](../../apis/openapi/jvzoo.com) | [main](../../apis/openapi/jvzoo.com/main) |
-
+<table width="100%">
+<thead><tr><th>Vendor</th><th>APIs</th></tr></thead>
+<tbody>
+<tr><td><a href="../../apis/openapi/jamendo.com">jamendo.com</a></td><td><a href="../../apis/openapi/jamendo.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jamf.com">jamf.com</a></td><td><a href="../../apis/openapi/jamf.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jammedapp.com">jammedapp.com</a></td><td><a href="../../apis/openapi/jammedapp.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/javatpoint.com">javatpoint.com</a></td><td><a href="../../apis/openapi/javatpoint.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jcdecaux.com">jcdecaux.com</a></td><td><a href="../../apis/openapi/jcdecaux.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jellyfin.local">jellyfin.local</a></td><td><a href="../../apis/openapi/jellyfin.local/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jentic.com">jentic.com</a></td><td><a href="../../apis/openapi/jentic.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jibble.io">jibble.io</a></td><td><a href="../../apis/openapi/jibble.io/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jina.ai">jina.ai</a></td><td><a href="../../apis/openapi/jina.ai/jina-ai">jina-ai</a></td></tr>
+<tr><td><a href="../../apis/openapi/jirafe.com">jirafe.com</a></td><td><a href="../../apis/openapi/jirafe.com/jirafe-events">jirafe-events</a> · <a href="../../apis/openapi/jirafe.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jobadderapi">jobadderapi</a></td><td><a href="../../apis/openapi/jobadderapi/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jobadder.com">jobadder.com</a></td><td><a href="../../apis/openapi/jobadder.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jobicy.com">jobicy.com</a></td><td><a href="../../apis/openapi/jobicy.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/joinblink.com">joinblink.com</a></td><td><a href="../../apis/openapi/joinblink.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/joinmastodon.org">joinmastodon.org</a></td><td><a href="../../apis/openapi/joinmastodon.org/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/join.me">join.me</a></td><td><a href="../../apis/openapi/join.me/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/joinroot.com">joinroot.com</a></td><td><a href="../../apis/openapi/joinroot.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jokes.one">jokes.one</a></td><td><a href="../../apis/openapi/jokes.one/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/joshuaproject.net">joshuaproject.net</a></td><td><a href="../../apis/openapi/joshuaproject.net/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jotform.com">jotform.com</a></td><td><a href="../../apis/openapi/jotform.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/journy.io">journy.io</a></td><td><a href="../../apis/openapi/journy.io/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/json2video.com">json2video.com</a></td><td><a href="../../apis/openapi/json2video.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/judge0.com">judge0.com</a></td><td><a href="../../apis/openapi/judge0.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jumio.ai">jumio.ai</a></td><td><a href="../../apis/openapi/jumio.ai/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jumppl.com">jumppl.com</a></td><td><a href="../../apis/openapi/jumppl.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jumpseller.com">jumpseller.com</a></td><td><a href="../../apis/openapi/jumpseller.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/junglescout.com">junglescout.com</a></td><td><a href="../../apis/openapi/junglescout.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jurny.com">jurny.com</a></td><td><a href="../../apis/openapi/jurny.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/juro.com">juro.com</a></td><td><a href="../../apis/openapi/juro.com/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/just-eat.co.uk">just-eat.co.uk</a></td><td><a href="../../apis/openapi/just-eat.co.uk/just-eat-uk">just-eat-uk</a> · <a href="../../apis/openapi/just-eat.co.uk/main">main</a></td></tr>
+<tr><td><a href="../../apis/openapi/jvzoo.com">jvzoo.com</a></td><td><a href="../../apis/openapi/jvzoo.com/main">main</a></td></tr>
+</tbody>
+</table>

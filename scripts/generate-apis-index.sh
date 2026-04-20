@@ -43,17 +43,17 @@ for api_dir in "$SOURCE_DIR"/*/; do
         if [[ -n "$sub_links" ]]; then
             sub_links+=" · "
         fi
-        sub_links+="[$sub_name](../../apis/openapi/$api_name/$sub_name)"
+        sub_links+="<a href=\"../../apis/openapi/$api_name/$sub_name\">$sub_name</a>"
         sub_count=$((sub_count + 1))
     done
 
     if [[ "$sub_count" -gt 5 ]]; then
-        apis_cell="[$sub_count APIs](../../apis/openapi/$api_name)"
+        apis_cell="<a href=\"../../apis/openapi/$api_name\">$sub_count APIs</a>"
     else
         apis_cell="$sub_links"
     fi
 
-    BUCKETS[$bucket]+="| [$api_name](../../apis/openapi/$api_name) | $apis_cell |"$'\n'
+    BUCKETS[$bucket]+="<tr><td><a href=\"../../apis/openapi/$api_name\">$api_name</a></td><td>$apis_cell</td></tr>"$'\n'
     total=$((total + 1))
 done
 
@@ -98,9 +98,11 @@ Browsing $count APIs starting with **$bucket**.
 
 $nav
 
-| Vendor | APIs |
-|--------|------|
-${BUCKETS[$bucket]}
+<table width="100%">
+<thead><tr><th>Vendor</th><th>APIs</th></tr></thead>
+<tbody>
+${BUCKETS[$bucket]}</tbody>
+</table>
 HEREDOC
     else
         cat > "$readme" <<HEREDOC
