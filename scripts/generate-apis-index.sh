@@ -74,7 +74,7 @@ build_nav() {
         if [[ "$b" == "$current" ]]; then
             nav+="**$b**"
         else
-            nav+="[$b](../$b)"
+            nav+="[$b](../$b#readme)"
         fi
     done
     echo "$nav"
