@@ -1,0 +1,545 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Blockchain.com Exchange API",
+    "version": "3.0.0",
+    "description": "Blockchain.com Exchange REST API for cryptocurrency trading. Provides endpoints for managing orders, viewing trades, fills, fees, account balances, deposits, withdrawals, and market data.",
+    "x-jentic-source-url": "https://api.blockchain.com/v3"
+  },
+  "servers": [
+    {
+      "url": "https://api.blockchain.com/v3/exchange",
+      "description": "Blockchain.com Exchange Production API"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "tags": [
+    { "name": "Trading", "description": "Order management and trading" },
+    { "name": "Market Data", "description": "Market and symbol information" },
+    { "name": "Payments", "description": "Account balances, deposits, and withdrawals" }
+  ],
+  "paths": {
+    "/fees": {
+      "get": {
+        "operationId": "getFees",
+        "summary": "Get current fee level",
+        "description": "Returns the current maker/taker fee rates and 30-day trading volume.",
+        "tags": ["Trading"],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Fees" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/orders": {
+      "get": {
+        "operationId": "getOrders",
+        "summary": "Get a list of orders",
+        "description": "Returns live and historic orders, defaulting to live orders. Returns at most 100 results, use timestamp to paginate.",
+        "tags": ["Trading"],
+        "parameters": [
+          { "name": "symbol", "in": "query", "schema": { "type": "string" }, "description": "Only return results for this symbol (e.g., BTC-USD)." },
+          { "name": "from", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." },
+          { "name": "to", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["OPEN", "REJECTED", "CANCELED", "FILLED", "PART_FILLED", "EXPIRED", "PENDING"] }, "description": "Filter by order status." },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "format": "int32" }, "description": "Maximum results to return (default 100)." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/OrderSummary" } }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "post": {
+        "operationId": "createOrder",
+        "summary": "Add an order",
+        "description": "Create a new trading order.",
+        "tags": ["Trading"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BaseOrder" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrderSummary" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAllOrders",
+        "summary": "Delete all open orders",
+        "description": "Cancel all open orders, optionally filtered by symbol.",
+        "tags": ["Trading"],
+        "parameters": [
+          { "name": "symbol", "in": "query", "schema": { "type": "string" }, "description": "Only cancel orders for this symbol." }
+        ],
+        "responses": {
+          "200": { "description": "Success" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "operationId": "getOrderById",
+        "summary": "Get a specific order",
+        "description": "Retrieve details of a specific order by its exchange order ID.",
+        "tags": ["Trading"],
+        "parameters": [
+          { "name": "orderId", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" }, "description": "Exchange Order ID." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrderSummary" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteOrder",
+        "summary": "Cancel a trade",
+        "description": "Cancel a specific order by its exchange order ID.",
+        "tags": ["Trading"],
+        "parameters": [
+          { "name": "orderId", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" }, "description": "Exchange Order ID." }
+        ],
+        "responses": {
+          "200": { "description": "Success" },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/trades": {
+      "get": {
+        "operationId": "getTrades",
+        "summary": "Get a list of filled orders",
+        "description": "Returns filled orders, including partial fills. Returns at most 100 results.",
+        "tags": ["Trading"],
+        "parameters": [
+          { "name": "symbol", "in": "query", "schema": { "type": "string" }, "description": "Only return results for this symbol." },
+          { "name": "from", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." },
+          { "name": "to", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "format": "int32" }, "description": "Maximum results (default 100)." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/OrderSummary" } }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/fills": {
+      "get": {
+        "operationId": "getFills",
+        "summary": "Get a list of fills",
+        "description": "Returns individual fills. Returns at most 1000 results, use timestamp and execId to navigate.",
+        "tags": ["Trading"],
+        "parameters": [
+          { "name": "symbol", "in": "query", "schema": { "type": "string" }, "description": "Only return results for this symbol." },
+          { "name": "from", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." },
+          { "name": "fromExecId", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "List from ExecId onwards." },
+          { "name": "to", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." },
+          { "name": "toExecId", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "List from ExecId backwards." },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "format": "int32" }, "description": "Maximum results (default 100)." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Fill" } }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/accounts": {
+      "get": {
+        "operationId": "getAccounts",
+        "summary": "Receive current account balances",
+        "description": "Returns all account balances grouped by account type.",
+        "tags": ["Payments"],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BalanceMap" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/accounts/{account}/{currency}": {
+      "get": {
+        "operationId": "getAccountByTypeAndCurrency",
+        "summary": "Receive current account balance",
+        "description": "Returns the balance for a specific account type and currency.",
+        "tags": ["Payments"],
+        "parameters": [
+          { "name": "account", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Account type (e.g., primary)." },
+          { "name": "currency", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Currency code (e.g., BTC)." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Balance" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/deposits/{currency}": {
+      "post": {
+        "operationId": "getDepositAddress",
+        "summary": "Get a deposit address",
+        "description": "Get a deposit address for a specific cryptocurrency.",
+        "tags": ["Payments"],
+        "parameters": [
+          { "name": "currency", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Currency code (e.g., BTC)." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DepositAddressCrypto" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/deposits": {
+      "get": {
+        "operationId": "getDeposits",
+        "summary": "Get a list of deposits",
+        "description": "Returns a list of deposits for the account.",
+        "tags": ["Payments"],
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." },
+          { "name": "to", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/DepositInfo" }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/withdrawals": {
+      "get": {
+        "operationId": "getWithdrawals",
+        "summary": "Get a list of withdrawals",
+        "description": "Returns a list of withdrawals for the account.",
+        "tags": ["Payments"],
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." },
+          { "name": "to", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/WithdrawalInfo" }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "post": {
+        "operationId": "createWithdrawal",
+        "summary": "Request a withdrawal",
+        "description": "Initiate a cryptocurrency withdrawal.",
+        "tags": ["Payments"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateWithdrawalRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WithdrawalInfo" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/withdrawals/{withdrawalId}": {
+      "get": {
+        "operationId": "getWithdrawalById",
+        "summary": "Get a specific withdrawal",
+        "description": "Get details of a specific withdrawal by its ID.",
+        "tags": ["Payments"],
+        "parameters": [
+          { "name": "withdrawalId", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Withdrawal ID." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WithdrawalInfo" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/internal/orders": {
+      "get": {
+        "operationId": "getOrdersInternal",
+        "summary": "Get orders directly from the matching engine",
+        "description": "Returns orders as pulled directly from the matching engine. Supports pagination by orderId.",
+        "tags": ["Trading"],
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Epoch timestamp in ms." },
+          { "name": "orderId", "in": "query", "schema": { "type": "integer", "format": "int64" }, "description": "Last orderId seen in paginated responses." },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "format": "int32" }, "description": "Maximum results (default 100)." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedOrderSummary" }
+              }
+            }
+          },
+          "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Token",
+        "description": "API key for authentication."
+      }
+    },
+    "schemas": {
+      "Fees": {
+        "type": "object",
+        "properties": {
+          "makerRate": { "type": "string", "description": "Maker fee rate." },
+          "takerRate": { "type": "string", "description": "Taker fee rate." },
+          "volumeInUSD": { "type": "string", "description": "30-day trading volume in USD." }
+        }
+      },
+      "BaseOrder": {
+        "type": "object",
+        "required": ["clOrdId", "ordType", "symbol", "side", "orderQty"],
+        "properties": {
+          "clOrdId": { "type": "string", "maxLength": 20, "description": "Client order ID. Max 20 alphanumeric characters." },
+          "ordType": { "type": "string", "enum": ["MARKET", "LIMIT", "STOP", "STOPLIMIT"], "description": "Order type." },
+          "symbol": { "type": "string", "description": "Trading symbol (e.g., BTC-USD)." },
+          "side": { "type": "string", "enum": ["BUY", "SELL"], "description": "Order side." },
+          "orderQty": { "type": "number", "format": "double", "description": "Order size in base currency." },
+          "timeInForce": { "type": "string", "enum": ["GTC", "IOC", "FOK", "GTD"], "description": "Time in force." },
+          "price": { "type": "number", "format": "double", "description": "Limit price." },
+          "expireDate": { "type": "string", "description": "Expiry date (YYYYMMDD format) for GTD orders." },
+          "minQty": { "type": "number", "format": "double", "description": "Minimum quantity for IOC fill." },
+          "stopPx": { "type": "number", "format": "double", "description": "Stop price for stop orders." }
+        }
+      },
+      "OrderSummary": {
+        "type": "object",
+        "properties": {
+          "exOrdId": { "type": "integer", "format": "int64", "description": "Exchange order ID." },
+          "clOrdId": { "type": "string", "description": "Client order ID." },
+          "ordType": { "type": "string", "enum": ["MARKET", "LIMIT", "STOP", "STOPLIMIT"] },
+          "ordStatus": { "type": "string", "enum": ["OPEN", "REJECTED", "CANCELED", "FILLED", "PART_FILLED", "EXPIRED", "PENDING"] },
+          "side": { "type": "string", "enum": ["BUY", "SELL"] },
+          "price": { "type": "number", "format": "double", "description": "Limit price." },
+          "text": { "type": "string", "description": "Rejection reason if applicable." },
+          "symbol": { "type": "string", "description": "Trading symbol." },
+          "lastShares": { "type": "number", "format": "double", "description": "Executed quantity for last fill." },
+          "lastPx": { "type": "number", "format": "double", "description": "Executed price for last fill." },
+          "leavesQty": { "type": "number", "format": "double", "description": "Remaining quantity." },
+          "cumQty": { "type": "number", "format": "double", "description": "Filled quantity." },
+          "avgPx": { "type": "number", "format": "double", "description": "Volume weighted average price." },
+          "timestamp": { "type": "integer", "format": "int64", "description": "Epoch timestamp in ms." }
+        }
+      },
+      "PaginatedOrderSummary": {
+        "type": "object",
+        "properties": {
+          "nextOrderId": { "type": "string" },
+          "orders": { "type": "array", "items": { "$ref": "#/components/schemas/OrderSummary" } }
+        }
+      },
+      "Fill": {
+        "type": "object",
+        "properties": {
+          "exOrdId": { "type": "integer", "format": "int64", "description": "Exchange order ID." },
+          "tradeId": { "type": "integer", "format": "int64", "description": "Trade ID." },
+          "execId": { "type": "integer", "format": "int64", "description": "Execution report ID." },
+          "side": { "type": "string", "enum": ["BUY", "SELL"] },
+          "symbol": { "type": "string" },
+          "price": { "type": "number", "format": "double" },
+          "qty": { "type": "number", "format": "double", "description": "Trade size in base currency." },
+          "fee": { "type": "number", "format": "double", "description": "Fee charged." },
+          "timestamp": { "type": "integer", "format": "int64", "description": "Epoch timestamp in ms." }
+        }
+      },
+      "BalanceMap": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/Balance" }
+        },
+        "description": "Map of account type to array of balances."
+      },
+      "Balance": {
+        "type": "object",
+        "properties": {
+          "currency": { "type": "string" },
+          "balance": { "type": "string" },
+          "available": { "type": "string" },
+          "balance_local": { "type": "string" },
+          "available_local": { "type": "string" },
+          "rate": { "type": "string" }
+        }
+      },
+      "DepositAddressCrypto": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "DepositInfo": {
+        "type": "object",
+        "properties": {
+          "depositId": { "type": "string" },
+          "amount": { "type": "number", "format": "double" },
+          "currency": { "type": "string" },
+          "address": { "type": "string" },
+          "txHash": { "type": "string" },
+          "state": { "type": "string" },
+          "timestamp": { "type": "integer", "format": "int64" }
+        }
+      },
+      "CreateWithdrawalRequest": {
+        "type": "object",
+        "required": ["amount", "currency", "beneficiary"],
+        "properties": {
+          "amount": { "type": "number", "format": "double", "description": "Amount to withdraw." },
+          "currency": { "type": "string", "description": "Currency code." },
+          "beneficiary": { "type": "string", "description": "Destination address." },
+          "sendMax": { "type": "boolean", "description": "Whether to send the maximum available amount." }
+        }
+      },
+      "WithdrawalInfo": {
+        "type": "object",
+        "properties": {
+          "withdrawalId": { "type": "string" },
+          "amount": { "type": "number", "format": "double" },
+          "fee": { "type": "number", "format": "double" },
+          "currency": { "type": "string" },
+          "beneficiary": { "type": "string" },
+          "state": { "type": "string" },
+          "timestamp": { "type": "integer", "format": "int64" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}
