@@ -1,0 +1,246 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Lexigram API",
+    "version": "1.0.0",
+    "description": "Lexigram provides medical NLP and knowledge graph APIs for extracting clinical concepts from text, resolving medical terms, mapping between medical ontologies (ICD-10, SNOMED, MeSH, RxNorm), and exploring relationships in a medical knowledge graph. Requires a JWT API key from app.lexigram.io.",
+    "x-jentic-source-url": "https://docs.lexigram.io/"
+  },
+  "servers": [
+    {
+      "url": "https://api.lexigram.io/v1"
+    }
+  ],
+  "paths": {
+    "/lexigraph/entities": {
+      "get": {
+        "operationId": "searchEntities",
+        "summary": "Search Medical Entities",
+        "description": "Search the medical knowledge graph for entities (diseases, symptoms, drugs, procedures) by name or keyword.",
+        "tags": ["Knowledge Graph"],
+        "parameters": [
+          {"name": "q", "in": "query", "required": true, "description": "Search query string", "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "required": false, "description": "Maximum number of results", "schema": {"type": "integer", "default": 10, "maximum": 100}},
+          {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}},
+          {"name": "types", "in": "query", "required": false, "description": "Comma-separated entity types to filter by", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Entity search results", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EntitySearchResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/lexigraph/entities/{conceptId}": {
+      "get": {
+        "operationId": "getEntity",
+        "summary": "Get Entity by ID",
+        "description": "Get details of a specific medical entity by its concept ID.",
+        "tags": ["Knowledge Graph"],
+        "parameters": [
+          {"name": "conceptId", "in": "path", "required": true, "description": "Lexigram concept ID", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Entity details", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Entity"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/lexigraph/entities/{conceptId}/ancestors": {
+      "get": {
+        "operationId": "getEntityAncestors",
+        "summary": "Get Entity Ancestors",
+        "description": "Get ancestor entities in the knowledge graph hierarchy.",
+        "tags": ["Knowledge Graph"],
+        "parameters": [
+          {"name": "conceptId", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "default": 10}}
+        ],
+        "responses": {
+          "200": {"description": "Ancestor entities", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EntityListResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/lexigraph/entities/{conceptId}/descendants": {
+      "get": {
+        "operationId": "getEntityDescendants",
+        "summary": "Get Entity Descendants",
+        "description": "Get descendant entities in the knowledge graph hierarchy.",
+        "tags": ["Knowledge Graph"],
+        "parameters": [
+          {"name": "conceptId", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "default": 10}},
+          {"name": "offset", "in": "query", "required": false, "schema": {"type": "integer", "default": 0}}
+        ],
+        "responses": {
+          "200": {"description": "Descendant entities", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EntityListResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/lexigraph/entities/{conceptId}/mappings": {
+      "get": {
+        "operationId": "getEntityMappings",
+        "summary": "Get Ontology Mappings",
+        "description": "Get mappings between this entity and external ontology codes (ICD-10, SNOMED CT, MeSH, RxNorm).",
+        "tags": ["Knowledge Graph"],
+        "parameters": [
+          {"name": "conceptId", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "ontologies", "in": "query", "required": false, "description": "Comma-separated ontology names to filter", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Ontology mappings", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MappingsResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/extract/entities": {
+      "post": {
+        "operationId": "extractEntities",
+        "summary": "Extract Medical Entities from Text",
+        "description": "Extract medical concepts (diseases, symptoms, drugs, procedures) from unstructured clinical text using NLP.",
+        "tags": ["NLP Extraction"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text"],
+                "properties": {
+                  "text": {"type": "string", "description": "Clinical text to analyze"},
+                  "withContext": {"type": "boolean", "description": "Include surrounding context for each extraction", "default": false},
+                  "withMappings": {"type": "boolean", "description": "Include ontology mappings for extracted entities", "default": false}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Extracted entities", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ExtractionResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/highlight": {
+      "post": {
+        "operationId": "highlightText",
+        "summary": "Highlight Medical Terms",
+        "description": "Return the input text with medical terms annotated/highlighted with their concept IDs.",
+        "tags": ["NLP Extraction"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text"],
+                "properties": {
+                  "text": {"type": "string", "description": "Text to highlight"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Highlighted text", "content": {"application/json": {"schema": {"type": "object", "properties": {"highlightedText": {"type": "string"}}}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Entity": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "Lexigram concept ID"},
+          "label": {"type": "string", "description": "Primary label/name"},
+          "types": {"type": "array", "items": {"type": "string"}, "description": "Entity types (e.g. Disease, Symptom, Drug)"},
+          "synonyms": {"type": "array", "items": {"type": "string"}},
+          "definitions": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "EntitySearchResponse": {
+        "type": "object",
+        "properties": {
+          "total": {"type": "integer"},
+          "entities": {"type": "array", "items": {"$ref": "#/components/schemas/Entity"}}
+        }
+      },
+      "EntityListResponse": {
+        "type": "object",
+        "properties": {
+          "total": {"type": "integer"},
+          "entities": {"type": "array", "items": {"$ref": "#/components/schemas/Entity"}}
+        }
+      },
+      "MappingsResponse": {
+        "type": "object",
+        "properties": {
+          "conceptId": {"type": "string"},
+          "mappings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ontology": {"type": "string", "description": "Ontology name (ICD10CM, SNOMEDCT, MESH, RXNORM)"},
+                "code": {"type": "string"},
+                "label": {"type": "string"}
+              }
+            }
+          }
+        }
+      },
+      "ExtractionResponse": {
+        "type": "object",
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "begin": {"type": "integer", "description": "Start character offset"},
+                "end": {"type": "integer", "description": "End character offset"},
+                "text": {"type": "string", "description": "Matched text span"},
+                "label": {"type": "string"},
+                "conceptId": {"type": "string"},
+                "types": {"type": "array", "items": {"type": "string"}},
+                "negated": {"type": "boolean", "description": "Whether the concept is negated in context"},
+                "mappings": {"type": "array", "items": {"type": "object", "properties": {"ontology": {"type": "string"}, "code": {"type": "string"}}}}
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "integer"},
+          "error": {"type": "string"},
+          "message": {"type": "string"}
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT API key obtained from app.lexigram.io"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}

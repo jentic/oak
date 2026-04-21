@@ -1,0 +1,274 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Medium API",
+    "version": "1.0.0",
+    "description": "The Medium API allows you to interact with Medium programmatically. It supports getting authenticated user details, listing publications, creating posts, and uploading images. WARNING: This API is officially deprecated by Medium and no longer actively supported.",
+    "x-jentic-source-url": "https://github.com/Medium/medium-api-docs"
+  },
+  "servers": [
+    {
+      "url": "https://api.medium.com/v1"
+    }
+  ],
+  "paths": {
+    "/me": {
+      "get": {
+        "operationId": "getAuthenticatedUser",
+        "summary": "Get Authenticated User",
+        "description": "Returns details of the authenticated user including their ID, username, name, URL, and image URL.",
+        "tags": ["Users"],
+        "responses": {
+          "200": {"description": "User details", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized - invalid or expired token", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/users/{userId}/publications": {
+      "get": {
+        "operationId": "getUserPublications",
+        "summary": "List User's Publications",
+        "description": "Returns a list of publications that the user is related to (editor, writer, or admin).",
+        "tags": ["Publications"],
+        "parameters": [
+          {"name": "userId", "in": "path", "required": true, "description": "The user ID", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "List of publications", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublicationListResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/publications/{publicationId}/contributors": {
+      "get": {
+        "operationId": "getPublicationContributors",
+        "summary": "List Publication Contributors",
+        "description": "Returns a list of contributors for a publication including their roles (editor, writer, admin).",
+        "tags": ["Publications"],
+        "parameters": [
+          {"name": "publicationId", "in": "path", "required": true, "description": "The publication ID", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "List of contributors", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ContributorListResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/users/{authorId}/posts": {
+      "post": {
+        "operationId": "createUserPost",
+        "summary": "Create a Post (User)",
+        "description": "Create a post on Medium under the authenticated user's profile. Content can be HTML or Markdown.",
+        "tags": ["Posts"],
+        "parameters": [
+          {"name": "authorId", "in": "path", "required": true, "description": "The author's user ID (from /me)", "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "contentFormat", "content"],
+                "properties": {
+                  "title": {"type": "string", "description": "Post title"},
+                  "contentFormat": {"type": "string", "enum": ["html", "markdown"], "description": "Format of the content field"},
+                  "content": {"type": "string", "description": "Post body in HTML or Markdown"},
+                  "tags": {"type": "array", "items": {"type": "string"}, "description": "Tags for the post (max 5)", "maxItems": 5},
+                  "canonicalUrl": {"type": "string", "description": "Original URL if this is a cross-post"},
+                  "publishStatus": {"type": "string", "enum": ["public", "draft", "unlisted"], "default": "public", "description": "Publish status of the post"},
+                  "license": {"type": "string", "enum": ["all-rights-reserved", "cc-40-by", "cc-40-by-sa", "cc-40-by-nd", "cc-40-by-nc", "cc-40-by-nc-nd", "cc-40-by-nc-sa", "cc-40-zero", "public-domain"], "default": "all-rights-reserved"},
+                  "notifyFollowers": {"type": "boolean", "default": false, "description": "Whether to notify followers"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {"description": "Post created", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PostResponse"}}}},
+          "400": {"description": "Bad request - missing required fields", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/publications/{publicationId}/posts": {
+      "post": {
+        "operationId": "createPublicationPost",
+        "summary": "Create a Post (Publication)",
+        "description": "Create a post under a publication. The authenticated user must be an editor or admin of the publication.",
+        "tags": ["Posts"],
+        "parameters": [
+          {"name": "publicationId", "in": "path", "required": true, "description": "The publication ID", "schema": {"type": "string"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "contentFormat", "content"],
+                "properties": {
+                  "title": {"type": "string"},
+                  "contentFormat": {"type": "string", "enum": ["html", "markdown"]},
+                  "content": {"type": "string"},
+                  "tags": {"type": "array", "items": {"type": "string"}, "maxItems": 5},
+                  "canonicalUrl": {"type": "string"},
+                  "publishStatus": {"type": "string", "enum": ["public", "draft", "unlisted"], "default": "public"},
+                  "license": {"type": "string", "enum": ["all-rights-reserved", "cc-40-by", "cc-40-by-sa", "cc-40-by-nd", "cc-40-by-nc", "cc-40-by-nc-nd", "cc-40-by-nc-sa", "cc-40-zero", "public-domain"]},
+                  "notifyFollowers": {"type": "boolean", "default": false}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {"description": "Post created under publication", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PostResponse"}}}},
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/images": {
+      "post": {
+        "operationId": "uploadImage",
+        "summary": "Upload Image",
+        "description": "Upload an image to use in Medium posts. Returns a URL to the uploaded image.",
+        "tags": ["Images"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["image"],
+                "properties": {
+                  "image": {"type": "string", "format": "binary", "description": "Image file (PNG, JPEG, GIF, TIFF). Max 5MB."}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {"description": "Image uploaded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ImageResponse"}}}},
+          "400": {"description": "Bad request - invalid image", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "string"},
+              "username": {"type": "string"},
+              "name": {"type": "string"},
+              "url": {"type": "string", "description": "Medium profile URL"},
+              "imageUrl": {"type": "string", "description": "Profile image URL"}
+            }
+          }
+        }
+      },
+      "PublicationListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {"type": "string"},
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+                "url": {"type": "string"},
+                "imageUrl": {"type": "string"}
+              }
+            }
+          }
+        }
+      },
+      "ContributorListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "publicationId": {"type": "string"},
+                "userId": {"type": "string"},
+                "role": {"type": "string", "enum": ["editor", "writer", "admin"]}
+              }
+            }
+          }
+        }
+      },
+      "PostResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "string"},
+              "title": {"type": "string"},
+              "authorId": {"type": "string"},
+              "tags": {"type": "array", "items": {"type": "string"}},
+              "url": {"type": "string", "description": "URL of the published post on Medium"},
+              "canonicalUrl": {"type": "string"},
+              "publishStatus": {"type": "string", "enum": ["public", "draft", "unlisted"]},
+              "publishedAt": {"type": "integer", "description": "Unix timestamp of publication"},
+              "license": {"type": "string"},
+              "licenseUrl": {"type": "string"}
+            }
+          }
+        }
+      },
+      "ImageResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "url": {"type": "string", "description": "URL of the uploaded image"},
+              "md5": {"type": "string", "description": "MD5 hash of the image"}
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message": {"type": "string"},
+                "code": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Medium integration token or OAuth2 access token. Tokens can be self-issued at https://medium.com/me/settings"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}
