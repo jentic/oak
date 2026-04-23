@@ -1,0 +1,1475 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Have I Been Pwned API v3",
+    "description": "Version 3 of the Have I Been Pwned API for searching pwned accounts (breaches, pastes, stealer logs) and the free Pwned Passwords k-Anonymity service.",
+    "version": "3.0.0",
+    "license": {
+      "name": "Creative Commons Attribution 4.0 International",
+      "url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "x-jentic-source-url": "https://haveibeenpwned.com/openapi.json"
+  },
+  "servers": [
+    {
+      "url": "https://haveibeenpwned.com/api/v3",
+      "description": "HIBP API v3 server"
+    },
+    {
+      "url": "https://api.pwnedpasswords.com",
+      "description": "Pwned Passwords k-Anonymity API (no authentication required)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "HibpApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "hibp-api-key",
+        "description": "HIBP subscription key (32-character hexadecimal string) or test key (e.g., 00000000000000000000000000000000 for test accounts)"
+      }
+    },
+    "parameters": {
+      "UserAgent": {
+        "name": "user-agent",
+        "in": "header",
+        "required": true,
+        "description": "User agent string identifying the application; required for all requests.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "AddPadding": {
+        "name": "Add-Padding",
+        "in": "header",
+        "required": false,
+        "description": "Adds random padding to Pwned Passwords responses (discard padded entries with count of 0).",
+        "schema": {
+          "type": "boolean"
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "statusCode",
+          "message"
+        ]
+      },
+      "BreachedAccountRangeResult": {
+        "type": "object",
+        "properties": {
+          "hashSuffix": {
+            "type": "string",
+            "description": "The remaining 34 hexadecimal characters of the breached account's SHA-1 hash."
+          },
+          "websites": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The breach names associated with the hashed account suffix after public API filtering. Sensitive breaches are never returned."
+          }
+        },
+        "required": [
+          "hashSuffix",
+          "websites"
+        ]
+      },
+      "Breach": {
+        "type": "object",
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "A Pascal-cased name representing the breach which is unique across all other breaches. This value never changes and may be used to name dependent assets (such as images) but should not be shown directly to end users (see the 'Title' attribute instead)."
+          },
+          "Title": {
+            "type": "string",
+            "description": "A descriptive title for the breach suitable for displaying to end users. It's unique across all breaches but individual values may change in the future (i.e. if another breach occurs against an organisation already in the system)."
+          },
+          "Domain": {
+            "type": "string",
+            "description": "The domain of the primary website the breach occurred on. This may be used for identifying other assets external systems may have for the site."
+          },
+          "BreachDate": {
+            "type": "string",
+            "format": "date",
+            "description": "The date (with no time) the breach originally occurred on in ISO 8601 format. This is not always accurate \u2014 frequently breaches are discovered and reported long after the original incident. Use this attribute as a guide only."
+          },
+          "AddedDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time (precision to the minute) the breach was added to the system in ISO 8601 format."
+          },
+          "ModifiedDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time (precision to the minute) the breach was modified in ISO 8601 format. This will only differ from the AddedDate attribute if other attributes represented here are changed or data in the breach itself is changed (i.e. additional data is identified and loaded). It is always either equal to or greater then the AddedDate attribute, never less than."
+          },
+          "PwnCount": {
+            "type": "integer",
+            "description": "The total number of accounts loaded into the system. This is usually less than the total number reported by the media due to duplication or other data integrity issues in the source data."
+          },
+          "Description": {
+            "type": "string",
+            "description": "Contains an overview of the breach represented in HTML markup. The description may include markup such as emphasis and strong tags as well as hyperlinks."
+          },
+          "DataClasses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "This attribute describes the nature of the data compromised in the breach and contains an alphabetically ordered string array of impacted data classes."
+          },
+          "IsVerified": {
+            "type": "boolean",
+            "description": "Indicates that the breach is considered unverified. An unverified breach may not have been hacked from the indicated website. An unverified breach is still loaded into HIBP when there's sufficient confidence that a significant portion of the data is legitimate."
+          },
+          "IsFabricated": {
+            "type": "boolean",
+            "description": "Indicates that the breach is considered fabricated. A fabricated breach is unlikely to have been hacked from the indicated website and usually contains a large amount of manufactured data. However, it still contains legitimate email addresses and asserts that the account owners were compromised in the alleged breach."
+          },
+          "IsSensitive": {
+            "type": "boolean",
+            "description": "Indicates if the breach is considered sensitive. The public API will not return any accounts for a breach flagged as sensitive."
+          },
+          "IsRetired": {
+            "type": "boolean",
+            "description": "Indicates if the breach has been retired. This data has been permanently removed and will not be returned by the API."
+          },
+          "IsSpamList": {
+            "type": "boolean",
+            "description": "Indicates if the breach is considered a spam list. This flag has no impact on any other attributes but it means that the data has not come as a result of a security compromise."
+          },
+          "IsMalware": {
+            "type": "boolean",
+            "description": "Indicates if the breach is sourced from malware. This flag has no impact on any other attributes, it merely flags that the data was sourced from a malware campaign rather than a security compromise of an online service."
+          },
+          "IsSubscriptionFree": {
+            "type": "boolean",
+            "description": "Indicates if the breach is subscription-free. This flag has no impact on any other attributes, it is only used when running a domain search where a sufficiently sized subscription isn't present."
+          },
+          "IsStealerLog": {
+            "type": "boolean",
+            "description": "Indicates if the breach is sourced from stealer logs. A breach with this flag also has the domains that appear in the logs loaded against each email address. This data can be accessed via the stealer logs API."
+          },
+          "LogoPath": {
+            "type": "string",
+            "format": "uri",
+            "description": "A URI that specifies where a logo for the breached service can be found. Logos are always in PNG format."
+          },
+          "Attribution": {
+            "type": "string",
+            "nullable": true,
+            "description": "Sometimes requested by the party that provides the data to HIBP."
+          }
+        },
+        "required": [
+          "Name",
+          "Title",
+          "Domain",
+          "BreachDate",
+          "AddedDate",
+          "ModifiedDate",
+          "PwnCount",
+          "Description",
+          "DataClasses",
+          "IsVerified",
+          "IsFabricated",
+          "IsSensitive",
+          "IsRetired",
+          "IsSpamList",
+          "IsMalware",
+          "IsSubscriptionFree",
+          "IsStealerLog",
+          "LogoPath"
+        ]
+      },
+      "Paste": {
+        "type": "object",
+        "properties": {
+          "Source": {
+            "type": "string",
+            "description": "The paste service the record was retrieved from. Current values are: AdHocUrl, Pastebin, Pastie, Slexy, Ghostbin, QuickLeak, JustPaste, AdHocUrl, OptOut."
+          },
+          "Id": {
+            "type": "string",
+            "description": "The ID of the paste as it was given at the source service. Combined with the 'Source' attribute, this can be used to resolve the URL of the paste."
+          },
+          "Title": {
+            "type": "string",
+            "nullable": true,
+            "description": "The title of the paste as observed on the source site. This may be null and if so will be omitted from the response."
+          },
+          "Date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "The date and time (precision to the second) that the paste was posted. This is taken directly from the paste site when this information is available but may be null if no date is published."
+          },
+          "EmailCount": {
+            "type": "integer",
+            "description": "The number of emails that were found when processing the paste."
+          }
+        },
+        "required": [
+          "Source",
+          "Id",
+          "EmailCount"
+        ]
+      },
+      "SubscribedDomain": {
+        "type": "object",
+        "properties": {
+          "DomainName": {
+            "type": "string",
+            "description": "The full domain name that has been successfully verified."
+          },
+          "PwnCount": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The total number of breached email addresses found on the domain at last search (will be null if no searches yet performed)."
+          },
+          "PwnCountExcludingSpamLists": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The number of breached email addresses found on the domain at last search, excluding any breaches flagged as a spam list (will be null if no searches yet performed)."
+          },
+          "PwnCountExcludingSpamListsAtLastSubscriptionRenewal": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The total number of breached email addresses found on the domain when the current subscription was taken out (will be null if no searches yet performed). This number ensures the domain remains searchable throughout the subscription period even if the volume of breached accounts grows beyond the subscription's scope."
+          },
+          "NextSubscriptionRenewal": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "The date and time the current subscription ends in ISO 8601 format. The PwnCountExcludingSpamListsAtLastSubscriptionRenewal value is locked in until this time (will be null if there have been no subscriptions)."
+          }
+        },
+        "required": [
+          "DomainName"
+        ]
+      },
+      "SubscriptionStatus": {
+        "type": "object",
+        "properties": {
+          "SubscriptionName": {
+            "type": "string",
+            "description": "The name representing the subscription being either 'Pwned 1', 'Pwned 2', 'Pwned 3', 'Pwned 4', or 'Pwned 5'."
+          },
+          "Description": {
+            "type": "string",
+            "description": "A human readable sentence explaining the scope of the subscription."
+          },
+          "SubscribedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the current subscription ends in ISO 8601 format."
+          },
+          "Rpm": {
+            "type": "integer",
+            "description": "The rate limit in requests per minute. This applies to the rate the breach search by email address API can be requested."
+          },
+          "DomainSearchMaxBreachedAccounts": {
+            "type": "integer",
+            "description": "The size of the largest domain the subscription can search. This is expressed in the total number of breached accounts on the domain, excluding those that appear solely in spam list."
+          },
+          "IncludesStealerLogs": {
+            "type": "boolean",
+            "description": "Indicates if the subscription includes access to the stealer logs APIs."
+          }
+        },
+        "required": [
+          "SubscriptionName",
+          "Description",
+          "SubscribedUntil",
+          "Rpm",
+          "DomainSearchMaxBreachedAccounts",
+          "IncludesStealerLogs"
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/breachedaccount/{account}": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get all breaches for an account",
+        "description": "The most common use of the API is to return a list of all breaches a particular account has been involved in. The account is not case-sensitive and will be trimmed of leading or trailing white spaces. The account should always be URL encoded. This is an authenticated API and an HIBP API key must be passed with the request. Test API keys (e.g., 00000000000000000000000000000000) can be used to query test accounts on the hibp-integration-tests.com domain.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          },
+          {
+            "name": "account",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "URL-encoded account to search for (email address, username, or phone number)"
+          },
+          {
+            "name": "truncateResponse",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "description": "Returns the full breach model when false. By default, only the name of the breach is returned rather than the complete breach data."
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filters the result set to only breaches against the domain specified. It is possible that one site (and consequently domain), is compromised on multiple occasions."
+          },
+          {
+            "name": "includeUnverified",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "description": "Returns breaches that have been flagged as 'unverified'. By default, both verified and unverified breaches are returned when performing a search."
+          }
+        ],
+        "security": [
+          {
+            "HibpApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of breaches (truncated or full). Note: the public API will not return accounts from any breaches flagged as sensitive or retired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Breach"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request \u2014 the account does not comply with an acceptable format (i.e. it's an empty string)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 the API key provided was not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "missing": {
+                    "value": {
+                      "statusCode": 401,
+                      "message": "Access denied due to missing hibp-api-key."
+                    }
+                  },
+                  "malformed": {
+                    "value": {
+                      "statusCode": 401,
+                      "message": "Access denied due to improperly formed hibp-api-key."
+                    }
+                  },
+                  "invalid": {
+                    "value": {
+                      "statusCode": 401,
+                      "message": "Access denied due to invalid hibp-api-key."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 no user agent has been specified in the request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found \u2014 the account could not be found and has therefore not been pwned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests \u2014 the rate limit has been exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until retry (rounded up to the next whole second)",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "statusCode": 429,
+                  "message": "Rate limit is exceeded. Try again in 2 seconds."
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable \u2014 usually returned by Cloudflare if the underlying service is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/breachedaccount/range/{prefix}": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get all breached account hashes for a range",
+        "description": "Provide the first 6 characters of the SHA-1 hash of a normalised email address and the API will return each matching hash suffix with the breaches associated to that account. Sensitive breaches are excluded from the response and any suffix with no remaining public breaches is omitted.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          },
+          {
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6,
+              "pattern": "^[0-9A-Fa-f]{6}$"
+            },
+            "description": "First 6 characters of the SHA-1 hash of the email address to search for (hexadecimal, not case-sensitive)"
+          }
+        ],
+        "security": [
+          {
+            "HibpApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hash suffixes and breach names for accounts in the requested range. Sensitive breaches are removed and any suffix with no remaining public breaches is omitted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BreachedAccountRangeResult"
+                  }
+                },
+                "example": [
+                  {
+                    "hashSuffix": "D95E127BD0C0455D0CF3CEE15022BA020D",
+                    "websites": [
+                      "Adobe"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request \u2014 the prefix was not a 6-character hexadecimal string",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 the API key provided was not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "missing": {
+                    "value": {
+                      "statusCode": 401,
+                      "message": "Access denied due to missing hibp-api-key."
+                    }
+                  },
+                  "malformed": {
+                    "value": {
+                      "statusCode": 401,
+                      "message": "Access denied due to improperly formed hibp-api-key."
+                    }
+                  },
+                  "invalid": {
+                    "value": {
+                      "statusCode": 401,
+                      "message": "Access denied due to invalid hibp-api-key."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 no user agent has been specified in the request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found \u2014 no non-sensitive breached accounts exist for the requested range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests \u2014 the rate limit has been exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until retry (rounded up to the next whole second)",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "statusCode": 429,
+                  "message": "Rate limit is exceeded. Try again in 2 seconds."
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable \u2014 usually returned by Cloudflare if the underlying service is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/breacheddomain/{domain}": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get all breached email addresses for a domain",
+        "description": "All email addresses on a given domain and the breaches they've appeared in can be returned via the domain search API. Only domains that have been successfully added to the domain search dashboard after verifying control can be searched. The domain search API will return sensitive data breaches as it can only be called after demonstrating control of the domain.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The domain to be searched for. Must be a verified domain in the domain search dashboard."
+          }
+        ],
+        "security": [
+          {
+            "HibpApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mapping of email aliases to breach names. For each breached email address on the domain, only the alias is returned along with each breach it has appeared in. Only the name attribute of the breach is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "alias1": [
+                    "Adobe"
+                  ],
+                  "alias2": [
+                    "Adobe",
+                    "Gawker",
+                    "Stratfor"
+                  ],
+                  "alias3": [
+                    "AshleyMadison"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request \u2014 invalid domain format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found \u2014 the domain does not have any email addresses in any breaches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests \u2014 the rate limit has been exceeded. Typically, there is no need to query a domain unless a new breach has been added since the last query.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until retry",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subscribeddomains": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get all subscribed domains for API key",
+        "description": "Domains that have been successfully added to the domain search dashboard after verifying control are returned via this API. This is an authenticated API requiring an HIBP API key which will then return all domains associated with that key.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          }
+        ],
+        "security": [
+          {
+            "HibpApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of subscribed domains",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SubscribedDomain"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/breaches": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get all breaches in the system",
+        "description": "A 'breach' is an instance of a system having been compromised by an attacker and the data disclosed. For example, Adobe was a breach, Gawker was a breach etc. It is possible to return the details of each of breach in the system.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          },
+          {
+            "name": "domain",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filters the result set to only breaches against the domain specified. It is possible that one site (and consequently domain), is compromised on multiple occasions."
+          },
+          {
+            "name": "isSpamList",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filters the result set to only breaches that either are or are not flagged as a spam list."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of all breaches, sorted alphabetically by the title of the breach",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Breach"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/breach/{name}": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get a single breach by name",
+        "description": "Sometimes just a single breach is required and this can be retrieved by the breach 'Name'. This is the stable value which may or may not be the same as the breach 'Title', which can change.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique breach name (Pascal-cased, stable identifier)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A single breach object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Breach"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found \u2014 breach name invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/latestbreach": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get the most recently added breach",
+        "description": "Often, it's most efficient to monitor for new breaches before performing other actions, for example querying an account or domain. This API returns the most recently added breach based on the 'AddedDate' attribute of the breach model. This may not be the most recent breach to occur as there may be significant lead time between a service being breached and the data later appearing on HIBP.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The latest breach based on AddedDate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Breach"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dataclasses": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get all data classes in the system",
+        "description": "A 'data class' is an attribute of a record compromised in a breach. For example, many breaches expose data classes such as 'Email addresses' and 'Passwords'. The values returned by this service are ordered alphabetically in a string array and will expand over time as new breaches expose previously unseen classes of data.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alphabetically ordered list of data classes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stealerlogsbyemail/{email}": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get all stealer log domains for an email address",
+        "description": "This search is based on the full email address captured by an info stealer as the owner authenticated to a website. The email address being searched for must be on a domain already added to the domain search dashboard. All stealer log APIs require a Pwned 5 subscription or higher, regardless of domain size.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          },
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "URL-encoded email address to search for stealer logs. Must be on a verified domain in the domain search dashboard."
+          }
+        ],
+        "security": [
+          {
+            "HibpApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of website domains sorted alphabetically where this email address appeared in stealer logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "example": [
+                  "netflix.com",
+                  "spotify.com"
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found \u2014 no stealer logs for address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stealerlogsbywebsitedomain/{domain}": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get all stealer log email addresses for a website domain",
+        "description": "This search is by the domain of the website URLs that appear in stealer logs. This is the website the info stealer victim was entering credentials into when their data was captured. The domain being searched for must be already added to the domain search dashboard. Typically, this search would be performed by a website operator looking to identify which of their customers is likely to be the subject of an account takeover attack.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Website domain to search for in stealer logs. Must be a verified domain in the domain search dashboard."
+          }
+        ],
+        "security": [
+          {
+            "HibpApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of email addresses sorted alphabetically",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "example": [
+                  "andy@gmail.com",
+                  "jane@gmail.com"
+                ]
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found \u2014 no stealer logs for domain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stealerlogsbyemaildomain/{domain}": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get all stealer log email aliases for an email domain",
+        "description": "This search is by the domain of the email address, which is a similar approach to getting all breached email addresses for a domain, it just returns stealer log data instead. The domain being searched for must be already added to the domain search dashboard. This API would normally be used to identify individuals within an organisation who've had credentials taken by an info stealer, and the services for which those credentials have been exposed.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Email domain to search for stealer logs. Must be a verified domain in the domain search dashboard."
+          }
+        ],
+        "security": [
+          {
+            "HibpApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Map of email aliases to website domains, both sorted alphabetically",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "andy": [
+                    "netflix.com"
+                  ],
+                  "jane": [
+                    "netflix.com",
+                    "spotify.com"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found \u2014 no stealer logs for email domain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pasteaccount/{account}": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get all pastes for an account",
+        "description": "The API takes a single parameter which is the email address to be searched for. The address is not case-sensitive and will be trimmed of leading or trailing white spaces. The address should always be URL encoded. This is an authenticated API and an HIBP API key must be passed with the request.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          },
+          {
+            "name": "account",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "URL-encoded email address to search for pastes"
+          }
+        ],
+        "security": [
+          {
+            "HibpApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of pastes, sorted chronologically with the newest paste first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Paste"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request \u2014 invalid account format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found \u2014 no pastes for account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests \u2014 rate limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until retry",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subscription/status": {
+      "servers": [
+        {
+          "url": "https://haveibeenpwned.com/api/v3"
+        }
+      ],
+      "get": {
+        "summary": "Get current subscription status",
+        "description": "This API returns details of the current subscription and is an authenticated API requiring an HIBP API key.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          }
+        ],
+        "security": [
+          {
+            "HibpApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription details for the API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing user agent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/range/{prefix}": {
+      "servers": [
+        {
+          "url": "https://api.pwnedpasswords.com"
+        }
+      ],
+      "get": {
+        "summary": "Pwned Passwords range search (k-Anonymity)",
+        "description": "In order to protect the value of the source password being searched for, Pwned Passwords implements a k-Anonymity model that allows a password to be searched for by partial hash. This allows the first 5 characters of either a SHA-1 or an NTLM hash (not case-sensitive) to be passed to the API. When a password hash with the same first 5 characters is found in the Pwned Passwords repository, the API will respond with an HTTP 200 and include the suffix of every hash beginning with the specified prefix, followed by a count of how many times it appears in the data set. A range search typically returns approximately 800 hash suffixes. There are 1,048,576 different hash prefixes between 00000 and FFFFF (16^5) and every single one will return HTTP 200.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserAgent"
+          },
+          {
+            "$ref": "#/components/parameters/AddPadding"
+          },
+          {
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 5,
+              "pattern": "^[0-9A-Fa-f]{5}$"
+            },
+            "description": "First 5 characters of a SHA-1 or NTLM hash (hexadecimal, not case-sensitive)"
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ntlm"
+              ]
+            },
+            "description": "Returns NTLM hash suffixes when set to 'ntlm'. When the mode is not specified or is any value other than 'ntlm', the resulting hashes will be in SHA-1 form."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hash suffixes and prevalence counts. Each line contains a hash suffix (35 characters for SHA-1, 27 characters for NTLM) followed by a colon and the count of how many times the password appears in the data set. Padded entries (when Add-Padding header is used) always have a count of 0 and should be discarded.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "0018A45C4D1DEF81644B54AB7F969B88D65:1\n00D4F6E8FA6EECAD2A3AA415EEC418D38EC:2\n011053FD0102E94D6AE2F8B83D76FAF94F6:1\n012A7CA357541F0AC487871FEEC1891C49C:2\n0136E006E24E7D152139815FB0FC6A50B15:2"
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 missing or invalid user agent",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Full API documentation and acceptable use policy",
+    "url": "https://haveibeenpwned.com/API/v3"
+  }
+}
