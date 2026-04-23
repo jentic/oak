@@ -1,0 +1,362 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TruthScan AI Text Detection API",
+    "description": "TruthScan AI text detection API for detecting AI-generated text. Supports batch analysis and sentence-level detection via WebSocket.",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://truthscan.com/truthscan-ai-text-detection-api-documentation"
+  },
+  "servers": [
+    {
+      "url": "https://detect-text.truthscan.com",
+      "description": "TruthScan Detection API"
+    }
+  ],
+  "paths": {
+    "/detect": {
+      "post": {
+        "operationId": "detectText",
+        "tags": ["AI Detector"],
+        "summary": "Submit text for AI detection",
+        "description": "Submit text for AI detection. At least 200 words are recommended for best accuracy. Input must be less than 30,000 words. Returns a pending detection job which can be queried via /query.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectRequest"
+              },
+              "example": {
+                "text": "Citizen science involves the public participating in scientific research...",
+                "key": "YOUR-API-KEY-GOES-HERE",
+                "model": "xlm_ud_detector",
+                "retry_count": 0
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detection job created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/query": {
+      "post": {
+        "operationId": "queryDetectionResult",
+        "tags": ["AI Detector"],
+        "summary": "Query detection result status",
+        "description": "Query the status and result of an AI detection request by document ID. Returns AI detection scores from multiple providers.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              },
+              "example": {
+                "id": "77565038-9e3d-4e6a-8c80-e20785be5ee9"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detection result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/check-user-credits": {
+      "get": {
+        "operationId": "checkUserCredits",
+        "tags": ["Account"],
+        "summary": "Check user credits",
+        "description": "Returns user credit details including base credits and boost credits.",
+        "parameters": [
+          {
+            "name": "apikey",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Your API key"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User credit details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyInBody": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "apikey",
+        "description": "TruthScan API key (may be passed in request body as 'key' field)"
+      }
+    },
+    "schemas": {
+      "DetectRequest": {
+        "type": "object",
+        "required": ["text", "key"],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to analyze. At least 200 words recommended. Maximum 30,000 words."
+          },
+          "key": {
+            "type": "string",
+            "description": "Your API key"
+          },
+          "model": {
+            "type": "string",
+            "description": "Detection model to use",
+            "default": "xlm_ud_detector",
+            "example": "xlm_ud_detector"
+          },
+          "retry_count": {
+            "type": "integer",
+            "description": "Number of retries",
+            "default": 0
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional document ID for sentence-level detection via WebSocket"
+          }
+        }
+      },
+      "DetectResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Document ID for querying results"
+          },
+          "input": {
+            "type": "string",
+            "description": "The submitted text"
+          },
+          "model": {
+            "type": "string",
+            "description": "Model used for detection"
+          },
+          "result": {
+            "type": "number",
+            "nullable": true,
+            "description": "Detection result score (1-100)"
+          },
+          "result_details": {
+            "$ref": "#/components/schemas/ResultDetails"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "done", "error"],
+            "description": "Processing status"
+          },
+          "retry_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "QueryRequest": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Document ID returned by /detect"
+          }
+        }
+      },
+      "QueryResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": "string"
+          },
+          "result": {
+            "type": "number",
+            "description": "AI detection score (1-100). Under 50 = definitely human. 50-60 = possible AI. Over 60 = definite AI."
+          },
+          "result_details": {
+            "$ref": "#/components/schemas/ResultDetails"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "done", "error"]
+          },
+          "retry_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "ResultDetails": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "scoreGptZero": {
+            "type": "number",
+            "description": "GPTZero humanness score"
+          },
+          "scoreOpenAI": {
+            "type": "number",
+            "description": "OpenAI humanness score"
+          },
+          "scoreWriter": {
+            "type": "number",
+            "description": "Writer humanness score"
+          },
+          "scoreCrossPlag": {
+            "type": "number",
+            "description": "CrossPlag humanness score"
+          },
+          "scoreCopyLeaks": {
+            "type": "number",
+            "description": "CopyLeaks humanness score"
+          },
+          "scoreSapling": {
+            "type": "number",
+            "description": "Sapling humanness score"
+          },
+          "scoreContentAtScale": {
+            "type": "number",
+            "description": "ContentAtScale humanness score"
+          },
+          "scoreZeroGPT": {
+            "type": "number",
+            "description": "ZeroGPT humanness score"
+          },
+          "human": {
+            "type": "number",
+            "description": "Overall humanness percentage"
+          }
+        }
+      },
+      "CreditsResponse": {
+        "type": "object",
+        "properties": {
+          "baseCredits": {
+            "type": "integer",
+            "description": "Base credit allocation"
+          },
+          "boostCredits": {
+            "type": "integer",
+            "description": "Boost credit allocation"
+          },
+          "credits": {
+            "type": "integer",
+            "description": "Total remaining credits"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code"
+          }
+        }
+      }
+    }
+  }
+}
