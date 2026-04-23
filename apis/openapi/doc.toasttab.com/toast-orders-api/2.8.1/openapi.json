@@ -1,0 +1,3020 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "2.8.1",
+    "title": "Toast Orders API",
+    "description": "The orders API includes operations that create, update, and retrieve information about restaurant\nguest orders.\n\nInformation on orders includes the checks, items ordered,\nprices, payments, discounts, and customer data.\n\nYou can create a new order. The orders API includes an operation to retrieve the order prices before you `POST` the order.\n\nYou can add items to an existing check.\n\nThe orders API also allows you to retrieve payment information for the order and add a credit card payment to the order.\nYou cannot update an existing payment, but you can update the tip amount.\n\nFor delivery orders, you can update the delivery information.\n\nYou can retrieve the applicable discounts for an order, and then add a discount to a menu item selection or a check.\n\nThe orders API supports email addresses that: \n  - Are up to 53 characters long. \n  - Start with the email prefix, ends with the email domain name, where the prefix and domain are separated by an @. \n  - Use the following supported characters:\n    - a-z\n    - A-Z\n    - 0-9\n    - _ (underscore)\n    - International characters are not supported\n",
+    "contact": {
+      "name": "Toast developer support"
+    }
+  },
+  "tags": [
+    {
+      "name": "Orders",
+      "description": "Related to orders made by restaurant guests. For example, a restaurant\nguest orders items from a menu. Toast platform orders include one or\nmore guest check.\n"
+    },
+    {
+      "name": "Payments",
+      "description": "Related to guests' payments for restaurant orders. Toast platform\npayments apply to a check in an order.\n"
+    },
+    {
+      "name": "Discounts",
+      "description": "Related to price reduction applied to restaurant orders. For example, a\nrestaurant might apply a discount for a promotion.\n"
+    }
+  ],
+  "paths": {
+    "/payments": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Get payment identifiers",
+        "description": "Returns a list of the GUIDs for each payment made during\none restaurant business day.\n\nThe specific hours that make up a business\nday depend on the business day cutoff in the restaurant configuration,\nwhich is available from the restaurants API in the `closeoutHour`\nproperty.\n\nThe business day for a restaurant is based on its local time (not UTC\nor local time for an API client).\n\nYou must include one of the\n`paidBusinessDate`, `refundBusinessDate`, or `voidBusinessDate` query\nparameters.\n",
+        "operationId": "paymentsGet",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The GUID of the restaurant used as the context of the request.",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paidBusinessDate",
+            "description": "Returns a list of the payments that were made during\none business day.\n\nSpecify the business day in the format yyyyMMdd.\nFor example, `20170101`.\n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "refundBusinessDate",
+            "description": "Returns a list of the payments that were refunded\nduring one business day.\n\nSpecify the business day in the format\nyyyyMMdd. For example, `20170101`.\n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "voidBusinessDate",
+            "description": "Returns a list of the payments that were voided during\none business day.\n\nSpecify the business day in the format yyyyMMdd.\nFor example, `20170101`.\n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A JSON array of the GUID identifiers for the payments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The API cannot process the request."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/payments/{guid}": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Get a payment",
+        "description": "Returns a JSON `Payment` object containing detailed information about a  single payment, specified by its GUID.",
+        "operationId": "paymentsGuidGet",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The GUID of the restaurant used as the context of the request.",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "guid",
+            "description": "The GUID for the payment you want to return.",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns a JSON `Payment` object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The GUID was malformed."
+          },
+          "404": {
+            "description": "The specified payment was not found."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/prices": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Get order prices",
+        "description": "Calculates the check price amounts, tax amounts, and service\ncharges for an `Order` object you supply as a _required message\nbody parameter_.\n\nThe `prices` endpoint validates the order you\nsubmit to ensure all referenced data exists and that you include\nitem selections in the expected structure with all required modifier\noptions.\n\nSome values that would be present in the response data when\ncreating an order are not present in the response data for the `prices`\nendpoint. For example, the order GUID is not set because the\nToast platform does not create persistent data for the order.\n\nThe calculated price can change between requests to the\n`prices` endpoint with the same `Order` object if enough time\npasses between the requests. The difference in price is\npossible because the restaurant configuration can change and\nbecause some pricing configuration is based on time and date\nschedules.\n",
+        "operationId": "pricesPost",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The identifier of the restaurant to be used for this price\ncalculation.\n",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Order"
+              }
+            }
+          },
+          "description": "A _required_ JSON `Order` object containing information about\nthe checks, item selections, modifier options, and other parts\nof the order.\n",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success. The response body contains a JSON `Order` object with\nvalues for check amounts, taxes, service charges, and other parts\nof the order.\n\nBecause this endpoint only calculates prices,\nno parts of the order persist in the Toast platform. There are no\nGUIDs in the response object.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Either the request contains data that is not supported by\nthe current version of the API as described, or the order\ncontains an item that is negatively priced.\n"
+          },
+          "403": {
+            "description": "The API client does not have access to the restaurant, the\nAPI client does not have the `orders:read` scope, or both.\n"
+          },
+          "404": {
+            "description": "An entity referenced in the order does not exist, or\nbelongs to a restaurant that the API client is not\nauthorized to access.\n"
+          },
+          "413": {
+            "description": "The number of checks in the submitted order exceeds the limit.\n"
+          },
+          "415": {
+            "description": "The request did not have `application/json` in the\n`Content-Type` HTTP header field.\n"
+          },
+          "500": {
+            "description": "An unexpected internal error occurred. The\n`requestId` that is attached to the error can be referenced by\nthe Toast support team.\n"
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders.orders:write"
+            ]
+          }
+        ]
+      }
+    },
+    "/orders/{guid}": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Get an order",
+        "description": "Retrieves detailed information about a single order, specified by its GUID.",
+        "operationId": "ordersGuidGet",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The identifier of the restaurant where this order was placed.",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "guid",
+            "description": "The GUID for the order to be returned.",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A JSON Order object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The GUID was malformed."
+          },
+          "404": {
+            "description": "The specified order was not found."
+          },
+          "500": {
+            "description": "There was a problem serializing the order entity."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/ordersBulk": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Get multiple orders",
+        "description": "Returns an array of `Order` objects containing detailed\ninformation about all of the orders opened during a period of time.\n\nYou can return the orders for either a specific period of time\nor for one business day.\n\n* Specify both `startDate` and `endDate` to return the orders\n  modified during that period of time.\n\n* Specify the `businessDate` to return the orders promised\n  during that business day.\n",
+        "operationId": "ordersBulkGet",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The identifier for the restaurant that processed the orders.\n",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "description": "The inclusive start date and time. The results include orders with a modified\ndate and time that occur at or after the `startDate`,\nbut before the `endDate`.\n\nUse ISO-8601 format for the date and time, including a decimal fraction of\na second. For example, `2016-01-01T14:13:12.000+0400`. URL encode the date\nand time value.\n\nThe date must be after\n2015-12-01T00:00:00.000+0000.\n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "ISO-8601"
+            }
+          },
+          {
+            "name": "endDate",
+            "description": "The exclusive end date and time. The results exclude any orders that have\na modified date and time that occurs at or after `endDate`.\n\nUse ISO-8601 format for the date and time, including a decimal\nfraction of a second. For example, `2016-01-01T14:13:12.000+0400`. URL\nencode the date and time value.\n\nThe `endDate` date and time\nmust be later than the `startDate` parameter value.\n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "ISO-8601"
+            }
+          },
+          {
+            "name": "businessDate",
+            "description": "The business date that same-day orders opened or that\nscheduled orders are promised, in the format `yyyymmdd`.\n\nThe business day of an order is determined by the time the\norder is opened or promised in the local time zone, and the\nrestaurant's business day cutoff time, which is available\nfrom  the `General` object of the restaurants API in the\n`closeoutHour` property.\n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "description": "The maximum number of objects to return in the array. If the\nnumber of objects selected by your request is greater than\nthe `pageSize`, the API uses response pagination for the\nremaining objects.\n\nThe maximum `pageSize` is `100`.\n\nFor more information, see [the _Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiResponseDataPagination.html).\n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "description": "The sequence number of the set of objects to return in\npaginated response data.\n\nFor example, if you set the\n`pageSize` parameter to `10`, and you set `page` to `2`, the\nAPI returns a set of objects that starts with the eleventh\nobject.\n\nFor more information, see [the _Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiResponseDataPagination.html).\n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A JSON array of `Order` objects for each order processed\nduring the period of time that you specify in your request.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Order"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request contains data that is not supported by the API.\n"
+          },
+          "500": {
+            "description": "An unexpected internal error occurred. The\n`requestId` that is attached to this error can be referenced by\nthe Toast support team.\n"
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/orders/{orderGuid}/checks/{checkGuid}/payments": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Post payments",
+        "description": "Adds one or more payments to a check in an existing order. Include\ninformation about the payments in an array of `Payment` objects in the\nmessage body. Specify the Toast platform GUID of the order\nand check in REST path parameters.\n\nFor more information, see [the _Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiAddingPaymentsToACheck.html).\n",
+        "operationId": "ordersChecksPaymentsPost",
+        "parameters": [
+          {
+            "name": "orderGuid",
+            "description": "The Toast platform identifier of the order that you are\nadding payments to.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "checkGuid",
+            "description": "The Toast platform identifier of the check that you are\nadding payments to.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              }
+            }
+          },
+          "description": "An array of JSON `Payment` objects containing information about the payments you are adding.\n",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A JSON `Order` object that includes the payments that you added.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The API cannot process the request."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders.payments:write"
+            ]
+          }
+        ]
+      }
+    },
+    "/orders/{orderGuid}/checks/{checkGuid}/payments/{paymentGuid}": {
+      "patch": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Update a tip amount",
+        "description": "Updates the tip amount in an existing payment for a check in an\norder. Include the new `tipAmount` value in a `Payment` object\nin the message body.\n\nThis endpoint does not allow any other\n`Payment` object value for a `PATCH` request.\n\nSpecify the Toast\nplatform GUID of the order, check, and payment in REST path\nparameters.\n\nFor more information, see [the _Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiUpdatingTipsInAPayment.html).\n",
+        "operationId": "ordersOrderGuidChecksCheckGuidPaymentsPaymentGuidPatch",
+        "parameters": [
+          {
+            "name": "orderGuid",
+            "description": "The Toast platform identifier of the order that you are\nupdating a tip in.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "checkGuid",
+            "description": "The Toast platform identifier of the check that you are\nupdating a tip in.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentGuid",
+            "description": "The Toast platform identifier of the payment that you are\nupdating a tip in.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePaymentRequest"
+              }
+            }
+          },
+          "description": "A JSON `Payment` object\ncontaining the `tipAmount` value that will replace any\nexisting tip amount for the payment.\n\nDo not include any\nvalue other than `tipAmount`.\n",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A JSON `Order` object\nthat includes the tip amount that you updated.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The API cannot process the request."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders.payments:write"
+            ]
+          }
+        ]
+      }
+    },
+    "/orders/{orderGuid}/checks/{checkGuid}/selections": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Add items to a check",
+        "description": "Adds one or more items to an existing check in an order.\n\nInclude information about the items in an array of `Selection` objects in the\nmessage body.\n\nSpecify the Toast platform GUID of the order and\ncheck in REST path parameters.\n\nFor more information, see [the _Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiAddingItemsToACheck.html).\n",
+        "operationId": "ordersOrderGuidChecksCheckGuidSelectionsPost",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The identifier of the restaurant.",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderGuid",
+            "description": "The Toast platform identifier of the order that you are\nadding items to.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "checkGuid",
+            "description": "The Toast platform identifier of the check that you are\nadding items to.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Selection"
+                }
+              }
+            }
+          },
+          "description": "An array of JSON `Selection` objects that identify the menu items you are adding.\n",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success. The response body contains the full order JSON, including the `Selection` objects with the items from the original check and the newly added ones you included.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request contains data that is not supported by the API.\n"
+          },
+          "404": {
+            "description": "An entity referenced in the order does not exist at the restaurant.\n"
+          },
+          "500": {
+            "description": "An unexpected internal error occurred. The `requestId` that is attached to this error can be referenced by the Toast support team.\n"
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders.items:write"
+            ]
+          }
+        ]
+      }
+    },
+    "/orders/{orderGuid}/checks/{checkGuid}/appliedDiscounts": {
+      "post": {
+        "tags": [
+          "Discounts"
+        ],
+        "summary": "Add check-level discounts",
+        "description": "Adds one or more check-level discounts to a check in an\nexisting order. Include an array of `Discount` objects in the\nmessage body.\n\nFor more information, see [the _Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiDiscountingOrders.html#apiAddingDiscountsToChecks).\n",
+        "operationId": "ordersChecksAppliedDiscountsPost",
+        "parameters": [
+          {
+            "name": "orderGuid",
+            "description": "The Toast platform identifier of the order that you are\nadding a discount to.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "checkGuid",
+            "description": "The Toast platform identifier of the check that you are\nadding a discount to.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/AppliedDiscountArray"
+        },
+        "responses": {
+          "200": {
+            "description": "A JSON `Order` object that includes the discount you added.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The API cannot process the request."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders.discounts:write"
+            ]
+          }
+        ]
+      }
+    },
+    "/orders/{orderGuid}/checks/{checkGuid}/selections/{selectionGuid}/appliedDiscounts": {
+      "post": {
+        "tags": [
+          "Discounts"
+        ],
+        "summary": "Add item-level discounts",
+        "description": "Adds one or more item-level discounts to menu item selections\nin a check in an existing order. Include an array of `Discount` objects in the\nmessage body.\n\nFor more information, see [the _Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiDiscountingOrders.html#apiAddingDiscountsToChecks).\n",
+        "operationId": "ordersChecksSelectionsAppliedDiscountsPost",
+        "parameters": [
+          {
+            "name": "orderGuid",
+            "description": "The Toast platform identifier of the order that you are\nadding a discount to.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "checkGuid",
+            "description": "The Toast platform identifier of the check that you are\nadding a discount to.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "selectionGuid",
+            "description": "The Toast platform identifier of the menu item selection\nthat you are adding a discount to.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/AppliedDiscountArray"
+        },
+        "responses": {
+          "200": {
+            "description": "A JSON `Order` object that includes the discount you added.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The API cannot process the request."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders.discounts:write"
+            ]
+          }
+        ]
+      }
+    },
+    "/orders/{orderGuid}/deliveryInfo": {
+      "patch": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Update delivery information",
+        "description": "Updates the delivery information of an order that uses the `DELIVERY` dining option.\nYou can use this endpoint to update the delivery time, dispatch time, the\nemployee who is delivering the order, the delivery state, and the delivery notes.\n\nSpecify the Toast platform GUID of the\norder in the `PATCH` path parameters. Returns a JSON\n`Order` object if successful.\n\nOnce an order's `deliveryState` is `DELIVERED`, updates are no longer accepted. \n\nFor more information, see [the _Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiUpdatingDeliveryInfoForAnOrder.html).\n",
+        "operationId": "ordersOrderGuidDeliveryInfoPatch",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The identifier of the restaurant.",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderGuid",
+            "description": "The Toast platform identifier of the order that you are\nupdating the delivery information for.\n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "deliveredDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The date on which the order was delivered.\n"
+                  },
+                  "dispatchedDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The date on which the order was dispatched. If `dispatchedDate` is not specified, it is set to the current system time.\n"
+                  },
+                  "deliveryState": {
+                    "type": "string",
+                    "description": "The delivery state of the order.\n",
+                    "enum": [
+                      "PENDING",
+                      "IN_PROGRESS",
+                      "PICKED_UP",
+                      "DELIVERED"
+                    ]
+                  },
+                  "deliveryEmployee": {
+                    "type": "string",
+                    "format": "UUID",
+                    "description": "The Toast platform identifier of the employee who is delivering the order.\n"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "description": "Delivery notes provided by the guest who placed the order. **Writing to this field overwrites the guest\u2019s original notes and may result in the loss of important order information.** Do not replace or remove the guest's notes."
+                  }
+                }
+              }
+            }
+          },
+          "description": "A JSON `DeliveryInfo` object\ncontaining the delivery information you want to update for an order.\n\nYou can update any combination of the `deliveredDate`, `dispatchedDate`, `deliveryState`,\n`deliveryEmployee`, or `notes` values. \n\nThese are the only values you can update with this endpoint.\n",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success. The response body contains the full order JSON, including information you updated in the `deliveryInfo` object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request contains data that is not supported by the API.\n"
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders.delivery_info:write"
+            ]
+          }
+        ]
+      }
+    },
+    "/orders/{orderGuid}/void": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Void an order",
+        "description": "Voids an order, and (if specified) its selections and payments. Only Orders with `OTHER` payment types can be voided.\n\nA request body that contains the `selections` and `payments` objects with each `voidAll` value set to `true` is required to void an order. The response body is the modified Order object.\n\nFor more information, see [Void an order](https://doc.toasttab.com/doc/devguide/apiVoidOrder.html).\n",
+        "operationId": "voidOrder",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The identifier of the restaurant.",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderGuid",
+            "in": "path",
+            "required": true,
+            "description": "The GUID of the order to be voided.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "selections": {
+                    "type": "object",
+                    "properties": {
+                      "voidAll": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    }
+                  },
+                  "payments": {
+                    "type": "object",
+                    "properties": {
+                      "voidAll": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Modified order object.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed order GUID or other validation errors.\n"
+          },
+          "404": {
+            "description": "Order not found."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders:void",
+              "orders.channel:void"
+            ]
+          }
+        ]
+      }
+    },
+    "/orders": {
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Post an order",
+        "description": "Submits an order to the server. Returns a JSON `Order` object if successful.",
+        "operationId": "ordersPost",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The identifier for the restaurant where this order was placed.",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Order"
+              }
+            }
+          },
+          "description": "A JSON object containing information about an order.",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A JSON `Order` object that has been persisted in Toast. The returned Order contains generated property values for the check amounts, taxes, service charges, and GUIDs for persisted entities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                },
+                "examples": {
+                  "response": {
+                    "value": {
+                      "guid": "89488287-f259-435b-a654-0bc391596af0",
+                      "entityType": "Order",
+                      "externalId": null,
+                      "revenueCenter": null,
+                      "server": {
+                        "guid": "c89d1e72-1888-469f-a24b-506c66eafab7",
+                        "entityType": "RestaurantUser",
+                        "externalId": null
+                      },
+                      "lastModifiedDevice": {
+                        "id": null
+                      },
+                      "source": "API",
+                      "voidDate": null,
+                      "duration": null,
+                      "businessDate": 20210730,
+                      "paidDate": null,
+                      "restaurantService": null,
+                      "voided": false,
+                      "estimatedFulfillmentDate": "2021-07-30T12:12:46.235+0000",
+                      "table": null,
+                      "requiredPrepTime": "PT15M",
+                      "approvalStatus": "NEEDS_APPROVAL",
+                      "deliveryInfo": {
+                        "address1": "401 Park Drive",
+                        "address2": "Suite 801",
+                        "city": "Boston",
+                        "state": "MA",
+                        "zipCode": "02215",
+                        "latitude": 42.3446671,
+                        "longitude": -71.1023575,
+                        "notes": "Please ring the doorbell.",
+                        "deliveredDate": null,
+                        "dispatchedDate": null,
+                        "deliveryEmployee": null,
+                        "deliveryState": null
+                      },
+                      "serviceArea": null,
+                      "curbsidePickupInfo": null,
+                      "numberOfGuests": 1,
+                      "diningOption": {
+                        "guid": "18855a26-40d4-4a8f-b484-c6af211dd597",
+                        "entityType": "DiningOption",
+                        "externalId": null
+                      },
+                      "openedDate": "2021-07-30T11:57:46.235+0000",
+                      "voidBusinessDate": null,
+                      "checks": [
+                        {
+                          "guid": "cbcb6fd5-d973-4e44-9b91-2abcee5ea6cd",
+                          "entityType": "Check",
+                          "externalId": null,
+                          "displayNumber": "pdesjardins-api-1627646263",
+                          "payments": [
+                            {
+                              "guid": "88642b2d-c359-4b96-bb8e-9cb3f5c2ac6a",
+                              "entityType": "OrderPayment",
+                              "externalId": null,
+                              "originalProcessingFee": null,
+                              "server": null,
+                              "cashDrawer": null,
+                              "lastModifiedDevice": {
+                                "id": null
+                              },
+                              "refundStatus": "NONE",
+                              "type": "OTHER",
+                              "voidInfo": null,
+                              "checkGuid": "cbcb6fd5-d973-4e44-9b91-2abcee5ea6cd",
+                              "otherPayment": {
+                                "guid": "0dc19214-d29e-4ab9-a773-27e5812999c7",
+                                "entityType": "AlternatePaymentType",
+                                "externalId": null
+                              },
+                              "paidDate": "2021-07-30T11:57:46.237+0000",
+                              "orderGuid": "89488287-f259-435b-a654-0bc391596af0",
+                              "cardEntryMode": null,
+                              "paymentStatus": "CAPTURED",
+                              "amount": 8.5,
+                              "tipAmount": 0,
+                              "amountTendered": null,
+                              "cardType": null,
+                              "houseAccount": null,
+                              "mcaRepaymentAmount": null,
+                              "createdDevice": {
+                                "id": null
+                              },
+                              "paidBusinessDate": 20210730,
+                              "last4Digits": null,
+                              "refund": null
+                            }
+                          ],
+                          "appliedDiscounts": [],
+                          "lastModifiedDevice": {
+                            "id": null
+                          },
+                          "voidDate": null,
+                          "paidDate": null,
+                          "appliedLoyaltyInfo": null,
+                          "voided": false,
+                          "paymentStatus": "OPEN",
+                          "amount": 5,
+                          "tabName": null,
+                          "taxExempt": false,
+                          "openedDate": "2021-07-30T11:57:46.235+0000",
+                          "totalAmount": 5,
+                          "selections": [
+                            {
+                              "guid": "2c8b6ece-c503-4f85-aed7-6a8c6526ba0d",
+                              "entityType": "MenuItemSelection",
+                              "externalId": null,
+                              "deferred": false,
+                              "preDiscountPrice": 5,
+                              "voidReason": null,
+                              "optionGroup": null,
+                              "displayName": "\u87f9\u9905  CRAB CAKES",
+                              "appliedDiscounts": [],
+                              "modifiers": [],
+                              "seatNumber": -1,
+                              "voidDate": null,
+                              "fulfillmentStatus": "NEW",
+                              "optionGroupPricingMode": null,
+                              "salesCategory": {
+                                "guid": "c0915e46-341e-4ec0-b46e-cb87fab729fd",
+                                "entityType": "SalesCategory",
+                                "externalId": null
+                              },
+                              "selectionType": "NONE",
+                              "price": 5,
+                              "voided": false,
+                              "appliedTaxes": [],
+                              "itemGroup": {
+                                "guid": "881472e6-dd94-48c6-b5c6-25e51a864208",
+                                "entityType": "MenuGroup",
+                                "externalId": null
+                              },
+                              "item": {
+                                "guid": "9c59d4ab-8242-450f-8f36-b16e1b3ab802",
+                                "entityType": "MenuItem",
+                                "externalId": null
+                              },
+                              "taxInclusion": "NOT_INCLUDED",
+                              "quantity": 1,
+                              "receiptLinePrice": 5,
+                              "unitOfMeasure": "NONE",
+                              "refundDetails": null,
+                              "tax": 0,
+                              "diningOption": {
+                                "guid": "18855a26-40d4-4a8f-b484-c6af211dd597",
+                                "entityType": "DiningOption",
+                                "externalId": null
+                              },
+                              "voidBusinessDate": null,
+                              "createdDate": "2021-07-30T11:57:46.269+0000",
+                              "preModifier": null,
+                              "modifiedDate": "2021-07-30T11:57:46.269+0000"
+                            }
+                          ],
+                          "voidBusinessDate": null,
+                          "createdDate": "2021-07-30T11:57:46.282+0000",
+                          "deleted": false,
+                          "createdDevice": {
+                            "id": null
+                          },
+                          "closedDate": null,
+                          "deletedDate": null,
+                          "modifiedDate": "2021-07-30T11:57:46.282+0000",
+                          "taxAmount": 0,
+                          "appliedServiceCharges": [],
+                          "customer": {
+                            "guid": "970e92e6-33b3-4caa-876b-2c6ef528ef4e",
+                            "entityType": "Customer",
+                            "firstName": "Severe",
+                            "lastName": "Thibault",
+                            "phone": "5555555555",
+                            "email": "severe@example.com"
+                          }
+                        }
+                      ],
+                      "deleted": false,
+                      "createdDevice": {
+                        "id": null
+                      },
+                      "createdDate": "2021-07-30T11:57:46.286+0000",
+                      "closedDate": null,
+                      "deletedDate": null,
+                      "modifiedDate": "2021-07-30T11:57:46.286+0000",
+                      "promisedDate": null,
+                      "pricingFeatures": [
+                        "TAXESV2"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Either the request contains data that is not supported by the current version of the API as described (e.g. specifying credit card as the payment type.), or the order contains an item that is negatively priced."
+          },
+          "404": {
+            "description": "An entity referenced in the order does not exist, or belongs to a restaurant the authenticated client is not authorized to access."
+          },
+          "413": {
+            "description": "The number of checks in the submitted order exceeds the limit."
+          },
+          "415": {
+            "description": "The request did not have \"application/json\" in the Content-Type header."
+          },
+          "500": {
+            "description": "An unexpected internal error occurred. There is a requestId attached to this error that can be referenced by Toast."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders.orders:write"
+            ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Get order identifiers (deprecated)",
+        "deprecated": true,
+        "description": "Returns a list of the GUIDs of all orders opened during a period of\ntime. You can return the list of orders for either a period of up to\none hour or for one business day.\n* Specify both `startDate` and `endDate` to return the list of orders\n  modified during a period of up to one hour.\n* Specify the `businessDate` to return the list of orders promised\n  for delivery during a business day.\n",
+        "operationId": "ordersGet",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The identifier for the restaurant to retrieve orders from.",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "description": "\\\nThe inclusive start date and time. The results exclude orders with an earlier modified date and time.\nUse ISO-8601 format for the date and time, including a decimal fraction of a second. For example, `2016-01-01T14:13:12.000+0400`. URL encode the date and time value.\nThe date must be after 2015-12-01T00:00:00.000+0000.",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "ISO-8601"
+            }
+          },
+          {
+            "name": "endDate",
+            "description": "\nThe exclusive end date and time. The results exclude orders with an equal\nor later modified date and time.\n\nUse ISO-8601 format for the date and time, including a decimal fraction of a\nsecond. For example,\n`2016-01-01T14:13:12.000+0400`. URL encode the date and time value.\n\nThe `endDate` date and time must be later than the `startDate`\nparameter value.\n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "ISO-8601"
+            }
+          },
+          {
+            "name": "businessDate",
+            "description": "The business date that same-day orders opened or that\nscheduled orders are promised, in the format `yyyyMMdd`.\n\nThe business day of an order is determined by the time the order is opened or\npromised in the local time zone, and by the restaurant's business day\ncutoff time, which is available from  the `General` object of the\nrestaurants API in the `closeoutHour` property.\n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A JSON array of the GUID identifiers for orders.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request contains data that is not supported by the current version of the API as described. For example, specifying credit card as the payment type."
+          },
+          "500": {
+            "description": "An unexpected internal error occurred. The `requestId` that is attached to this error can be referenced by Toast."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/applicableDiscounts": {
+      "post": {
+        "tags": [
+          "Discounts"
+        ],
+        "summary": "Get applicable discounts",
+        "description": "Returns an array of `ApplicableDiscount`\nobjects that contain information about the discounts that apply\nto the checks and menu item selections in an order.\n\nEach `ApplicableDiscount` object contains information that you can\nuse to determine which items and checks are eligible for the\ndiscount.\n\nIf you include a `promoCode` value in the\n`ApplicableDiscount` object, the `applicableDiscounts` endpoint\nreturns the only the discounts that are associated with that\npromotional code.\n",
+        "operationId": "applicableDiscountsPost",
+        "parameters": [
+          {
+            "name": "Toast-Restaurant-External-ID",
+            "description": "The identifier of the restaurant.",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicableDiscountsRequest"
+              }
+            }
+          },
+          "description": "A JSON `ApplicableDiscountsRequest` object containing\ninformation about an order, and an optional `promoCode`.\n",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A JSON array of `ApplicableDiscount` objects.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "ApplicableDiscounts",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApplicableDiscount"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid arguments"
+          },
+          "500": {
+            "description": "An unexpected internal error occurred. The `requestId` that is attached to this error can be referenced by Toast."
+          }
+        },
+        "security": [
+          {
+            "oauth2": [
+              "orders.orders:write"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://toast-api-server/orders/v2"
+    }
+  ],
+  "components": {
+    "requestBodies": {
+      "AppliedDiscountArray": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AppliedDiscount"
+              }
+            }
+          }
+        },
+        "description": "A JSON array of `AppliedDiscount` objects that identify the discounts you are adding.\n",
+        "required": true
+      }
+    },
+    "securitySchemes": {
+      "oauth2": {
+        "description": "Access to Toast APIs, specific endpoints, \nand specific API endpoint operations is \ncontrolled by the scopes that are associated \nwith your API account. \n\nA full reference for Toast API scopes and \ntheir capabilities can be found in the\n[_Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiScopes.html).\n",
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://toast-api-server/authentication/v1/authentication/login",
+            "scopes": {
+              "orders:read": "Allows reading from the orders API with the exception of guest information.\n\nIf your API client creates orders, then to read orders, it must have both the orders:read scope and the \norders.channel:read scope.\n",
+              "orders.channel:read": "Allows API clients that submit orders to the Toast platform to read from the orders API.\n\nTo read orders, the API client must have both the orders:read scope and the orders.channel:read scope.\n\nAPI clients that have the orders.channel:read scope can only read the orders that they submitted. They cannot\nread orders from any other source.\n",
+              "delivery_info.address:read": "Allows reading guest delivery address information from the orders API.\nOptionally used in conjunction with the `orders:read` scope to return\nthe `deliveredDate`, `dispatchedDate`, `deliveryEmployee`, and `deliveryState`\nfields as part of the `deliveryInfo` field on the Order object.\n",
+              "guest.pi:read": "Allows reading guest and curbside pickup information from the orders API.\nOptionally used in conjunction with the `orders:read` scope to return the\n`email` and `phone` fields as part of the `checks[].customer` object.\n",
+              "orders.delivery_info:write": "Allows updating delivery information from the orders API.\n",
+              "orders.discounts:write": "Allows adding discounts to orders using the orders API.\n",
+              "orders.items:write": "Allows adding items to orders using the orders API.\n",
+              "orders.orders:write": "Allows posting orders orders using the orders API.\n",
+              "orders.payments:write": "Allows adding payments and tips to existing orders using the orders API.\n"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Order": {
+        "type": "object",
+        "description": "A Toast platform order is composed of one or more checks. Each check has \none or more menu item selections.\n\nThe `externalId` value for an order must be unique. If you submit an order\nwith an `externalId` that already exists for another order, the request\nwill fail. You can use this behavior to implement idempotent order\nsubmission by always providing a consistent `externalId` for each unique\norder attempt.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ExternalReference"
+          },
+          {
+            "type": "object",
+            "required": [
+              "diningOption",
+              "checks"
+            ],
+            "properties": {
+              "openedDate": {
+                "description": "The business date of the order.\n\nFor dine-in and as soon as possible (ASAP) orders, `openedDate` should match `createdDate`.\n\nFor scheduled orders, `openedDate` should match `promisedDate`.\n\nIf you do not provide a value for \n`openedDate` value when you `POST` a new order, the\nbusiness date of the order is set to the restaurant\nbusiness day that corresponds to the current date and\ntime.\n\nThe business date of an order is affected by the\nbusiness date cutoff time for a restaurant, which is\navailable from the restaurants API in the `closeoutHour` property.\n",
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-02-07T08:00:00.000-0800"
+              },
+              "modifiedDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The most recent date that the order, or a check or menu item selection in the order, was modified.",
+                "example": "2025-02-07T08:00:00.000-0800"
+              },
+              "promisedDate": {
+                "description": "For scheduled orders, the date and time that the order is scheduled to be fulfilled.\n\nFor dine-in and as soon as possible (ASAP) orders, `promisedDate` is `null`.\n",
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-05-01T08:00:00.000-0800"
+              },
+              "channelGuid": {
+                "description": "Reserved for future use.\n",
+                "type": "string",
+                "format": "uuid"
+              },
+              "diningOption": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "checks": {
+                "type": "array",
+                "description": "The checks for this order. Most orders have one check.\n\nIf the check is split, then there are multiple checks.\n",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/components/schemas/Check"
+                }
+              },
+              "table": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "serviceArea": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "restaurantService": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "revenueCenter": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "source": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "Indicates the way that the order was placed.\n\nValid values:\n\n* `In Store`\n* `Online`\n* `Order-and-Pay-at-Table`\n* `API`\n* `Kiosk`\n* `Caller Id`\n* `Google`\n* `Invoice`\n* `Toast Pickup App`\n* `Toast Local`\n* `Branded Online Ordering`\n* `Catering`\n* `Catering Online Ordering`\n* `Toast Tables`\n* `eCommerce Online ordering`\n* `Branded Mobile App`\n* `Grubhub` (deprecated)\n\nResponse only.\n"
+              },
+              "duration": {
+                "x-toast-read-only": true,
+                "type": "integer",
+                "description": "The number of seconds between creation and payment. Response only."
+              },
+              "deliveryInfo": {
+                "$ref": "#/components/schemas/DeliveryInfo"
+              },
+              "requiredPrepTime": {
+                "type": "string",
+                "format": "ISO-8601",
+                "description": "The amount of time that it will take to prepare the order. This value overrides the \ndefault `deliveryPrepTime` or `takeoutPrepTime` that normally controls auto-firing for scheduled orders.\n\nYou can use `requiredPrepTime` to handle atypical orders that will take more time than usual for a restaurant to prepare.\n\nExpress the required preparation time in ISO-8601 duration format. Must be greater than zero and be an \nincrement of five minutes. For example, the value \"PT15M\" sets the required preparation time for the order to 15 minutes.\n"
+              },
+              "estimatedFulfillmentDate": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "format": "date-time",
+                "description": "The date and time that the order is expected to be ready for pickup or to be delivered.\n\nThis value is only set when the order dining option uses the `DELIVERY` or `TAKE_OUT` dining behavior. For other dining options, the value is `null`.\n\nResponse only.\n",
+                "example": "2025-05-01T08:00:00.000-0800"
+              },
+              "numberOfGuests": {
+                "type": "integer",
+                "description": "The number of restaurant guests that are associated with the\norder. For example, for a dine-in order, this might be the\nnumber of guests at a table.\n"
+              },
+              "voided": {
+                "x-toast-read-only": true,
+                "type": "boolean",
+                "description": "Set to `true` if this order was voided. Response only."
+              },
+              "voidDate": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "format": "date-time",
+                "description": "The date on which this order was voided. Response only.",
+                "example": "2025-02-07T08:00:00.000-0800"
+              },
+              "voidBusinessDate": {
+                "x-toast-read-only": true,
+                "type": "integer",
+                "description": "The business date (yyyyMMdd) on which this order was voided. Response only."
+              },
+              "paidDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The most recent date on which this order received payment. If not specified when `POST`ing, it is set to the current system time.",
+                "example": "2025-02-07T08:00:00.000-0800"
+              },
+              "closedDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The most recent date on which the order payment status changed to `CLOSED`.\n\nThis status is not returned for the order. The order is simply `CLOSED` when all of the checks on the order are `CLOSED`.\n",
+                "example": "2025-02-07T08:00:00.000-0800"
+              },
+              "deletedDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The date and time when the order was deleted.\n\nThe `deletedDate` value only\napplies when the `deleted` value is `true`.\n\nIf `deleted` is `false`, the value\nof `deletedDate` is the UNIX epoch, `1970-01-01T00:00:00.000+0000`.\n",
+                "example": "2025-02-07T08:00:00.000-0800"
+              },
+              "deleted": {
+                "x-toast-read-only": true,
+                "type": "boolean",
+                "description": "Set to `true` if this order is deleted. Response only.\n\nFor example, if you combine a\ncheck into another order, the original order for the check is deleted.\n"
+              },
+              "businessDate": {
+                "x-toast-read-only": true,
+                "type": "integer",
+                "description": "The business date (yyyyMMdd) on which the order was fulfilled. Response only."
+              },
+              "server": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "pricingFeatures": {
+                "type": "array",
+                "description": "Pricing features that this order is using.",
+                "items": {
+                  "type": "string",
+                  "description": "A specific pricing feature used to price out the order.",
+                  "enum": [
+                    "TAXESV2",
+                    "TAXESV3"
+                  ]
+                }
+              },
+              "approvalStatus": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The current state of the order in the restaurant order\nfulfillment process. For example, the `approvalStatus`\ncan indicate that an order is waiting for a restaurant\nemployee to approve it or that the order is in a\nrestaurant kitchen being fulfilled. Response only.\n\nValid values:\n\n* `NEEDS_APPROVAL` - The order is created but will\nnot be fulfilled by the restaurant until an employee\napproves it.\n\n* `APPROVED` - The order is being fulfilled by the\nrestaurant or it was fulfilled in the past. Orders\nremain in this state indefinitely after they are\nfulfilled.\n\n* `FUTURE` - The order is expected to be fulfilled by the\nrestaurant at a future date and time. Restaurant\nemployees will receive information about the order at the\ndate and time that it is ready to be fulfilled.\n\n* `NOT_APPROVED` - Restaurant employees received\ninformation about the order but did not approve it for\nfulfillment. An order enters this state after a period of\ntime passes without a restaurant employee approving it.\n",
+                "enum": [
+                  "NEEDS_APPROVAL",
+                  "APPROVED",
+                  "FUTURE",
+                  "NOT_APPROVED"
+                ]
+              },
+              "createdDevice": {
+                "$ref": "#/components/schemas/Device"
+              },
+              "createdDate": {
+                "description": "The date and time that the Toast platform received the order.",
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-02-07T08:00:00.000-0800"
+              },
+              "lastModifiedDevice": {
+                "$ref": "#/components/schemas/Device"
+              },
+              "curbsidePickupInfo": {
+                "$ref": "#/components/schemas/CurbsidePickupInfo"
+              },
+              "marketplaceFacilitatorTaxInfo": {
+                "$ref": "#/components/schemas/MarketplaceFacilitatorTaxInfo"
+              },
+              "createdInTestMode": {
+                "type": "boolean",
+                "description": "Indicates whether the order was created while the restaurant was\nin test mode.\n\nFor more information, see [this _Toast Central_\narticle](https://central.toasttab.com/s/article/Test-Mode-Enable-and-Disable-1492802389999)\n"
+              },
+              "appliedPackagingInfo": {
+                "$ref": "#/components/schemas/AppliedPackagingInfo"
+              },
+              "excessFood": {
+                "x-toast-read-only": true,
+                "type": "boolean",
+                "description": "Indicates whether the order was created to track excess food (for example, food waste) rather than a \nstandard guest order. Response only.\n\nFor more information on the differences between guest orders and excess food orders, see \n[Daily order for tracking excess food](https://doc.toasttab.com/doc/devguide/apiDailyOrderForTrackingExcessFood.html).\n"
+              },
+              "displayNumber": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "Response only. Generally starts at one each day and counts up. Not guaranteed to be unique, can be empty if unset."
+              }
+            }
+          }
+        ]
+      },
+      "Check": {
+        "type": "object",
+        "description": "Represents a single check within an order.\n\nThe `externalId` value for a check must be unique. If you submit a check\nwith an `externalId` that already exists for another check, the request\nwill fail. You can use this behavior to implement idempotent check\nsubmission by always providing a consistent `externalId` for each unique\ncheck attempt.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ExternalReference"
+          },
+          {
+            "type": "object",
+            "required": [
+              "selections"
+            ],
+            "properties": {
+              "createdDate": {
+                "description": "The date and time that the Toast platform received the check.",
+                "type": "string",
+                "format": "date-time"
+              },
+              "openedDate": {
+                "description": "The date on which this check was opened. If not specified, it is set to the current system time.",
+                "type": "string",
+                "format": "date-time"
+              },
+              "closedDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The most recent date on which this check's payment status was set to `CLOSED`."
+              },
+              "modifiedDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The most recent date on which this check was modified."
+              },
+              "deletedDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The date on which this check was deleted.\n\n`deletedDate` is only applicable when `deleted` is true.\n\nIf `deleted` is false, then `deletedDate` is set to the UNIX epoch, `1970-01-01T00:00:00.000+0000`.\n"
+              },
+              "deleted": {
+                "type": "boolean",
+                "description": "Set to `true` if this check was deleted."
+              },
+              "selections": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Selection"
+                }
+              },
+              "customer": {
+                "$ref": "#/components/schemas/Customer"
+              },
+              "appliedLoyaltyInfo": {
+                "$ref": "#/components/schemas/AppliedLoyaltyInfo"
+              },
+              "taxExempt": {
+                "type": "boolean",
+                "default": false,
+                "description": "Set to `true` if this check is tax exempt."
+              },
+              "displayNumber": {
+                "type": "string",
+                "description": "Generally starts at one each day and counts up. The Toast platform fills this in if it is not specified when the order is POSTed. Not guaranteed to be unique."
+              },
+              "appliedServiceCharges": {
+                "type": "array",
+                "description": "Any restaurant-configured service charges that applied to this check.",
+                "items": {
+                  "$ref": "#/components/schemas/AppliedServiceCharge"
+                }
+              },
+              "amount": {
+                "x-toast-read-only": true,
+                "type": "number",
+                "format": "double",
+                "description": "The total calculated price of the check including discounts and service charges. The `amount` does not include gratuity or taxes. Response only."
+              },
+              "taxAmount": {
+                "x-toast-read-only": true,
+                "type": "number",
+                "format": "double",
+                "description": "The calculated tax amount. Includes service charge and item level taxes. Response only."
+              },
+              "totalAmount": {
+                "type": "number",
+                "format": "double",
+                "description": "The total calculated price of this check including discounts and taxes. Not affected by refunds."
+              },
+              "payments": {
+                "type": "array",
+                "description": "Payments made on this check.",
+                "minItems": 0,
+                "items": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              },
+              "tabName": {
+                "type": "string",
+                "description": "The name of the tab on this check. This displays on the KDS (Kitchen Display System) for pending orders.\n\nThe `tabName` value can contain up to 255 characters.\n"
+              },
+              "paymentStatus": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The payment status of this check.\n\nValid values:\n\n* `OPEN` - There is an outstanding balance.\n\n* `PAID` - A credit card payment was applied, but the tip has not been adjusted.\n\n* `CLOSED`  - There is no remaining amount due on this check. For credit card payments, the payment has been adjusted to reflect the tip. Toast does not prevent a `CLOSED` check from transitioning back to `OPEN` or `PAID`.\n\nResponse only.\n",
+                "enum": [
+                  "OPEN",
+                  "PAID",
+                  "CLOSED"
+                ]
+              },
+              "appliedDiscounts": {
+                "type": "array",
+                "description": "The discounts applied to this check. In a `POST` request, only one `appliedDiscount` is allowed per check.",
+                "minItems": 0,
+                "items": {
+                  "$ref": "#/components/schemas/AppliedDiscount"
+                }
+              },
+              "voided": {
+                "x-toast-read-only": true,
+                "type": "boolean",
+                "description": "True if this check is voided. Response only."
+              },
+              "voidDate": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "format": "date-time",
+                "description": "The date when this check was voided. Response only."
+              },
+              "voidBusinessDate": {
+                "x-toast-read-only": true,
+                "type": "integer",
+                "description": "The business date (yyyyMMdd) on which this check was voided. Response only."
+              },
+              "paidDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The most recent date when this check received payment. If not specified when `POST`ing, it is set to the current system time."
+              },
+              "createdDevice": {
+                "$ref": "#/components/schemas/Device"
+              },
+              "lastModifiedDevice": {
+                "$ref": "#/components/schemas/Device"
+              },
+              "duration": {
+                "x-toast-read-only": true,
+                "type": "integer",
+                "description": "The number of seconds between creation and payment. Response only."
+              },
+              "openedBy": {
+                "$ref": "#/components/schemas/ExternalReference"
+              }
+            }
+          }
+        ]
+      },
+      "AppliedLoyaltyInfo": {
+        "type": "object",
+        "description": "Information about the customer loyalty program account associated with a check.",
+        "required": [
+          "loyaltyIdentifier",
+          "vendor"
+        ],
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "loyaltyIdentifier": {
+                "type": "string",
+                "description": "An identifier for the loyalty program account. For `POST` orders, this identifier is transmitted to the loyalty program service provider to associate the check with the loyalty account."
+              },
+              "maskedLoyaltyIdentifier": {
+                "type": "string",
+                "description": "A representation of the identifier of the loyalty program\naccount that can be displayed securely. For example:\n`************1234`. The Toast POS displays this string to\nrestaurant employees and guests.\n\nYou can optionally include this\nvalue when you `POST` an order. It is\navailable in response data when you `GET` the order.\n\nIf you do not provide a `maskedLoyaltyIdentifier` when you\n`POST` an order, this value is `null` in response data.\n\nThe Toast POS app displays a masked representation of the\n`loyaltyIdentifier`. All characters except the last four\nare hidden.\n"
+              },
+              "vendor": {
+                "type": "string",
+                "description": "The specific loyalty program service provider that supports the loyalty account.",
+                "enum": [
+                  "TOAST",
+                  "PUNCHH",
+                  "PUNCHH2",
+                  "PAYTRONIX",
+                  "APPFRONT",
+                  "INTEGRATION"
+                ]
+              },
+              "accrualFamilyGuid": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "Response only. An internal Toast platform identifier for loyalty\nprogram transactions.\n\nThis is not returned from the initial\n`POST` order request and is available at a later time.\n"
+              },
+              "accrualText": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "Response only. A description of the loyalty program transaction\nto print on the customer's receipt. For example,\n\"Earned 27 points.\"\n\nThe maximum length of the description string\nis 255 characters.\n\nThis is not returned from the initial\n`POST` order request and is available at a later time.\n"
+              }
+            }
+          }
+        ]
+      },
+      "Selection": {
+        "type": "object",
+        "description": "A `Selection` object can represent either a primary item (for example,\n`Check.selections`) or a modifier (`Selection.modifiers`) selection.\nQuantity defaults to `1`.\n\nFor a `POST` operation, all selections must have valid `item` and\n`itemGroup` fields. The `item` and `itemGroup` values can be `null` for\n`GET` requests. For example, they are `null` for gift cards and on special\nrequests.\n\nTo specify a modifier selection, add it to the `modifiers` list of\nanother selection. Each modifier selection must have its `optionGroup` field\nset correctly, because a `MenuItem` can be included in multiple\n`MenuOptionGroups`, potentially with different prices or sizing.\n\nThe `externalId` value for a selection must be unique. If you submit a\nselection with an `externalId` that already exists for another selection,\nthe request will fail. You can use this behavior to implement idempotent\nselection submission by always providing a consistent `externalId` for\neach unique selection attempt.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ExternalReference"
+          },
+          {
+            "type": "object",
+            "required": [
+              "item",
+              "quantity"
+            ],
+            "properties": {
+              "item": {
+                "$ref": "#/components/schemas/ConfigReference"
+              },
+              "itemGroup": {
+                "$ref": "#/components/schemas/ConfigReference"
+              },
+              "optionGroup": {
+                "$ref": "#/components/schemas/ConfigReference"
+              },
+              "preModifier": {
+                "$ref": "#/components/schemas/ConfigReference"
+              },
+              "quantity": {
+                "type": "number",
+                "format": "double",
+                "description": "Quantity ordered. For items sold by weight, a decimal number. For discrete items, a counting number."
+              },
+              "seatNumber": {
+                "x-toast-read-only": true,
+                "type": "integer",
+                "description": "Indicates which guest seat at a restaurant table ordered\na menu item selection. Restaurant employees can choose the\nseat number when they add a menu item to a guest check.\n\n* A positive integer value indicates the seat number for\n  the menu item.\n\n* `0` - Indicates that the menu item is shared by\n  multiple guests.\n\n* `-1` - Indicates that the restaurant employee did not\n  select a seat for the menu item.\n\nResponse only.\n"
+              },
+              "unitOfMeasure": {
+                "type": "string",
+                "description": "The unit of measure used to weigh, determine size, or otherwise\nquantify the item.\n\nThe default is `NONE`, which means that the item is not meant to\nbe measured during a sale.\n\nValues are:\n* `NONE` - The item is not meant to be measured.\n* `LB` - Weighed in pounds.\n* `OZ` - Weighed in ounces.\n* `KG` - Weighed in kilograms.\n* `G` - Weighed in grams.\n* `GAL` - Measured in gallons.\n* `L` - Measured in liters.\n* `ML` - Measured in milliliters.\n* `FL_OZ` - Measured in fluid ounces.\n* `M` - Measured in meters.\n* `CM` - Measured in centimeters.\n* `FT` - Measured in feet.\n* `IN` - Measured in inches.\n* `YD` - Measured in yards.\n",
+                "enum": [
+                  "NONE",
+                  "LB",
+                  "OZ",
+                  "KG",
+                  "G",
+                  "GAL",
+                  "L",
+                  "ML",
+                  "FL_OZ",
+                  "M",
+                  "CM",
+                  "FT",
+                  "IN",
+                  "YD"
+                ]
+              },
+              "selectionType": {
+                "type": "string",
+                "description": "Specifies whether this selection is a special request or other off-menu sale.\n\nIf `null` or `NONE`, describes a normal modifier or item selection.\n\n`TOAST_CARD_SELL` and `TOAST_CARD_RELOAD` are currently response-only.\n",
+                "enum": [
+                  "NONE",
+                  "OPEN_ITEM",
+                  "SPECIAL_REQUEST",
+                  "PORTION",
+                  "HOUSE_ACCOUNT_PAY_BALANCE",
+                  "TOAST_CARD_SELL",
+                  "TOAST_CARD_RELOAD"
+                ]
+              },
+              "salesCategory": {
+                "$ref": "#/components/schemas/ConfigReference"
+              },
+              "appliedDiscounts": {
+                "x-toast-read-only": true,
+                "type": "array",
+                "description": "The itemized discounts that are applied to this item. Response only.",
+                "minItems": 0,
+                "items": {
+                  "$ref": "#/components/schemas/AppliedDiscount"
+                }
+              },
+              "deferred": {
+                "type": "boolean",
+                "description": "Whether this selection is a deferred revenue transaction, such as a gift card sale."
+              },
+              "preDiscountPrice": {
+                "x-toast-read-only": true,
+                "type": "number",
+                "description": "Gross sale price for this selection. Excludes tax. Response only.",
+                "format": "double"
+              },
+              "price": {
+                "x-toast-read-only": true,
+                "type": "number",
+                "format": "double",
+                "description": "Net price for this selection. The final price of the item after considering discounts (including discounts at the check level), quantity adjustments, and modifier prices at the time the item was selected for purchase. Response only."
+              },
+              "tax": {
+                "x-toast-read-only": true,
+                "type": "number",
+                "format": "double",
+                "description": "The total tax amount for this selection. Response only."
+              },
+              "voided": {
+                "x-toast-read-only": true,
+                "type": "boolean",
+                "description": "Set to `true` if this selection is voided. Response only."
+              },
+              "voidDate": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "format": "date-time",
+                "description": "The date on which this selection was voided. Response only."
+              },
+              "voidBusinessDate": {
+                "x-toast-read-only": true,
+                "type": "integer",
+                "description": "The business date (yyyyMMdd) on which this selection was voided. Response only."
+              },
+              "voidReason": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "refundDetails": {
+                "$ref": "#/components/schemas/RefundDetails"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The display name of the selection.\n\nCan be used to set a special request value.\n\nOtherwise, it is generated from this selection's item property.\n"
+              },
+              "plu": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The price look-up (PLU) code for the menu item selection used for pricing and inventory management."
+              },
+              "premodifierPlu": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The Price Look-Up (PLU) code for the premodifier associated with this menu item selection. This is a unique identifier used for pricing and inventory management purposes. Currently this field is read only."
+              },
+              "createdDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The date on which this selection was created. If not specified, defaults to the current time."
+              },
+              "modifiedDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The date on which this selection was last modified. If not specified, defaults to the current time."
+              },
+              "modifiers": {
+                "type": "array",
+                "description": "A list of modifiers that apply to this selection.",
+                "items": {
+                  "$ref": "#/components/schemas/Selection"
+                }
+              },
+              "fulfillmentStatus": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "default": "NEW",
+                "description": "Indicates the stage of the preparation workflow that the\nmenu item selection is in.\n\nThe `fulfillmentStatus` of a\nmenu item selection changes as restaurant employees move\nthe item through the functions of the Toast POS, for\nexample order entry and the kitchen display system (KDS).\nResponse only.\n\nValid values:\n\n* `NEW` - The menu item selection was added to a\n  check but is not yet sent to the KDS for\n  preparation.\n\n* `HOLD` - A restaurant employee paused the menu\n  item selection so that it does not appear in the\n  KDS for preparation.\n\n* `SENT` - The menu item selection was fired and\n  appears in the KDS for preparation.\n\n* `READY` - Preparation is complete. The menu item\n  selection is fulfilled and no longer appears in\n  the KDS. If your restaurant does not use the Toast platform\n  KDS, then order items do not reach the `READY`\n  status.\n",
+                "enum": [
+                  "NEW",
+                  "HOLD",
+                  "SENT",
+                  "READY"
+                ]
+              },
+              "fulfillment": {
+                "$ref": "#/components/schemas/Fulfillment"
+              },
+              "taxInclusion": {
+                "type": "string",
+                "description": "Indicates whether the menu item price includes one or more tax\namounts. If the menu item is a modifier for another menu item\nselection, it always inherits the tax inclusion behavior of the menu\nitem that it applies to.\n\nValid values:\n* `INCLUDED` - The menu item price includes one or more tax amounts.\n* `NOT_INCLUDED` - The menu item price does not include any tax\n  amounts.\n* `INHERITED` - The menu item is a modifier for another menu item\n  selection in the check. The `taxInclusion` value of the parent menu\n  item selection applies to the modifier. If a menu item selection\n  *that is not a modifier* inherits tax inclusion behavior from a\n  menu or menu group, the `taxInclusion` value is either\n  `INCLUDED` or `NOT_INCLUDED`.\n",
+                "enum": [
+                  "INCLUDED",
+                  "NOT_INCLUDED",
+                  "INHERITED"
+                ]
+              },
+              "appliedTaxes": {
+                "x-toast-read-only": true,
+                "type": "array",
+                "description": "An array of `AppliedTaxRate` objects that contain information about tax payments made for the selection. Response only.",
+                "items": {
+                  "$ref": "#/components/schemas/AppliedTaxRate"
+                }
+              },
+              "diningOption": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "openPriceAmount": {
+                "description": "A non-negative currency amount that sets the price of a\nmenu item that is configured to use the *Open Price*\npricing strategy. If you do not supply an\n`openPriceAmount` value for an open price menu item, the\norders API sets the price to 0.00.\n\nIf a menu item is configured to use tax-inclusive\npricing, the orders API calculates the base price and tax\namount based on the open price that you specify. _The\nopen-price amount includes both the base-price and\ninclusive tax amount._\n\n`POST` only. The `openPriceAmount` value is not\npresent in orders API return data. It is used to\npopulate `receiptLinePrice`.\n",
+                "type": "number",
+                "format": "double"
+              },
+              "receiptLinePrice": {
+                "type": "number",
+                "format": "double",
+                "description": "The price of the menu item selection without any quantity, taxes, \ndiscounts, and modifier adjustments. If the menu item has taxes included, the `receiptLinePrice` value shows the original price, including taxes.\n\nFor example, if the menu item selection is for two orders of fries, \n`receiptLinePrice` is the price of one order of fries. If a menu item selection \nis for three large drinks, receiptLinePrice is the price of one large drink.\n\nPopulated based on the menu configuration, or using the value provided in \n`externalPriceAmount` or `openPriceAmount`.\n"
+              },
+              "optionGroupPricingMode": {
+                "type": "string",
+                "description": "Information about how the modifier group affects the pricing of its parent item.",
+                "enum": [
+                  "INCLUDED",
+                  "FIXED_PRICE",
+                  "ADJUSTS_PRICE",
+                  "REPLACES_PRICE",
+                  "LOCATION_SPECIFIC_PRICE"
+                ]
+              },
+              "externalPriceAmount": {
+                "description": "The menu item price that was calculated by the\nmarketplace facilitator organization that created the\norder.\n\n`POST` only. The orders API does not include the\n`externalPriceAmount` value in return data. It is\nused to populate `receiptLinePrice`.\n\n**Note**: you can only include this information if your\nToast API client is associated with a designated\nmarketplace facilitator organization. Most Toast API\nclients do not create marketplace facilitator orders.\n",
+                "type": "number",
+                "format": "double"
+              },
+              "splitOrigin": {
+                "$ref": "#/components/schemas/ExternalReference"
+              }
+            }
+          }
+        ]
+      },
+      "Fulfillment": {
+        "type": "object",
+        "description": "Information about the fulfillment requirements for a menu item selection.\n",
+        "properties": {
+          "quantity": {
+            "type": "number",
+            "format": "double",
+            "description": "The quantity required for fulfillment."
+          },
+          "unit": {
+            "type": "string",
+            "description": "The unit of measure for the fulfillment quantity."
+          }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "description": "Defines a payment.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ExternalReference"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "amount",
+              "tipAmount"
+            ],
+            "properties": {
+              "paidDate": {
+                "description": "The date on which the payment was made.",
+                "type": "string",
+                "format": "date-time"
+              },
+              "paidBusinessDate": {
+                "x-toast-read-only": true,
+                "description": "The business date (yyyyMMdd) on which this payment was first applied. Response only.",
+                "type": "integer"
+              },
+              "type": {
+                "type": "string",
+                "description": "The payment method.\n\nWhen `POST`ing, only `OTHER` and `CREDIT` payment types are supported. For cash payments, you create an external cash payment type in Other Payment Options.\n\nAll other types are response only.\n\nValid values:\n\n* `CASH` - The guest paid in cash.\n* `CREDIT` - The guest used a credit card.\n* `GIFTCARD` - The guest used a gift card.\n* `HOUSE_ACCOUNT` - The guest used funds from their house account.\n* `REWARDCARD` - The guest used the available balance on a rewards card.\n* `LEVELUP` - The guest used the LevelUp app.\n* `TOAST_SV` - The guest used their Toast Cash stored value.\n* `OTHER` - The payment type is a custom type configured by the restaurant.\n* `UNDETERMINED` - The payment type cannot be determined.\n",
+                "enum": [
+                  "CASH",
+                  "CREDIT",
+                  "GIFTCARD",
+                  "HOUSE_ACCOUNT",
+                  "REWARDCARD",
+                  "LEVELUP",
+                  "TOAST_SV",
+                  "OTHER",
+                  "UNDETERMINED"
+                ]
+              },
+              "cardEntryMode": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "Indicates how credit card data was obtained. Response only.\n\nValid values:\n\n* `SWIPED` - The credit card was swiped through a card reader.\n* `KEYED` - The restaurant employee typed the card number into a device.\n* `ONLINE` - The credit card information was entered online.\n* `EMV_CHIP_SIGN` - The credit card was inserted into a chip reader.\n* `TOKENIZED` - The credit card number is tokenized, meaning that it is replaced by a series of randomly generated numbers. The authorizer is able to use the token to authorize the actual credit card.\n* `PRE_AUTHED` - The credit card was pre-authorized for an initial amount. An example of pre-authorization is swiping a credit card to start a bar tab. The final payment is authorized when the order is complete.\n* `SAVED_CARD` - The credit card information was retrieved from the guest's account.\n* `FUTURE_ORDER` - The credit card payment was included on a scheduled order.\n* `CONTACTLESS` - The guest used a contactless payment option to provide the credit card number.\n* `APPLE_PAY_CNP` - The guest used the Apple Pay app to make the payment.\n* `GOOGLE_PAY_CNP` - The guest used the Google Pay app to make the payment.\n* `INCREMENTAL_PRE_AUTHED` - An additional payment was added to a pre-authorized card. For example, a guest uses a credit card to open a bar tab. As they continue to order more drinks, the pre-authorized amount is updated. The final payment is authorized when the order is complete.\n* `PARTNER_ECOM_COF` - The restaurant has the credit card on file.\n* `CLICK_TO_PAY_CNP` - The guest used Click to Pay to make the payment.\n",
+                "enum": [
+                  "SWIPED",
+                  "KEYED",
+                  "ONLINE",
+                  "EMV_CHIP_SIGN",
+                  "TOKENIZED",
+                  "PRE_AUTHED",
+                  "SAVED_CARD",
+                  "FUTURE_ORDER",
+                  "CONTACTLESS",
+                  "APPLE_PAY_CNP",
+                  "GOOGLE_PAY_CNP",
+                  "INCREMENTAL_PRE_AUTHED",
+                  "PARTNER_ECOM_COF",
+                  "CLICK_TO_PAY_CNP"
+                ]
+              },
+              "amount": {
+                "type": "number",
+                "format": "double",
+                "description": "The amount of this payment, excluding tips."
+              },
+              "tipAmount": {
+                "type": "number",
+                "format": "double",
+                "description": "The amount tipped on this payment."
+              },
+              "amountTendered": {
+                "type": "number",
+                "format": "double",
+                "description": "The amount tendered for this payment. The amount tendered does not include the tip."
+              },
+              "cardType": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The type of credit card that was used. Response only.",
+                "enum": [
+                  "VISA",
+                  "MASTERCARD",
+                  "AMEX",
+                  "DISCOVER",
+                  "JCB",
+                  "DINERS",
+                  "CIT",
+                  "MAESTRO",
+                  "LASER",
+                  "SOLO",
+                  "INTERAC",
+                  "EFTPOS",
+                  "WRIGHT_EXPRESS",
+                  "VOYAGER",
+                  "UNKNOWN"
+                ]
+              },
+              "last4Digits": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The last 4 digits of the credit card that was used. Response only."
+              },
+              "originalProcessingFee": {
+                "x-toast-read-only": true,
+                "type": "number",
+                "format": "double",
+                "description": "The original processing fee for this payment. Populated after the payment is captured. Response only."
+              },
+              "server": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "cashDrawer": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "refundStatus": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "Indicates whether the payment was refunded. Response only.\n\nValid values:\n* `NONE` - The payment was not refunded.\n* `PARTIAL` - The payment was partially refunded.\n* `FULL` - The payment was refunded in full.\n",
+                "enum": [
+                  "NONE",
+                  "PARTIAL",
+                  "FULL"
+                ]
+              },
+              "refund": {
+                "$ref": "#/components/schemas/Refund"
+              },
+              "paymentStatus": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The status of this payment when the type is `CREDIT`. Response only.\n\nValid values:\n\n* `OPEN` - The payment has not been presented for processing.\n* `PROCESSING` - The payment is being processed.\n* `AUTHORIZED_AT_RISK` - (DEPRECATED) This value is no longer used.\n* `AUTHORIZED` - The payment is approved but not yet captured. The card is valid and the funds are available.\n* `ERROR` - An error occurred during the payment processing.\n* `ERROR_NETWORK` - Unable to connect to the payment authorizer.\n* `DENIED` - The payment request was denied. For example, the provided credit card is over its limit.\n* `PROCESSING_VOID` - A void request for the payment is being processed.\n* `VOIDED_AT_RISK` - This value is no longer used.\n* `CANCELLED` - The payment is canceled.\n* `CAPTURE_IN_PROGRESS` - The payment is in the process of being captured.\n* `CAPTURED` - The payment has been captured. When the payment is captured, the guest account is charged for the transaction amount.\n* `VOIDED` - The payment is voided.\n",
+                "enum": [
+                  "OPEN",
+                  "PROCESSING",
+                  "AUTHORIZED_AT_RISK",
+                  "AUTHORIZED",
+                  "ERROR",
+                  "ERROR_NETWORK",
+                  "DENIED",
+                  "PROCESSING_VOID",
+                  "VOIDED_AT_RISK",
+                  "CANCELLED",
+                  "CAPTURE_IN_PROGRESS",
+                  "CAPTURED",
+                  "VOIDED"
+                ]
+              },
+              "voidInfo": {
+                "$ref": "#/components/schemas/VoidInformation"
+              },
+              "houseAccount": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "otherPayment": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "createdDevice": {
+                "$ref": "#/components/schemas/Device"
+              },
+              "lastModifiedDevice": {
+                "$ref": "#/components/schemas/Device"
+              },
+              "mcaRepaymentAmount": {
+                "x-toast-read-only": true,
+                "description": "The total currency amount withheld as payments or repayments that\napply to your business. For example, the `mcaRepaymentAmount` might include:\n\n* Toast Capital payments\n* Marketplace facilitator tax\n* Toast Delivery Services costs\n* Instant deposits\n\nThe MCA repayment amount is set at the time the payment is\ncaptured, which is typically hours after the actual restaurant\nguest payment.\n\nUntil the `mcaRepaymentAmount` is set, this value is `null`.\n\nThe `mcaRepaymentAmount` _might_ be updated when the payment is\nsettled, which is typically one or more days after the actual\nguest payment. Response only.\n\nYou can use the following resources to find more specific\ninformation about the payment and repayment amounts that are\nincluded in `mcaRepaymentAmount`.\n\n* [Toast Capital payments](https://www.toasttab.com/restaurants/admin/capital/)\n* [Marketplace facilitator tax](https://www.toasttab.com/restaurants/admin/reports/home#sales-summary)\n* [Marketplace facilitator tax in API data](https://doc.toasttab.com/openapi/orders/tag/Data-definitions/schema/MarketplaceFacilitatorTaxInfo/)\n* [Instant deposits](https://www.toasttab.com/restaurants/admin/instant-deposit)\n* [Toast Delivery Services fees and tips](https://www.toasttab.com/restaurants/admin/reports/home#sales-summary)\n* [Toast Delivery Services fees and tips description](https://www.toasttab.com/restaurants/admin/reports/home#sales-summary)\n\n_Important_: Some of the resources listed here require access to\nToast products as a restaurant employee or operator. If your\norganization provides an integration service you might not have\naccess to the Toast products used by the restaurants you integrate\nwith. Toast support cannot provide access to Toast product\ninformation. That information is only available to direct Toast\nproduct users.\n",
+                "type": "number",
+                "format": "double"
+              },
+              "cardPaymentId": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "**Note:** this value is in limited release. Your orders API\nintegration might not include the `cardPaymentId` value.\n\nA unique identifier for the credit card used for a\n`CREDIT` type payment. The identifier string is generated\nby the Toast platform and _does not include any\ninformation related to or associated with the actual\ncredit card account._ The identifier is unique within\nyour restaurant management group.\n\nThe value is `null` for the following payment types:\n\n* Payment types other than `CREDIT`\n* Credit card payments entered using EMV (chip cards)\n* Credit card payments entered by keying in card numbers\n\nResponse only.\n"
+              },
+              "orderGuid": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The Toast platform identifier for the order that contains the payment. Response only."
+              },
+              "checkGuid": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The Toast platform identifier for the check that contains the payment. Response only."
+              },
+              "tenderTransactionGuid": {
+                "type": "string",
+                "description": "For internal use only."
+              },
+              "networkTransactionIdentifier": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "Card network identifier for transactions. Response only.\n\nFor more information, see [networkTransactionIdentifier in order payments](https://doc.toasttab.com/doc/apiordersdraftdoc/apiOrdersPaymentNetworkTransactionIdentifier.html).\n"
+              }
+            }
+          }
+        ]
+      },
+      "GiftCardInfo": {
+        "type": "object",
+        "description": "Reserved for future use.",
+        "required": [
+          "cardNumberIdentifier",
+          "last4CardDigits"
+        ],
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "last4CardDigits": {
+                "type": "string",
+                "description": "The last 4 digits of the gift card that was used."
+              },
+              "first5CardDigits": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The first 5 digits of the gift card that was used. Response only."
+              }
+            }
+          }
+        ]
+      },
+      "Customer": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "required": [
+              "firstName",
+              "lastName",
+              "email",
+              "phone"
+            ],
+            "properties": {
+              "firstName": {
+                "type": "string",
+                "description": "The first name, or given name, of the guest.\n"
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The last name, or surname, of the guest.\n"
+              },
+              "phone": {
+                "type": "string",
+                "description": "The telephone number of the guest.\n"
+              },
+              "phoneCountryCode": {
+                "type": "string",
+                "description": "The international phone country code for the number of the guest.\n"
+              },
+              "email": {
+                "type": "string",
+                "description": "The email address corresponding to the guest who placed the order.\n\nThe email address is the key that identifies a unique restaurant guest. All distinct guests should have distinct email addresses.\n"
+              }
+            }
+          }
+        ]
+      },
+      "DeliveryInfo": {
+        "type": "object",
+        "description": "Information related to delivery orders. Required if the dining option behavior is `DELIVERY`.",
+        "required": [
+          "address1",
+          "city",
+          "state",
+          "zipCode"
+        ],
+        "properties": {
+          "address1": {
+            "type": "string",
+            "description": "The first line of the street address of the delivery destination.\n"
+          },
+          "address2": {
+            "type": "string",
+            "description": "The second line of the street address of the delivery destination.\n"
+          },
+          "city": {
+            "type": "string",
+            "description": "The name of the city or town of the delivery destination.\n"
+          },
+          "administrativeArea": {
+            "type": "string",
+            "description": "The geographic or government division, larger than a city/town, for\nthe delivery destination. For example, the name of a province, county,\nregion, or state might be the `administrativeArea` value for a\ndelivery address. This value is optional, not all delivery addresses\ninclude a regional area name other than a `city`. If you include the \n`state` value, you would typically _not_ include an `administrativeArea`.\n"
+          },
+          "state": {
+            "type": "string",
+            "format": "ISO 3166-2",
+            "description": "The postal abbreviation of the state or province of the\ndelivery destination.\n\nThe abbreviation must be in ISO 3166-2\nformat (two capital letters).\n"
+          },
+          "zipCode": {
+            "type": "string",
+            "description": "The postal or zip code of the delivery destination.\n"
+          },
+          "country": {
+            "type": "string",
+            "description": "The two-digit ISO-3166-2 country code of the delivery destination.\n"
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "description": "The north/south geographic coordinate of the delivery\ndestination, in decimal format.\n"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "description": "The east/west geographic coordinate of the delivery\ndestination, in decimal format.\n"
+          },
+          "notes": {
+            "description": "Additional instructions or information about the delivery.\n",
+            "type": "string"
+          },
+          "deliveredDate": {
+            "x-toast-read-only": true,
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time that the delivery employee indicated in the Toast POS app that\nthe order was delivered. Response only.\n\nThis value is only set when the dining option for the order is\n`DELIVERY`. For other dining options, the value is `null`.\n",
+            "example": "2025-02-07T08:00:00.000-0800"
+          },
+          "dispatchedDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time that the restaurant indicated in the Toast POS app that the\norder was available for delivery and assigned to a delivery\nemployee.\n\nThis value is only set when the\ndining option for the order is `DELIVERY`. For other dining\noptions, the value is `null`.\n",
+            "example": "2025-02-07T08:00:00.000-0800"
+          },
+          "deliveryEmployee": {
+            "$ref": "#/components/schemas/ExternalReference"
+          },
+          "deliveryState": {
+            "description": "An internal representation of the state of a delivery order.\n\nValid values:\n\n* `PENDING` - The delivery is not dispatched. This corresponds to the **Unassigned** tab of\nthe Delivery screen of the Toast POS app.\n\n* `IN_PROGRESS` - The order is on the way to the destination. This corresponds to \nthe **En Route** tab of the Delivery screen of the Toast POS app.\n\n* `PICKED_UP` - The employee who delivers the order has picked up the order from the\nrestaurant.\n\n* `DELIVERED` - The order was delivered. This corresponds to the **Delivered** tab of the\nDelivery screen of the Toast POS app.\n",
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "IN_PROGRESS",
+              "PICKED_UP",
+              "DELIVERED"
+            ]
+          }
+        }
+      },
+      "AppliedServiceCharge": {
+        "type": "object",
+        "description": "A service charge that is added to a check. A service charge can represent an upcharge such as a gratuity or a delivery fee.\n\nWhether the upcharge is taxable is defined in the restaurant-configured `serviceCharge`.\n\nThe fields on the `AppliedServiceCharge` are calculated based on the referenced `ServiceCharge` configuration.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ExternalReference"
+          },
+          {
+            "type": "object",
+            "required": [
+              "serviceCharge"
+            ],
+            "properties": {
+              "chargeAmount": {
+                "type": "number",
+                "format": "double",
+                "description": "The final applied amount excluding tax. Required if `chargeType` is `OPEN`."
+              },
+              "serviceCharge": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "chargeType": {
+                "x-toast-read-only": true,
+                "description": "The type of service charge. Response only.\n\nValid values:\n\n* `FIXED` - The service charge is for a specific currency amount.\n\n* `PERCENT` - The service charge is for a percentage of the check amount.\n\n* `OPEN` - The service charge is not configured with an amount. The amount is specified by the restaurant employee.\n",
+                "type": "string",
+                "enum": [
+                  "FIXED",
+                  "PERCENT",
+                  "OPEN"
+                ]
+              },
+              "name": {
+                "x-toast-read-only": true,
+                "description": "The configured human readable label for the service charge. Response only.",
+                "type": "string"
+              },
+              "delivery": {
+                "x-toast-read-only": true,
+                "description": "Whether this service charge is a delivery charge. Response only.",
+                "type": "boolean"
+              },
+              "takeout": {
+                "x-toast-read-only": true,
+                "description": "Whether this service charge is a takeout charge. Response only.",
+                "type": "boolean"
+              },
+              "dineIn": {
+                "x-toast-read-only": true,
+                "description": "Whether this service charge is a dine-in charge. Response only.",
+                "type": "boolean"
+              },
+              "gratuity": {
+                "x-toast-read-only": true,
+                "description": "Whether this service charge is a gratuity. Can be used to derive required tip amount on the check. Response only.",
+                "type": "boolean"
+              },
+              "taxable": {
+                "x-toast-read-only": true,
+                "description": "Whether this service charge is taxable. Response only.",
+                "type": "boolean"
+              },
+              "appliedTaxes": {
+                "type": "array",
+                "description": "Taxes applied to the service charge.",
+                "items": {
+                  "$ref": "#/components/schemas/AppliedTaxRate"
+                }
+              },
+              "serviceChargeCalculation": {
+                "type": "string",
+                "description": "Defines whether a `PERCENT` service charge is applied before (`PRE_DISCOUNT`) or after (`POST_DISCOUNT`) discounts.\n\nThis field is `null` for `FIXED` and `OPEN` service charges.\n",
+                "enum": [
+                  "PRE_DISCOUNT",
+                  "POST_DISCOUNT"
+                ]
+              },
+              "refundDetails": {
+                "$ref": "#/components/schemas/RefundDetails"
+              },
+              "serviceChargeCategory": {
+                "x-toast-read-only": true,
+                "description": "The type of service charge. Default is `SERVICE_CHARGE`. Response only.\n\nValid values:\n\n* `SERVICE_CHARGE` - The default type for a service charge.\n\n* `CREDIT_CARD_SURCHARGE` - A fee assessed _only_ on payment transactions that use a credit card.\n\n* `FUNDRAISING_CAMPAIGN` - Service charge associated with fundraising.\n\n* `CASH_ROUNDING` - Adjustment to the check total to account for cash payments with minimum denominations greater than 0.01.\n",
+                "type": "string",
+                "enum": [
+                  "SERVICE_CHARGE",
+                  "CREDIT_CARD_SURCHARGE",
+                  "FUNDRAISING_CAMPAIGN",
+                  "CASH_ROUNDING"
+                ]
+              },
+              "paymentGuid": {
+                "x-toast-read-only": true,
+                "description": "The Toast platform unique identifier for the payment the fee is linked to. The `paymentGuid` value is always `null` unless the `serviceChargeCategory` object value is `CREDIT_CARD_SURCHARGE` or `CASH_ROUNDING`. Response only.",
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "AppliedTaxRate": {
+        "type": "object",
+        "description": "A tax rate that is applied to an item or service charge.",
+        "required": [
+          "taxRate"
+        ],
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "entityType": {
+                "description": "The type of object this is.",
+                "type": "string"
+              },
+              "taxRate": {
+                "$ref": "#/components/schemas/ToastReference"
+              },
+              "name": {
+                "type": "string",
+                "description": "The name of the tax rate."
+              },
+              "rate": {
+                "type": "number",
+                "format": "double",
+                "description": "The tax rate, which can be a fixed amount, a percentage, or null."
+              },
+              "taxAmount": {
+                "type": "number",
+                "format": "double",
+                "description": "The tax amount that was actually applied."
+              },
+              "type": {
+                "type": "string",
+                "description": "The type of the tax rate. Default is `PERCENT`.\n\nThe value `EXTERNAL` indicates that the tax is for a marketplace\nfacilitator order, and that the marketplace facilitator\norganization calculated the tax amount.\n",
+                "enum": [
+                  "PERCENT",
+                  "FIXED",
+                  "NONE",
+                  "TABLE",
+                  "EXTERNAL"
+                ]
+              },
+              "facilitatorCollectAndRemitTax": {
+                "type": "boolean",
+                "description": "Indicates whether the marketplace facilitator that\nreceived a guest order remitted the tax amount on behalf\nof the Toast platform restaurant.\n\nYou can use this information to identify tax amounts that\nhave already been paid by an ordering service provider\nand do not need to be paid again.\n\n* `true` - The marketplace facilitator paid the tax\namount on behalf of the Toast platform restaurant\nlocation.\n\n* `false` - The marketplace facilitator has not paid the\ntax amount. The Toast platform restaurant location may be\nrequired to pay the tax amount.\n\n**Note**: Toast API response data is not guidance or\nadvice for tax compliance.\n"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The name of the tax rate as it appears on guest receipts."
+              },
+              "jurisdiction": {
+                "type": "string",
+                "description": "The state or province of the tax rate for reporting purposes."
+              },
+              "jurisdictionType": {
+                "type": "string",
+                "description": "The jurisdiction type (ex. STATE, COUNTY, etc.) of the tax rate for reporting purposes."
+              }
+            }
+          }
+        ]
+      },
+      "AppliedDiscountTrigger": {
+        "type": "object",
+        "description": "The Selection that triggered the application of this discount",
+        "properties": {
+          "selection": {
+            "$ref": "#/components/schemas/ExternalReference"
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double",
+            "description": "The amount of the selection used to trigger the applied discount."
+          }
+        }
+      },
+      "AppliedDiscount": {
+        "type": "object",
+        "description": "A discount applied to a check or item. The Toast platform calculates service\ncharges before it applies discounts. The system calculates tax after applying\ndiscounts.\n\nIn a `POST` request, you cannot apply open percent discounts. You can apply open amount discounts.\nYou can only apply one discount to a menu item selection. For more information, see\n[the _Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiDiscountingOrders.html).\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ExternalReference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the applied discount."
+              },
+              "discountAmount": {
+                "type": "number",
+                "format": "double",
+                "description": "The discount amount. This amount is subtracted from the check or item."
+              },
+              "nonTaxDiscountAmount": {
+                "type": "number",
+                "format": "double",
+                "description": "The amount that a discount reduces a menu item price,\nexcluding any discount amount applied to taxes.\n\nIn most cases, a discount only applies to the menu item price, and\nthe `nonTaxDiscountAmount` is the same as the `discountAmount`.\n\nIf you apply a discount to a menu item that includes tax in\nits price, the `nonTaxDiscountAmount` is less than `discountAmount`.\n"
+              },
+              "discount": {
+                "$ref": "#/components/schemas/ToastReference"
+              },
+              "triggers": {
+                "x-toast-read-only": true,
+                "type": "array",
+                "description": "Optional items that triggered this discount. Response only.",
+                "items": {
+                  "$ref": "#/components/schemas/AppliedDiscountTrigger"
+                }
+              },
+              "approver": {
+                "$ref": "#/components/schemas/ExternalReference"
+              },
+              "processingState": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "Applies to loyalty program discounts only. Loyalty\nprogram reward discounts are validated and then applied,\nor redeemed, by the third-party loyalty program service\nprovider depending on the state of the Toast platform order.\n\nThis field's value is `null` if the order discount is a Toast discount.\n\nThis value indicates the state of the discount in that\nvalidation and application process. Response only.\n\nValid values:\n\n* `PENDING_APPLIED` - The loyalty program\n  service provider confirmed that the reward discount\n  is valid for the order and customer. The reward is not yet\n  redeemed, or applied to the customer's loyalty\n  account.\n* `APPLIED` - The reward discount is\n  redeemed. The reward is no longer available from the\n  customer's loyalty program account.\n* `PENDING_VOID` - The reward discount was\n  removed from the Toast platform order. The reward is not\n  available from the customer's loyalty program account\n  until the loyalty program service provider processes\n  the void operation.\n* `VOID` - The reward discount was removed\n  from the Toast platform order and the reward is available from\n  the customer's loyalty program account again.\n",
+                "enum": [
+                  "PENDING_APPLIED",
+                  "APPLIED",
+                  "PENDING_VOID",
+                  "VOID"
+                ]
+              },
+              "appliedDiscountReason": {
+                "$ref": "#/components/schemas/AppliedDiscountReason"
+              },
+              "loyaltyDetails": {
+                "$ref": "#/components/schemas/LoyaltyDetails"
+              },
+              "comboItems": {
+                "x-toast-read-only": true,
+                "type": "array",
+                "description": "A list of menu item selections that this combo discount applies to. Empty for non-combo discounts. Response only.",
+                "items": {
+                  "$ref": "#/components/schemas/ExternalReference"
+                }
+              },
+              "appliedPromoCode": {
+                "type": "string",
+                "description": "The promo code that was applied for this discount.\n\nFor a POSTed order, the Toast platform cannot validate the promo code.\n"
+              },
+              "discountType": {
+                "type": "string",
+                "description": "The behavior of this discount.\n\nValid values:\n* `BOGO` - Buy One, Get One. The guest receives a discount based on purchasing a specific item or items.\n* `PERCENT` - The guest receives a specific percentage off of the price.\n* `FIXED` - The guest receives a fixed currency amount off of the price.\n* `OPEN_PERCENT` - The guest receives a percentage off of the price. The percentage is specified when the order is placed.\n* `OPEN_FIXED` - The guest receives a currency amount off of the price. The amount is specified when the order is placed.\n* `FIXED_TOTAL` - The guest pays a specified discounted price when they purchase specific items. Also referred to as a combo discount.\n",
+                "enum": [
+                  "BOGO",
+                  "PERCENT",
+                  "FIXED",
+                  "OPEN_PERCENT",
+                  "OPEN_FIXED",
+                  "FIXED_TOTAL"
+                ]
+              },
+              "discountPercent": {
+                "type": "number",
+                "format": "double",
+                "description": "The percent value (0-100) of the applied discount when the `discountType` is `PERCENT` or `OPEN_PERCENT`. For other discount types, this value is `null`."
+              }
+            }
+          }
+        ]
+      },
+      "AppliedDiscountReason": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the reason for the applied discount."
+          },
+          "description": {
+            "type": "string",
+            "description": "An optional description for the reason for the applied discount."
+          },
+          "comment": {
+            "type": "string",
+            "description": "An optional comment on the reason for the applied discount."
+          },
+          "discountReason": {
+            "$ref": "#/components/schemas/ToastReference"
+          }
+        }
+      },
+      "LoyaltyDetails": {
+        "type": "object",
+        "description": "Information about the loyalty program discount that is applied to a check. The loyalty program account is identified in the `AppliedLoyaltyInfo` value for the check.",
+        "required": [
+          "vendor",
+          "referenceId"
+        ],
+        "properties": {
+          "vendor": {
+            "type": "string",
+            "description": "The specific loyalty program service provider that supports the loyalty account.",
+            "enum": [
+              "TOAST",
+              "PUNCHH",
+              "PUNCHH2",
+              "PAYTRONIX",
+              "APPFRONT",
+              "INTEGRATION"
+            ]
+          },
+          "referenceId": {
+            "type": "string",
+            "description": "The identifier of the loyalty program discount that\nis recognized by the loyalty program service provider.\n\nThe Toast platform transmits the discount identifier to the service\nprovider to determine the validity and amount of the discount.\n"
+          }
+        }
+      },
+      "Refund": {
+        "type": "object",
+        "description": "A currency amount removed from a guest payment.",
+        "properties": {
+          "refundAmount": {
+            "type": "number",
+            "format": "double",
+            "description": "The amount of the refund, excluding the tip."
+          },
+          "tipRefundAmount": {
+            "type": "number",
+            "format": "double",
+            "description": "The amount of the tip refund."
+          },
+          "refundDate": {
+            "description": "The date and time when the refund was made.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "refundBusinessDate": {
+            "x-toast-read-only": true,
+            "description": "The business date (yyyyMMdd) on which this refund was created. Response only.",
+            "type": "integer"
+          },
+          "refundTransaction": {
+            "$ref": "#/components/schemas/RefundTransaction"
+          }
+        }
+      },
+      "RefundTransaction": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "description": "An identifier for the refund transaction. You can use the identifier to associate items and service charges that were refunded in the same transaction.\n"
+          }
+        ]
+      },
+      "Device": {
+        "type": "object",
+        "description": "The *Device ID* value that the Toast platform assigns to a specific Toast POS device.\n\nThe `id` value is a unique identifier for a device.\n\nTo find the ID for a Toast POS device, from the overflow  menu (\u22ee) select *Device Status* and then select the *Device* tab.\n",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The physical id of the device"
+          }
+        }
+      },
+      "VoidInformation": {
+        "type": "object",
+        "description": "Information about a void applied to a check or item.",
+        "properties": {
+          "voidUser": {
+            "$ref": "#/components/schemas/ExternalReference"
+          },
+          "voidApprover": {
+            "$ref": "#/components/schemas/ExternalReference"
+          },
+          "voidDate": {
+            "description": "The date on which the void was made.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "voidBusinessDate": {
+            "x-toast-read-only": true,
+            "description": "The business date (yyyyMMdd) on which the void was made. Response only.",
+            "type": "integer"
+          },
+          "voidReason": {
+            "$ref": "#/components/schemas/ExternalReference"
+          }
+        }
+      },
+      "ConfigReference": {
+        "type": "object",
+        "description": "A wrapper object containing identifier values for Toast platform entities.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "multiLocationId": {
+                "description": "A consistent identifier for Toast platform entities, such\nas menu items, that applies to all versions of a shared\nentity at all locations in a restaurant group.\n\nFor example, you can use the `multiLocationId` value to\nidentify menu entities that are versions of a shared menu\nentity. For more information about the menus API `multilocationId` value, see\n[the _Toast Developer Guide_](https://doc.toasttab.com/doc/devguide/apiUnderstandingGuidsEntityIdentifiersAndMultilocationIds_V2.html#apiMultilocationIdValues_V2).\n",
+                "type": "string"
+              },
+              "externalId": {
+                "description": "An external identifier that is prefixed by a naming\nauthority. Deprecated for use in `ConfigReference`.\n",
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "ExternalReference": {
+        "type": "object",
+        "description": "A wrapper object with fields that allow reference to a Toast platform entity by Toast GUID or a partner's identifier.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "externalId": {
+                "description": "External identifier string that is prefixed by the naming authority. You can use the orders API to set an `externalId` for an order and then GET the order with that `externalId`.",
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "ToastReference": {
+        "type": "object",
+        "description": "A wrapper object with fields that allow reference to a Toast entity by Toast GUID.",
+        "required": [
+          "guid",
+          "entityType"
+        ],
+        "properties": {
+          "guid": {
+            "description": "The GUID maintained by the Toast platform.",
+            "type": "string"
+          },
+          "entityType": {
+            "x-toast-read-only": true,
+            "description": "The type of object this is. Response only.",
+            "type": "string"
+          }
+        }
+      },
+      "OrderResponse": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        }
+      },
+      "ApplicableDiscountsRequest": {
+        "type": "object",
+        "description": "A wrapper object that contains an `Order` object and an optional\npromotional code.\n\nYou include an `ApplicableDiscountsRequest`\nobject in the message body of a `POST` request to the\n`applicableDiscounts` endpoint.\n",
+        "required": [
+          "order"
+        ],
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/Order"
+          },
+          "promoCode": {
+            "description": "An optional promotional code. If you include a promotional\ncode, the `applicableDiscounts` endpoint returns only\ndiscounts that are associated with that promotional code.\n",
+            "type": "string"
+          }
+        }
+      },
+      "ApplicableDiscount": {
+        "type": "object",
+        "description": "A wrapper object that contains information about a discount that you\ncan apply to an order, and which checks or menu item selections\nyou can apply it to.\n",
+        "required": [
+          "discount"
+        ],
+        "properties": {
+          "discount": {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          "applicableChecks": {
+            "description": "If the discount is applicable to a check, this value holds an\narray of `ExternalReference` objects containing the identifiers of the checks.\n",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalReference"
+            }
+          },
+          "applicableSelections": {
+            "description": "If the discount is applicable to a menu item selection, this\nvalue holds an array of `ExternalReference` objects containing\nthe identifiers of the menu items.\n",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalReference"
+            }
+          }
+        }
+      },
+      "UpdatePaymentRequest": {
+        "type": "object",
+        "description": "A wrapper object containing payment fields that you can update.\n",
+        "properties": {
+          "tipAmount": {
+            "description": "The amount tipped on a payment.\n",
+            "type": "number",
+            "format": "double",
+            "example": 3.25
+          }
+        }
+      },
+      "CurbsidePickupInfo": {
+        "type": "object",
+        "description": "Information that the restaurant can use to identify a guest when they arrive\noutside the restaurant to pick up their order. `transportDescription` is a required field.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "transportColor": {
+                "description": "The color of the guest's vehicle if they will arrive at the restaurant in a vehicle to pick up their order.\n",
+                "type": "string",
+                "maxLength": 20
+              },
+              "transportDescription": {
+                "description": "Information about how the guest will arrive at the restaurant to pick up their order.\n\nFor example, the make and model of the vehicle the guest will arrive in.\n",
+                "type": "string",
+                "maxLength": 100
+              },
+              "notes": {
+                "description": "Extra notes.\n",
+                "type": "string",
+                "maxLength": 100
+              }
+            }
+          }
+        ]
+      },
+      "DeliveryServiceInfo": {
+        "type": "object",
+        "description": "Reserved for future use.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "providerId": {
+                "description": "Reserved for future use.\n",
+                "type": "string",
+                "maxLength": 255
+              },
+              "providerName": {
+                "description": "Reserved for future use.\n",
+                "type": "string",
+                "maxLength": 36
+              },
+              "driverName": {
+                "description": "Reserved for future use.\n",
+                "type": "string",
+                "maxLength": 255
+              },
+              "driverPhoneNumber": {
+                "description": "Reserved for future use.\n",
+                "type": "string",
+                "maxLength": 30
+              },
+              "providerInfo": {
+                "description": "Reserved for future use.\n",
+                "type": "string",
+                "format": "byte"
+              },
+              "originalQuotedDeliveryDate": {
+                "description": "Reserved for future use.\n",
+                "type": "string",
+                "format": "ISO-8601"
+              }
+            }
+          }
+        ]
+      },
+      "RefundDetails": {
+        "type": "object",
+        "description": "Information about refunded currency amounts for an item\nselection, modifier option, or service charge. The refund\ninformation includes separate values for the pre-tax value\nbeing refunded and the tax amount being refunded.\n",
+        "properties": {
+          "refundAmount": {
+            "description": "The value of the menu item or service charge (excluding taxes) being\nrefunded. Includes the value of any nested modifier options that\nincreased the price of the item or modifier option (an upcharge for\nthe modifier option).\n",
+            "type": "number",
+            "format": "double"
+          },
+          "taxRefundAmount": {
+            "description": "The tax amount being refunded.\n",
+            "type": "number",
+            "format": "double"
+          },
+          "refundTransaction": {
+            "$ref": "#/components/schemas/RefundTransaction"
+          }
+        }
+      },
+      "MarketplaceFacilitatorTaxInfo": {
+        "type": "object",
+        "description": "Information about the taxes that a marketplace facilitator\norganization remits on behalf of a Toast platform restaurant.\n`POST` only. The orders API does not include the\n`MarketplaceFacilitatorTaxInfo` object in response data.\n\n**Note**: you can only include this information if your\nToast API client is associated with a designated\nmarketplace facilitator organization. Most Toast API\nclients do not create marketplace facilitator orders.\n",
+        "properties": {
+          "facilitatorCollectAndRemitTaxOrder": {
+            "description": "Indicates whether a marketplace facilitator organization has\npaid the tax amounts for an order on behalf of the restaurant\nthat fulfills the order.\n\nIf you include this value, you indicate that the marketplace\nfacilitator order uses the prices and tax amounts calculated\nby the Toast platform.\n\nIf you include this value, you *must not* include the `taxes`\nvalue and you *must not* include the `externalPriceAmount`\nfor menu item selections in the order.\n",
+            "type": "boolean"
+          },
+          "taxes": {
+            "description": "An array of `AppliedTaxRate` objects that describe the tax\namounts that apply to a marketplace facilitator order.\n\nIf you include this value, you must include an `externalPriceAmount`\nfor each menu item selection in the order.\n",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppliedTaxRate"
+            }
+          }
+        }
+      },
+      "AppliedPackagingInfo": {
+        "type": "object",
+        "description": "Information describing the guest's packaging preferences for this order, for example utensils, napkins, condiments.\n\nFor more information, see [Packaging preferences](https://doc.toasttab.com/doc/devguide/apiOrdersPackagingPreferences.html)\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "appliedPackagingItems": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/components/schemas/AppliedPackagingItem"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "AppliedPackagingItem": {
+        "type": "object",
+        "description": "Indicates the guest preference for an individual packaging item in this order.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ToastReference"
+          },
+          {
+            "type": "object",
+            "required": [
+              "itemConfigId",
+              "inclusion"
+            ],
+            "properties": {
+              "itemConfigId": {
+                "type": "string",
+                "description": "The identifier GUID of the packaging preference option.\n"
+              },
+              "inclusion": {
+                "type": "string",
+                "description": "The packaging preference choice that the guest selected in your ordering interface.\n",
+                "enum": [
+                  "YES",
+                  "NO"
+                ]
+              },
+              "itemTypes": {
+                "x-toast-read-only": true,
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The packaging item types relevant for this packaging item as configured by the restaurant in Toast Web. Response only.\n"
+              },
+              "guestDisplayName": {
+                "x-toast-read-only": true,
+                "type": "string",
+                "description": "The guest-facing name, configured by the restaurant in Toast Web, for this packaging item. Response only.\n"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
