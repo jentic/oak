@@ -28,6 +28,12 @@ The repository uses a structured approach to organize:
 │       │       │   └── meta                              # A directory containing various metadata files
 │       │       │       ├── diagnostics.json              # Diagnostic information about the API
 │       │       │       ├── meta.json                     # various metrics and metadata about the API
+│       │       │       ├── changelog                     # Per-run improve metadata
+│       │       │       │   ├── overlays.json             # Cumulative ordered array of all overlays applied so far
+│       │       │       │   └── improve-{YYYYMMDDTHHmmSS} # Per-run directory for this improve invocation
+│       │       │       │       ├── changelog.md          # Caller-supplied changelog for this run
+│       │       │       │       ├── scorecard.json        # Snapshot of the new scorecard immediately after this run
+│       │       │       │       └── overlays.json         # Per-run overlay set (array, same shape as the cumulative file)
 │       │       │       ├── import                        # A directory containing  metadata about the import process
 │       │       │       │   ├── diagnostics-import.json   # Diagnostic information related to the import process
 │       │       │       │   └── input-bundled.json        # Imported bundled OpenAPI spec 
@@ -39,8 +45,8 @@ The repository uses a structured approach to organize:
 │       │       │       ├── feedback.json                 # Optional file detailing updates of spec (applied before initial import)
 │       │       │       └── source                        # A directory containing a pristine copy of the original file
 │       │       │          └── source.dat                 # A pristine copy of the original file
-│       │       └── meta.json                             # API metadata 
-|       ├── apis.json                                     # apis.json collection APIs file - see https://apisjson.org/
+│       │       └── meta.json                             # API metadata
+|       └── apis.json                                     # apis.json collection APIs file - see https://apisjson.org/
 ├── workflows                                             # All workflow-related files
     ├── vendor1.com/                                      # Vendor's main API workflows 
     │   ├── workflows.arrazo.json                         # Default workflow file for this API
