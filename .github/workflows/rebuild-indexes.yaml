@@ -27,18 +27,25 @@ concurrency:
 
 jobs:
   rebuild:
+    if: github.event_name != 'push' || github.actor != 'jentic-public-apis-automation[bot]'  
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-
+    permissions: {}
+    
     env:
       GITHUB_REPO_URL: "https://github.com/${{ github.repository }}"
 
     steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.JENTIC_PUBLIC_APIS_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.JENTIC_PUBLIC_APIS_AUTOMATION_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write    
       - name: Sparse checkout (apis.json + scorecard.json only)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           git clone --no-checkout --depth 1 --filter=blob:none \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" .
@@ -76,13 +83,25 @@ jobs:
 
       - name: Create PR and merge
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          APP_USER_ID="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+
+          git config user.name  "${APP_SLUG}[bot]"
+          git config user.email "${APP_USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
 
           git add apis/openapi/apis.json apis/openapi/scores.json index/apis/openapi/
 
+          # Safety guard: only generated index paths may be changed.
+          git diff --cached --name-only > changed-files.txt
+
+          if grep -Ev '^(apis/openapi/apis\.json|apis/openapi/scores\.json|index/apis/openapi/)' changed-files.txt; then
+            echo "Unexpected files changed:"
+            cat changed-files.txt
+            exit 1
+          fi
+          
           # Exit early if nothing actually changed (idempotent rebuild).
           if git diff --cached --quiet; then
             echo "Index files are already up to date — nothing to commit."
