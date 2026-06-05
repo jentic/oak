@@ -61,6 +61,31 @@ This repository follows the OAK (Open Agentic Knowledge) Standard, which defines
 
 For detailed information, please refer to the [OAK Standard documentation](STRUCTURE.md).
 
+## AI-Readiness Scoring
+
+OpenAPI documents in this repository can be scored for AI-readiness using the **Jentic API Scorecard CLI** — no signup, no API key, and no configuration needed.
+
+### URL format
+
+Files follow a predictable raw URL pattern:
+
+```
+https://raw.githubusercontent.com/jentic/jentic-public-apis/refs/heads/main/apis/openapi/{vendor}/{api-name}/{version}/openapi.json
+```
+
+### Running a score
+
+Pass any spec URL directly to the CLI:
+
+```bash
+npx @jentic/api-scorecard-cli@latest score \
+  https://raw.githubusercontent.com/jentic/jentic-public-apis/refs/heads/main/apis/openapi/swagger-api/petstore/1.0.27/openapi.json
+```
+
+![Jentic API Scorecard CLI](assets/jentic-scoring-cli.png)
+
+To learn more about the API Scoring Cli and Jentic API AI-Readiness Framework, visit the [Jentic API Scorecard CLI repository](https://github.com/jentic/jentic-api-scorecard).
+
 ## Acknowledgments
 
 The Jentic Public APIs project is built upon the foundation of open standards and community contributions. We extend our sincere gratitude to:
