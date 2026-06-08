@@ -26,7 +26,7 @@ Agents depend on APIs as much as AI. Chatbots chat, but agents act, and they act
    To avoid fragmentation and proprietary lock-in, we must build upon established, open standards. The [OpenAPI Specification](https://www.openapis.org/), owned by the Linux Foundation, already provides a robust foundation with its vibrant ecosystem of tools and services.
 
 7. **Building on OpenAPI**  
-   The OpenAPI Initiative's [Arazzo](https://www.openapis.org/arazzo) specification defines composable complex workflows built from OpenAPI operations, providing a timely declarative format needed for representing complex agentic tool knowledge. We will support these standards, and propose additional extensions as necessary to make them even more valuable to agents.
+   The OpenAPI Initiative's [Arazzo](https://www.openapis.org/arazzo-specification) specification defines composable complex workflows built from OpenAPI operations, providing a timely declarative format needed for representing complex agentic tool knowledge. We will support these standards, and propose additional extensions as necessary to make them even more valuable to agents.
 
 8. **MCP and OpenAPI Are Complementary**  
    The future of AI needs both [Model Context Protocol (MCP)](https://docs.anthropic.com/en/docs/agents-and-tools/mcp) and OpenAPI standards working in tandem. While OpenAPI and Arazzo provide the standard declarative format for representing agentic tool knowledge, MCP offers an ergonomic format for agents to access this knowledge, creating a complete ecosystem for AI interaction with APIs.
