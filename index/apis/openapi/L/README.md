@@ -1,6 +1,6 @@
 # APIs — L
 
-Browsing 85 APIs starting with **L**.
+Browsing 86 APIs starting with **L**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · **L** · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -75,6 +75,7 @@ Browsing 85 APIs starting with **L**.
 | [logoraisr.com](../../../../apis/openapi/logoraisr.com) | [api-docs--logoraisr.com](../../../../apis/openapi/logoraisr.com/api-docs--logoraisr.com) · [logoraisr-api](../../../../apis/openapi/logoraisr.com/logoraisr-api) · [main](../../../../apis/openapi/logoraisr.com/main) |
 | [logto.io](../../../../apis/openapi/logto.io) | [main](../../../../apis/openapi/logto.io/main) |
 | [loket.nl](../../../../apis/openapi/loket.nl) | [main](../../../../apis/openapi/loket.nl/main) |
+| [longevityworldcup.com](../../../../apis/openapi/longevityworldcup.com) | [main](../../../../apis/openapi/longevityworldcup.com/main) |
 | [loom.com](../../../../apis/openapi/loom.com) | [main](../../../../apis/openapi/loom.com/main) |
 | [loopreturns.com](../../../../apis/openapi/loopreturns.com) | [main](../../../../apis/openapi/loopreturns.com/main) |
 | [lotadata.com](../../../../apis/openapi/lotadata.com) | [lotadata](../../../../apis/openapi/lotadata.com/lotadata) · [main](../../../../apis/openapi/lotadata.com/main) |
