@@ -10,7 +10,7 @@ The OAK Repository aims to build an open knowledge foundation that empowers AI t
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [community@jentic.com](mailto:community@jentic.com).
+This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [hello@jentic.com](mailto:hello@jentic.com).
 
 ## Getting Started
 
