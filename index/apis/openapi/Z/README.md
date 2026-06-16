@@ -37,7 +37,7 @@ Browsing 39 APIs starting with **Z**.
 | [zocdoc.com](../../../../apis/openapi/zocdoc.com) | [main](../../../../apis/openapi/zocdoc.com/main) |
 | [zocks.io](../../../../apis/openapi/zocks.io) | [main](../../../../apis/openapi/zocks.io/main) |
 | [zoho.com](../../../../apis/openapi/zoho.com) | [8 APIs](../../../../apis/openapi/zoho.com) |
-| [zoom.us](../../../../apis/openapi/zoom.us) | [contact-center](../../../../apis/openapi/zoom.us/contact-center) · [phone](../../../../apis/openapi/zoom.us/phone) · [video-sdk](../../../../apis/openapi/zoom.us/video-sdk) |
+| [zoom.us](../../../../apis/openapi/zoom.us) | [contact-center](../../../../apis/openapi/zoom.us/contact-center) · [meetings](../../../../apis/openapi/zoom.us/meetings) · [phone](../../../../apis/openapi/zoom.us/phone) · [video-sdk](../../../../apis/openapi/zoom.us/video-sdk) |
 | [zoom.us~contactcenter](../../../../apis/openapi/zoom.us~contactcenter) |  |
 | [zoom.us~videoSDK](../../../../apis/openapi/zoom.us~videoSDK) |  |
 | [zoomconnect.com](../../../../apis/openapi/zoomconnect.com) | [www.zoomconnect.com](../../../../apis/openapi/zoomconnect.com/www.zoomconnect.com) |
