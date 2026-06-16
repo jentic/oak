@@ -1,6 +1,6 @@
 # APIs — Z
 
-Browsing 40 APIs starting with **Z**.
+Browsing 39 APIs starting with **Z**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · **Z** · [~rest](../~rest)
 
@@ -37,9 +37,8 @@ Browsing 40 APIs starting with **Z**.
 | [zocdoc.com](../../../../apis/openapi/zocdoc.com) | [main](../../../../apis/openapi/zocdoc.com/main) |
 | [zocks.io](../../../../apis/openapi/zocks.io) | [main](../../../../apis/openapi/zocks.io/main) |
 | [zoho.com](../../../../apis/openapi/zoho.com) | [8 APIs](../../../../apis/openapi/zoho.com) |
-| [zoom.us](../../../../apis/openapi/zoom.us) | [contact-center](../../../../apis/openapi/zoom.us/contact-center) · [meetings](../../../../apis/openapi/zoom.us/meetings) · [phone](../../../../apis/openapi/zoom.us/phone) · [video-sdk](../../../../apis/openapi/zoom.us/video-sdk) |
+| [zoom.us](../../../../apis/openapi/zoom.us) | [contact-center](../../../../apis/openapi/zoom.us/contact-center) · [phone](../../../../apis/openapi/zoom.us/phone) · [video-sdk](../../../../apis/openapi/zoom.us/video-sdk) |
 | [zoom.us~contactcenter](../../../../apis/openapi/zoom.us~contactcenter) |  |
-| [zoom.us~meetings.json](../../../../apis/openapi/zoom.us~meetings.json) |  |
 | [zoom.us~videoSDK](../../../../apis/openapi/zoom.us~videoSDK) |  |
 | [zoomconnect.com](../../../../apis/openapi/zoomconnect.com) | [www.zoomconnect.com](../../../../apis/openapi/zoomconnect.com/www.zoomconnect.com) |
 | [zube.io](../../../../apis/openapi/zube.io) | [main](../../../../apis/openapi/zube.io/main) |
