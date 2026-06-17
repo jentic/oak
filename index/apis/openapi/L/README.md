@@ -45,7 +45,7 @@ Browsing 86 APIs starting with **L**.
 | [linguarobot.io](../../../../apis/openapi/linguarobot.io) | [main](../../../../apis/openapi/linguarobot.io/main) |
 | [link.fish](../../../../apis/openapi/link.fish) | [link.fish-api](../../../../apis/openapi/link.fish/link.fish-api) · [main](../../../../apis/openapi/link.fish/main) |
 | [linkedape.com](../../../../apis/openapi/linkedape.com) | [main](../../../../apis/openapi/linkedape.com/main) |
-| [linkedin.com](../../../../apis/openapi/linkedin.com) | [main](../../../../apis/openapi/linkedin.com/main) |
+| [linkedin.com](../../../../apis/openapi/linkedin.com) | [main](../../../../apis/openapi/linkedin.com/main) · [marketing](../../../../apis/openapi/linkedin.com/marketing) |
 | [linklyhq.com](../../../../apis/openapi/linklyhq.com) | [main](../../../../apis/openapi/linklyhq.com/main) |
 | [linkpreview.net](../../../../apis/openapi/linkpreview.net) | [main](../../../../apis/openapi/linkpreview.net/main) |
 | [linode.com](../../../../apis/openapi/linode.com) | [linode-api](../../../../apis/openapi/linode.com/linode-api) · [main](../../../../apis/openapi/linode.com/main) |
