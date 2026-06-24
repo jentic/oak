@@ -1,0 +1,754 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Starveri API",
+    "version": "1.0.0",
+    "description": "OpenAI-compatible Starveri API for chat completions, model discovery, prepaid credit discovery, and priced tool usage.",
+    "x-jentic-source-url": "https://api.starveri.net/openapi.yaml"
+  },
+  "servers": [
+    {
+      "url": "https://api.starveri.net/v1",
+      "description": "Starveri production API"
+    }
+  ],
+  "paths": {
+    "/models": {
+      "get": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "List available Starveri API models and pricing.",
+        "operationId": "listModels",
+        "responses": {
+          "200": {
+            "description": "Available models.",
+            "headers": {
+              "X-Magicapi-Billing": {
+                "description": "API.market custom billing header. Model discovery is free.",
+                "schema": {
+                  "type": "string",
+                  "example": "API=0;"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/billing/credit-packs": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "List prepaid Starveri API credit packs.",
+        "operationId": "listCreditPacks",
+        "responses": {
+          "200": {
+            "description": "Available prepaid credit packs.",
+            "headers": {
+              "X-Magicapi-Billing": {
+                "description": "API.market custom billing header. Credit-pack discovery is free.",
+                "schema": {
+                  "type": "string",
+                  "example": "API=0;"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditPackList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/billing/checkout": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Create a fallback Stripe Checkout session for prepaid credits.",
+        "description": "Marketplace-first launches can ignore this endpoint and credit keys through provider-side purchase events instead.",
+        "operationId": "createCreditCheckout",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stripe Checkout session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid credit pack.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Checkout requires a managed non-admin API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/completions": {
+      "post": {
+        "tags": [
+          "Chat Completions"
+        ],
+        "summary": "Create a chat completion.",
+        "operationId": "createChatCompletion",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chat completion result.",
+            "headers": {
+              "X-Magicapi-Billing": {
+                "description": "API.market custom billing units for this successful request.",
+                "schema": {
+                  "type": "string",
+                  "example": "API=1;"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatCompletionResponse"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "Server-sent event stream returned when the request sets stream to true. Each event is sent as a data line containing a chat completion chunk JSON object, followed by data: [DONE] when complete.",
+                  "example": "data: {\"id\":\"chatcmpl_123\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello\"},\"finish_reason\":null}]}\n\ndata: [DONE]\n"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Prepaid credits required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/completions/{model_bucket}": {
+      "post": {
+        "tags": [
+          "Chat Completions"
+        ],
+        "summary": "Create a model-specific chat completion with a token bucket.",
+        "description": "The model and token bucket are selected by the path. Starveri forces the requested model and rejects requests whose estimated prompt/context tokens plus requested output cap exceed the selected bucket.",
+        "operationId": "createBucketedChatCompletion",
+        "parameters": [
+          {
+            "name": "model_bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gpt-5.1-codex-10k",
+                "gpt-5.1-codex-100k",
+                "gpt-5.1-codex-max-10k",
+                "gpt-5.1-codex-max-100k",
+                "gpt-5.1-codex-mini-10k",
+                "gpt-5.1-codex-mini-100k",
+                "gpt-5.3-codex-spark-10k",
+                "gpt-5.3-codex-spark-100k",
+                "gpt-5.3-codex-10k",
+                "gpt-5.3-codex-100k",
+                "gpt-5.4-10k",
+                "gpt-5.4-100k",
+                "gpt-5.4-mini-10k",
+                "gpt-5.4-mini-100k",
+                "gpt-5.5-10k",
+                "gpt-5.5-100k"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chat completion result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatCompletionResponse"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "Server-sent event stream returned when the request sets stream to true. Each event is sent as a data line containing a chat completion chunk JSON object, followed by data: [DONE] when complete.",
+                  "example": "data: {\"id\":\"chatcmpl_123\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello\"},\"finish_reason\":null}]}\n\ndata: [DONE]\n"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request exceeds the selected token bucket.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Prepaid credits required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "ModelList": {
+        "type": "object",
+        "required": [
+          "object",
+          "data"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "example": "list"
+          },
+          "pricing": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Model"
+            }
+          }
+        }
+      },
+      "Model": {
+        "type": "object",
+        "required": [
+          "id",
+          "object",
+          "owned_by"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "gpt-5.5"
+          },
+          "object": {
+            "type": "string",
+            "example": "model"
+          },
+          "created": {
+            "type": "integer",
+            "example": 0
+          },
+          "owned_by": {
+            "type": "string",
+            "example": "starveri-chatgpt"
+          },
+          "name": {
+            "type": "string",
+            "example": "GPT 5.5"
+          },
+          "context_window": {
+            "type": "integer",
+            "nullable": true
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/ModelPricing"
+          }
+        }
+      },
+      "CreditPackList": {
+        "type": "object",
+        "required": [
+          "object",
+          "currency",
+          "credit_unit",
+          "data"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "example": "list"
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "credit_unit": {
+            "type": "string",
+            "example": "1 credit = $0.01 prepaid API balance"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreditPack"
+            }
+          }
+        }
+      },
+      "CreditPack": {
+        "type": "object",
+        "properties": {
+          "lookup_key": {
+            "type": "string",
+            "example": "starveri_credits_500_v1"
+          },
+          "credits": {
+            "type": "integer",
+            "example": 500
+          },
+          "credit_unit": {
+            "type": "string",
+            "example": "1 credit = $0.01 prepaid API balance"
+          },
+          "amount_usd_micros": {
+            "type": "integer",
+            "example": 5000000
+          },
+          "amount_usd": {
+            "type": "number",
+            "example": 5
+          },
+          "price_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CheckoutRequest": {
+        "type": "object",
+        "required": [
+          "lookup_key"
+        ],
+        "properties": {
+          "lookup_key": {
+            "type": "string",
+            "example": "starveri_credits_500_v1"
+          },
+          "success_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "cancel_url": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "CheckoutSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string",
+            "example": "checkout.session"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "credit_pack": {
+            "$ref": "#/components/schemas/CreditPack"
+          }
+        }
+      },
+      "ModelPricing": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "unit": {
+            "type": "string",
+            "example": "1M tokens"
+          },
+          "cached_input": {
+            "type": "number",
+            "nullable": true
+          },
+          "input": {
+            "type": "number",
+            "nullable": true
+          },
+          "output": {
+            "type": "number",
+            "nullable": true
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "ChatCompletionRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "messages"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "example": "gpt-5.5"
+          },
+          "messages": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            }
+          },
+          "stream": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, successful chat completion responses are returned as text/event-stream server-sent events instead of a single application/json response."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 5,
+            "description": "OpenAI-compatible output token cap. Bucketed endpoints reject the request if prompt/context plus this cap exceeds the selected bucket."
+          },
+          "max_completion_tokens": {
+            "type": "integer",
+            "minimum": 5,
+            "description": "Alias accepted for output token cap."
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "minimum": 5,
+            "description": "Responses-style output token cap forwarded to the upstream backend."
+          },
+          "temperature": {
+            "type": "number"
+          },
+          "starveri_chat": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ChatMessage": {
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant",
+              "tool"
+            ]
+          },
+          "content": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "ChatCompletionResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "object",
+          "model",
+          "choices"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string",
+            "example": "chat.completion"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "model": {
+            "type": "string"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "usage": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "message",
+              "type"
+            ],
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Models"
+    },
+    {
+      "name": "Billing"
+    },
+    {
+      "name": "Chat Completions"
+    }
+  ],
+  "externalDocs": {
+    "description": "Starveri API documentation",
+    "url": "https://api.starveri.net/docs"
+  },
+  "x-starveri-pricing": {
+    "currency": "USD",
+    "token_unit": "1M tokens",
+    "note": "Prices are one third of the configured OpenAI reference table and remain subject to context window limits available in Codex.",
+    "models": {
+      "gpt-5.1-codex": {
+        "name": "GPT 5.1 Codex",
+        "cached_input": 0.041666666666666664,
+        "input": 0.4166666666666667,
+        "output": 3.3333333333333335
+      },
+      "gpt-5.1-codex-max": {
+        "name": "GPT 5.1 Codex Max",
+        "cached_input": 0.041666666666666664,
+        "input": 0.4166666666666667,
+        "output": 3.3333333333333335
+      },
+      "gpt-5.1-codex-mini": {
+        "name": "GPT 5.1 Codex Mini",
+        "cached_input": 0.008333333333333333,
+        "input": 0.08333333333333333,
+        "output": 0.6666666666666666
+      },
+      "gpt-5.3-codex-spark": {
+        "name": "GPT 5.3 Codex Spark",
+        "cached_input": 0.0033333333333333335,
+        "input": 0.3333333333333333,
+        "output": 0.6666666666666666
+      },
+      "gpt-5.3-codex": {
+        "name": "GPT 5.3 Codex",
+        "cached_input": 0.016666666666666666,
+        "input": 0.16666666666666666,
+        "output": 0.3333333333333333
+      },
+      "gpt-5.4": {
+        "name": "GPT 5.4",
+        "cached_input": 0.03333333333333333,
+        "input": 0.3333333333333333,
+        "output": 1.6666666666666667
+      },
+      "gpt-5.4-mini": {
+        "name": "GPT 5.4 Mini",
+        "cached_input": 0.025,
+        "input": 0.25,
+        "output": 1.1666666666666667
+      },
+      "gpt-5.5": {
+        "name": "GPT 5.5",
+        "cached_input": 0.08333333333333333,
+        "input": 0.8333333333333334,
+        "output": 2.5
+      }
+    },
+    "tools": {
+      "code_interpreter": {
+        "billing": "0.016666666666666666 per 30 seconds plus 0.01 per GB, up to 8 GB",
+        "per_30_seconds": 0.016666666666666666,
+        "per_gb": 0.01,
+        "max_gb": 8
+      },
+      "web_search": {
+        "billing": "0.0033333333333333335 per call",
+        "per_call": 0.0033333333333333335
+      }
+    }
+  },
+  "x-starveri-rate-limits": {
+    "paid": {
+      "requests_per_minute": 50,
+      "tokens_per_minute": 500000
+    },
+    "global": {
+      "tokens_per_day": 500000000
+    },
+    "chat_context_tokens": 500000
+  },
+  "x-starveri-monetization": {
+    "preferred_provider": "middleman_marketplace",
+    "fallback_provider": "stripe",
+    "billing_model": "prepaid_credits",
+    "first_party_fallback": true,
+    "stripe_account_type": "standalone",
+    "connected_to_crescent": false,
+    "uses_stripe_connect": false,
+    "charge_owner": "starveri_stripe_account",
+    "credit_unit": "1 credit = $0.01 prepaid API balance",
+    "usage_metering": "model_token_usage_debited_from_prepaid_balance"
+  }
+}
