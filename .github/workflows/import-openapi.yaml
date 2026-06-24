@@ -177,138 +177,116 @@ jobs:
             echo "issue_number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Call Apitools Service and Download ZIP
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install jentic-apitools-cli
+        run: pip install --quiet jentic-apitools-cli
+
+      - name: Run Apitools Import CLI and Produce ZIP
         id: call_apitools
+        env:
+          # Untrusted inputs (label/URL originate from the issue body) are passed
+          # via env and quoted in the script — never interpolated into run: directly.
+          LABEL: ${{ steps.extract_info.outputs.apitools_label }}
+          IMPORT_URL: ${{ steps.extract_info.outputs.import_oas_url }}
+          REJECT_INVALID_SERVER_URLS: ${{ steps.extract_info.outputs.reject_invalid_server_urls }}
+          REJECT_INVALID_SECURITY: ${{ steps.extract_info.outputs.reject_invalid_security }}
+          GITHUB_REPOSITORY_SLUG: ${{ github.repository }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          LIGHT_LLM_PROVIDER: ${{ vars.LIGHT_LLM_PROVIDER }}
+          LLM_LIGHT_MODEL: ${{ vars.LLM_LIGHT_MODEL }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
         run: |
-          echo "Calling Apitools Service for URL: ${{ steps.extract_info.outputs.import_oas_url }}"
-          echo "Using Apitools Label: ${{ steps.extract_info.outputs.apitools_label }}"
-          API_ENDPOINT="https://apitools.main.us-east-1.jenticprod.net/openapi/import"
+          echo "Importing URL: $IMPORT_URL"
+          echo "Using Apitools Label: $LABEL"
 
-          LABEL="${{ steps.extract_info.outputs.apitools_label }}"
-          IMPORT_URL="${{ steps.extract_info.outputs.import_oas_url }}"
-          REJECT_INVALID_SERVER_URLS="${{ steps.extract_info.outputs.reject_invalid_server_urls }}"
-          REJECT_INVALID_SECURITY="${{ steps.extract_info.outputs.reject_invalid_security }}"
-          REQUEST_BODY=$(jq -n \
-            --arg label "$LABEL" \
-            --arg url "$IMPORT_URL" \
-            --argjson reject_invalid_server_urls "$REJECT_INVALID_SERVER_URLS" \
-            --argjson reject_invalid_security "$REJECT_INVALID_SECURITY" \
-            ' {
-              meta: {
-                label: $label,
-                original_url: $url,
-                canonical_source_url: $url,
-                canonical_artifacts_base_url: "https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/main/apis/openapi",
-                canonical_artifacts_base_url_ui: "https://github.com/${{ github.repository }}/tree/main/apis/openapi",
-                oas_process_configuration: {
-                  enable_spec_repair: false,
-                  enable_llm_analysis: true,
-                  reject_invalid_server_urls: $reject_invalid_server_urls,
-                  reject_invalid_security: $reject_invalid_security,
-                }
-              },
-              spec: {
-                kind: "url",
-                url: $url
-              }
-            } ')
-          
-          echo "Request Body:"
-          echo "$REQUEST_BODY"
-          echo "Calling endpoint: $API_ENDPOINT"
+          # The deployed service derives the ZIP filename from the label as
+          # "<vendor>:<api>.zip"; reproduce that so the unzip step's subpath
+          # logic (replacing ':' with '/') keeps working unchanged.
+          SAFE_LABEL=$(echo "$LABEL" | tr '/' ':')
+          # A single-segment label (issue path) maps to "<vendor>/main" in the
+          # pipeline, so the ZIP filename must be "<vendor>:main.zip" to match.
+          case "$SAFE_LABEL" in
+            *:*) : ;;                       # already vendor:api
+            *)   SAFE_LABEL="$SAFE_LABEL:main" ;;
+          esac
+          OUTPUT_ZIP="${SAFE_LABEL}.zip"
 
-          # Use -sS for silent (no progress meter) but still show error messages on stderr
-          # Use set +e to prevent immediate exit on curl failure
-          CURL_STDERR_FILE=$(mktemp)
-          CURL_EXIT_CODE=0
+          # Map the optional reject flags to the CLI's boolean toggles.
+          REJECT_SERVER_FLAG="--reject-invalid-server-urls"
+          if [ "$REJECT_INVALID_SERVER_URLS" = "false" ]; then
+            REJECT_SERVER_FLAG="--no-reject-invalid-server-urls"
+          fi
+          REJECT_SECURITY_FLAG="--reject-invalid-security"
+          if [ "$REJECT_INVALID_SECURITY" = "false" ]; then
+            REJECT_SECURITY_FLAG="--no-reject-invalid-security"
+          fi
 
+          # --skip-bundle is intentional: the CLI maps bundled_spec = not skip_bundle,
+          # and the pipeline only bundles when bundled_spec is false. The deployed
+          # service sends bundled_spec=false, so --skip-bundle reproduces its bundling.
           set +e
-          CURL_OUTPUT=$(curl -sS -L -OJ -X POST \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/zip" \
-              -H "Jentic-API-Key: ${{ secrets.JENTIC_APITOOLS_API_KEY_PROD }}" \
-              -d "$REQUEST_BODY" \
-              -w "%{http_code}"$'\n'"%{filename_effective}" \
-              "$API_ENDPOINT" 2>"$CURL_STDERR_FILE")
-          CURL_EXIT_CODE=$?
+          CLI_STDERR_FILE=$(mktemp)
+          jentic-apitools import "$IMPORT_URL" \
+            --archive "$OUTPUT_ZIP" \
+            --label "$LABEL" \
+            --skip-bundle \
+            --enable-llm-analysis \
+            "$REJECT_SERVER_FLAG" \
+            "$REJECT_SECURITY_FLAG" \
+            --canonical-source-url "$IMPORT_URL" \
+            --canonical-artifacts-base-url "https://raw.githubusercontent.com/${GITHUB_REPOSITORY_SLUG}/refs/heads/main/apis/openapi" \
+            --canonical-artifacts-base-url-ui "https://github.com/${GITHUB_REPOSITORY_SLUG}/tree/main/apis/openapi" \
+            --overwrite \
+            -q 1>cli_stdout.txt 2>"$CLI_STDERR_FILE"
+          CLI_EXIT_CODE=$?
           set -e
 
-          # Parse curl -w output into STATUS_CODE and FILE_STRUCTURE
-          STATUS_CODE=$(echo "$CURL_OUTPUT" | sed -n '1p')
-          FILE_STRUCTURE=$(echo "$CURL_OUTPUT" | sed -n '2p')
-          OUTPUT_ZIP=$FILE_STRUCTURE
+          CLI_STDERR=$(cat "$CLI_STDERR_FILE")
+          rm -f "$CLI_STDERR_FILE"
+          echo "CLI stdout:"
+          cat cli_stdout.txt
+          echo "CLI stderr: $CLI_STDERR"
 
-          # Layer 1: Check for transport-level curl failure (DNS, connection, SSL, timeout)
-          if [ "$CURL_EXIT_CODE" -ne 0 ]; then
-              CURL_STDERR=$(cat "$CURL_STDERR_FILE")
-              rm -f "$CURL_STDERR_FILE"
-              echo "::error::curl command failed with exit code $CURL_EXIT_CODE."
-              echo "curl stderr: $CURL_STDERR"
+          if [ "$CLI_EXIT_CODE" -ne 0 ]; then
+              echo "::error::jentic-apitools import failed with exit code $CLI_EXIT_CODE."
               echo "api_failed=true" >> $GITHUB_OUTPUT
-              echo "error_response=curl failed with exit code $CURL_EXIT_CODE: $CURL_STDERR" >> $GITHUB_OUTPUT
-              exit 1
-          fi
-          rm -f "$CURL_STDERR_FILE"
-
-          # Layer 2: Validate STATUS_CODE is a numeric HTTP status
-          if [ -z "$STATUS_CODE" ] || ! [[ "$STATUS_CODE" =~ ^[0-9]+$ ]]; then
-              echo "::error::Failed to parse HTTP status code from curl output. Got: '$STATUS_CODE'"
-              echo "Full curl output: '$CURL_OUTPUT'"
-              echo "api_failed=true" >> $GITHUB_OUTPUT
-              echo "error_response=Failed to parse HTTP status code from Apitools API response. Got: '$STATUS_CODE'" >> $GITHUB_OUTPUT
+              echo 'error_response<<EREOF' >> $GITHUB_OUTPUT
+              echo "${CLI_STDERR:-Import CLI failed with exit code $CLI_EXIT_CODE. No additional error details available.}" >> $GITHUB_OUTPUT
+              echo 'EREOF' >> $GITHUB_OUTPUT
               exit 1
           fi
 
-          # Layer 3: Validate FILE_STRUCTURE (filename from Content-Disposition header)
-          if [ -z "$FILE_STRUCTURE" ]; then
-              echo "::error::curl did not report a downloaded filename. The server may not have sent a Content-Disposition header."
-              echo "HTTP status code: $STATUS_CODE"
+          if [ ! -f "$OUTPUT_ZIP" ]; then
+              echo "::error::Import CLI reported success but ZIP '$OUTPUT_ZIP' was not found on disk."
               echo "api_failed=true" >> $GITHUB_OUTPUT
-              echo "error_response=Apitools API responded with HTTP $STATUS_CODE but did not provide a downloadable file (no Content-Disposition header)." >> $GITHUB_OUTPUT
+              echo "error_response=Import CLI succeeded but the expected ZIP '$OUTPUT_ZIP' was not produced." >> $GITHUB_OUTPUT
               exit 1
           fi
 
-          if [ "$STATUS_CODE" -ne 200 ]; then
-              echo "::error::Apitools API call failed with status code $STATUS_CODE."
+          # Verify zip file is not empty/tiny (basic check)
+          if [ $(stat -c%s "$OUTPUT_ZIP") -lt 100 ]; then # Check if file is > 100 bytes
+              echo "::error::Produced ZIP file seems empty or too small."
+              ls -l "$OUTPUT_ZIP"
               echo "api_failed=true" >> $GITHUB_OUTPUT
-
-              if [ -s "$OUTPUT_ZIP" ]; then
-                  echo "Response details (if any):"
-                  ERROR_RESPONSE=$(cat "$OUTPUT_ZIP")
-                  echo "$ERROR_RESPONSE"
-                  echo 'error_response<<EREOF' >> $GITHUB_OUTPUT
-                  echo "$ERROR_RESPONSE" >> $GITHUB_OUTPUT
-                  echo 'EREOF' >> $GITHUB_OUTPUT
-              else
-                  echo 'error_response<<EREOF' >> $GITHUB_OUTPUT
-                  echo "Apitools API call failed with HTTP status code $STATUS_CODE. No additional error details available." >> $GITHUB_OUTPUT
-                  echo 'EREOF' >> $GITHUB_OUTPUT
-              fi
+              echo "error_response=Produced ZIP file from import CLI is empty or too small. The OpenAPI URL may be invalid or inaccessible." >> $GITHUB_OUTPUT
               exit 1
-          else
-              # Verify the downloaded file actually exists on disk
-              if [ ! -f "$OUTPUT_ZIP" ]; then
-                  echo "::error::curl reported filename '$OUTPUT_ZIP' but the file does not exist on disk."
-                  echo "api_failed=true" >> $GITHUB_OUTPUT
-                  echo "error_response=Apitools API responded with HTTP 200 but the downloaded file '$OUTPUT_ZIP' was not found on disk." >> $GITHUB_OUTPUT
-                  exit 1
-              fi
-
-              # Remove filename extension, Replace all ':' with '/' to point to API endpoint location
-              FILE_STRUCTURE=${FILE_STRUCTURE%.zip}
-              ACTUAL_CONTENT_SUBPATH_IN_ZIP=${FILE_STRUCTURE//:/\/}
-
-              echo "API call successful (HTTP $STATUS_CODE). ZIP file downloaded to $OUTPUT_ZIP."
-              # Verify zip file is not empty/tiny (basic check)
-              if [ ! -s "$OUTPUT_ZIP" ] || [ $(stat -c%s "$OUTPUT_ZIP") -lt 100 ]; then # Check if file exists and is > 100 bytes
-                  echo "::error::Downloaded ZIP file seems empty or too small."
-                  ls -l "$OUTPUT_ZIP"
-                  echo "api_failed=true" >> $GITHUB_OUTPUT
-                  echo "error_response=Downloaded ZIP file from Apitools API is empty or too small. The OpenAPI URL may be invalid or inaccessible." >> $GITHUB_OUTPUT
-                  exit 1
-              fi
-              echo "ZIP file size: $(stat -c%s "$OUTPUT_ZIP") bytes."
           fi
+          echo "Import successful. ZIP file produced at $OUTPUT_ZIP ($(stat -c%s "$OUTPUT_ZIP") bytes)."
+
+          # Remove filename extension, Replace all ':' with '/' to point to API endpoint location
+          FILE_STRUCTURE=${OUTPUT_ZIP%.zip}
+          ACTUAL_CONTENT_SUBPATH_IN_ZIP=${FILE_STRUCTURE//:/\/}
+
           echo "zip_file=$OUTPUT_ZIP" >> $GITHUB_OUTPUT
           echo "actual_content_subpath_in_zip=$ACTUAL_CONTENT_SUBPATH_IN_ZIP" >> $GITHUB_OUTPUT
 
