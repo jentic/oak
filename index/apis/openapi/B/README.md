@@ -91,7 +91,7 @@ Browsing 197 APIs starting with **B**.
 | [binance.com](../../../../apis/openapi/binance.com) | [main](../../../../apis/openapi/binance.com/main) |
 | [binated.com](../../../../apis/openapi/binated.com) | [main](../../../../apis/openapi/binated.com/main) |
 | [binderr.com](../../../../apis/openapi/binderr.com) | [main](../../../../apis/openapi/binderr.com/main) |
-| [bing.com](../../../../apis/openapi/bing.com) | [main](../../../../apis/openapi/bing.com/main) |
+| [bing.com](../../../../apis/openapi/bing.com) | [main](../../../../apis/openapi/bing.com/main) · [webmaster-tools](../../../../apis/openapi/bing.com/webmaster-tools) |
 | [bintable.com](../../../../apis/openapi/bintable.com) | [main](../../../../apis/openapi/bintable.com/main) |
 | [bippybox.io](../../../../apis/openapi/bippybox.io) | [main](../../../../apis/openapi/bippybox.io/main) |
 | [biron-analytics.com](../../../../apis/openapi/biron-analytics.com) | [main](../../../../apis/openapi/biron-analytics.com/main) |
