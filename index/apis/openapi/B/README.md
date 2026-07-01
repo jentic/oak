@@ -173,7 +173,7 @@ Browsing 197 APIs starting with **B**.
 | [buddy.works](../../../../apis/openapi/buddy.works) | [main](../../../../apis/openapi/buddy.works/main) |
 | [buddypt.com](../../../../apis/openapi/buddypt.com) | [main](../../../../apis/openapi/buddypt.com/main) |
 | [buddyyen](../../../../apis/openapi/buddyyen) | [main](../../../../apis/openapi/buddyyen/main) |
-| [buffer.com](../../../../apis/openapi/buffer.com) | [main](../../../../apis/openapi/buffer.com/main) |
+| [buffer.com](../../../../apis/openapi/buffer.com) | [buffer-graphql-api](../../../../apis/openapi/buffer.com/buffer-graphql-api) · [main](../../../../apis/openapi/buffer.com/main) |
 | [bufferapp.com](../../../../apis/openapi/bufferapp.com) | [main](../../../../apis/openapi/bufferapp.com/main) |
 | [bugfender.com](../../../../apis/openapi/bugfender.com) | [main](../../../../apis/openapi/bugfender.com/main) |
 | [bugherd.com](../../../../apis/openapi/bugherd.com) | [main](../../../../apis/openapi/bugherd.com/main) |
