@@ -1,6 +1,6 @@
 # APIs — B
 
-Browsing 197 APIs starting with **B**.
+Browsing 198 APIs starting with **B**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · **B** · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -112,6 +112,7 @@ Browsing 197 APIs starting with **B**.
 | [blastable.com](../../../../apis/openapi/blastable.com) | [main](../../../../apis/openapi/blastable.com/main) |
 | [blazemeter.com](../../../../apis/openapi/blazemeter.com) | [main](../../../../apis/openapi/blazemeter.com/main) |
 | [blockchain.com](../../../../apis/openapi/blockchain.com) | [main](../../../../apis/openapi/blockchain.com/main) |
+| [blocklottos.com](../../../../apis/openapi/blocklottos.com) | [main](../../../../apis/openapi/blocklottos.com/main) |
 | [blockfrost.io](../../../../apis/openapi/blockfrost.io) | [main](../../../../apis/openapi/blockfrost.io/main) |
 | [blogger.googleapis.com](../../../../apis/openapi/blogger.googleapis.com) | [main](../../../../apis/openapi/blogger.googleapis.com/main) |
 | [bloomerang.co](../../../../apis/openapi/bloomerang.co) | [main](../../../../apis/openapi/bloomerang.co/main) |
