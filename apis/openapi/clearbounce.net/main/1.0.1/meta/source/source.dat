@@ -1,0 +1,256 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ClearBounce API",
+    "version": "1.0.1",
+    "description": "Official OpenAPI specification for the ClearBounce email verification API. Verify single addresses in real time or clean entire lists asynchronously. Get your API key from the dashboard at https://clearbounce.net/dashboard/api.",
+    "contact": {
+      "name": "ClearBounce Support",
+      "url": "https://clearbounce.net",
+      "email": "support@clearbounce.net"
+    },
+    "termsOfService": "https://clearbounce.net/terms.html"
+  },
+  "externalDocs": {
+    "description": "Full API documentation",
+    "url": "https://clearbounce.net/docs/"
+  },
+  "servers": [
+    { "url": "https://clearbounce.net", "description": "Production" },
+    { "url": "https://api.clearbounce.net", "description": "Production (API subdomain)" }
+  ],
+  "security": [{ "ApiKeyAuth": [] }],
+  "paths": {
+    "/api/v1/verify": {
+      "post": {
+        "operationId": "verifyEmail",
+        "summary": "Verify a single email address",
+        "description": "Performs full verification (syntax, MX, SMTP mailbox probe, disposable/role/catch-all detection) and consumes 1 credit.",
+        "tags": ["Verification"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "user@example.com" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": { "$ref": "#/components/schemas/VerificationResult" },
+                    "creditsRemaining": { "type": "integer", "example": 999 }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "402": { "$ref": "#/components/responses/InsufficientCredits" }
+        }
+      }
+    },
+    "/api/v1/bulk/upload": {
+      "post": {
+        "operationId": "bulkUpload",
+        "summary": "Upload a list of emails for batch verification",
+        "description": "Accepts up to 10,000 emails per job. Duplicates are removed automatically and only unique addresses consume credits. Verification starts immediately; poll the status endpoint for progress.",
+        "tags": ["Batch"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["emails"],
+                "properties": {
+                  "emails": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 10000,
+                    "items": { "type": "string", "format": "email" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job created and queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "jobId": { "type": "string", "format": "uuid" },
+                    "totalEmails": { "type": "integer" },
+                    "duplicateCount": { "type": "integer" },
+                    "skippedRows": { "type": "integer" },
+                    "emptyRows": { "type": "integer" },
+                    "invalidRows": { "type": "integer" },
+                    "estimatedTimeSeconds": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "402": { "$ref": "#/components/responses/InsufficientCredits" }
+        }
+      }
+    },
+    "/api/v1/bulk/status/{jobId}": {
+      "get": {
+        "operationId": "bulkStatus",
+        "summary": "Get batch job status and progress",
+        "tags": ["Batch"],
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
+        "responses": {
+          "200": {
+            "description": "Current job status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "job": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed"] },
+                        "progress": { "type": "integer", "minimum": 0, "maximum": 100 },
+                        "totalEmails": { "type": "integer" },
+                        "processedEmails": { "type": "integer" },
+                        "deliverableCount": { "type": "integer" },
+                        "undeliverableCount": { "type": "integer" },
+                        "riskyCount": { "type": "integer" },
+                        "unknownCount": { "type": "integer" },
+                        "catchAllCount": { "type": "integer" },
+                        "createdAt": { "type": "string", "format": "date-time" },
+                        "completedAt": { "type": "string", "format": "date-time", "nullable": true },
+                        "bounceEstimate": { "type": "object", "nullable": true }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/bulk/results/{jobId}": {
+      "get": {
+        "operationId": "bulkResults",
+        "summary": "Download batch verification results",
+        "description": "Available once the job status is `completed`; returns 400 with code JOB_NOT_COMPLETED before that. Results are returned in the original upload order.",
+        "tags": ["Batch"],
+        "parameters": [{ "$ref": "#/components/parameters/JobId" }],
+        "responses": {
+          "200": {
+            "description": "Full verification results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "results": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/VerificationResult" }
+                    },
+                    "originalCsvData": { "type": "object", "nullable": true }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Job not completed yet (code JOB_NOT_COMPLETED)" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key created in the ClearBounce dashboard (Dashboard → API)."
+      }
+    },
+    "parameters": {
+      "JobId": {
+        "name": "jobId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" },
+        "description": "Job ID returned by the upload endpoint"
+      }
+    },
+    "responses": {
+      "Unauthorized": { "description": "Missing or invalid API key" },
+      "InsufficientCredits": { "description": "Not enough credits (code INSUFFICIENT_CREDITS)" },
+      "NotFound": { "description": "Resource not found" }
+    },
+    "schemas": {
+      "VerificationResult": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "status": { "type": "string", "enum": ["deliverable", "undeliverable", "risky", "unknown"] },
+          "subStatus": { "type": "string", "example": "accepted_email" },
+          "reason": { "type": "string", "example": "accepted_email" },
+          "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "isDeliverable": { "type": "boolean" },
+          "toxicity": { "type": "integer" },
+          "checks": {
+            "type": "object",
+            "properties": {
+              "syntax": { "type": "boolean" },
+              "mxRecords": { "type": "boolean" },
+              "smtpValid": { "type": "boolean", "nullable": true },
+              "isDisposable": { "type": "boolean" },
+              "isRoleBased": { "type": "boolean" },
+              "isFreeProvider": { "type": "boolean" },
+              "isCatchAll": { "type": "boolean", "nullable": true },
+              "hasTypo": { "type": "boolean", "nullable": true }
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "domain": { "type": "string" },
+              "localPart": { "type": "string" },
+              "mxHost": { "type": "string", "nullable": true },
+              "provider": { "type": "string", "nullable": true },
+              "dnsType": { "type": "string", "nullable": true },
+              "verifiedAt": { "type": "string", "format": "date-time" },
+              "processingTimeMs": { "type": "integer" }
+            }
+          },
+          "riskFactors": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}
