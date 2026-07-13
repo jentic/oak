@@ -1,6 +1,6 @@
 # APIs — B
 
-Browsing 197 APIs starting with **B**.
+Browsing 196 APIs starting with **B**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · **B** · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -173,8 +173,7 @@ Browsing 197 APIs starting with **B**.
 | [buddy.works](../../../../apis/openapi/buddy.works) | [main](../../../../apis/openapi/buddy.works/main) |
 | [buddypt.com](../../../../apis/openapi/buddypt.com) | [main](../../../../apis/openapi/buddypt.com/main) |
 | [buddyyen](../../../../apis/openapi/buddyyen) | [main](../../../../apis/openapi/buddyyen/main) |
-| [buffer.com](../../../../apis/openapi/buffer.com) | [buffer-graphql-api](../../../../apis/openapi/buffer.com/buffer-graphql-api) · [main](../../../../apis/openapi/buffer.com/main) |
-| [bufferapp.com](../../../../apis/openapi/bufferapp.com) | [main](../../../../apis/openapi/bufferapp.com/main) |
+| [buffer.com](../../../../apis/openapi/buffer.com) | [buffer-graphql-api](../../../../apis/openapi/buffer.com/buffer-graphql-api) |
 | [bugfender.com](../../../../apis/openapi/bugfender.com) | [main](../../../../apis/openapi/bugfender.com/main) |
 | [bugherd.com](../../../../apis/openapi/bugherd.com) | [main](../../../../apis/openapi/bugherd.com/main) |
 | [bugshot.de](../../../../apis/openapi/bugshot.de) | [main](../../../../apis/openapi/bugshot.de/main) |
