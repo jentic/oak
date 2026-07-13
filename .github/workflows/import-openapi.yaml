@@ -234,7 +234,10 @@ jobs:
           # --skip-bundle is intentional: the CLI maps bundled_spec = not skip_bundle,
           # and the pipeline only bundles when bundled_spec is false. The deployed
           # service sends bundled_spec=false, so --skip-bundle reproduces its bundling.
+          # Write CLI stdout/stderr to temp files outside the repo working tree
+          # (via mktemp) so they can never be picked up by create-pull-request.
           set +e
+          CLI_STDOUT_FILE=$(mktemp)
           CLI_STDERR_FILE=$(mktemp)
           jentic-apitools import "$IMPORT_URL" \
             --archive "$OUTPUT_ZIP" \
@@ -247,14 +250,15 @@ jobs:
             --canonical-artifacts-base-url "https://raw.githubusercontent.com/${GITHUB_REPOSITORY_SLUG}/refs/heads/main/apis/openapi" \
             --canonical-artifacts-base-url-ui "https://github.com/${GITHUB_REPOSITORY_SLUG}/tree/main/apis/openapi" \
             --overwrite \
-            -q 1>cli_stdout.txt 2>"$CLI_STDERR_FILE"
+            -q 1>"$CLI_STDOUT_FILE" 2>"$CLI_STDERR_FILE"
           CLI_EXIT_CODE=$?
           set -e
 
           CLI_STDERR=$(cat "$CLI_STDERR_FILE")
           rm -f "$CLI_STDERR_FILE"
           echo "CLI stdout:"
-          cat cli_stdout.txt
+          cat "$CLI_STDOUT_FILE"
+          rm -f "$CLI_STDOUT_FILE"
           echo "CLI stderr: $CLI_STDERR"
 
           if [ "$CLI_EXIT_CODE" -ne 0 ]; then
