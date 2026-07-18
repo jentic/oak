@@ -1,0 +1,378 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Latchshot API",
+    "version": "0.1.1",
+    "description": "Render public HTTP and HTTPS web pages as PNG or JPEG screenshots and PDF documents. Targets are checked against private and special-use networks before rendering. Create one recurring Free-plan key per email, then send that key as an HTTPS Bearer token. Only successful renders consume monthly quota; automatic overages are disabled.",
+    "license": { "name": "Proprietary", "identifier": "LicenseRef-Proprietary" }
+  },
+  "externalDocs": {
+    "description": "Latchshot developer documentation, limits, diagnostics, and quickstarts",
+    "url": "https://latchshot.fly.dev/docs.md"
+  },
+  "servers": [
+    { "url": "https://latchshot.fly.dev" }
+  ],
+  "tags": [
+    { "name": "Access", "description": "Create a Free-plan key and inspect its quota." },
+    { "name": "Rendering", "description": "Capture supported public web pages as image or PDF artifacts." },
+    { "name": "Plans", "description": "Request a higher paid quota without replacing the current key." },
+    { "name": "Service", "description": "Inspect service and render-queue health." }
+  ],
+  "paths": {
+    "/api/trials": {
+      "post": {
+        "operationId": "createTrial",
+        "summary": "Create an instant Free-plan key",
+        "tags": ["Access"],
+        "security": [],
+        "description": "Issues one Free-plan key per email and returns it once. Only email is required; workflow context and contact permission are optional. The allowance renews to 100 successful renders at the start of each UTC calendar month. Limited to three issuance attempts per client IP per hour.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TrialRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Free-plan key created; the plaintext key is returned only in this response",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TrialIssue" } } }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Service health",
+        "tags": ["Service"],
+        "security": [],
+        "description": "Returns process health and the current render queue state. No API key is required and this request does not consume render quota.",
+        "responses": {
+          "200": {
+            "description": "Healthy",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Health" } } }
+          },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/screenshot": {
+      "get": {
+        "operationId": "renderScreenshot",
+        "summary": "Render a screenshot",
+        "tags": ["Rendering"],
+        "security": [{ "bearerAuth": [] }],
+        "description": "Captures one supported public URL as PNG or JPEG. The URL must resolve only to public addresses and use HTTP or HTTPS on port 80 or 443. Successful responses are binary image bodies; diagnostic and quota values are returned in response headers. Only a successful render consumes monthly quota.",
+        "parameters": [
+          { "name": "url", "in": "query", "required": true, "description": "Public HTTP or HTTPS page URL to capture.", "schema": { "type": "string", "format": "uri", "maxLength": 2048 }, "example": "https://example.com" },
+          { "name": "width", "in": "query", "description": "Viewport width in CSS pixels.", "schema": { "type": "integer", "minimum": 320, "maximum": 2560, "default": 1440 } },
+          { "name": "height", "in": "query", "description": "Viewport height in CSS pixels. Ignored for the final artifact when fullPage is true.", "schema": { "type": "integer", "minimum": 240, "maximum": 1440, "default": 900 } },
+          { "name": "format", "in": "query", "description": "Binary image format returned in the response body.", "schema": { "type": "string", "enum": ["png", "jpeg"], "default": "png" } },
+          { "name": "fullPage", "in": "query", "description": "When true, capture the bounded full document height instead of only the viewport.", "schema": { "type": "boolean", "default": false } },
+          { "name": "darkMode", "in": "query", "description": "Emulate a dark color-scheme preference for the page.", "schema": { "type": "boolean", "default": false } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rendered image. Diagnostic, rate-limit, and quota values are returned in headers.",
+            "headers": {
+              "X-Latchshot-Render-Ms": { "$ref": "#/components/headers/RenderMs" },
+              "X-Latchshot-Navigation": { "$ref": "#/components/headers/Navigation" },
+              "X-Quota-Remaining": { "$ref": "#/components/headers/QuotaRemaining" },
+              "X-Quota-Reset": { "$ref": "#/components/headers/QuotaReset" }
+            },
+            "content": {
+              "image/png": { "schema": { "type": "string", "format": "binary" } },
+              "image/jpeg": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" },
+          "502": { "$ref": "#/components/responses/Error" },
+          "504": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/render": {
+      "post": {
+        "operationId": "renderPage",
+        "summary": "Render a screenshot or PDF",
+        "tags": ["Rendering"],
+        "security": [{ "bearerAuth": [] }],
+        "description": "Captures one supported public URL using bounded screenshot or PDF options. The response body is the binary artifact, not JSON. Diagnostic and quota values are returned in headers. Only a successful render consumes monthly quota.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RenderRequest" },
+              "examples": {
+                "screenshot": { "value": { "url": "https://example.com", "width": 1440, "height": 900 } },
+                "pdf": { "value": { "url": "https://example.com", "kind": "pdf", "paper": "A4" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rendered image or PDF. Diagnostic, rate-limit, and quota values are returned in headers.",
+            "headers": {
+              "X-Latchshot-Render-Ms": { "$ref": "#/components/headers/RenderMs" },
+              "X-Latchshot-Navigation": { "$ref": "#/components/headers/Navigation" },
+              "X-Quota-Remaining": { "$ref": "#/components/headers/QuotaRemaining" },
+              "X-Quota-Reset": { "$ref": "#/components/headers/QuotaReset" }
+            },
+            "content": {
+              "image/png": { "schema": { "type": "string", "format": "binary" } },
+              "image/jpeg": { "schema": { "type": "string", "format": "binary" } },
+              "application/pdf": { "schema": { "type": "string", "format": "binary" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "413": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" },
+          "502": { "$ref": "#/components/responses/Error" },
+          "504": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/upgrade-requests": {
+      "post": {
+        "operationId": "requestUpgrade",
+        "summary": "Request a higher paid plan",
+        "tags": ["Plans"],
+        "description": "Authenticates the current quota-metered key and records one deduplicated paid-plan request. No payment is taken. The owner replies to the email attached to the key and activates the same key only after confirming payment.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpgradeRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New paid-plan request recorded",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpgradeResponse" } } }
+          },
+          "200": {
+            "description": "Existing open request updated",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpgradeResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "429": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/usage": {
+      "get": {
+        "operationId": "getUsage",
+        "summary": "Read current monthly usage",
+        "tags": ["Access"],
+        "security": [{ "bearerAuth": [] }],
+        "description": "Returns the authenticated key's current plan, successful-render allowance, consumption counters, next UTC calendar-month reset time, and any paid-plan request attached to the key. This request does not consume render quota.",
+        "responses": {
+          "200": {
+            "description": "Current plan, quota usage, and optional paid-plan request",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsageResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "API key", "description": "Send the one-time Latchshot key in the Authorization header as Bearer YOUR_KEY. Keys are stored only as hashes." }
+    },
+    "headers": {
+      "RenderMs": { "description": "End-to-end render duration in milliseconds.", "schema": { "type": "integer", "minimum": 0 } },
+      "Navigation": { "description": "Whether navigation completed normally or reached its bounded timeout after a usable page response.", "schema": { "type": "string", "enum": ["complete", "timed-out"] } },
+      "QuotaRemaining": { "description": "Successful renders remaining in the current UTC calendar month after this response.", "schema": { "type": "integer", "minimum": 0 } },
+      "QuotaReset": { "description": "UTC date-time when the monthly successful-render allowance replenishes.", "schema": { "type": "string", "format": "date-time" } }
+    },
+    "schemas": {
+      "TrialRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "name": { "type": "string", "maxLength": 120, "description": "Optional display name for owner review." },
+          "email": { "type": "string", "format": "email", "maxLength": 254, "description": "Email used to enforce one lifetime Free-plan key. It does not grant contact permission." },
+          "useCase": { "type": "string", "maxLength": 1000, "description": "Optional public-page capture use case." },
+          "expectedRenders": {
+            "type": "string",
+            "default": "not sure",
+            "enum": ["under 1,000", "1,000–10,000", "10,000–50,000", "over 50,000", "not sure"]
+          },
+          "consent": { "type": "boolean", "default": false, "description": "Optional permission for the owner to send product-fit guidance." }
+        }
+      },
+      "TrialIssue": {
+        "type": "object",
+        "required": ["apiKey", "trial", "notice", "quickstart"],
+        "properties": {
+          "apiKey": { "type": "string", "pattern": "^ls_live_" },
+          "trial": {
+            "type": "object",
+            "required": ["plan", "displayName", "successfulRenderLimit", "rateLimitPerMinute", "quotaPeriod", "resetAt"],
+            "properties": {
+              "plan": { "type": "string", "const": "trial" },
+              "displayName": { "type": "string", "const": "Free" },
+              "successfulRenderLimit": { "type": "integer", "const": 100 },
+              "rateLimitPerMinute": { "type": "integer", "minimum": 1 },
+              "quotaPeriod": { "type": "string", "const": "calendar_month" },
+              "resetAt": { "type": "string", "format": "date-time" }
+            }
+          },
+          "notice": { "type": "string" },
+          "quickstart": { "type": "string", "format": "uri" }
+        }
+      },
+      "UpgradeRequest": {
+        "type": "object",
+        "required": ["requestedPlan", "consent"],
+        "properties": {
+          "requestedPlan": { "type": "string", "enum": ["launch", "build", "scale"] },
+          "note": { "type": "string", "maxLength": 1000 },
+          "consent": { "type": "boolean", "const": true }
+        }
+      },
+      "UpgradeResponse": {
+        "type": "object",
+        "required": ["request", "notice"],
+        "properties": {
+          "request": {
+            "type": "object",
+            "required": ["id", "currentPlan", "requestedPlan", "status", "createdAt", "updatedAt"],
+            "properties": {
+              "id": { "type": "integer", "minimum": 1 },
+              "currentPlan": { "type": "string" },
+              "requestedPlan": { "type": "string", "enum": ["launch", "build", "scale"] },
+              "status": { "type": "string", "enum": ["new", "contacted", "fulfilled", "declined"] },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" }
+            }
+          },
+          "notice": { "type": "string" }
+        }
+      },
+      "RenderRequest": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": { "type": "string", "format": "uri", "maxLength": 2048, "description": "Public HTTP or HTTPS page URL. Private, loopback, link-local, special-use, credential-bearing, and non-web-port targets are rejected.", "example": "https://example.com" },
+          "kind": { "type": "string", "enum": ["screenshot", "pdf"], "default": "screenshot", "description": "Artifact family to return." },
+          "format": { "type": "string", "enum": ["png", "jpeg", "pdf"], "description": "Exact artifact format. PDF selects PDF rendering even when kind is omitted." },
+          "width": { "type": "integer", "minimum": 320, "maximum": 2560, "default": 1440, "description": "Viewport width in CSS pixels." },
+          "height": { "type": "integer", "minimum": 240, "maximum": 1440, "default": 900, "description": "Viewport height in CSS pixels." },
+          "scale": { "type": "integer", "minimum": 1, "maximum": 2, "default": 1, "description": "Device scale factor used for image capture." },
+          "fullPage": { "type": "boolean", "default": false, "description": "Capture the bounded full document height for screenshots." },
+          "waitUntil": { "type": "string", "enum": ["load", "domcontentloaded", "networkidle"], "default": "domcontentloaded", "description": "Browser lifecycle event awaited before the optional delay." },
+          "delay": { "type": "integer", "minimum": 0, "maximum": 3000, "default": 0, "description": "Additional bounded wait in milliseconds after the lifecycle event." },
+          "timeout": { "type": "integer", "minimum": 3000, "maximum": 30000, "default": 15000, "description": "Navigation timeout in milliseconds. A separate hard process deadline still applies." },
+          "darkMode": { "type": "boolean", "default": false, "description": "Emulate a dark color-scheme preference." },
+          "reducedMotion": { "type": "boolean", "default": true, "description": "Emulate reduced motion to improve capture stability." },
+          "paper": { "type": "string", "enum": ["A4", "Letter", "Legal"], "default": "A4", "description": "Paper size used for PDF rendering." },
+          "landscape": { "type": "boolean", "default": false, "description": "Use landscape orientation for PDF rendering." }
+        }
+      },
+      "UsageResponse": {
+        "type": "object",
+        "required": ["customer", "usage", "upgradeRequest"],
+        "properties": {
+          "customer": {
+            "type": "object",
+            "required": ["name", "plan"],
+            "properties": {
+              "name": { "type": "string", "description": "Display name attached to the key." },
+              "plan": { "type": "string", "enum": ["trial", "launch", "build", "scale"], "description": "Current internal plan identifier. The trial identifier is displayed publicly as Free." }
+            }
+          },
+          "usage": {
+            "type": "object",
+            "required": ["period", "plan", "limit", "remaining", "resetAt", "successful", "failed", "reserved", "outputBytes", "renderMs", "updatedAt"],
+            "properties": {
+              "period": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$", "description": "Current UTC calendar month." },
+              "plan": { "type": "string", "enum": ["trial", "launch", "build", "scale"] },
+              "limit": { "type": "integer", "minimum": 1, "description": "Successful renders included in the current plan each calendar month." },
+              "remaining": { "type": "integer", "minimum": 0, "description": "Successful renders still available in the current month." },
+              "resetAt": { "type": "string", "format": "date-time", "description": "Start of the next UTC calendar month, when the allowance replenishes." },
+              "successful": { "type": "integer", "minimum": 0 },
+              "failed": { "type": "integer", "minimum": 0, "description": "Failed reserved renders; these do not consume successful-render quota." },
+              "reserved": { "type": "integer", "minimum": 0, "description": "Currently reserved render slots for this key." },
+              "outputBytes": { "type": "integer", "minimum": 0 },
+              "renderMs": { "type": "integer", "minimum": 0, "description": "Aggregate successful render time in milliseconds for the current month." },
+              "updatedAt": { "anyOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] }
+            }
+          },
+          "upgradeRequest": {
+            "description": "Latest paid-plan request attached to this key, or null when none exists.",
+            "anyOf": [
+              { "$ref": "#/components/schemas/UpgradeStatus" },
+              { "type": "null" }
+            ]
+          }
+        }
+      },
+      "UpgradeStatus": {
+        "type": "object",
+        "required": ["id", "keyId", "requestedPlan", "note", "status", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1 },
+          "keyId": { "type": "integer", "minimum": 1 },
+          "requestedPlan": { "type": "string", "enum": ["launch", "build", "scale"] },
+          "note": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "status": { "type": "string", "enum": ["new", "contacted", "fulfilled", "declined"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": ["ok", "service", "render"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "service": { "type": "string" },
+          "render": {
+            "type": "object",
+            "required": ["active", "pending", "concurrency"],
+            "properties": {
+              "active": { "type": "integer" },
+              "pending": { "type": "integer" },
+              "concurrency": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Error response",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  }
+}
