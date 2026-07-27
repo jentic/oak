@@ -1,6 +1,6 @@
 # APIs — L
 
-Browsing 86 APIs starting with **L**.
+Browsing 87 APIs starting with **L**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · **L** · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -16,6 +16,7 @@ Browsing 86 APIs starting with **L**.
 | [langfuse.com](../../../../apis/openapi/langfuse.com) | [main](../../../../apis/openapi/langfuse.com/main) |
 | [languagetool.org](../../../../apis/openapi/languagetool.org) | [main](../../../../apis/openapi/languagetool.org/main) |
 | [larksuite.com](../../../../apis/openapi/larksuite.com) | [main](../../../../apis/openapi/larksuite.com/main) |
+| [latchshot.fly.dev](../../../../apis/openapi/latchshot.fly.dev) | [main](../../../../apis/openapi/latchshot.fly.dev/main) |
 | [launchdarkly.com](../../../../apis/openapi/launchdarkly.com) | [launchdarkly-api](../../../../apis/openapi/launchdarkly.com/launchdarkly-api) · [launchdarkly-rest-api](../../../../apis/openapi/launchdarkly.com/launchdarkly-rest-api) · [main](../../../../apis/openapi/launchdarkly.com/main) |
 | [launchnotes.com](../../../../apis/openapi/launchnotes.com) | [main](../../../../apis/openapi/launchnotes.com/main) |
 | [layerise.com](../../../../apis/openapi/layerise.com) | [main](../../../../apis/openapi/layerise.com/main) |
