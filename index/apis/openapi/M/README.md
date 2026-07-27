@@ -110,7 +110,7 @@ Browsing 216 APIs starting with **M**.
 | [microbilt.com](../../../../apis/openapi/microbilt.com) | [main](../../../../apis/openapi/microbilt.com/main) |
 | [microcks.local](../../../../apis/openapi/microcks.local) | [main](../../../../apis/openapi/microcks.local/main) |
 | [microlink.io](../../../../apis/openapi/microlink.io) | [main](../../../../apis/openapi/microlink.io/main) |
-| [microsoft.com](../../../../apis/openapi/microsoft.com) | [microsoft-teams-events-api](../../../../apis/openapi/microsoft.com/microsoft-teams-events-api) · [microsoft-todo-api](../../../../apis/openapi/microsoft.com/microsoft-todo-api) |
+| [microsoft.com](../../../../apis/openapi/microsoft.com) | [clarity](../../../../apis/openapi/microsoft.com/clarity) · [microsoft-teams-events-api](../../../../apis/openapi/microsoft.com/microsoft-teams-events-api) · [microsoft-todo-api](../../../../apis/openapi/microsoft.com/microsoft-todo-api) |
 | [microsofttranslator.com](../../../../apis/openapi/microsofttranslator.com) | [main](../../../../apis/openapi/microsofttranslator.com/main) |
 | [mightynetworks.com](../../../../apis/openapi/mightynetworks.com) | [main](../../../../apis/openapi/mightynetworks.com/main) |
 | [mightyrep.com](../../../../apis/openapi/mightyrep.com) | [main](../../../../apis/openapi/mightyrep.com/main) |
