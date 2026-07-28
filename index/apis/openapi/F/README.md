@@ -1,6 +1,6 @@
 # APIs — F
 
-Browsing 102 APIs starting with **F**.
+Browsing 103 APIs starting with **F**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · **F** · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -87,6 +87,7 @@ Browsing 102 APIs starting with **F**.
 | [fordefi.com](../../../../apis/openapi/fordefi.com) | [main](../../../../apis/openapi/fordefi.com/main) |
 | [forgerock.io](../../../../apis/openapi/forgerock.io) | [main](../../../../apis/openapi/forgerock.io/main) |
 | [formapi.io](../../../../apis/openapi/formapi.io) | [main](../../../../apis/openapi/formapi.io/main) |
+| [foursquare.com](../../../../apis/openapi/foursquare.com) | [main](../../../../apis/openapi/foursquare.com/main) |
 | [franceconnect.gouv.fr](../../../../apis/openapi/franceconnect.gouv.fr) | [main](../../../../apis/openapi/franceconnect.gouv.fr/main) |
 | [frankiefinancial.io](../../../../apis/openapi/frankiefinancial.io) | [main](../../../../apis/openapi/frankiefinancial.io/main) |
 | [frappe.io](../../../../apis/openapi/frappe.io) | [main](../../../../apis/openapi/frappe.io/main) |
