@@ -1,11 +1,12 @@
 # APIs — E
 
-Browsing 140 APIs starting with **E**.
+Browsing 141 APIs starting with **E**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · **E** · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
 | Vendor | APIs |
 |--------|------|
+| [Eventbrite](../../../../apis/openapi/Eventbrite) | [main](../../../../apis/openapi/Eventbrite/main) |
 | [e-conomic.com](../../../../apis/openapi/e-conomic.com) | [e-conomic-api](../../../../apis/openapi/e-conomic.com/e-conomic-api) |
 | [e-goi.com](../../../../apis/openapi/e-goi.com) | [e-goi](../../../../apis/openapi/e-goi.com/e-goi) · [e-goi-api](../../../../apis/openapi/e-goi.com/e-goi-api) |
 | [ean-search.org](../../../../apis/openapi/ean-search.org) | [main](../../../../apis/openapi/ean-search.org/main) |
