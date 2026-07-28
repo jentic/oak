@@ -1,6 +1,6 @@
 # APIs — R
 
-Browsing 224 APIs starting with **R**.
+Browsing 225 APIs starting with **R**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · **R** · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -130,6 +130,7 @@ Browsing 224 APIs starting with **R**.
 | [respondflow.com](../../../../apis/openapi/respondflow.com) | [respond-flow-api](../../../../apis/openapi/respondflow.com/respond-flow-api) |
 | [rest-demo.wannme.com](../../../../apis/openapi/rest-demo.wannme.com) | [main](../../../../apis/openapi/rest-demo.wannme.com/main) |
 | [rest.cleverreach.com](../../../../apis/openapi/rest.cleverreach.com) | [main](../../../../apis/openapi/rest.cleverreach.com/main) |
+| [restcountries.com](../../../../apis/openapi/restcountries.com) | [main](../../../../apis/openapi/restcountries.com/main) |
 | [restdb.io](../../../../apis/openapi/restdb.io) | [main](../../../../apis/openapi/restdb.io/main) |
 | [restful4up.local](../../../../apis/openapi/restful4up.local) | [main](../../../../apis/openapi/restful4up.local/main) |
 | [restpac.groov.com](../../../../apis/openapi/restpac.groov.com) | [main](../../../../apis/openapi/restpac.groov.com/main) |
