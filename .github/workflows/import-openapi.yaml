@@ -301,7 +301,7 @@ jobs:
           ACTUAL_CONTENT_SUBPATH_IN_ZIP="${{ steps.call_apitools.outputs.actual_content_subpath_in_zip }}"
 
           EXTRACT_TEMP_DIR="openapi_temp_extract"
-          FINAL_OAK_TARGET_BASE="apis/openapi"
+          FINAL_TARGET_BASE="apis/openapi"
 
           echo "Ensuring temporary extraction directory $EXTRACT_TEMP_DIR exists and is empty..."
           rm -rf "$EXTRACT_TEMP_DIR"
@@ -318,11 +318,11 @@ jobs:
           ls -lA "$EXTRACT_TEMP_DIR"
 
           SOURCE_API_CONTENT_PATH="$EXTRACT_TEMP_DIR/$ACTUAL_CONTENT_SUBPATH_IN_ZIP"
-          OAK_API_CONTENT_PATH="$FINAL_OAK_TARGET_BASE/$ACTUAL_CONTENT_SUBPATH_IN_ZIP"
+          TARGET_API_CONTENT_PATH="$FINAL_TARGET_BASE/$ACTUAL_CONTENT_SUBPATH_IN_ZIP"
 
           echo "Determined actual content subpath in zip: $ACTUAL_CONTENT_SUBPATH_IN_ZIP"
           echo "Full source API content path (in temp extract): $SOURCE_API_CONTENT_PATH"
-          echo "Full OAK API content path (target in repo): $OAK_API_CONTENT_PATH"
+          echo "Full target API content path (in repo): $TARGET_API_CONTENT_PATH"
 
           if [ ! -d "$SOURCE_API_CONTENT_PATH" ]; then
               echo "::error::Source API content path '$SOURCE_API_CONTENT_PATH' does not exist after unzipping. Check zip structure and label logic."
@@ -336,13 +336,13 @@ jobs:
 
           echo "extract_temp_dir=$EXTRACT_TEMP_DIR" >> $GITHUB_OUTPUT
           echo "source_api_content_path=$SOURCE_API_CONTENT_PATH" >> $GITHUB_OUTPUT
-          echo "oak_api_content_path=$OAK_API_CONTENT_PATH" >> $GITHUB_OUTPUT
+          echo "target_api_content_path=$TARGET_API_CONTENT_PATH" >> $GITHUB_OUTPUT
 
       - name: Check for Duplicate API Version
         id: check_duplicate_version
         run: |
           SOURCE_API_CONTENT_PATH="${{ steps.unzip_files.outputs.source_api_content_path }}"
-          OAK_API_CONTENT_PATH="${{ steps.unzip_files.outputs.oak_api_content_path }}"
+          TARGET_API_CONTENT_PATH="${{ steps.unzip_files.outputs.target_api_content_path }}"
 
           DUPLICATE_FOUND=false
           DUPLICATE_VERSIONS=""
@@ -365,8 +365,8 @@ jobs:
 
             echo "Checking version directory '$version_dir_name' (version: $VERSION_LABEL)..."
 
-            if [ -d "$OAK_API_CONTENT_PATH/$version_dir_name" ]; then
-              echo "::error::Duplicate detected: version '$VERSION_LABEL' already exists at '$OAK_API_CONTENT_PATH/$version_dir_name/'."
+            if [ -d "$TARGET_API_CONTENT_PATH/$version_dir_name" ]; then
+              echo "::error::Duplicate detected: version '$VERSION_LABEL' already exists at '$TARGET_API_CONTENT_PATH/$version_dir_name/'."
               DUPLICATE_FOUND=true
               if [ -n "$DUPLICATE_VERSIONS" ]; then
                 DUPLICATE_VERSIONS="$DUPLICATE_VERSIONS, $VERSION_LABEL"
@@ -390,16 +390,16 @@ jobs:
         id: copy_files
         run: |
           SOURCE_API_CONTENT_PATH="${{ steps.unzip_files.outputs.source_api_content_path }}"
-          OAK_API_CONTENT_PATH="${{ steps.unzip_files.outputs.oak_api_content_path }}"
+          TARGET_API_CONTENT_PATH="${{ steps.unzip_files.outputs.target_api_content_path }}"
 
-          echo "Ensuring target OAK API directory '$OAK_API_CONTENT_PATH' exists..."
-          mkdir -p "$OAK_API_CONTENT_PATH"
+          echo "Ensuring target API directory '$TARGET_API_CONTENT_PATH' exists..."
+          mkdir -p "$TARGET_API_CONTENT_PATH"
 
-          echo "Copying version directories from '$SOURCE_API_CONTENT_PATH' to '$OAK_API_CONTENT_PATH'..."
+          echo "Copying version directories from '$SOURCE_API_CONTENT_PATH' to '$TARGET_API_CONTENT_PATH'..."
           find "$SOURCE_API_CONTENT_PATH" -mindepth 1 -maxdepth 1 -type d -print0 | while IFS= read -r -d $'\0' source_version_dir_path; do
             version_dir_name=$(basename "$source_version_dir_path")
             echo "Copying version directory: '$version_dir_name'"
-            rsync -a "$source_version_dir_path/" "$OAK_API_CONTENT_PATH/$version_dir_name/"
+            rsync -a "$source_version_dir_path/" "$TARGET_API_CONTENT_PATH/$version_dir_name/"
             if [ $? -ne 0 ]; then
               echo "::error::Failed to copy version directory '$version_dir_name' using rsync."
               exit 1
@@ -409,22 +409,22 @@ jobs:
 
           # Handle api-level meta.json
           SOURCE_META_JSON="$SOURCE_API_CONTENT_PATH/meta.json"
-          OAK_META_JSON="$OAK_API_CONTENT_PATH/meta.json"
+          TARGET_META_JSON="$TARGET_API_CONTENT_PATH/meta.json"
 
           echo "Handling meta.json..."
           echo "Source meta.json: $SOURCE_META_JSON"
-          echo "OAK target meta.json: $OAK_META_JSON"
+          echo "Target meta.json: $TARGET_META_JSON"
 
-          if [ ! -f "$OAK_META_JSON" ]; then
-            echo "$OAK_META_JSON does not exist in OAK. Copying from source..."
+          if [ ! -f "$TARGET_META_JSON" ]; then
+            echo "$TARGET_META_JSON does not exist in the target. Copying from source..."
             if [ -f "$SOURCE_META_JSON" ]; then
-              cp "$SOURCE_META_JSON" "$OAK_META_JSON"
-              echo "Copied new meta.json to $OAK_META_JSON."
+              cp "$SOURCE_META_JSON" "$TARGET_META_JSON"
+              echo "Copied new meta.json to $TARGET_META_JSON."
             else
               echo "::warning::meta.json not found in source at $SOURCE_META_JSON. Cannot copy."
             fi
           else
-            echo "Existing meta.json found at $OAK_META_JSON. Not overwriting."
+            echo "Existing meta.json found at $TARGET_META_JSON. Not overwriting."
           fi
 
       - name: Clean Up Temporary Files
@@ -456,10 +456,10 @@ jobs:
         run: |
           # set -x
           # Search within the path where files were copied into the repo for commit
-          SEARCH_PATH="${{ steps.unzip_files.outputs.oak_api_content_path }}"
+          SEARCH_PATH="${{ steps.unzip_files.outputs.target_api_content_path }}"
           
           if [ -z "$SEARCH_PATH" ]; then
-            echo "::warning::Search path for repair log (oak_api_content_path) is empty. Skipping log processing."
+            echo "::warning::Search path for repair log (target_api_content_path) is empty. Skipping log processing."
             echo "log_found=false" >> $GITHUB_OUTPUT
             echo "log_content_base64=" >> $GITHUB_OUTPUT # Ensure output is set
             exit 0 # Exit successfully, as this isn't a fatal error for the whole workflow

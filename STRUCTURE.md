@@ -1,6 +1,6 @@
-# Repository Structure (OAK Standard)
+# Repository Structure
 
-This document describes the standardized directory structure for an Open Agentic Knowledge (OAK) repository. This repository follows this standard to organize its API specifications and workflows.
+This document describes the standardized directory structure for the Jentic API Directory. This repository follows this structure to organize its API specifications and workflows.
 
 ## Overview
 
