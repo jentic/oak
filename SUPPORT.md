@@ -22,7 +22,7 @@ Before opening a support request, please check our resources:
 If you encounter a bug, have a question, or need guidance, here’s how to proceed:
 
 1. **Search existing issues**:  
-   Check the [GitHub Issues](https://github.com/jentic-public-apis/issues) to see if your question is already answered.
+   Check the [GitHub Issues](https://github.com/jentic/jentic-public-apis/issues) to see if your question is already answered.
 
 2. **Ask the community**:  
    Join our [Discord](https://discord.gg/yrxmDZWMqB) for general help, advice, or feature ideas.
