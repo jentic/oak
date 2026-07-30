@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OAK repository includes `feedback.json` files that document repairs and improvements made to OpenAPI specifications. These files provide create an audit trail for API specification quality improvements intended for future human and LLM use.
+The Jentic API Directory includes `feedback.json` files that document repairs and improvements made to OpenAPI specifications. These files provide create an audit trail for API specification quality improvements intended for future human and LLM use.
 
 ## Purpose
 

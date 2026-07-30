@@ -1,12 +1,12 @@
-# Contributing to The OAK Repository
+# Contributing to the Jentic API Directory
 
-Thank you for your interest in contributing to The OAK Repository! This document outlines the process for contributing to the Open Agentic Knowledge Repository.
+Thank you for your interest in contributing to the Jentic API Directory! This document outlines the process for contributing to the repository.
 
 ## Our Mission
 
-The OAK Repository aims to build an open knowledge foundation that empowers AI to interact with the world's APIs without artificial barriers or unnecessary intermediaries. By contributing, you're helping create a comprehensive "knowledge layer" for agents - a communal repository of detailed, AI-optimized information about public APIs.
+The Jentic API Directory aims to build an open knowledge foundation that empowers AI to interact with the world's APIs without artificial barriers or unnecessary intermediaries. By contributing, you're helping create a comprehensive "knowledge layer" for agents - a communal repository of detailed, AI-optimized information about public APIs.
 
-> **Note:** We are actively developing tools to make the feedback and PR process easier for contributors. Stay tuned for updates that will streamline the contribution workflow to help you effortlessly participate in building The OAK Repository.
+> **Note:** We are actively developing tools to make the feedback and PR process easier for contributors. Stay tuned for updates that will streamline the contribution workflow to help you effortlessly participate in building the Jentic API Directory.
 
 ## Code of Conduct
 
@@ -39,7 +39,7 @@ We welcome contributions in the following areas:
 
 ### For Arazzo Workflows
 
-Arazzo workflows are a core focus of The OAK Repository. They define composable operations across one or more APIs. Contributed workflows:
+Arazzo workflows are a core focus of the Jentic API Directory. They define composable operations across one or more APIs. Contributed workflows:
 
 - Must follow the OpenAPI Initiative's Arazzo specification
 - Should include clear documentation of inputs, outputs, and purpose

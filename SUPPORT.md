@@ -9,8 +9,7 @@ We want to make sure you can get the help you need.
 
 Before opening a support request, please check our resources:
 
-* [**OAK.md**](OAK.md) - The OAK manifesto: principles and vision behind the Open Agentic Knowledge (OAK) initiative.
-* [**STRUCTURE.md**](STRUCTURE.md) - The OAK (Open Agentic Knowledge) Standard for repository structure
+* [**STRUCTURE.md**](STRUCTURE.md) - The standardized repository structure for the Jentic API Directory
 * [**FEEDBACK-FILES.md**](FEEDBACK-FILES.md) - Documentation of feedback.json files that track API specification repairs
 * [**CONTRIBUTING.md**](CONTRIBUTING.md) - Guidelines for contributing to the repository
 * [**CODE_OF_CONDUCT.md**](CODE_OF_CONDUCT.md) - Community standards and expectations
