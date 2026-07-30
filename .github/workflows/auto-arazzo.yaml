@@ -19,28 +19,41 @@
 
         - name: Extract OpenAPI URL and Details from issue body
           id: extract_info
+          env:
+            # SECURITY: the issue body is attacker-controlled — pass it via env,
+            # never via ${{ }} interpolation inside run:. See GHSA-xfrx-9433-mqfp.
+            ISSUE_BODY: ${{ github.event.issue.body }}
+            ISSUE_NUM: ${{ github.event.issue.number }}
           run: |
             echo "Parsing OpenAPI URL and details from issue..."
-            BODY="${{ github.event.issue.body }}"
-            URL=$(echo "$BODY" | grep -oP '(?<=openapi_url:).*' | head -n 1 | xargs)
-            # Attempt to extract vendor and api_name from URL structure
-            # Example: .../apis/openapi/vendor.com/api_name/version/openapi.json
-            VENDOR_NAME=$(echo "$URL" | grep -oP '(?<=apis/openapi/)[^/]+' | head -n 1)
-            API_NAME=$(echo "$URL" | grep -oP '(?<=apis/openapi/'"$VENDOR_NAME"'/)[^/]+' | head -n 1)
-            # Extract version from the part right before openapi.json
-            API_VERSION=$(echo "$URL" | grep -oP '[^/]+(?=/openapi\.json)' | head -n 1)
-
-            # Extract Workflow Descriptions section as a JSON array
-            # Looks for the specific heading from the issue template
-            WORKFLOW_DESCRIPTIONS=$(echo "$BODY" | awk '/^### Workflow Descriptions \(Optional\)/{flag=1;next}/^## |^### /{if(flag)flag=0}flag' | grep -E '^[-*] ' | sed -E 's/^[-*] *//' | jq -R . | jq -sc .)
+            BODY=$(printf '%s' "$ISSUE_BODY" | tr -d '\r')
+            URL=$(printf '%s\n' "$BODY" | grep -oP '(?<=openapi_url:).*' | head -n 1 | xargs)
 
             if [ -z "$URL" ]; then
               echo "::error::Could not extract openapi_url from issue body."
               exit 1
             fi
+            # Validate the URL shape (defense in depth: it flows into later
+            # steps and the PR body). http(s) only, no whitespace/quotes/backticks.
+            if ! printf '%s\n' "$URL" | grep -qE '^https?://[A-Za-z0-9._~:/?#@!$&()*+,;=%-]+$'; then
+              echo "::error::openapi_url does not look like a valid http(s) URL."
+              exit 1
+            fi
+
+            # Attempt to extract vendor and api_name from URL structure
+            # Example: .../apis/openapi/vendor.com/api_name/version/openapi.json
+            VENDOR_NAME=$(printf '%s\n' "$URL" | grep -oP '(?<=apis/openapi/)[^/]+' | head -n 1)
+            API_NAME=$(printf '%s\n' "$URL" | grep -oP '(?<=apis/openapi/'"$VENDOR_NAME"'/)[^/]+' | head -n 1)
+            # Extract version from the part right before openapi.json
+            API_VERSION=$(printf '%s\n' "$URL" | grep -oP '[^/]+(?=/openapi\.json)' | head -n 1)
+
+            # Extract Workflow Descriptions section as a JSON array
+            # Looks for the specific heading from the issue template
+            WORKFLOW_DESCRIPTIONS=$(printf '%s\n' "$BODY" | awk '/^### Workflow Descriptions \(Optional\)/{flag=1;next}/^## |^### /{if(flag)flag=0}flag' | grep -E '^[-*] ' | sed -E 's/^[-*] *//' | jq -R . | jq -sc .)
+
             if [ -z "$VENDOR_NAME" ]; then
               echo "::warning::Could not automatically determine VENDOR_NAME from URL: $URL. Defaulting path."
-              VENDOR_NAME="unknown-vendor-${{ github.event.issue.number }}"
+              VENDOR_NAME="unknown-vendor-${ISSUE_NUM}"
             fi
             if [ -z "$API_NAME" ]; then
               # Assume 'main' if api_name part is missing or different structure
@@ -67,14 +80,20 @@
 
         - name: Call Arazzo Generator API and Create File
           id: call_api_and_create_file
+          env:
+            # Values derived from the issue body are untrusted — env only.
+            OPENAPI_URL: ${{ steps.extract_info.outputs.openapi_url }}
+            WF_DESCRIPTIONS_JSON: ${{ steps.extract_info.outputs.workflow_descriptions }}
+            VENDOR: ${{ steps.extract_info.outputs.vendor_name }}
+            API: ${{ steps.extract_info.outputs.api_name }}
           run: |
-            echo "Calling Arazzo Generator API with OpenAPI URL: ${{ steps.extract_info.outputs.openapi_url }}"
+            echo "Calling Arazzo Generator API with OpenAPI URL: $OPENAPI_URL"
             # Prepare workflow_descriptions JSON for curl
-            WF_DESCRIPTIONS='${{ steps.extract_info.outputs.workflow_descriptions }}'
+            WF_DESCRIPTIONS="$WF_DESCRIPTIONS_JSON"
             if [ "$WF_DESCRIPTIONS" = "" ] || [ "$WF_DESCRIPTIONS" = "null" ] || [ "$WF_DESCRIPTIONS" = "[]" ]; then
               WF_DESCRIPTIONS=null
             fi
-            RESPONSE=$(jq -n --arg url "${{ steps.extract_info.outputs.openapi_url }}" \
+            RESPONSE=$(jq -n --arg url "$OPENAPI_URL" \
                           --arg format "json" \
                           --argjson validate_spec true \
                           --argjson direct_llm false \
@@ -85,8 +104,6 @@
                 -d @-)
 
             # Determine output directory structure based on vendor/api name
-            VENDOR="${{ steps.extract_info.outputs.vendor_name }}"
-            API="${{ steps.extract_info.outputs.api_name }}"
             if [ "$API" == "main" ] || [ -z "$API" ]; then
               TARGET_SUBDIR="$VENDOR"
             else
@@ -107,13 +124,19 @@
               echo "Response was:"
               echo "$RESPONSE"
               echo "api_failed=true" >> $GITHUB_OUTPUT
-              echo "error_response=$RESPONSE" >> $GITHUB_OUTPUT
+              # Multiline / untrusted response: use heredoc output syntax so it
+              # cannot inject additional GITHUB_OUTPUT keys.
+              {
+                echo 'error_response<<AREOF'
+                echo "$RESPONSE"
+                echo 'AREOF'
+              } >> $GITHUB_OUTPUT
               exit 1
             fi
 
             # Extract fallback status/message if custom workflow descriptions failed and caused regeneration
             FALLBACK_USED=$(echo "$RESPONSE" | jq -r '.fallback_used // false')
-            FALLBACK_MSG=$(echo "$RESPONSE" | jq -r '.message // empty')
+            FALLBACK_MSG=$(echo "$RESPONSE" | jq -r '.message // empty' | tr -d '\n\r')
 
             # Build a note for the PR body
             # If the fallback regeneration logic is used after custom workflow descriptions failed to generate arazzo file then add a warning note
@@ -169,10 +192,13 @@
         - name: Comment on Issue if API Failed
           if: failure() && steps.call_api_and_create_file.outputs.api_failed == 'true'
           uses: actions/github-script@v7
+          env:
+            # Untrusted API response — env only, never into the script source.
+            API_ERROR_RESPONSE: ${{ steps.call_api_and_create_file.outputs.error_response }}
           with:
             github-token: ${{ secrets.GITHUB_TOKEN }}
             script: |
-              const errorResponse = `${{ steps.call_api_and_create_file.outputs.error_response }}`;
+              const errorResponse = process.env.API_ERROR_RESPONSE || '';
               let errorMessage = "❌ **Failed to generate Arazzo specification**\n\n";
               
               try {
