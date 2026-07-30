@@ -43,7 +43,8 @@ jobs:
         id: extract_info_from_inputs
         env:
           # Inputs are passed via env (not interpolated into the script) so the
-          # shell never evaluates their content. See GHSA-xfrx-9433-mqfp.
+          # shell never evaluates their content. See the workflow-injection fix
+          # (jentic/jentic-public-apis#21955).
           INPUT_URL: ${{ inputs.url }}
           INPUT_VENDOR: ${{ inputs.vendor }}
           INPUT_API: ${{ inputs.api }}
@@ -102,7 +103,7 @@ jobs:
           # SECURITY: the issue body is attacker-controlled. It must only enter
           # the script through the environment — never via ${{ }} interpolation
           # inside run:, which lets `$(...)`, backticks, or a stray `"` execute
-          # arbitrary commands on the runner. See GHSA-xfrx-9433-mqfp.
+          # arbitrary commands on the runner (jentic/jentic-public-apis#21955).
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
           # set -x # Enable debugging output
@@ -123,8 +124,11 @@ jobs:
           fi
 
           # Validate the URL shape (defense in depth: it flows into later steps
-          # and into the PR body). http(s) only, no whitespace or shell metachars.
-          if ! printf '%s\n' "$URL" | grep -qE '^https?://[A-Za-z0-9._~:/?#@!$&()*+,;=%-]+$'; then
+          # and into the PR body). http(s) only; reject whitespace, quotes and
+          # backticks — the characters that would let it break out of a shell
+          # context downstream. (Values reach the shell only via env, so this is
+          # belt-and-braces, not the primary control.)
+          if ! printf '%s\n' "$URL" | grep -qE "^https?://[]A-Za-z0-9._~:/?#@!\$&'()*+,;=%[-]+\$"; then
             echo "::error::'import_oas_url:' does not look like a valid http(s) URL."
             echo "extract_failed=true" >> $GITHUB_OUTPUT
             echo "error_message=The 'import_oas_url:' value must be a plain http(s) URL without spaces, quotes, or backticks." >> $GITHUB_OUTPUT
@@ -142,12 +146,14 @@ jobs:
           fi
 
           # Validate the vendor name: it becomes a directory under apis/openapi/
-          # and part of the PR branch name, so restrict it to a safe charset
-          # (also rules out path traversal like '../..').
-          if ! printf '%s\n' "$VENDOR_NAME" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
+          # and part of the PR branch name. Allow the documented "<vendor>/<api>"
+          # form (a single optional slash segment; see the issue template) but
+          # nothing else — each segment must start alphanumeric, so no path
+          # traversal ('..', leading dot) and no shell metacharacters.
+          if ! printf '%s\n' "$VENDOR_NAME" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?$'; then
             echo "::error::'vendor_name:' contains unsupported characters."
             echo "extract_failed=true" >> $GITHUB_OUTPUT
-            echo "error_message=The 'vendor_name:' value may only contain letters, digits, dots, hyphens, and underscores (and must not start with a dot)." >> $GITHUB_OUTPUT
+            echo "error_message=The 'vendor_name:' value may only contain letters, digits, dots, hyphens, and underscores, with an optional single '/<api>' segment (e.g. 'acme.com' or 'acme.com/widgets'); each segment must start with a letter or digit." >> $GITHUB_OUTPUT
             exit 1
           fi
 
@@ -310,9 +316,13 @@ jobs:
           if [ "$CLI_EXIT_CODE" -ne 0 ]; then
               echo "::error::jentic-apitools import failed with exit code $CLI_EXIT_CODE."
               echo "api_failed=true" >> $GITHUB_OUTPUT
-              echo 'error_response<<EREOF' >> $GITHUB_OUTPUT
+              # Random delimiter: CLI stderr is untrusted and could otherwise
+              # contain a line matching a fixed delimiter and break out of the
+              # heredoc (a GITHUB_OUTPUT injection).
+              DELIM="EOF_$(openssl rand -hex 16)"
+              echo "error_response<<$DELIM" >> $GITHUB_OUTPUT
               echo "${CLI_STDERR:-Import CLI failed with exit code $CLI_EXIT_CODE. No additional error details available.}" >> $GITHUB_OUTPUT
-              echo 'EREOF' >> $GITHUB_OUTPUT
+              echo "$DELIM" >> $GITHUB_OUTPUT
               exit 1
           fi
 
@@ -425,7 +435,7 @@ jobs:
           echo "duplicate_detected=$DUPLICATE_FOUND" >> $GITHUB_OUTPUT
           # Version labels come from the imported zip's meta.json (untrusted):
           # strip newlines so they cannot inject extra GITHUB_OUTPUT keys.
-          echo "duplicate_versions=$(printf '%s' "$DUPLICATE_VERSIONS" | tr -d '\n\r')" >> $GITHUB_OUTPUT
+          echo "duplicate_versions=$(printf '%s' "$DUPLICATE_VERSIONS" | tr '\n\r' '  ')" >> $GITHUB_OUTPUT
 
           if [ "$DUPLICATE_FOUND" = true ]; then
             echo "::error::Import rejected: the following API version(s) already exist in the repository: $DUPLICATE_VERSIONS"

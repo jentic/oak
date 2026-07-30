@@ -21,7 +21,8 @@
           id: extract_info
           env:
             # SECURITY: the issue body is attacker-controlled — pass it via env,
-            # never via ${{ }} interpolation inside run:. See GHSA-xfrx-9433-mqfp.
+            # never via ${{ }} interpolation inside run:
+            # (jentic/jentic-public-apis#21955).
             ISSUE_BODY: ${{ github.event.issue.body }}
             ISSUE_NUM: ${{ github.event.issue.number }}
           run: |
@@ -31,12 +32,18 @@
 
             if [ -z "$URL" ]; then
               echo "::error::Could not extract openapi_url from issue body."
+              echo "extract_failed=true" >> $GITHUB_OUTPUT
+              echo "error_message=Could not extract required 'openapi_url:' field from issue body. Please ensure your issue contains a line with 'openapi_url: <your-url>'." >> $GITHUB_OUTPUT
               exit 1
             fi
             # Validate the URL shape (defense in depth: it flows into later
-            # steps and the PR body). http(s) only, no whitespace/quotes/backticks.
-            if ! printf '%s\n' "$URL" | grep -qE '^https?://[A-Za-z0-9._~:/?#@!$&()*+,;=%-]+$'; then
+            # steps and the PR body). http(s) only; reject whitespace, quotes and
+            # backticks — the characters that would let it break out of a shell
+            # context downstream.
+            if ! printf '%s\n' "$URL" | grep -qE "^https?://[]A-Za-z0-9._~:/?#@!\$&'()*+,;=%[-]+\$"; then
               echo "::error::openapi_url does not look like a valid http(s) URL."
+              echo "extract_failed=true" >> $GITHUB_OUTPUT
+              echo "error_message=The 'openapi_url:' value must be a plain http(s) URL without spaces, quotes, or backticks." >> $GITHUB_OUTPUT
               exit 1
             fi
 
@@ -65,6 +72,20 @@
               echo "::warning::Could not automatically determine API_VERSION from URL: $URL. Assuming 'latest'."
               API_VERSION="latest"
             fi
+
+            # The vendor/api/version fields are parsed out of the (untrusted) URL
+            # and flow into the git branch name, commit message, and PR
+            # title/body. Restrict each to a safe path/ref charset so a crafted
+            # URL cannot inject '..', a leading '-', or ref-breaking characters.
+            for field in VENDOR_NAME API_NAME API_VERSION; do
+              value=$(eval "printf '%s' \"\$$field\"")
+              if ! printf '%s' "$value" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
+                echo "::error::Derived $field ('$value') contains unsupported characters."
+                echo "extract_failed=true" >> $GITHUB_OUTPUT
+                echo "error_message=The OpenAPI URL path segment used for $field ('$value') may only contain letters, digits, dots, hyphens, and underscores and must start with a letter or digit." >> $GITHUB_OUTPUT
+                exit 1
+              fi
+            done
 
             echo "Extracted URL: $URL"
             echo "Determined Vendor: $VENDOR_NAME"
@@ -124,12 +145,14 @@
               echo "Response was:"
               echo "$RESPONSE"
               echo "api_failed=true" >> $GITHUB_OUTPUT
-              # Multiline / untrusted response: use heredoc output syntax so it
-              # cannot inject additional GITHUB_OUTPUT keys.
+              # Random delimiter: the API response is untrusted and could
+              # otherwise contain a line matching a fixed delimiter and break
+              # out of the heredoc (a GITHUB_OUTPUT injection).
+              DELIM="EOF_$(openssl rand -hex 16)"
               {
-                echo 'error_response<<AREOF'
+                echo "error_response<<$DELIM"
                 echo "$RESPONSE"
-                echo 'AREOF'
+                echo "$DELIM"
               } >> $GITHUB_OUTPUT
               exit 1
             fi
@@ -189,41 +212,48 @@
             # Optional: Add labels, assignees etc.
             # labels: automated-pr, arazzo-spec
 
-        - name: Comment on Issue if API Failed
-          if: failure() && steps.call_api_and_create_file.outputs.api_failed == 'true'
+        - name: Comment on Issue if Extraction or API Failed
+          if: failure() && (steps.extract_info.outputs.extract_failed == 'true' || steps.call_api_and_create_file.outputs.api_failed == 'true')
           uses: actions/github-script@v7
           env:
             # Untrusted API response — env only, never into the script source.
             API_ERROR_RESPONSE: ${{ steps.call_api_and_create_file.outputs.error_response }}
+            EXTRACT_FAILED: ${{ steps.extract_info.outputs.extract_failed }}
+            EXTRACT_ERROR_MESSAGE: ${{ steps.extract_info.outputs.error_message }}
           with:
             github-token: ${{ secrets.GITHUB_TOKEN }}
             script: |
-              const errorResponse = process.env.API_ERROR_RESPONSE || '';
               let errorMessage = "❌ **Failed to generate Arazzo specification**\n\n";
-              
-              try {
-                const response = JSON.parse(errorResponse);
-                if (response.error) {
-                  errorMessage += `**Error:** ${response.error}\n\n`;
+
+              if (process.env.EXTRACT_FAILED === 'true') {
+                errorMessage += `**Error:** ${process.env.EXTRACT_ERROR_MESSAGE || 'Could not parse the issue.'}\n\n`;
+                errorMessage += "Please check your issue format and ensure it contains a valid `openapi_url: <url>` line.\n\n";
+              } else {
+                const errorResponse = process.env.API_ERROR_RESPONSE || '';
+                try {
+                  const response = JSON.parse(errorResponse);
+                  if (response.error) {
+                    errorMessage += `**Error:** ${response.error}\n\n`;
+                  }
+                  if (response.message) {
+                    errorMessage += `**Details:** ${response.message}\n\n`;
+                  }
+                  if (response.validation_errors && response.validation_errors.length > 0) {
+                    errorMessage += `**Validation Errors:**\n`;
+                    response.validation_errors.forEach(error => {
+                      errorMessage += `- ${error}\n`;
+                    });
+                    errorMessage += "\n";
+                  }
+                } catch (e) {
+                  errorMessage += `**Raw Response:** \`\`\`\n${errorResponse}\n\`\`\`\n\n`;
                 }
-                if (response.message) {
-                  errorMessage += `**Details:** ${response.message}\n\n`;
-                }
-                if (response.validation_errors && response.validation_errors.length > 0) {
-                  errorMessage += `**Validation Errors:**\n`;
-                  response.validation_errors.forEach(error => {
-                    errorMessage += `- ${error}\n`;
-                  });
-                  errorMessage += "\n";
-                }
-              } catch (e) {
-                errorMessage += `**Raw Response:** \`\`\`\n${errorResponse}\n\`\`\`\n\n`;
+                errorMessage += "There was an error generating the Arazzo spec from the provided OpenAPI specification URL.\n\n";
               }
-              
-              errorMessage += "There was an error generating the Arazzo spec from the provided OpenAPI specification URL.\n\n";
+
               errorMessage += "If you believe this is a bug with the Arazzo generator or need additional support, please contact the development team at Jentic Community Discord (https://discord.gg/yrxmDZWMqB).\n\n";
               errorMessage += "Alternatively create a new issue reporting the bug (https://github.com/jentic/jentic-public-apis/issues/new?template=BLANK_ISSUE).";
-              
+
               github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
