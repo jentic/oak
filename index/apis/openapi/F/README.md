@@ -1,6 +1,6 @@
 # APIs — F
 
-Browsing 103 APIs starting with **F**.
+Browsing 104 APIs starting with **F**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · **F** · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -104,6 +104,7 @@ Browsing 103 APIs starting with **F**.
 | [fullcontact.com](../../../../apis/openapi/fullcontact.com) | [main](../../../../apis/openapi/fullcontact.com/main) |
 | [fullenrich.com](../../../../apis/openapi/fullenrich.com) | [main](../../../../apis/openapi/fullenrich.com/main) |
 | [fullhunt.io](../../../../apis/openapi/fullhunt.io) | [main](../../../../apis/openapi/fullhunt.io/main) |
+| [fundz.net](../../../../apis/openapi/fundz.net) | [main](../../../../apis/openapi/fundz.net/main) |
 | [fungenerators.com](../../../../apis/openapi/fungenerators.com) | [11 APIs](../../../../apis/openapi/fungenerators.com) |
 | [funtranslations.com](../../../../apis/openapi/funtranslations.com) | [braile](../../../../apis/openapi/funtranslations.com/braile) · [index](../../../../apis/openapi/funtranslations.com/index) · [starwars](../../../../apis/openapi/funtranslations.com/starwars) |
 | [furkot.com](../../../../apis/openapi/furkot.com) | [main](../../../../apis/openapi/furkot.com/main) |
