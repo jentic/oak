@@ -1,0 +1,2833 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Fundz API",
+    "version": "1.1.0",
+    "description": "The Fundz API delivers structured private-market events \u2014 funding rounds, crowdfunding campaigns, acquisitions, executive appointments, business agreements and product launches \u2014 collected continuously from SEC filings, state registries and company disclosures since 2015.\n\n**Keys are self-serve.** A working key takes about five seconds at https://www.fundz.net/api-trial \u2014 no sales call, no licence tier, no card required to start. Pricing is published at https://www.fundz.net/pricing rather than quoted, so an agent can evaluate cost before committing.\n\n**Shape.** Every endpoint is a `GET` returning `{_attribution, _licensing, data[], meta}`. Pages hold 25 records; walk them with `page` and `meta.next_page`. Sort is newest-first by `created_at`, so polling `created_from` is the idiomatic way to consume the feed incrementally.\n\n**Coverage.** 637 funding events in the last 7 days (113 in the last 24h) and 45,861 investors linked to rounds, verified live 2026-08-05. Organization records carry domain, LinkedIn, location, industries, headcount and public/private status.\n\n**Auth.** The API key is the raw value of the `Authorization` header \u2014 there is no `Bearer` prefix.\n\n**Errors.** `403` and `404` return `{type, message}`. `429` returns a different shape \u2014 `{error, current_tier, queries_limit, remaining_searches, upgrade_url}`. Both are documented below as they actually behave; the API does not currently emit RFC 9457 Problem Details.\n\n**Attribution.** Every response carries `_attribution` and `_licensing`. The API is free to call on a self-serve key; commercial redistribution or embedding requires a licence (john@fundz.net).",
+    "contact": {
+      "name": "Fundz API Support",
+      "email": "john@fundz.net",
+      "url": "https://app.fundz.net/fundz-api"
+    },
+    "license": {
+      "name": "Fundz API Terms of Service",
+      "url": "https://www.fundz.net/terms"
+    },
+    "termsOfService": "https://www.fundz.net/terms"
+  },
+  "servers": [
+    {
+      "url": "https://api.fundz.net",
+      "description": "Production API server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "name": "Authorization",
+        "in": "header",
+        "description": "API key passed as the raw value of the `Authorization` header \u2014 **no `Bearer` prefix**.\n\n```\nAuthorization: YOUR_API_KEY\n```\n\nGet a key instantly and self-serve at https://www.fundz.net/api-trial. Requests without a valid key return HTTP 403. Your remaining quota is reported on every successful response as `meta.remaining_searches`, and your plan as `meta.tier`."
+      }
+    },
+    "schemas": {
+      "Meta": {
+        "type": "object",
+        "description": "Pagination and quota metadata returned with every list response.",
+        "properties": {
+          "current_page": {
+            "type": "integer",
+            "description": "The page you requested. Pages hold 25 records."
+          },
+          "next_page": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Next page number, or null on the last page."
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "Total records matching the query across all pages."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages available."
+          },
+          "tier": {
+            "type": "string",
+            "description": "The plan attached to your API key, e.g. \"Starter\", \"Pro\", \"Strategic\"."
+          },
+          "remaining_searches": {
+            "type": "integer",
+            "description": "Requests left in your current quota window."
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "description": "Standard error body, returned for 403 and 404.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Error class, e.g. \"Unauthorized\" or \"NotFound\"."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable explanation."
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ]
+      },
+      "RateLimitError": {
+        "type": "object",
+        "description": "Returned with HTTP 429 when the daily request quota for your tier is exhausted. Note this body has a different shape from the other error responses.",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Always \"rate_limit_exceeded\"."
+          },
+          "current_tier": {
+            "type": "string",
+            "description": "The plan attached to your key."
+          },
+          "queries_limit": {
+            "type": "integer",
+            "description": "Your daily request allowance."
+          },
+          "remaining_searches": {
+            "type": "integer",
+            "description": "Always 0 in this response."
+          },
+          "upgrade_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where to raise the limit."
+          }
+        }
+      },
+      "Organization": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Company description."
+          },
+          "domain": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+              },
+              "description": {
+                "type": "string",
+                "nullable": true,
+                "description": "Company description."
+              },
+              "logo": {
+                "type": "string",
+                "format": "uri",
+                "description": "Company logo image URL."
+              },
+              "name": {
+                "type": "string",
+                "description": "Company name."
+              },
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "nullable": true,
+                "description": "Company website URL."
+              },
+              "website": {
+                "type": "string",
+                "format": "uri",
+                "description": "Company website."
+              }
+            },
+            "nullable": true,
+            "description": "The company web domain, resolved and verified."
+          },
+          "founded": {
+            "type": "string",
+            "nullable": true,
+            "description": "Year the company was founded, where known."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+          },
+          "industries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Human-readable headline for the event."
+                }
+              },
+              "description": "Industry classifications applied to the company."
+            },
+            "description": "Industry classifications applied to the company."
+          },
+          "is_public_company": {
+            "type": "boolean",
+            "description": "True when the company is publicly traded."
+          },
+          "linkedin_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Company LinkedIn page."
+          },
+          "list_badges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "list_name": {
+                  "type": "string"
+                },
+                "list_year": {
+                  "type": "integer"
+                },
+                "rank": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "description": "Badges applied to the company by Fundz curation lists."
+            },
+            "description": "Badges applied to the company by Fundz curation lists."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+              },
+              "country": {
+                "type": "string",
+                "description": "Country name."
+              },
+              "short_description": {
+                "type": "string",
+                "description": "Full location string, e.g. \"San Francisco, California, United States\"."
+              },
+              "title": {
+                "type": "string",
+                "description": "Human-readable headline for the event."
+              }
+            },
+            "nullable": true,
+            "description": "Company headquarters location."
+          },
+          "name": {
+            "type": "string",
+            "description": "Company name."
+          },
+          "number_of_employees": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Headcount, where known. Null when not disclosed."
+          },
+          "status_code": {
+            "type": "string",
+            "description": "Company status, e.g. \"private\" or \"public\"."
+          },
+          "status_label": {
+            "type": "string",
+            "description": "Display form of status_code."
+          },
+          "ticker": {
+            "type": "string",
+            "nullable": true,
+            "description": "Stock ticker for public companies. Null for private companies."
+          }
+        },
+        "description": "The company the event is about. Identical shape on every endpoint."
+      },
+      "Funding": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Fundz published the event, in UTC. This is the field to poll on for new events."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+          },
+          "investors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Human-readable headline for the event."
+                }
+              },
+              "description": "Investors participating in this round, linked to the Fundz investor graph (45,855 investors)."
+            },
+            "description": "Investors participating in this round, linked to the Fundz investor graph (45,855 investors)."
+          },
+          "money_raised": {
+            "type": "string",
+            "nullable": true,
+            "description": "Amount raised, as a display string, e.g. \"$40 Million\"."
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "series": {
+            "type": "string",
+            "description": "Funding stage, e.g. \"Seed\", \"Series A\", \"Series B\"."
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The public source the event was extracted from (press release, filing or company announcement)."
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable headline for the event."
+          },
+          "use_of_proceeds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        },
+        "description": "A single funding round."
+      },
+      "FundingPage": {
+        "type": "object",
+        "description": "A page of funding rounds.",
+        "properties": {
+          "_attribution": {
+            "type": "string",
+            "description": "Required attribution string. Display or retain it when surfacing this data."
+          },
+          "_licensing": {
+            "type": "string",
+            "description": "Licensing terms. Commercial redistribution or embedding requires a licence."
+          },
+          "data": {
+            "type": "array",
+            "description": "The funding rounds on this page, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/Funding"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "upgrade_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where to raise your plan quota. Returned at the top level of the envelope, not inside meta."
+          }
+        }
+      },
+      "Crowdfunding": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Fundz published the event, in UTC. This is the field to poll on for new events."
+          },
+          "deadline_date": {
+            "type": "string",
+            "nullable": true
+          },
+          "filing": {
+            "type": "string"
+          },
+          "financials": {
+            "type": "object",
+            "properties": {
+              "auditor": {
+                "type": "string"
+              },
+              "eps_basic": {
+                "type": "string"
+              },
+              "net_income": {
+                "type": "string"
+              },
+              "eps_diluted": {
+                "type": "string"
+              },
+              "total_assets": {
+                "type": "string"
+              },
+              "long_term_debt": {
+                "type": "string"
+              },
+              "total_revenues": {
+                "type": "string"
+              },
+              "accounts_payable": {
+                "type": "string"
+              },
+              "cash_equivalents": {
+                "type": "string"
+              },
+              "cost_and_expenses": {
+                "type": "string"
+              },
+              "total_liabilities": {
+                "type": "string"
+              },
+              "accounts_receivable": {
+                "type": "string"
+              },
+              "full_time_employees": {
+                "type": "string"
+              },
+              "part_time_employees": {
+                "type": "string"
+              },
+              "investment_securities": {
+                "type": "string"
+              },
+              "property_plant_equipment": {
+                "type": "string"
+              },
+              "total_stockholder_equity": {
+                "type": "string"
+              },
+              "depreciation_amortization": {
+                "type": "string"
+              },
+              "total_liabilities_and_equity": {
+                "type": "string"
+              },
+              "price_per_security": {
+                "type": "string"
+              },
+              "securities_offered": {
+                "type": "string"
+              }
+            },
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+          },
+          "issuer_contact_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuer_name": {
+            "type": "string"
+          },
+          "issuer_organization": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+              },
+              "industries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Human-readable headline for the event."
+                    }
+                  },
+                  "description": "Industry classifications applied to the company."
+                },
+                "description": "Industry classifications applied to the company."
+              },
+              "is_public_company": {
+                "type": "boolean",
+                "description": "True when the company is publicly traded."
+              },
+              "list_badges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "list_name": {
+                      "type": "string"
+                    },
+                    "list_year": {
+                      "type": "integer"
+                    },
+                    "rank": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "description": "Badges applied to the company by Fundz curation lists."
+                },
+                "description": "Badges applied to the company by Fundz curation lists."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "Country name."
+                  },
+                  "short_description": {
+                    "type": "string",
+                    "description": "Full location string, e.g. \"San Francisco, California, United States\"."
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Human-readable headline for the event."
+                  }
+                },
+                "description": "Company headquarters location."
+              },
+              "name": {
+                "type": "string",
+                "description": "Company name."
+              },
+              "number_of_employees": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Headcount, where known. Null when not disclosed."
+              },
+              "status_code": {
+                "type": "string",
+                "description": "Company status, e.g. \"private\" or \"public\"."
+              },
+              "status_label": {
+                "type": "string",
+                "description": "Display form of status_code."
+              },
+              "ticker": {
+                "type": "string",
+                "nullable": true,
+                "description": "Stock ticker for public companies. Null for private companies."
+              }
+            }
+          },
+          "issuer_phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuer_website": {
+            "type": "string",
+            "nullable": true
+          },
+          "jurisdictions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "offering_amount": {
+            "type": "string"
+          },
+          "offerred_type": {
+            "type": "string"
+          },
+          "portal": {
+            "type": "string",
+            "nullable": true
+          },
+          "portal_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "sec_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "state": {
+            "type": "string"
+          },
+          "street1": {
+            "type": "string"
+          },
+          "street2": {
+            "type": "string",
+            "nullable": true
+          },
+          "tier": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable headline for the event."
+          },
+          "zip_code": {
+            "type": "string"
+          }
+        },
+        "description": "A single crowdfunding campaign."
+      },
+      "CrowdfundingPage": {
+        "type": "object",
+        "description": "A page of crowdfunding campaigns.",
+        "properties": {
+          "_attribution": {
+            "type": "string",
+            "description": "Required attribution string. Display or retain it when surfacing this data."
+          },
+          "_licensing": {
+            "type": "string",
+            "description": "Licensing terms. Commercial redistribution or embedding requires a licence."
+          },
+          "data": {
+            "type": "array",
+            "description": "The crowdfunding campaigns on this page, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/Crowdfunding"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "upgrade_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where to raise your plan quota. Returned at the top level of the envelope, not inside meta."
+          }
+        }
+      },
+      "Acquisition": {
+        "type": "object",
+        "properties": {
+          "acquirees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+                },
+                "is_public_company": {
+                  "type": "boolean",
+                  "description": "True when the company is publicly traded."
+                },
+                "list_badges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "list_name": {
+                        "type": "string"
+                      },
+                      "list_year": {
+                        "type": "integer"
+                      },
+                      "rank": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Badges applied to the company by Fundz curation lists."
+                  },
+                  "description": "Badges applied to the company by Fundz curation lists."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Company name."
+                },
+                "number_of_employees": {
+                  "type": "integer",
+                  "nullable": true,
+                  "description": "Headcount, where known. Null when not disclosed."
+                },
+                "status_code": {
+                  "type": "string",
+                  "description": "Company status, e.g. \"private\" or \"public\"."
+                },
+                "status_label": {
+                  "type": "string",
+                  "description": "Display form of status_code."
+                },
+                "ticker": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Stock ticker for public companies. Null for private companies."
+                }
+              }
+            }
+          },
+          "acquirers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+                },
+                "industries": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Human-readable headline for the event."
+                      }
+                    },
+                    "description": "Industry classifications applied to the company."
+                  },
+                  "description": "Industry classifications applied to the company."
+                },
+                "is_public_company": {
+                  "type": "boolean",
+                  "description": "True when the company is publicly traded."
+                },
+                "list_badges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "list_name": {
+                        "type": "string"
+                      },
+                      "list_year": {
+                        "type": "integer"
+                      },
+                      "rank": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Badges applied to the company by Fundz curation lists."
+                  },
+                  "description": "Badges applied to the company by Fundz curation lists."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "Country name."
+                    },
+                    "short_description": {
+                      "type": "string",
+                      "description": "Full location string, e.g. \"San Francisco, California, United States\"."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Human-readable headline for the event."
+                    }
+                  },
+                  "nullable": true,
+                  "description": "Company headquarters location."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Company name."
+                },
+                "number_of_employees": {
+                  "type": "integer",
+                  "nullable": true,
+                  "description": "Headcount, where known. Null when not disclosed."
+                },
+                "status_code": {
+                  "type": "string",
+                  "description": "Company status, e.g. \"private\" or \"public\"."
+                },
+                "status_label": {
+                  "type": "string",
+                  "description": "Display form of status_code."
+                },
+                "ticker": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Stock ticker for public companies. Null for private companies."
+                }
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Fundz published the event, in UTC. This is the field to poll on for new events."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable headline for the event."
+          }
+        },
+        "description": "A single acquisition."
+      },
+      "AcquisitionPage": {
+        "type": "object",
+        "description": "A page of acquisitions.",
+        "properties": {
+          "_attribution": {
+            "type": "string",
+            "description": "Required attribution string. Display or retain it when surfacing this data."
+          },
+          "_licensing": {
+            "type": "string",
+            "description": "Licensing terms. Commercial redistribution or embedding requires a licence."
+          },
+          "data": {
+            "type": "array",
+            "description": "The acquisitions on this page, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/Acquisition"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "upgrade_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where to raise your plan quota. Returned at the top level of the envelope, not inside meta."
+          }
+        }
+      },
+      "ExecutiveAppointment": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Fundz published the event, in UTC. This is the field to poll on for new events."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "related_contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "first_name": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer",
+                  "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+                },
+                "photo_url": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "positions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Human-readable headline for the event."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable headline for the event."
+          }
+        },
+        "description": "A single executive appointment."
+      },
+      "ExecutiveAppointmentPage": {
+        "type": "object",
+        "description": "A page of executive appointments.",
+        "properties": {
+          "_attribution": {
+            "type": "string",
+            "description": "Required attribution string. Display or retain it when surfacing this data."
+          },
+          "_licensing": {
+            "type": "string",
+            "description": "Licensing terms. Commercial redistribution or embedding requires a licence."
+          },
+          "data": {
+            "type": "array",
+            "description": "The executive appointments on this page, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/ExecutiveAppointment"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "upgrade_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where to raise your plan quota. Returned at the top level of the envelope, not inside meta."
+          }
+        }
+      },
+      "Agreement": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Fundz published the event, in UTC. This is the field to poll on for new events."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+          },
+          "kind": {
+            "type": "string"
+          },
+          "money_raised": {
+            "type": "string",
+            "nullable": true,
+            "description": "Amount raised, as a display string, e.g. \"$40 Million\"."
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable headline for the event."
+          }
+        },
+        "description": "A single business agreement."
+      },
+      "AgreementPage": {
+        "type": "object",
+        "description": "A page of business agreements.",
+        "properties": {
+          "_attribution": {
+            "type": "string",
+            "description": "Required attribution string. Display or retain it when surfacing this data."
+          },
+          "_licensing": {
+            "type": "string",
+            "description": "Licensing terms. Commercial redistribution or embedding requires a licence."
+          },
+          "data": {
+            "type": "array",
+            "description": "The business agreements on this page, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/Agreement"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "upgrade_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where to raise your plan quota. Returned at the top level of the envelope, not inside meta."
+          }
+        }
+      },
+      "ProductLaunch": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Fundz published the event, in UTC. This is the field to poll on for new events."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable slug identifier for this record. Safe to use as a deduplication key."
+          },
+          "organization": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable headline for the event."
+          }
+        },
+        "description": "A single product launch."
+      },
+      "ProductLaunchPage": {
+        "type": "object",
+        "description": "A page of product launchs.",
+        "properties": {
+          "_attribution": {
+            "type": "string",
+            "description": "Required attribution string. Display or retain it when surfacing this data."
+          },
+          "_licensing": {
+            "type": "string",
+            "description": "Licensing terms. Commercial redistribution or embedding requires a licence."
+          },
+          "data": {
+            "type": "array",
+            "description": "The product launchs on this page, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/ProductLaunch"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "upgrade_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where to raise your plan quota. Returned at the top level of the envelope, not inside meta."
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/fundings": {
+      "get": {
+        "summary": "Retrieve funding rounds",
+        "tags": [
+          "Fundings"
+        ],
+        "description": "Retrieve a feed of funding rounds, including seed rounds, Series A-F, venture capital, and private equity investments. Use this endpoint to track investment activity, discover newly funded companies, and analyze funding trends across different industries and locations.",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "created_from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or after this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-01"
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or before this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-05"
+          },
+          {
+            "name": "money_raised_min",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Minimum money raised",
+            "required": false,
+            "example": 1000000
+          },
+          {
+            "name": "money_raised_max",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Maximum money raised",
+            "required": false,
+            "example": 50000000
+          },
+          {
+            "name": "number_of_employees_min",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Minimum number of employees",
+            "required": false,
+            "example": 10
+          },
+          {
+            "name": "number_of_employees_max",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Maximum number of employees",
+            "required": false,
+            "example": 500
+          },
+          {
+            "name": "keywords",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Free-text search across the event title and the company description.",
+            "required": false,
+            "example": [
+              "artificial intelligence"
+            ]
+          },
+          {
+            "name": "series",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Funding series",
+            "required": false,
+            "example": [
+              "Series A"
+            ]
+          },
+          {
+            "name": "offered_types",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Offered types",
+            "required": false,
+            "example": [
+              "Equity"
+            ]
+          },
+          {
+            "name": "locations",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Locations titles and short_description filter",
+            "required": false,
+            "example": [
+              "San Francisco"
+            ]
+          },
+          {
+            "name": "industries",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Industry titles filter",
+            "required": false,
+            "example": [
+              "Information Technology"
+            ]
+          },
+          {
+            "name": "investors",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Filter to rounds involving this investor, matched against the Fundz investor graph.",
+            "required": false,
+            "example": [
+              "General Catalyst"
+            ]
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number, 1-based. Responses hold 25 records; use `meta.next_page` to walk the set.",
+            "required": false,
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of funding rounds, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundingPage"
+                },
+                "examples": {
+                  "live_response": {
+                    "summary": "Real production response captured 2026-08-05 (first 2 of 25 records)",
+                    "value": {
+                      "_attribution": "Data provided by Fundz \u2014 https://fundz.net",
+                      "_licensing": "Commercial use, redistribution or embedding requires a licence \u2014 john@fundz.net",
+                      "data": [
+                        {
+                          "created_at": "2026-08-05T13:26:01Z",
+                          "id": "briidge-inc-funding-round-70e9eb",
+                          "investors": [
+                            {
+                              "id": 55143,
+                              "title": "Lumin Arx Capital Management"
+                            }
+                          ],
+                          "money_raised": "$500 Million",
+                          "organization": {
+                            "description": "Bridge Industries, LLC, founded by Jeff Berlin in 2003 is a holding company based in Cleveland, OH. Bridge partners with operating management teams to help successful manufacturers/distributors of engineered products expand into new markets and execute strategic growth plans. bridgeind.com",
+                            "domain": {
+                              "id": 48235,
+                              "description": "Free online bridge. Largest bridge site in the world. Duplicate, tournaments, money games, vugraph, more.",
+                              "logo": "https://www.google.com/s2/favicons?domain=www.bridgebase.com&sz=128",
+                              "name": "www.bridgebase.com",
+                              "url": "https://www.bridgebase.com/",
+                              "website": "https://www.bridgebase.com/"
+                            },
+                            "founded": null,
+                            "id": "briidge-inc",
+                            "industries": [],
+                            "is_public_company": false,
+                            "linkedin_url": null,
+                            "list_badges": [],
+                            "location": {
+                              "id": 4811,
+                              "country": "United States",
+                              "short_description": "Nashville, Arkansas, United States",
+                              "title": "Nashville"
+                            },
+                            "name": "Briidge Inc.",
+                            "number_of_employees": 9,
+                            "status_code": "private",
+                            "status_label": "PRIVATE",
+                            "ticker": null
+                          },
+                          "series": "Venture - Series Unknown",
+                          "source_url": "https://www.finsmes.com/2026/08/bridge-received-500m-from-luminarx-capital-management.html",
+                          "title": "Bridge received $500M from LuminArx Capital Management to enhance its AI-powered lending platform.",
+                          "use_of_proceeds": []
+                        },
+                        {
+                          "created_at": "2026-08-05T13:00:00Z",
+                          "id": "aurelius-systems-funding-round-series-a-a25b2e",
+                          "investors": [
+                            {
+                              "id": 51104,
+                              "title": "Decisive Point"
+                            },
+                            {
+                              "id": 12140,
+                              "title": "Detroit Venture Partners"
+                            },
+                            {
+                              "id": 74651,
+                              "title": "Bravo Victor Venture Capital (Bvvc)"
+                            },
+                            {
+                              "id": 339,
+                              "title": "Alumni Ventures"
+                            },
+                            {
+                              "id": 74650,
+                              "title": "Outlander"
+                            },
+                            {
+                              "id": 74649,
+                              "title": "Hanwha Defense Usa"
+                            },
+                            {
+                              "id": 4796,
+                              "title": "General Catalyst"
+                            },
+                            {
+                              "id": 71151,
+                              "title": "Kas Venture Partners"
+                            },
+                            {
+                              "id": 5385,
+                              "title": "Draper Associates"
+                            }
+                          ],
+                          "money_raised": "$40 Million",
+                          "organization": {
+                            "description": "Aurelius Systems is developing autonomous laser weapons to counter modern drone threats. Based in San Francisco, the company fuses advanced optics, AI-guided tracking, and high-powered directed energy into a compact platform that can eliminate low-cost drones for a fraction of the cost of traditional systems. Aurelius is accelerating the deployment of practical, scalable, and field-ready innovation to restore the technological edge in defense.",
+                            "domain": {
+                              "id": 1358898,
+                              "description": "Directed Energy for Every Battlefield",
+                              "logo": "https://www.google.com/s2/favicons?domain=aureliussystems.com&sz=128",
+                              "name": "aureliussystems.com",
+                              "url": "https://aureliussystems.com/",
+                              "website": "https://aureliussystems.com/"
+                            },
+                            "founded": null,
+                            "id": "aurelius-systems",
+                            "industries": [
+                              {
+                                "id": 3,
+                                "title": "Manufacturing"
+                              },
+                              {
+                                "id": 4,
+                                "title": "Information Technology"
+                              },
+                              {
+                                "id": 81,
+                                "title": "Cyber Security"
+                              }
+                            ],
+                            "is_public_company": false,
+                            "linkedin_url": "https://www.linkedin.com/company/aurelius-systems/",
+                            "list_badges": [],
+                            "location": {
+                              "id": 90764,
+                              "country": "United States",
+                              "short_description": "San Francisco, California, United States",
+                              "title": "San Francisco"
+                            },
+                            "name": "Aurelius Systems",
+                            "number_of_employees": 18,
+                            "status_code": "private",
+                            "status_label": "PRIVATE",
+                            "ticker": null
+                          },
+                          "series": "Series A",
+                          "source_url": "http://www.businesswire.com/news/home/20260805445217/en/Aurelius-Systems-Secures-40M-Series-A-to-Meet-Growing-Demand-for-Counter-Drone-Systems/?feedref=JjAwJuNHiystnCoBq_hl-bV7DTIYheT0D-1vT4_bKFzt_EW40VMdK6eG-WLfRGUE1fJraLPL1g6AeUGJlCTYs7Oafol48Kkc8KJgZoTHgMu0w8LYSbRdYOj2VdwnuKwa",
+                          "title": "Aurelius Systems secures $40M Series A funding led by Draper Associates and KAS Venture Partners to meet the growing demand for counter-drone systems.",
+                          "use_of_proceeds": []
+                        }
+                      ],
+                      "meta": {
+                        "current_page": 1,
+                        "next_page": 2,
+                        "total_count": 152681,
+                        "total_pages": 6108,
+                        "tier": "Pro",
+                        "remaining_searches": 47
+                      },
+                      "upgrade_url": "https://www.fundz.net/pricing"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing, invalid, orphaned or non-entitled API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "Unauthorized",
+                  "message": "Authentication required"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Daily request quota for your tier is exhausted. Watch `meta.remaining_searches` on successful responses to avoid this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitError"
+                },
+                "example": {
+                  "error": "rate_limit_exceeded",
+                  "current_tier": "Pro",
+                  "queries_limit": 500,
+                  "remaining_searches": 0,
+                  "upgrade_url": "https://www.fundz.net/pricing"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "NotFound",
+                  "message": "Not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error."
+          },
+          "default": {
+            "description": "Unexpected error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listFundings"
+      }
+    },
+    "/crowdfundings": {
+      "get": {
+        "summary": "Retrieve crowdfunding",
+        "tags": [
+          "Crowdfundings"
+        ],
+        "description": "Access active and completed crowdfunding campaigns. Perfect for discovering investment opportunities, and monitoring crowdfunding market trends.",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "created_from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or after this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-01"
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or before this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-05"
+          },
+          {
+            "name": "deadline_from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by deadline from (YYYY-MM-DD)",
+            "required": false,
+            "example": "example"
+          },
+          {
+            "name": "deadline_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by deadline to (YYYY-MM-DD)",
+            "required": false,
+            "example": "example"
+          },
+          {
+            "name": "offering_amount_min",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Minimum offering amount",
+            "required": false,
+            "example": 1
+          },
+          {
+            "name": "offering_amount_max",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Maximum offering amount",
+            "required": false,
+            "example": 1
+          },
+          {
+            "name": "offered_types",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Offered types",
+            "required": false,
+            "example": [
+              "Equity"
+            ]
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number, 1-based. Responses hold 25 records; use `meta.next_page` to walk the set.",
+            "required": false,
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of crowdfunding campaigns, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrowdfundingPage"
+                },
+                "examples": {
+                  "live_response": {
+                    "summary": "Real production response captured 2026-08-05 (first 2 of 25 records)",
+                    "value": {
+                      "_attribution": "Data provided by Fundz \u2014 https://fundz.net",
+                      "_licensing": "Commercial use, redistribution or embedding requires a licence \u2014 john@fundz.net",
+                      "data": [
+                        {
+                          "city": "Miami",
+                          "created_at": "2026-08-05T10:10:18Z",
+                          "deadline_date": null,
+                          "filing": "1-A",
+                          "financials": {
+                            "auditor": "BCRG Group",
+                            "eps_basic": "-0.01",
+                            "net_income": "-536600.00",
+                            "eps_diluted": "-0.01",
+                            "total_assets": "2952920.00",
+                            "long_term_debt": "0.00",
+                            "total_revenues": "0.00",
+                            "accounts_payable": "689520.00",
+                            "cash_equivalents": "2367920.00",
+                            "cost_and_expenses": "0.00",
+                            "total_liabilities": "3489520.00",
+                            "accounts_receivable": "0.00",
+                            "full_time_employees": "39",
+                            "part_time_employees": "0",
+                            "investment_securities": "0.00",
+                            "property_plant_equipment": "0.00",
+                            "total_stockholder_equity": "-536600.00",
+                            "depreciation_amortization": "0.00",
+                            "total_liabilities_and_equity": "2952920.00",
+                            "price_per_security": "4.0000",
+                            "securities_offered": "6000000"
+                          },
+                          "id": "naoris-quantum-protocol-crowdfunding-24m-ccdc",
+                          "issuer_contact_name": "Louis A. Bevilacqua",
+                          "issuer_name": "Naoris Quantum Protocol Inc.",
+                          "issuer_organization": {
+                            "id": "naoris-quantum-protocol",
+                            "industries": [
+                              {
+                                "id": 2,
+                                "title": "Other"
+                              }
+                            ],
+                            "is_public_company": false,
+                            "list_badges": [],
+                            "location": {
+                              "id": 4687,
+                              "country": "United States",
+                              "short_description": "Miami, Florida, United States",
+                              "title": "Miami"
+                            },
+                            "name": "Naoris Quantum Protocol",
+                            "number_of_employees": null,
+                            "status_code": "private",
+                            "status_label": "PRIVATE",
+                            "ticker": null
+                          },
+                          "issuer_phone": "1-833-333-7329",
+                          "issuer_website": null,
+                          "jurisdictions": [
+                            "AL",
+                            "AK",
+                            "AZ",
+                            "AR",
+                            "CA",
+                            "CO",
+                            "CT",
+                            "DE",
+                            "FL",
+                            "GA",
+                            "HI",
+                            "ID",
+                            "IL",
+                            "IN",
+                            "IA",
+                            "KS",
+                            "KY",
+                            "LA",
+                            "ME",
+                            "MD",
+                            "MA",
+                            "MI",
+                            "MN",
+                            "MS",
+                            "MO",
+                            "MT",
+                            "NE",
+                            "NV",
+                            "NH",
+                            "NJ",
+                            "NM",
+                            "NY",
+                            "NC",
+                            "ND",
+                            "OH",
+                            "OK",
+                            "OR",
+                            "PA",
+                            "RI",
+                            "SC",
+                            "SD",
+                            "TN",
+                            "TX",
+                            "UT",
+                            "VT",
+                            "VA",
+                            "WA",
+                            "WV",
+                            "WI",
+                            "WY",
+                            "DC",
+                            "PR",
+                            "A0",
+                            "A1",
+                            "A2",
+                            "A3",
+                            "A4",
+                            "A5",
+                            "A6",
+                            "A7",
+                            "A8",
+                            "A9",
+                            "B0"
+                          ],
+                          "offering_amount": "$24 Million",
+                          "offerred_type": "Equity (common or preferred stock)",
+                          "portal": null,
+                          "portal_url": null,
+                          "sec_url": "https://www.sec.gov/Archives/edgar/data/2145466/000121390026085345/0001213900-26-085345-index.htm",
+                          "state": "FL",
+                          "street1": "848 Brickell Ave, PH 1",
+                          "street2": null,
+                          "tier": "Tier2",
+                          "title": "Naoris Quantum Protocol is looking to raise $24 Million",
+                          "zip_code": "33131"
+                        },
+                        {
+                          "city": "WILMINGTON",
+                          "created_at": "2026-08-05T10:10:16Z",
+                          "deadline_date": "2027-04-30T00:00:00Z",
+                          "filing": "C/A",
+                          "financials": null,
+                          "id": "simplex-chat-crowdfunding-50k-433e",
+                          "issuer_contact_name": null,
+                          "issuer_name": "Simplex Chat, Inc.",
+                          "issuer_organization": {
+                            "id": "simplex-chat",
+                            "industries": [],
+                            "is_public_company": false,
+                            "list_badges": [],
+                            "location": {
+                              "id": 4872,
+                              "country": "United States",
+                              "short_description": "Wilmington, Delaware, United States",
+                              "title": "Wilmington"
+                            },
+                            "name": "Simplex Chat",
+                            "number_of_employees": null,
+                            "status_code": "private",
+                            "status_label": "PRIVATE",
+                            "ticker": null
+                          },
+                          "issuer_phone": null,
+                          "issuer_website": "simplex.chat",
+                          "jurisdictions": null,
+                          "offering_amount": "$50,000",
+                          "offerred_type": "Other",
+                          "portal": "Wefunder Portal LLC",
+                          "portal_url": "https://www.Wefunder.com",
+                          "sec_url": "https://www.sec.gov/Archives/edgar/data/2140143/000214014326000004/0002140143-26-000004-index.htm",
+                          "state": "DE",
+                          "street1": "800 KING N STREET",
+                          "street2": "SUITE 304-2697",
+                          "tier": null,
+                          "title": "Simplex Chat is looking to raise $50,000",
+                          "zip_code": "19801"
+                        }
+                      ],
+                      "meta": {
+                        "current_page": 1,
+                        "next_page": 2,
+                        "total_count": 16918,
+                        "total_pages": 677,
+                        "tier": "Pro",
+                        "remaining_searches": 46
+                      },
+                      "upgrade_url": "https://www.fundz.net/pricing"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing, invalid, orphaned or non-entitled API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "Unauthorized",
+                  "message": "Authentication required"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Daily request quota for your tier is exhausted. Watch `meta.remaining_searches` on successful responses to avoid this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitError"
+                },
+                "example": {
+                  "error": "rate_limit_exceeded",
+                  "current_tier": "Pro",
+                  "queries_limit": 500,
+                  "remaining_searches": 0,
+                  "upgrade_url": "https://www.fundz.net/pricing"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "NotFound",
+                  "message": "Not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error."
+          },
+          "default": {
+            "description": "Unexpected error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listCrowdfundings"
+      }
+    },
+    "/acquisitions": {
+      "get": {
+        "summary": "Retrieve acquisitions",
+        "tags": [
+          "Acquisitions"
+        ],
+        "description": "Monitor mergers and acquisitions activity across markets. Track which companies are being acquired, who is buying them, and emerging M&A trends. Valuable for competitive intelligence, market analysis, and identifying consolidation patterns in specific industries.",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "created_from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or after this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-01"
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or before this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-05"
+          },
+          {
+            "name": "locations",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Locations titles and short_description filter",
+            "required": false,
+            "example": [
+              "San Francisco"
+            ]
+          },
+          {
+            "name": "industries",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Industry titles filter",
+            "required": false,
+            "example": [
+              "Information Technology"
+            ]
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number, 1-based. Responses hold 25 records; use `meta.next_page` to walk the set.",
+            "required": false,
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of acquisitions, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquisitionPage"
+                },
+                "examples": {
+                  "live_response": {
+                    "summary": "Real production response captured 2026-08-05 (first 2 of 25 records)",
+                    "value": {
+                      "_attribution": "Data provided by Fundz \u2014 https://fundz.net",
+                      "_licensing": "Commercial use, redistribution or embedding requires a licence \u2014 john@fundz.net",
+                      "data": [
+                        {
+                          "acquirees": [
+                            {
+                              "id": "trak-racer",
+                              "is_public_company": false,
+                              "list_badges": [],
+                              "name": "Trak Racer",
+                              "number_of_employees": null,
+                              "status_code": "recently_acquired",
+                              "status_label": "RECENTLY ACQUIRED",
+                              "ticker": null
+                            }
+                          ],
+                          "acquirers": [
+                            {
+                              "id": "corsair-gaming",
+                              "industries": [
+                                {
+                                  "id": 52,
+                                  "title": "Gaming"
+                                },
+                                {
+                                  "id": 106,
+                                  "title": "Video Games"
+                                }
+                              ],
+                              "is_public_company": true,
+                              "list_badges": [],
+                              "location": {
+                                "id": 4838,
+                                "country": "United States",
+                                "short_description": "Palo Alto, California, United States",
+                                "title": "Palo Alto"
+                              },
+                              "name": "Corsair Gaming",
+                              "number_of_employees": null,
+                              "status_code": "public",
+                              "status_label": "PUBLIC",
+                              "ticker": "CRSR"
+                            }
+                          ],
+                          "created_at": "2026-08-05T13:10:17Z",
+                          "id": "acquires-4db5-260e5463-2a65-4f84-ba60-736380ee12dd",
+                          "title": "Corsair Gaming acquires Trak Racer assets"
+                        },
+                        {
+                          "acquirees": [
+                            {
+                              "id": "stmicroelectronics-international-nv",
+                              "is_public_company": false,
+                              "list_badges": [],
+                              "name": "ST",
+                              "number_of_employees": null,
+                              "status_code": "private",
+                              "status_label": "PRIVATE",
+                              "ticker": null
+                            }
+                          ],
+                          "acquirers": [
+                            {
+                              "id": "charlton-aria-acquisition-corporation",
+                              "industries": [
+                                {
+                                  "id": 39,
+                                  "title": "Artificial Intelligence"
+                                }
+                              ],
+                              "is_public_company": false,
+                              "list_badges": [],
+                              "location": {
+                                "id": 4872,
+                                "country": "United States",
+                                "short_description": "Wilmington, Delaware, United States",
+                                "title": "Wilmington"
+                              },
+                              "name": "CHARLTON ARIA ACQUISITION CORPORATION",
+                              "number_of_employees": null,
+                              "status_code": "private",
+                              "status_label": "PRIVATE",
+                              "ticker": null
+                            }
+                          ],
+                          "created_at": "2026-08-05T13:10:16Z",
+                          "id": "acquires-448b",
+                          "title": "Charlton Aria Acquisition Corporation Announces Acquisition of ST"
+                        }
+                      ],
+                      "meta": {
+                        "current_page": 1,
+                        "next_page": 2,
+                        "total_count": 34878,
+                        "total_pages": 1396,
+                        "tier": "Pro",
+                        "remaining_searches": 45
+                      },
+                      "upgrade_url": "https://www.fundz.net/pricing"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing, invalid, orphaned or non-entitled API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "Unauthorized",
+                  "message": "Authentication required"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Daily request quota for your tier is exhausted. Watch `meta.remaining_searches` on successful responses to avoid this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitError"
+                },
+                "example": {
+                  "error": "rate_limit_exceeded",
+                  "current_tier": "Pro",
+                  "queries_limit": 500,
+                  "remaining_searches": 0,
+                  "upgrade_url": "https://www.fundz.net/pricing"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "NotFound",
+                  "message": "Not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error."
+          },
+          "default": {
+            "description": "Unexpected error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listAcquisitions"
+      }
+    },
+    "/executives": {
+      "get": {
+        "summary": "Retrieve executive changes",
+        "tags": [
+          "Executives"
+        ],
+        "description": "Track C-level and senior executive appointments across companies. Monitor leadership changes, new hires at the executive level, and identify talent movement patterns. Essential for recruiters, investors, and business development professionals tracking key personnel changes.",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "created_from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or after this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-01"
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or before this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-05"
+          },
+          {
+            "name": "positions",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Positions filter",
+            "required": false,
+            "example": [
+              "example"
+            ]
+          },
+          {
+            "name": "locations",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Locations titles and short_description filter",
+            "required": false,
+            "example": [
+              "San Francisco"
+            ]
+          },
+          {
+            "name": "industries",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Industry titles filter",
+            "required": false,
+            "example": [
+              "Information Technology"
+            ]
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number, 1-based. Responses hold 25 records; use `meta.next_page` to walk the set.",
+            "required": false,
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of executive appointments, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutiveAppointmentPage"
+                },
+                "examples": {
+                  "live_response": {
+                    "summary": "Real production response captured 2026-08-05 (first 2 of 25 records)",
+                    "value": {
+                      "_attribution": "Data provided by Fundz \u2014 https://fundz.net",
+                      "_licensing": "Commercial use, redistribution or embedding requires a licence \u2014 john@fundz.net",
+                      "data": [
+                        {
+                          "created_at": "2026-08-05T13:15:26Z",
+                          "id": "prosperity-hired-150c",
+                          "organization": {
+                            "id": "prosperity",
+                            "industries": [
+                              {
+                                "id": 226,
+                                "title": "Document Management"
+                              }
+                            ],
+                            "is_public_company": true,
+                            "list_badges": [],
+                            "location": null,
+                            "name": "Prosperity",
+                            "number_of_employees": null,
+                            "status_code": "public",
+                            "status_label": "PUBLIC",
+                            "ticker": "PB"
+                          },
+                          "related_contacts": [
+                            {
+                              "first_name": "Brian",
+                              "id": 2648947,
+                              "photo_url": null,
+                              "positions": [
+                                {
+                                  "id": 4229,
+                                  "title": "Chief Investment Officer"
+                                }
+                              ]
+                            }
+                          ],
+                          "title": "Prosperity Appoints Brian W. Katz As Chief Investment Officer"
+                        },
+                        {
+                          "created_at": "2026-08-05T13:15:26Z",
+                          "id": "idaho-copper-hired-fe9e",
+                          "organization": {
+                            "id": "idaho-copper",
+                            "industries": [
+                              {
+                                "id": 117,
+                                "title": "Mining"
+                              },
+                              {
+                                "id": 119,
+                                "title": "Mineral"
+                              },
+                              {
+                                "id": 128,
+                                "title": "Mining Technology"
+                              }
+                            ],
+                            "is_public_company": true,
+                            "list_badges": [],
+                            "location": {
+                              "id": 4921,
+                              "country": "United States",
+                              "short_description": "Boise, Idaho, United States",
+                              "title": "Boise"
+                            },
+                            "name": "Idaho Copper",
+                            "number_of_employees": 9,
+                            "status_code": "public",
+                            "status_label": "PUBLIC",
+                            "ticker": "COPR"
+                          },
+                          "related_contacts": [
+                            {
+                              "first_name": "Bruce",
+                              "id": 2648946,
+                              "photo_url": null,
+                              "positions": [
+                                {
+                                  "id": 1,
+                                  "title": "Chief Financial Officer"
+                                }
+                              ]
+                            }
+                          ],
+                          "title": "Idaho Copper Corporation Appoints Bruce Harmon As Chief Financial Officer"
+                        }
+                      ],
+                      "meta": {
+                        "current_page": 1,
+                        "next_page": 2,
+                        "total_count": 46603,
+                        "total_pages": 1865,
+                        "tier": "Pro",
+                        "remaining_searches": 44
+                      },
+                      "upgrade_url": "https://www.fundz.net/pricing"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing, invalid, orphaned or non-entitled API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "Unauthorized",
+                  "message": "Authentication required"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Daily request quota for your tier is exhausted. Watch `meta.remaining_searches` on successful responses to avoid this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitError"
+                },
+                "example": {
+                  "error": "rate_limit_exceeded",
+                  "current_tier": "Pro",
+                  "queries_limit": 500,
+                  "remaining_searches": 0,
+                  "upgrade_url": "https://www.fundz.net/pricing"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "NotFound",
+                  "message": "Not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error."
+          },
+          "default": {
+            "description": "Unexpected error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listExecutiveAppointments"
+      }
+    },
+    "/agreements": {
+      "get": {
+        "summary": "Retrieve agreements",
+        "tags": [
+          "Agreements"
+        ],
+        "description": "Access announcements of business partnerships, strategic alliances, distribution agreements, and other material contracts between companies. Useful for tracking collaboration patterns, identifying partnership opportunities, and monitoring business development activity in your market.",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "created_from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or after this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-01"
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or before this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-05"
+          },
+          {
+            "name": "locations",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Locations titles and short_description filter",
+            "required": false,
+            "example": [
+              "San Francisco"
+            ]
+          },
+          {
+            "name": "industries",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Industry titles filter",
+            "required": false,
+            "example": [
+              "Information Technology"
+            ]
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number, 1-based. Responses hold 25 records; use `meta.next_page` to walk the set.",
+            "required": false,
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of business agreements, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgreementPage"
+                },
+                "examples": {
+                  "live_response": {
+                    "summary": "Real production response captured 2026-08-05 (first 2 of 25 records)",
+                    "value": {
+                      "_attribution": "Data provided by Fundz \u2014 https://fundz.net",
+                      "_licensing": "Commercial use, redistribution or embedding requires a licence \u2014 john@fundz.net",
+                      "data": [
+                        {
+                          "created_at": "2026-08-05T13:15:27Z",
+                          "id": "dirickx-systems-ltd-contract-a4637d",
+                          "kind": "contract",
+                          "money_raised": "$200 Million",
+                          "organization": {
+                            "id": "dirickx-systems-ltd",
+                            "industries": [
+                              {
+                                "id": 3,
+                                "title": "Manufacturing"
+                              },
+                              {
+                                "id": 71,
+                                "title": "Security"
+                              }
+                            ],
+                            "is_public_company": false,
+                            "list_badges": [],
+                            "location": {
+                              "id": 4796,
+                              "country": "United Kingdom",
+                              "short_description": "United Kingdom",
+                              "title": "United Kingdom"
+                            },
+                            "name": "DIRICKX Systems Ltd",
+                            "number_of_employees": null,
+                            "status_code": "private",
+                            "status_label": "PRIVATE",
+                            "ticker": null
+                          },
+                          "title": "DIRICKX Systems Ltd and Hesco Bastion Ltd share $200 million US contract for barrier systems."
+                        },
+                        {
+                          "created_at": "2026-08-05T13:10:28Z",
+                          "id": "sportsdaq-contract-5a7602",
+                          "kind": "partnership",
+                          "money_raised": null,
+                          "organization": {
+                            "id": "sportsdaq",
+                            "industries": [
+                              {
+                                "id": 53,
+                                "title": "Sports"
+                              }
+                            ],
+                            "is_public_company": false,
+                            "list_badges": [],
+                            "location": {
+                              "id": 6638,
+                              "country": "India",
+                              "short_description": "Ahmedabad, Gujarat, India",
+                              "title": "Ahmedabad"
+                            },
+                            "name": "SPORTSDAQ",
+                            "number_of_employees": null,
+                            "status_code": "private",
+                            "status_label": "PRIVATE",
+                            "ticker": null
+                          },
+                          "title": "SPORTSDAQ forms strategic partnership with GSIC Powered by Microsoft to enhance global collaboration in sports technology."
+                        }
+                      ],
+                      "meta": {
+                        "current_page": 1,
+                        "next_page": 2,
+                        "total_count": 35229,
+                        "total_pages": 1410,
+                        "tier": "Pro",
+                        "remaining_searches": 43
+                      },
+                      "upgrade_url": "https://www.fundz.net/pricing"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing, invalid, orphaned or non-entitled API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "Unauthorized",
+                  "message": "Authentication required"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Daily request quota for your tier is exhausted. Watch `meta.remaining_searches` on successful responses to avoid this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitError"
+                },
+                "example": {
+                  "error": "rate_limit_exceeded",
+                  "current_tier": "Pro",
+                  "queries_limit": 500,
+                  "remaining_searches": 0,
+                  "upgrade_url": "https://www.fundz.net/pricing"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "NotFound",
+                  "message": "Not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error."
+          },
+          "default": {
+            "description": "Unexpected error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listAgreements"
+      }
+    },
+    "/products": {
+      "get": {
+        "summary": "Retrieve product launches",
+        "tags": [
+          "Products"
+        ],
+        "description": "Stay updated on new product launches, feature releases, and service announcements from companies. Track innovation trends, monitor competitor product releases, and identify emerging technologies. Perfect for product managers, market researchers, and competitive analysts.",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "created_from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or after this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-01"
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only return events published on or before this date (YYYY-MM-DD), against `created_at`.",
+            "required": false,
+            "example": "2026-08-05"
+          },
+          {
+            "name": "locations",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Locations titles and short_description filter",
+            "required": false,
+            "example": [
+              "San Francisco"
+            ]
+          },
+          {
+            "name": "industries",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Industry titles filter",
+            "required": false,
+            "example": [
+              "Information Technology"
+            ]
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number, 1-based. Responses hold 25 records; use `meta.next_page` to walk the set.",
+            "required": false,
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of product launchs, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductLaunchPage"
+                },
+                "examples": {
+                  "live_response": {
+                    "summary": "Real production response captured 2026-08-05 (first 2 of 25 records)",
+                    "value": {
+                      "_attribution": "Data provided by Fundz \u2014 https://fundz.net",
+                      "_licensing": "Commercial use, redistribution or embedding requires a licence \u2014 john@fundz.net",
+                      "data": [
+                        {
+                          "created_at": "2026-08-05T13:10:30Z",
+                          "id": "kms-lighthouse-product-launch-3f20aa",
+                          "organization": {
+                            "id": "kms-lighthouse",
+                            "industries": [
+                              {
+                                "id": 23,
+                                "title": "Software"
+                              },
+                              {
+                                "id": 39,
+                                "title": "Artificial Intelligence"
+                              },
+                              {
+                                "id": 85,
+                                "title": "Saas"
+                              },
+                              {
+                                "id": 86,
+                                "title": "Enterprise Software"
+                              },
+                              {
+                                "id": 107,
+                                "title": "Machine Learning"
+                              },
+                              {
+                                "id": 108,
+                                "title": "Natural Language Processing"
+                              }
+                            ],
+                            "is_public_company": false,
+                            "list_badges": [],
+                            "location": {
+                              "id": 10993,
+                              "country": "United States",
+                              "short_description": "Dallas, Texas, United States",
+                              "title": "Dallas"
+                            },
+                            "name": "KMS Lighthouse",
+                            "number_of_employees": null,
+                            "status_code": "private",
+                            "status_label": "PRIVATE",
+                            "ticker": null
+                          },
+                          "title": "KMS Lighthouse has launched KMS Lighthouse for Jira, an app that provides instant access to governed knowledge directly in Jira's issue view."
+                        },
+                        {
+                          "created_at": "2026-08-05T13:10:29Z",
+                          "id": "ichrax-product-launch-f3bbf9",
+                          "organization": {
+                            "id": "ichrax",
+                            "industries": [
+                              {
+                                "id": 36,
+                                "title": "Health Care"
+                              },
+                              {
+                                "id": 89,
+                                "title": "Employee Benefits"
+                              }
+                            ],
+                            "is_public_company": false,
+                            "list_badges": [],
+                            "location": {
+                              "id": 10993,
+                              "country": "United States",
+                              "short_description": "Dallas, Texas, United States",
+                              "title": "Dallas"
+                            },
+                            "name": "ICHRAx",
+                            "number_of_employees": null,
+                            "status_code": "private",
+                            "status_label": "PRIVATE",
+                            "ticker": null
+                          },
+                          "title": "ICHRAx launches a health insurance technology platform to standardize enrollment and billing for ICHRA plans."
+                        }
+                      ],
+                      "meta": {
+                        "current_page": 1,
+                        "next_page": 2,
+                        "total_count": 25309,
+                        "total_pages": 1013,
+                        "tier": "Pro",
+                        "remaining_searches": 42
+                      },
+                      "upgrade_url": "https://www.fundz.net/pricing"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing, invalid, orphaned or non-entitled API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "Unauthorized",
+                  "message": "Authentication required"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Daily request quota for your tier is exhausted. Watch `meta.remaining_searches` on successful responses to avoid this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitError"
+                },
+                "example": {
+                  "error": "rate_limit_exceeded",
+                  "current_tier": "Pro",
+                  "queries_limit": 500,
+                  "remaining_searches": 0,
+                  "upgrade_url": "https://www.fundz.net/pricing"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "type": "NotFound",
+                  "message": "Not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error."
+          },
+          "default": {
+            "description": "Unexpected error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listProductLaunches"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Fundings",
+      "description": "Funding rounds \u2014 seed through late-stage venture and private equity \u2014 with the investors on the round and the full organization record."
+    },
+    {
+      "name": "Crowdfundings",
+      "description": "Regulation CF and Regulation A crowdfunding campaigns, sourced from SEC Form C and Form 1-A filings."
+    },
+    {
+      "name": "Acquisitions",
+      "description": "Company acquisitions and M&A events, with acquirer and target organization records where disclosed."
+    },
+    {
+      "name": "Executives",
+      "description": "Executive hires and appointments \u2014 new C-level, VP and board appointments at private and public companies."
+    },
+    {
+      "name": "Agreements",
+      "description": "Business agreements and partnerships announced by companies \u2014 distribution, licensing, joint ventures and similar."
+    },
+    {
+      "name": "Products",
+      "description": "Product launches and major product announcements."
+    }
+  ],
+  "externalDocs": {
+    "description": "Fundz API documentation and self-serve key",
+    "url": "https://app.fundz.net/fundz-api"
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ]
+}
