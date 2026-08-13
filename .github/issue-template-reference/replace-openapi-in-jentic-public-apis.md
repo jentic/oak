@@ -1,6 +1,6 @@
 ---
-name: Replace OpenAPI in Jentic Public APIs
-about: Completely delete an existing API folder and re-import it fresh from a new OpenAPI URL.
+name: Replace OpenAPI in Jentic Public APIs (agent reference — not a picker template)
+about: Canonical body shape for programmatic/agent submissions. Humans should use the "Replace OpenAPI in Jentic Public APIs" issue form instead. Kept outside .github/ISSUE_TEMPLATE so it does not appear in the New Issue picker.
 title: "[AUTO] Replace OpenAPI in Jentic Public APIs: "
 labels: enhancement
 assignees: ''

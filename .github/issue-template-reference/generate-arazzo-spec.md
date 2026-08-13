@@ -1,7 +1,6 @@
 ---
-name: Generate Arazzo Specification for Jentic OpenAPI
-about: Request automatic generation of an Arazzo specification from an Jentic OpenAPI
-  URL
+name: Generate Arazzo Specification for Jentic OpenAPI (agent reference — not a picker template)
+about: Canonical body shape for programmatic/agent submissions. Humans should use the "Generate Arazzo Specification for Jentic OpenAPI" issue form instead. Kept outside .github/ISSUE_TEMPLATE so it does not appear in the New Issue picker.
 title: "[AUTO] Generate Arazzo spec for Jentic OpenAPI"
 labels: enhancement
 assignees: ''
