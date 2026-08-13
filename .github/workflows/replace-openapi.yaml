@@ -1,0 +1,771 @@
+name: Replace OpenAPI Spec in Public APIs
+
+# Unlike "Import OpenAPI Spec to Public APIs" (import-openapi.yaml), which REJECTS
+# an import when a version directory already exists, this workflow does the
+# opposite: it COMPLETELY DELETES the existing apis/openapi/<vendor>/<api>
+# directory (every version directory + the api-level meta.json) and then runs
+# the import pipeline against a fresh spec, regenerating all files and meta from
+# scratch. Use it when the same vendor/api is being re-published with a brand
+# new version of the spec and the whole prior folder should be discarded.
+#
+# If deleting the api folder leaves the vendor folder empty, the vendor folder
+# is deleted too.
+
+on:
+  issues:
+    types: [ opened, reopened ]
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'URL of the new OpenAPI spec to import'
+        required: true
+      vendor:
+        description: 'Vendor name whose api folder should be replaced'
+        required: true
+      api:
+        description: 'API name (required — replace never defaults; you must name the exact api folder to delete)'
+        required: true
+      reject_invalid_server_urls:
+        description: 'Reject specs with invalid/relative server URLs (optional, default: true)'
+        required: false
+        type: boolean
+        default: true
+      reject_invalid_security:
+        description: 'Reject specs with invalid/missing security fields (optional, default: true)'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  replace-repo-structure:
+    # Issue-triggered runs only proceed when the body carries the dedicated
+    # replace trigger field, so a normal import issue never fires this
+    # destructive workflow.
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.body, 'replace_oas_url:')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # To push the new branch and commit files
+      pull-requests: write   # To create the pull request
+      issues: write          # To comment on the issue (if needed)
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Extract Info from inputs
+        # Only run if not coming from issue
+        if: github.event_name == 'workflow_dispatch'
+        id: extract_info_from_inputs
+        env:
+          # Inputs are passed via env (not interpolated into the script) so the
+          # shell never evaluates their content. See the workflow-injection fix
+          # (jentic/jentic-public-apis#21955).
+          INPUT_URL: ${{ inputs.url }}
+          INPUT_VENDOR: ${{ inputs.vendor }}
+          INPUT_API: ${{ inputs.api }}
+          INPUT_REJECT_INVALID_SERVER_URLS: ${{ inputs.reject_invalid_server_urls }}
+          INPUT_REJECT_INVALID_SECURITY: ${{ inputs.reject_invalid_security }}
+        run: |
+          URL="$INPUT_URL"
+          echo "URL: $URL"
+          if [ -z "$URL" ]; then
+            echo "::error::Could not extract required 'url' field from input."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=Could not extract required 'url' field from input." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Extract Vendor Name (Required)
+          VENDOR_NAME="$INPUT_VENDOR"
+          echo "Vendor Name: $VENDOR_NAME"
+          if [ -z "$VENDOR_NAME" ]; then
+            echo "::error::Could not extract required 'vendor' field from input."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=Could not extract required 'vendor' field from input." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Extract API Name (Required). Unlike import, replace NEVER defaults to
+          # 'main': it deletes the target folder, so the exact api must be named
+          # to avoid creating a spurious 'main' or deleting the wrong api on a
+          # multi-api vendor.
+          API_NAME="$INPUT_API"
+          echo "API Name: $API_NAME"
+          if [ -z "$API_NAME" ]; then
+            echo "::error::'api' is required for replace and must not be empty."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=The 'api' input is required for replace. Name the exact api folder to delete and re-import (e.g. vendor 'hashicorp.com', api 'nomad'). Replace never defaults to 'main'." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Set the Apitools Label as the fully-qualified vendor/api.
+          APITOOLS_LABEL="${VENDOR_NAME}/${API_NAME}"
+          echo "Using provided Vendor/API as Apitools label: $APITOOLS_LABEL"
+
+          # Extract reject_invalid_server_urls (optional, defaults to true)
+          REJECT_INVALID_SERVER_URLS="$INPUT_REJECT_INVALID_SERVER_URLS"
+          echo "Reject Invalid Server URLs: $REJECT_INVALID_SERVER_URLS"
+
+          # Extract reject_invalid_security (optional, defaults to true)
+          REJECT_INVALID_SECURITY="$INPUT_REJECT_INVALID_SECURITY"
+          echo "Reject Invalid security: $REJECT_INVALID_SECURITY"
+
+          echo "Extracted URL: $URL"
+          echo "Apitools Label: $APITOOLS_LABEL"
+          echo "import_oas_url=$URL" >> $GITHUB_OUTPUT
+          echo "apitools_label=$APITOOLS_LABEL" >> $GITHUB_OUTPUT
+          echo "reject_invalid_server_urls=$REJECT_INVALID_SERVER_URLS" >> $GITHUB_OUTPUT
+          echo "reject_invalid_security=$REJECT_INVALID_SECURITY" >> $GITHUB_OUTPUT
+
+      - name: Extract Info from Issue
+        # Only run if the issue body contains the trigger string
+        if: contains(github.event.issue.body, 'replace_oas_url:')
+        id: extract_info_from_issue
+        env:
+          # SECURITY: the issue body is attacker-controlled. It must only enter
+          # the script through the environment — never via ${{ }} interpolation
+          # inside run:, which lets `$(...)`, backticks, or a stray `"` execute
+          # arbitrary commands on the runner (jentic/jentic-public-apis#21955).
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          echo "Parsing REQUIRED OpenAPI URL and Vendor Name from issue..."
+          BODY=$(printf '%s' "$ISSUE_BODY" | tr -d '\r')
+          # Strip leading whitespace from each line to allow indented fields
+          BODY_STRIPPED=$(printf '%s\n' "$BODY" | sed 's/^[[:space:]]*//')
+
+          # Extract URL (Required)
+          URL=$(printf '%s\n' "$BODY_STRIPPED" | grep -oP '(?<=^replace_oas_url:).*' | head -n 1 | xargs)
+          echo "URL after grep/xargs: $URL"
+          if [ -z "$URL" ]; then
+            echo "::error::Could not extract required 'replace_oas_url:' field from issue body."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=Could not extract required 'replace_oas_url:' field from issue body. Please ensure your issue contains a line with 'replace_oas_url: <your-url>'." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Validate the URL shape (defense in depth: it flows into later steps
+          # and into the PR body). http(s) only; reject whitespace, quotes and
+          # backticks — the characters that would let it break out of a shell
+          # context downstream. (Values reach the shell only via env, so this is
+          # belt-and-braces, not the primary control.)
+          if ! printf '%s\n' "$URL" | grep -qE "^https?://[]A-Za-z0-9._~:/?#@!\$&'()*+,;=%[-]+\$"; then
+            echo "::error::'replace_oas_url:' does not look like a valid http(s) URL."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=The 'replace_oas_url:' value must be a plain http(s) URL without spaces, quotes, or backticks." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Extract Vendor Name (Required)
+          VENDOR_NAME=$(printf '%s\n' "$BODY_STRIPPED" | grep -oP '(?<=^vendor_name:).*' | head -n 1 | xargs)
+          echo "Vendor Name after grep/xargs: $VENDOR_NAME"
+          if [ -z "$VENDOR_NAME" ]; then
+            echo "::error::Could not extract required 'vendor_name:' field from issue body."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=Could not extract required 'vendor_name:' field from issue body. Please ensure your issue contains a line with 'vendor_name: <your-vendor-name>'." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Validate the vendor name: it becomes a directory under apis/openapi/
+          # and part of the PR branch name. Unlike import, replace REQUIRES the
+          # "<vendor>/<api>" form — the '/<api>' segment is mandatory, not
+          # optional. Because replace deletes the target folder, defaulting a
+          # missing api to 'main' would either create a spurious 'main' api or
+          # delete the wrong api on a multi-api vendor; forcing the explicit api
+          # removes that ambiguity. Each segment must start alphanumeric, so no
+          # path traversal ('..', leading dot) and no shell metacharacters.
+          if ! printf '%s\n' "$VENDOR_NAME" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$'; then
+            echo "::error::'vendor_name:' must be of the form '<vendor>/<api>' and contain only supported characters."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=Replace requires an explicit api: 'vendor_name:' must be '<vendor>/<api_name>' (e.g. 'hashicorp.com/nomad'), not just '<vendor>'. Segments may only contain letters, digits, dots, hyphens, and underscores, and each must start with a letter or digit. Replace never defaults to 'main' — name the exact api folder to delete and re-import." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          # Extract reject_invalid_server_urls (optional, defaults to true)
+          REJECT_INVALID_SERVER_URLS=$(printf '%s\n' "$BODY_STRIPPED" | grep -oP '(?<=^reject_invalid_server_urls:).*' | head -n 1 | xargs || true)
+          if [ "$REJECT_INVALID_SERVER_URLS" != "false" ]; then
+            REJECT_INVALID_SERVER_URLS="true"
+          fi
+          echo "Reject Invalid Server URLs: $REJECT_INVALID_SERVER_URLS"
+
+          # Extract reject_invalid_security (optional, defaults to true)
+          REJECT_INVALID_SECURITY=$(printf '%s\n' "$BODY_STRIPPED" | grep -oP '(?<=^reject_invalid_security:).*' | head -n 1 | xargs || true)
+          if [ "$REJECT_INVALID_SECURITY" != "false" ]; then
+            REJECT_INVALID_SECURITY="true"
+          fi
+          echo "Reject Invalid security: $REJECT_INVALID_SECURITY"
+
+          # Set the Apitools Label (always the vendor name now)
+          APITOOLS_LABEL="$VENDOR_NAME"
+          echo "Using provided Vendor Name as Apitools label: $APITOOLS_LABEL"
+
+          echo "Extracted URL: $URL"
+          echo "Apitools Label: $APITOOLS_LABEL"
+          echo "import_oas_url=$URL" >> $GITHUB_OUTPUT
+          echo "apitools_label=$APITOOLS_LABEL" >> $GITHUB_OUTPUT
+          echo "reject_invalid_server_urls=$REJECT_INVALID_SERVER_URLS" >> $GITHUB_OUTPUT
+          echo "reject_invalid_security=$REJECT_INVALID_SECURITY" >> $GITHUB_OUTPUT
+
+      - name: Consolidate extracted info
+        if: always()
+        id: extract_info
+        env:
+          # Step outputs derived from the issue body are still untrusted —
+          # route them through env, not ${{ }} inside run:.
+          INPUTS_URL: ${{ steps.extract_info_from_inputs.outputs.import_oas_url }}
+          INPUTS_LABEL: ${{ steps.extract_info_from_inputs.outputs.apitools_label }}
+          INPUTS_REJECT_SERVER: ${{ steps.extract_info_from_inputs.outputs.reject_invalid_server_urls }}
+          INPUTS_REJECT_SECURITY: ${{ steps.extract_info_from_inputs.outputs.reject_invalid_security }}
+          INPUTS_EXTRACT_FAILED: ${{ steps.extract_info_from_inputs.outputs.extract_failed }}
+          INPUTS_ERROR_MESSAGE: ${{ steps.extract_info_from_inputs.outputs.error_message }}
+          ISSUE_URL: ${{ steps.extract_info_from_issue.outputs.import_oas_url }}
+          ISSUE_LABEL: ${{ steps.extract_info_from_issue.outputs.apitools_label }}
+          ISSUE_REJECT_SERVER: ${{ steps.extract_info_from_issue.outputs.reject_invalid_server_urls }}
+          ISSUE_REJECT_SECURITY: ${{ steps.extract_info_from_issue.outputs.reject_invalid_security }}
+          ISSUE_EXTRACT_FAILED: ${{ steps.extract_info_from_issue.outputs.extract_failed }}
+          ISSUE_ERROR_MESSAGE: ${{ steps.extract_info_from_issue.outputs.error_message }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "import_oas_url=$INPUTS_URL" >> $GITHUB_OUTPUT
+            echo "apitools_label=$INPUTS_LABEL" >> $GITHUB_OUTPUT
+            echo "reject_invalid_server_urls=$INPUTS_REJECT_SERVER" >> $GITHUB_OUTPUT
+            echo "reject_invalid_security=$INPUTS_REJECT_SECURITY" >> $GITHUB_OUTPUT
+            echo "extract_failed=$INPUTS_EXTRACT_FAILED" >> $GITHUB_OUTPUT
+            echo "error_message=$INPUTS_ERROR_MESSAGE" >> $GITHUB_OUTPUT
+
+            SAFE_LABEL=$(echo "$INPUTS_LABEL" | tr '/' '-')
+            echo "pr_ref=$INPUTS_LABEL" >> $GITHUB_OUTPUT
+            echo "branch_name=feat/replace-oas-$SAFE_LABEL" >> $GITHUB_OUTPUT
+            echo "closes_line=" >> $GITHUB_OUTPUT
+            echo "has_issue=false" >> $GITHUB_OUTPUT
+          else
+            echo "import_oas_url=$ISSUE_URL" >> $GITHUB_OUTPUT
+            echo "apitools_label=$ISSUE_LABEL" >> $GITHUB_OUTPUT
+            echo "reject_invalid_server_urls=$ISSUE_REJECT_SERVER" >> $GITHUB_OUTPUT
+            echo "reject_invalid_security=$ISSUE_REJECT_SECURITY" >> $GITHUB_OUTPUT
+            echo "extract_failed=$ISSUE_EXTRACT_FAILED" >> $GITHUB_OUTPUT
+            echo "error_message=$ISSUE_ERROR_MESSAGE" >> $GITHUB_OUTPUT
+
+            echo "pr_ref=Issue #${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            echo "branch_name=feat/replace-oas-${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            echo "closes_line=Closes #${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            echo "has_issue=true" >> $GITHUB_OUTPUT
+            echo "issue_number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify Existing API Folder to Replace
+        # Replace is delete-then-import: there must be an existing folder to
+        # replace. If the named vendor/api does not exist (typo, wrong vendor, or
+        # an api that was never imported), fail HERE — before the import CLI runs
+        # — rather than silently importing a brand-new folder. That would be a
+        # plain import masquerading as a replace, which is not what was asked.
+        if: steps.extract_info.outputs.extract_failed != 'true'
+        id: verify_existing
+        env:
+          # The label originates from untrusted input — env only, and validated
+          # into a strict "<vendor>/<api>" shape upstream.
+          LABEL: ${{ steps.extract_info.outputs.apitools_label }}
+        run: |
+          # The label is always the fully-qualified "<vendor>/<api>" (the
+          # dispatch path builds it, the issue path validates it), so the repo
+          # folder to replace is simply apis/openapi/<vendor>/<api>.
+          TARGET_API_CONTENT_PATH="apis/openapi/$LABEL"
+          echo "Expecting an existing api folder at '$TARGET_API_CONTENT_PATH'."
+
+          if [ ! -d "$TARGET_API_CONTENT_PATH" ]; then
+            echo "::error::No existing api folder at '$TARGET_API_CONTENT_PATH' — nothing to replace."
+            echo "not_found=true" >> $GITHUB_OUTPUT
+            # Reuse the standard extract/error surface so the failure comment and
+            # summary steps report a clear message.
+            echo "error_message=Replace was requested for '$LABEL' but 'apis/openapi/$LABEL' does not exist, so there is nothing to delete and replace. Check the vendor/api name. If you meant to add a NEW api, use the Import workflow instead — replace only re-imports over an existing folder." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          echo "Found existing api folder at '$TARGET_API_CONTENT_PATH'. Proceeding with delete-and-replace."
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install jentic-apitools-cli
+        run: pip install --quiet jentic-apitools-cli
+
+      - name: Run Apitools Import CLI and Produce ZIP
+        id: call_apitools
+        env:
+          # Untrusted inputs (label/URL originate from the issue body) are passed
+          # via env and quoted in the script — never interpolated into run: directly.
+          LABEL: ${{ steps.extract_info.outputs.apitools_label }}
+          IMPORT_URL: ${{ steps.extract_info.outputs.import_oas_url }}
+          REJECT_INVALID_SERVER_URLS: ${{ steps.extract_info.outputs.reject_invalid_server_urls }}
+          REJECT_INVALID_SECURITY: ${{ steps.extract_info.outputs.reject_invalid_security }}
+          GITHUB_REPOSITORY_SLUG: ${{ github.repository }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          LIGHT_LLM_PROVIDER: ${{ vars.LIGHT_LLM_PROVIDER }}
+          LLM_LIGHT_MODEL: ${{ vars.LLM_LIGHT_MODEL }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
+        run: |
+          echo "Importing URL: $IMPORT_URL"
+          echo "Using Apitools Label: $LABEL"
+
+          # The deployed service derives the ZIP filename from the label as
+          # "<vendor>:<api>.zip"; reproduce that so the unzip step's subpath
+          # logic (replacing ':' with '/') keeps working unchanged. Replace
+          # always receives a fully-qualified "<vendor>/<api>" label (validated
+          # above), so there is no single-segment / 'main' fallback to handle.
+          SAFE_LABEL=$(echo "$LABEL" | tr '/' ':')
+          OUTPUT_ZIP="${SAFE_LABEL}.zip"
+
+          # Map the optional reject flags to the CLI's boolean toggles.
+          REJECT_SERVER_FLAG="--reject-invalid-server-urls"
+          if [ "$REJECT_INVALID_SERVER_URLS" = "false" ]; then
+            REJECT_SERVER_FLAG="--no-reject-invalid-server-urls"
+          fi
+          REJECT_SECURITY_FLAG="--reject-invalid-security"
+          if [ "$REJECT_INVALID_SECURITY" = "false" ]; then
+            REJECT_SECURITY_FLAG="--no-reject-invalid-security"
+          fi
+
+          # --skip-bundle is intentional: the CLI maps bundled_spec = not skip_bundle,
+          # and the pipeline only bundles when bundled_spec is false. The deployed
+          # service sends bundled_spec=false, so --skip-bundle reproduces its bundling.
+          # Write CLI stdout/stderr to temp files outside the repo working tree
+          # (via mktemp) so they can never be picked up by create-pull-request.
+          set +e
+          CLI_STDOUT_FILE=$(mktemp)
+          CLI_STDERR_FILE=$(mktemp)
+          jentic-apitools import "$IMPORT_URL" \
+            --archive "$OUTPUT_ZIP" \
+            --label "$LABEL" \
+            --skip-bundle \
+            --enable-llm-analysis \
+            "$REJECT_SERVER_FLAG" \
+            "$REJECT_SECURITY_FLAG" \
+            --canonical-source-url "$IMPORT_URL" \
+            --canonical-artifacts-base-url "https://raw.githubusercontent.com/${GITHUB_REPOSITORY_SLUG}/refs/heads/main/apis/openapi" \
+            --canonical-artifacts-base-url-ui "https://github.com/${GITHUB_REPOSITORY_SLUG}/tree/main/apis/openapi" \
+            --overwrite \
+            -q 1>"$CLI_STDOUT_FILE" 2>"$CLI_STDERR_FILE"
+          CLI_EXIT_CODE=$?
+          set -e
+
+          CLI_STDERR=$(cat "$CLI_STDERR_FILE")
+          rm -f "$CLI_STDERR_FILE"
+          echo "CLI stdout:"
+          cat "$CLI_STDOUT_FILE"
+          rm -f "$CLI_STDOUT_FILE"
+          echo "CLI stderr: $CLI_STDERR"
+
+          if [ "$CLI_EXIT_CODE" -ne 0 ]; then
+              echo "::error::jentic-apitools import failed with exit code $CLI_EXIT_CODE."
+              echo "api_failed=true" >> $GITHUB_OUTPUT
+              # Random delimiter: CLI stderr is untrusted and could otherwise
+              # contain a line matching a fixed delimiter and break out of the
+              # heredoc (a GITHUB_OUTPUT injection).
+              DELIM="EOF_$(openssl rand -hex 16)"
+              echo "error_response<<$DELIM" >> $GITHUB_OUTPUT
+              echo "${CLI_STDERR:-Import CLI failed with exit code $CLI_EXIT_CODE. No additional error details available.}" >> $GITHUB_OUTPUT
+              echo "$DELIM" >> $GITHUB_OUTPUT
+              exit 1
+          fi
+
+          if [ ! -f "$OUTPUT_ZIP" ]; then
+              echo "::error::Import CLI reported success but ZIP '$OUTPUT_ZIP' was not found on disk."
+              echo "api_failed=true" >> $GITHUB_OUTPUT
+              echo "error_response=Import CLI succeeded but the expected ZIP '$OUTPUT_ZIP' was not produced." >> $GITHUB_OUTPUT
+              exit 1
+          fi
+
+          # Verify zip file is not empty/tiny (basic check)
+          if [ $(stat -c%s "$OUTPUT_ZIP") -lt 100 ]; then # Check if file is > 100 bytes
+              echo "::error::Produced ZIP file seems empty or too small."
+              ls -l "$OUTPUT_ZIP"
+              echo "api_failed=true" >> $GITHUB_OUTPUT
+              echo "error_response=Produced ZIP file from import CLI is empty or too small. The OpenAPI URL may be invalid or inaccessible." >> $GITHUB_OUTPUT
+              exit 1
+          fi
+          echo "Import successful. ZIP file produced at $OUTPUT_ZIP ($(stat -c%s "$OUTPUT_ZIP") bytes)."
+
+          # Remove filename extension, Replace all ':' with '/' to point to API endpoint location
+          FILE_STRUCTURE=${OUTPUT_ZIP%.zip}
+          ACTUAL_CONTENT_SUBPATH_IN_ZIP=${FILE_STRUCTURE//:/\/}
+
+          echo "zip_file=$OUTPUT_ZIP" >> $GITHUB_OUTPUT
+          echo "actual_content_subpath_in_zip=$ACTUAL_CONTENT_SUBPATH_IN_ZIP" >> $GITHUB_OUTPUT
+
+      - name: Unzip Generated Files
+        id: unzip_files
+        env:
+          ZIP_FILE: ${{ steps.call_apitools.outputs.zip_file }}
+          ACTUAL_CONTENT_SUBPATH_IN_ZIP: ${{ steps.call_apitools.outputs.actual_content_subpath_in_zip }}
+        run: |
+          EXTRACT_TEMP_DIR="openapi_temp_extract"
+          FINAL_TARGET_BASE="apis/openapi"
+
+          echo "Ensuring temporary extraction directory $EXTRACT_TEMP_DIR exists and is empty..."
+          rm -rf "$EXTRACT_TEMP_DIR"
+          mkdir -p "$EXTRACT_TEMP_DIR"
+
+          echo "Unzipping $ZIP_FILE into $EXTRACT_TEMP_DIR..."
+          unzip -o "$ZIP_FILE" -d "$EXTRACT_TEMP_DIR"
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to unzip $ZIP_FILE into $EXTRACT_TEMP_DIR."
+            exit 1
+          fi
+          echo "Successfully unzipped files into temporary directory $EXTRACT_TEMP_DIR."
+          echo "Contents of $EXTRACT_TEMP_DIR:"
+          ls -lA "$EXTRACT_TEMP_DIR"
+
+          SOURCE_API_CONTENT_PATH="$EXTRACT_TEMP_DIR/$ACTUAL_CONTENT_SUBPATH_IN_ZIP"
+          TARGET_API_CONTENT_PATH="$FINAL_TARGET_BASE/$ACTUAL_CONTENT_SUBPATH_IN_ZIP"
+
+          echo "Determined actual content subpath in zip: $ACTUAL_CONTENT_SUBPATH_IN_ZIP"
+          echo "Full source API content path (in temp extract): $SOURCE_API_CONTENT_PATH"
+          echo "Full target API content path (in repo): $TARGET_API_CONTENT_PATH"
+
+          if [ ! -d "$SOURCE_API_CONTENT_PATH" ]; then
+              echo "::error::Source API content path '$SOURCE_API_CONTENT_PATH' does not exist after unzipping. Check zip structure and label logic."
+              echo "Contents of $EXTRACT_TEMP_DIR:"
+              ls -lA "$EXTRACT_TEMP_DIR"
+              FIRST_PART_OF_LABEL=$(echo "$ACTUAL_CONTENT_SUBPATH_IN_ZIP" | cut -d'/' -f1)
+              echo "Contents of $EXTRACT_TEMP_DIR/$FIRST_PART_OF_LABEL:"
+              ls -lA "$EXTRACT_TEMP_DIR/$FIRST_PART_OF_LABEL"
+              exit 1
+          fi
+
+          echo "extract_temp_dir=$EXTRACT_TEMP_DIR" >> $GITHUB_OUTPUT
+          echo "source_api_content_path=$SOURCE_API_CONTENT_PATH" >> $GITHUB_OUTPUT
+          echo "target_api_content_path=$TARGET_API_CONTENT_PATH" >> $GITHUB_OUTPUT
+
+      - name: Delete Existing API Folder
+        # This is the step that makes "replace" differ from "import". Instead of
+        # rejecting when the api folder already exists, delete it wholesale — all
+        # version directories AND the api-level meta.json — so the subsequent copy
+        # step lays down an entirely fresh set of files and regenerated meta. If
+        # removing the api folder leaves its vendor folder empty, delete the
+        # vendor folder too.
+        id: delete_existing
+        env:
+          TARGET_API_CONTENT_PATH: ${{ steps.unzip_files.outputs.target_api_content_path }}
+        run: |
+          # Defense in depth: the target path is built from the (untrusted)
+          # label. It must live strictly under apis/openapi/ and contain no
+          # path-traversal segment before we hand it to `rm -rf`.
+          case "$TARGET_API_CONTENT_PATH" in
+            apis/openapi/*) : ;;
+            *)
+              echo "::error::Refusing to delete '$TARGET_API_CONTENT_PATH': not under apis/openapi/."
+              exit 1
+              ;;
+          esac
+          if printf '%s' "$TARGET_API_CONTENT_PATH" | grep -q '\.\.'; then
+            echo "::error::Refusing to delete '$TARGET_API_CONTENT_PATH': contains '..'."
+            exit 1
+          fi
+
+          # Existence was already asserted in "Verify Existing API Folder to
+          # Replace" before the import ran. Re-check here as a safety net (the
+          # label-derived path there and this zip-content-derived path should
+          # agree): if it is somehow absent now, fail rather than fall through to
+          # a plain import — replace must never import when there was nothing to
+          # replace.
+          if [ ! -d "$TARGET_API_CONTENT_PATH" ]; then
+            echo "::error::Expected existing api folder '$TARGET_API_CONTENT_PATH' to replace, but it is not present. Aborting rather than importing a new folder."
+            exit 1
+          fi
+
+          echo "Existing api folder found at '$TARGET_API_CONTENT_PATH'. Deleting it entirely (all versions + meta.json)..."
+          echo "Contents being removed:"
+          ls -lA "$TARGET_API_CONTENT_PATH" || true
+          rm -rf "$TARGET_API_CONTENT_PATH"
+          echo "folder_deleted=true" >> $GITHUB_OUTPUT
+
+          # If the vendor folder is now empty (the deleted api was its only api),
+          # remove the empty vendor folder too. `rmdir` is intentional: it only
+          # succeeds on an empty directory, so a vendor with other apis is left
+          # untouched.
+          VENDOR_DIR=$(dirname "$TARGET_API_CONTENT_PATH")
+          case "$VENDOR_DIR" in
+            apis/openapi/*)
+              if [ -d "$VENDOR_DIR" ] && [ -z "$(ls -A "$VENDOR_DIR")" ]; then
+                echo "Vendor folder '$VENDOR_DIR' is now empty. Removing it too..."
+                rmdir "$VENDOR_DIR"
+                echo "vendor_deleted=true" >> $GITHUB_OUTPUT
+              else
+                echo "Vendor folder '$VENDOR_DIR' still contains other apis (or does not exist). Leaving it in place."
+                echo "vendor_deleted=false" >> $GITHUB_OUTPUT
+              fi
+              ;;
+            *)
+              echo "vendor_deleted=false" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Copy Files to Repository
+        id: copy_files
+        env:
+          SOURCE_API_CONTENT_PATH: ${{ steps.unzip_files.outputs.source_api_content_path }}
+          TARGET_API_CONTENT_PATH: ${{ steps.unzip_files.outputs.target_api_content_path }}
+        run: |
+          echo "Ensuring target API directory '$TARGET_API_CONTENT_PATH' exists..."
+          mkdir -p "$TARGET_API_CONTENT_PATH"
+
+          echo "Copying version directories from '$SOURCE_API_CONTENT_PATH' to '$TARGET_API_CONTENT_PATH'..."
+          find "$SOURCE_API_CONTENT_PATH" -mindepth 1 -maxdepth 1 -type d -print0 | while IFS= read -r -d $'\0' source_version_dir_path; do
+            version_dir_name=$(basename "$source_version_dir_path")
+            echo "Copying version directory: '$version_dir_name'"
+            rsync -a "$source_version_dir_path/" "$TARGET_API_CONTENT_PATH/$version_dir_name/"
+            if [ $? -ne 0 ]; then
+              echo "::error::Failed to copy version directory '$version_dir_name' using rsync."
+              exit 1
+            fi
+          done
+          echo "Version directories copied successfully."
+
+          # Handle api-level meta.json. Because the existing folder was deleted
+          # above, the target meta.json never exists here, so it is always
+          # regenerated from the freshly imported source.
+          SOURCE_META_JSON="$SOURCE_API_CONTENT_PATH/meta.json"
+          TARGET_META_JSON="$TARGET_API_CONTENT_PATH/meta.json"
+
+          echo "Handling meta.json..."
+          echo "Source meta.json: $SOURCE_META_JSON"
+          echo "Target meta.json: $TARGET_META_JSON"
+
+          if [ -f "$SOURCE_META_JSON" ]; then
+            cp "$SOURCE_META_JSON" "$TARGET_META_JSON"
+            echo "Copied freshly generated meta.json to $TARGET_META_JSON."
+          else
+            echo "::warning::meta.json not found in source at $SOURCE_META_JSON. Cannot copy."
+          fi
+
+      - name: Clean Up Temporary Files
+        if: always() && steps.unzip_files.outcome == 'success'
+        env:
+          EXTRACT_TEMP_DIR: ${{ steps.unzip_files.outputs.extract_temp_dir }}
+          ZIP_FILE: ${{ steps.call_apitools.outputs.zip_file }}
+        run: |
+          if [ -n "$EXTRACT_TEMP_DIR" ] && [ -d "$EXTRACT_TEMP_DIR" ]; then
+            echo "Cleaning up temporary extraction directory $EXTRACT_TEMP_DIR..."
+            rm -rf "$EXTRACT_TEMP_DIR"
+          fi
+
+          if [ -n "$ZIP_FILE" ] && [ -f "$ZIP_FILE" ]; then
+            echo "Cleaning up ZIP file $ZIP_FILE..."
+            rm "$ZIP_FILE"
+          fi
+
+          echo "Cleanup complete."
+
+      - name: Check Git Status Before PR Action
+        run: |
+          echo "--- Git Status After Replace ---"
+          git status
+          echo "--- End Git Status ---"
+
+      - name: Find, Prepare, Read, and Remove Repair Log for Commit
+        id: prepare_repair_log
+        env:
+          SEARCH_PATH: ${{ steps.unzip_files.outputs.target_api_content_path }}
+        run: |
+          # Search within the path where files were copied into the repo for commit
+          if [ -z "$SEARCH_PATH" ]; then
+            echo "::warning::Search path for repair log (target_api_content_path) is empty. Skipping log processing."
+            echo "log_found=false" >> $GITHUB_OUTPUT
+            echo "log_content_base64=" >> $GITHUB_OUTPUT # Ensure output is set
+            exit 0 # Exit successfully, as this isn't a fatal error for the whole workflow
+          fi
+
+          echo "Searching for repair_log.txt in $SEARCH_PATH and its subdirectories..."
+          LOG_FILE_CANDIDATE=$(find "$SEARCH_PATH" -name "repair_log.txt" -print -quit)
+
+          if [[ -f "$LOG_FILE_CANDIDATE" ]]; then
+            echo "Repair log found at: $LOG_FILE_CANDIDATE"
+            echo "--- Start of Repair Log Content ---"
+            cat "$LOG_FILE_CANDIDATE"
+            echo "--- End of Repair Log Content ---"
+
+            # Read content, encode to base64, and set as output using multiline syntax
+            LOG_CONTENT_BASE64=$(base64 -w 0 < "$LOG_FILE_CANDIDATE")
+            echo 'log_content_base64<<EOF' >> "$GITHUB_OUTPUT"
+            echo "$LOG_CONTENT_BASE64" >> "$GITHUB_OUTPUT"
+            echo 'EOF' >> "$GITHUB_OUTPUT"
+
+            echo "Removing original $LOG_FILE_CANDIDATE to prevent it from being committed..."
+            rm "$LOG_FILE_CANDIDATE"
+            if [ $? -eq 0 ]; then
+              echo "Original $LOG_FILE_CANDIDATE removed successfully."
+            else
+              echo "::warning::Failed to remove original $LOG_FILE_CANDIDATE. It might be committed."
+            fi
+
+            echo "log_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "repair_log.txt not found in $SEARCH_PATH."
+            echo "log_found=false" >> $GITHUB_OUTPUT
+            echo "log_content_base64=" >> $GITHUB_OUTPUT # Ensure output is set
+          fi
+        shell: bash
+
+      - name: Create Pull Request
+        id: create_pr_step
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # Make sure this token has write permissions
+          commit-message: "feat: Replace OpenAPI spec for ${{ steps.extract_info.outputs.pr_ref }}"
+          title: "feat: Replace OpenAPI spec for ${{ steps.extract_info.outputs.pr_ref }}"
+          body: |
+            This PR **completely replaces** the existing API folder for the vendor/api referenced in ${{ steps.extract_info.outputs.pr_ref }}: the prior `apis/openapi/<vendor>/<api>` directory (all version directories and its `meta.json`) was deleted, and the import pipeline was re-run against a new spec so every file and all meta were regenerated from scratch.
+
+            **Source URL:** ${{ steps.extract_info.outputs.import_oas_url }}
+
+            Files were automatically generated by the Jentic OpenAPI import service.
+
+            ${{ steps.extract_info.outputs.closes_line }}
+          branch: ${{ steps.extract_info.outputs.branch_name }}
+          base: main
+          delete-branch: true
+
+      - name: Display PR URL
+        if: steps.create_pr_step.outputs.pull-request-url
+        env:
+          PR_URL: ${{ steps.create_pr_step.outputs.pull-request-url }}
+        run: echo "::notice::Replace PR:${PR_URL}"
+
+      - name: Post Repair Log Comment to PR
+        if: steps.prepare_repair_log.outputs.log_found == 'true' && steps.create_pr_step.outputs.pull-request-number
+        uses: actions/github-script@v7
+        env:
+          # The repair log originates from the imported spec pipeline
+          # (untrusted); pass it via env, never into the script source.
+          LOG_CONTENT_BASE64: ${{ steps.prepare_repair_log.outputs.log_content_base64 }}
+          LOG_FOUND: ${{ steps.prepare_repair_log.outputs.log_found }}
+          PR_NUMBER: ${{ steps.create_pr_step.outputs.pull-request-number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            let logContentBase64 = process.env.LOG_CONTENT_BASE64 || '';
+            let logContent = '';
+
+            if (logContentBase64) {
+              try {
+                logContent = Buffer.from(logContentBase64, 'base64').toString('utf8');
+              } catch (error) {
+                console.error('Error decoding base64 log content:', error);
+                logContent = 'Error decoding repair log content.';
+              }
+            } else if (process.env.LOG_FOUND === 'true') {
+              logContent = 'Repair log was found but content is missing or could not be retrieved.';
+            } else {
+              // This part of the script should not be reached if log_found is false due to the step's 'if' condition,
+              // but as a safeguard, or if the 'if' condition were removed.
+              console.log('Repair log not found or content unavailable, skipping comment.');
+              return; // Exit script gracefully
+            }
+
+            const maxLength = 60000; // GitHub comment character limit is ~65535
+            let commentBody = `**OpenAPI Spec Repair Log:**\n\n\`\`\`text\n${logContent}\n\`\`\``;
+
+            if (commentBody.length > maxLength) {
+              const header = `**OpenAPI Spec Repair Log (truncated):**\n\n\`\`\`text\n`;
+              const footer = `\n...\n(Log was truncated due to length.)\n\`\`\``;
+              const availableLength = maxLength - header.length - footer.length;
+              const truncatedContent = logContent.substring(0, availableLength);
+              commentBody = `${header}${truncatedContent}${footer}`;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(process.env.PR_NUMBER, 10),
+              body: commentBody
+            });
+
+      - name: Comment on Issue if Replace Failed
+        if: failure() && steps.extract_info.outputs.has_issue == 'true' && (steps.extract_info.outputs.extract_failed == 'true' || steps.verify_existing.outputs.not_found == 'true' || steps.call_apitools.outputs.api_failed == 'true')
+        uses: actions/github-script@v7
+        env:
+          API_ERROR_RESPONSE: ${{ steps.call_apitools.outputs.error_response }}
+          EXTRACT_FAILED: ${{ steps.extract_info.outputs.extract_failed }}
+          EXTRACT_ERROR_MESSAGE: ${{ steps.extract_info.outputs.error_message }}
+          NOT_FOUND: ${{ steps.verify_existing.outputs.not_found }}
+          NOT_FOUND_MESSAGE: ${{ steps.verify_existing.outputs.error_message }}
+          API_FAILED: ${{ steps.call_apitools.outputs.api_failed }}
+          ISSUE_NUMBER: ${{ steps.extract_info.outputs.issue_number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            let errorMessage = "❌ **Failed to replace OpenAPI specification**\n\n";
+
+            // Check which step failed and provide appropriate error message
+            if (process.env.EXTRACT_FAILED === 'true') {
+              errorMessage += `**Error:** ${process.env.EXTRACT_ERROR_MESSAGE}\n\n`;
+              errorMessage += "Please check your issue format and ensure it contains the required fields:\n";
+              errorMessage += "- \`replace_oas_url: <your-openapi-url>\`\n";
+              errorMessage += "- \`vendor_name: <your-vendor-name>\`\n\n";
+            } else if (process.env.NOT_FOUND === 'true') {
+              errorMessage += `**Error:** ${process.env.NOT_FOUND_MESSAGE}\n\n`;
+              errorMessage += "No files were changed. If you meant to add a brand-new API, use the [Import OpenAPI to Jentic Public APIs](https://github.com/jentic/jentic-public-apis/issues/new?template=import-openapi-to-jentic-public-apis.md) template instead.\n\n";
+            } else if (process.env.API_FAILED === 'true') {
+              const errorResponse = process.env.API_ERROR_RESPONSE || '';
+              errorMessage += `**Error:** Import service failed\n\n`;
+
+              try {
+                const response = JSON.parse(errorResponse);
+                if (response.title) {
+                  errorMessage += `**${response.status || 'Error'} — ${response.title}**\n\n`;
+                }
+                if (response.detail) {
+                  errorMessage += `**Details:** ${response.detail}\n\n`;
+                }
+                if (response.error_code) {
+                  errorMessage += `**Error code:** \`${response.error_code}\`\n\n`;
+                }
+              } catch (e) {
+                errorMessage += `**Details:** ${errorResponse}\n\n`;
+              }
+
+              errorMessage += "Please check that your OpenAPI URL is accessible and contains a valid OpenAPI specification.\n\n";
+            }
+
+            errorMessage += "If you believe this is a bug with the import service or need additional support, please contact the development team at Jentic Community Discord (https://discord.gg/yrxmDZWMqB).\n\n";
+            errorMessage += "Alternatively create a new issue reporting the bug (https://github.com/jentic/jentic-public-apis/issues/new?template=BLANK_ISSUE).";
+
+            await github.rest.issues.createComment({
+              issue_number: parseInt(process.env.ISSUE_NUMBER, 10),
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: errorMessage
+            });
+
+      - name: Write Error to Workflow Summary
+        if: failure() && (steps.extract_info.outputs.extract_failed == 'true' || steps.verify_existing.outputs.not_found == 'true' || steps.call_apitools.outputs.api_failed == 'true')
+        env:
+          API_ERROR_RESPONSE: ${{ steps.call_apitools.outputs.error_response }}
+          EXTRACT_ERROR: ${{ steps.extract_info.outputs.error_message }}
+          EXTRACT_FAILED: ${{ steps.extract_info.outputs.extract_failed }}
+          NOT_FOUND: ${{ steps.verify_existing.outputs.not_found }}
+          NOT_FOUND_ERROR: ${{ steps.verify_existing.outputs.error_message }}
+          API_FAILED: ${{ steps.call_apitools.outputs.api_failed }}
+        run: |
+          echo "## ❌ Replace Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$EXTRACT_FAILED" = "true" ]; then
+            echo "**Error:** $EXTRACT_ERROR" >> $GITHUB_STEP_SUMMARY
+          elif [ "$NOT_FOUND" = "true" ]; then
+            echo "**Error:** $NOT_FOUND_ERROR" >> $GITHUB_STEP_SUMMARY
+          elif [ "$API_FAILED" = "true" ]; then
+            echo "**Error:** Import service returned an error." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            echo "$API_ERROR_RESPONSE" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
