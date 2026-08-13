@@ -1,7 +1,6 @@
 ---
-name: Generate Arazzo Specification for Jentic OpenAPI
-about: Request automatic generation of an Arazzo specification from an Jentic OpenAPI
-  URL
+name: Generate Arazzo Specification for Jentic OpenAPI (raw / agent fallback)
+about: Plain-markdown fallback for the Generate Arazzo form. Prefer the "Generate Arazzo Specification for Jentic OpenAPI" form; use this only for programmatic/agent submissions.
 title: "[AUTO] Generate Arazzo spec for Jentic OpenAPI"
 labels: enhancement
 assignees: ''

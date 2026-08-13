@@ -1,6 +1,6 @@
 ---
-name: Import OpenAPI to Jentic Public APIs
-about: Request import of OpenAPI spec to Jentic Public APIs from an OpenAPI URL.
+name: Import OpenAPI to Jentic Public APIs (raw / agent fallback)
+about: Plain-markdown fallback for the Import form. Prefer the "Import OpenAPI to Jentic Public APIs" form; use this only for programmatic/agent submissions.
 title: "[AUTO] Import OpenAPI to Jentic Public APIs: "
 labels: enhancement
 assignees: ''

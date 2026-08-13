@@ -1,6 +1,6 @@
 ---
-name: Replace OpenAPI in Jentic Public APIs
-about: Completely delete an existing API folder and re-import it fresh from a new OpenAPI URL.
+name: Replace OpenAPI in Jentic Public APIs (raw / agent fallback)
+about: Plain-markdown fallback for the Replace form. Prefer the "Replace OpenAPI in Jentic Public APIs" form; use this only for programmatic/agent submissions.
 title: "[AUTO] Replace OpenAPI in Jentic Public APIs: "
 labels: enhancement
 assignees: ''
