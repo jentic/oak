@@ -23,9 +23,8 @@ on:
         description: 'Vendor name whose api folder should be replaced'
         required: true
       api:
-        description: 'API name (optional)'
-        required: false
-        default: 'main' # Default to 'main' if not provided
+        description: 'API name (required — replace never defaults; you must name the exact api folder to delete)'
+        required: true
       reject_invalid_server_urls:
         description: 'Reject specs with invalid/relative server URLs (optional, default: true)'
         required: false
@@ -86,13 +85,22 @@ jobs:
             exit 1
           fi
 
-          # Extract API Name
+          # Extract API Name (Required). Unlike import, replace NEVER defaults to
+          # 'main': it deletes the target folder, so the exact api must be named
+          # to avoid creating a spurious 'main' or deleting the wrong api on a
+          # multi-api vendor.
           API_NAME="$INPUT_API"
           echo "API Name: $API_NAME"
+          if [ -z "$API_NAME" ]; then
+            echo "::error::'api' is required for replace and must not be empty."
+            echo "extract_failed=true" >> $GITHUB_OUTPUT
+            echo "error_message=The 'api' input is required for replace. Name the exact api folder to delete and re-import (e.g. vendor 'hashicorp.com', api 'nomad'). Replace never defaults to 'main'." >> $GITHUB_OUTPUT
+            exit 1
+          fi
 
-          # Set the Apitools Label (always the vendor name now)
+          # Set the Apitools Label as the fully-qualified vendor/api.
           APITOOLS_LABEL="${VENDOR_NAME}/${API_NAME}"
-          echo "Using provided Vendor Name as Apitools label: $APITOOLS_LABEL"
+          echo "Using provided Vendor/API as Apitools label: $APITOOLS_LABEL"
 
           # Extract reject_invalid_server_urls (optional, defaults to true)
           REJECT_INVALID_SERVER_URLS="$INPUT_REJECT_INVALID_SERVER_URLS"
@@ -158,14 +166,17 @@ jobs:
           fi
 
           # Validate the vendor name: it becomes a directory under apis/openapi/
-          # and part of the PR branch name. Allow the documented "<vendor>/<api>"
-          # form (a single optional slash segment; see the issue template) but
-          # nothing else — each segment must start alphanumeric, so no path
-          # traversal ('..', leading dot) and no shell metacharacters.
-          if ! printf '%s\n' "$VENDOR_NAME" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?$'; then
-            echo "::error::'vendor_name:' contains unsupported characters."
+          # and part of the PR branch name. Unlike import, replace REQUIRES the
+          # "<vendor>/<api>" form — the '/<api>' segment is mandatory, not
+          # optional. Because replace deletes the target folder, defaulting a
+          # missing api to 'main' would either create a spurious 'main' api or
+          # delete the wrong api on a multi-api vendor; forcing the explicit api
+          # removes that ambiguity. Each segment must start alphanumeric, so no
+          # path traversal ('..', leading dot) and no shell metacharacters.
+          if ! printf '%s\n' "$VENDOR_NAME" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$'; then
+            echo "::error::'vendor_name:' must be of the form '<vendor>/<api>' and contain only supported characters."
             echo "extract_failed=true" >> $GITHUB_OUTPUT
-            echo "error_message=The 'vendor_name:' value may only contain letters, digits, dots, hyphens, and underscores, with an optional single '/<api>' segment (e.g. 'acme.com' or 'acme.com/widgets'); each segment must start with a letter or digit." >> $GITHUB_OUTPUT
+            echo "error_message=Replace requires an explicit api: 'vendor_name:' must be '<vendor>/<api_name>' (e.g. 'hashicorp.com/nomad'), not just '<vendor>'. Segments may only contain letters, digits, dots, hyphens, and underscores, and each must start with a letter or digit. Replace never defaults to 'main' — name the exact api folder to delete and re-import." >> $GITHUB_OUTPUT
             exit 1
           fi
 
@@ -276,14 +287,10 @@ jobs:
 
           # The deployed service derives the ZIP filename from the label as
           # "<vendor>:<api>.zip"; reproduce that so the unzip step's subpath
-          # logic (replacing ':' with '/') keeps working unchanged.
+          # logic (replacing ':' with '/') keeps working unchanged. Replace
+          # always receives a fully-qualified "<vendor>/<api>" label (validated
+          # above), so there is no single-segment / 'main' fallback to handle.
           SAFE_LABEL=$(echo "$LABEL" | tr '/' ':')
-          # A single-segment label (issue path) maps to "<vendor>/main" in the
-          # pipeline, so the ZIP filename must be "<vendor>:main.zip" to match.
-          case "$SAFE_LABEL" in
-            *:*) : ;;                       # already vendor:api
-            *)   SAFE_LABEL="$SAFE_LABEL:main" ;;
-          esac
           OUTPUT_ZIP="${SAFE_LABEL}.zip"
 
           # Map the optional reject flags to the CLI's boolean toggles.

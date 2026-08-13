@@ -44,18 +44,26 @@ The URL should point directly to the spec file, not a web page.
 -->
 replace_oas_url: 
 
-## Vendor Name (Required)
+## Vendor / API Name (Required)
 <!--
-REQUIRED: Provide the vendor name of the folder to REPLACE (e.g., github.com, stripe.com).
+REQUIRED: Provide the fully-qualified '<vendor>/<api_name>' of the folder to
+REPLACE (e.g., hashicorp.com/nomad, stripe.com/payments).
 The workflow deletes 'apis/openapi/<vendor>/<api_name>/' before re-importing.
 
-Vendor name is parsed into vendor (vendor identifier) and api_name.
+⚠️ The '/<api_name>' segment is MANDATORY for replace.
+Unlike the import template, replace does NOT default a bare vendor to 'main'.
+Because this operation deletes the target folder, a defaulted 'main' could
+either create a spurious 'main' api or delete the wrong api on a vendor that has
+several — so you must name the exact api folder.
 
 Examples:
-- hashicorp.com
-//=> deletes apis/openapi/hashicorp.com/main/, then re-imports (api_name=main)
 - hashicorp.com/nomad
 //=> deletes apis/openapi/hashicorp.com/nomad/, then re-imports (api_name=nomad)
+- stripe.com/payments
+//=> deletes apis/openapi/stripe.com/payments/, then re-imports (api_name=payments)
+
+Not allowed:
+- hashicorp.com        (missing '/<api_name>' — the workflow will reject this)
 
 ⚠️ Double-check this value: an incorrect vendor/api will delete the wrong folder.
 The deletion is reviewable in the resulting PR before it merges.
