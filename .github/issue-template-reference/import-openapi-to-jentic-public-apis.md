@@ -1,6 +1,6 @@
 ---
-name: Import OpenAPI to Jentic Public APIs (raw / agent fallback)
-about: Plain-markdown fallback for the Import form. Prefer the "Import OpenAPI to Jentic Public APIs" form; use this only for programmatic/agent submissions.
+name: Import OpenAPI to Jentic Public APIs (agent reference — not a picker template)
+about: Canonical body shape for programmatic/agent submissions. Humans should use the "Import OpenAPI to Jentic Public APIs" issue form instead. Kept outside .github/ISSUE_TEMPLATE so it does not appear in the New Issue picker.
 title: "[AUTO] Import OpenAPI to Jentic Public APIs: "
 labels: enhancement
 assignees: ''

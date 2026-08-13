@@ -1,6 +1,6 @@
 ---
-name: Generate Arazzo Specification for Jentic OpenAPI (raw / agent fallback)
-about: Plain-markdown fallback for the Generate Arazzo form. Prefer the "Generate Arazzo Specification for Jentic OpenAPI" form; use this only for programmatic/agent submissions.
+name: Generate Arazzo Specification for Jentic OpenAPI (agent reference — not a picker template)
+about: Canonical body shape for programmatic/agent submissions. Humans should use the "Generate Arazzo Specification for Jentic OpenAPI" issue form instead. Kept outside .github/ISSUE_TEMPLATE so it does not appear in the New Issue picker.
 title: "[AUTO] Generate Arazzo spec for Jentic OpenAPI"
 labels: enhancement
 assignees: ''
