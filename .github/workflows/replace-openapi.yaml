@@ -253,6 +253,36 @@ jobs:
             echo "issue_number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Verify Existing API Folder to Replace
+        # Replace is delete-then-import: there must be an existing folder to
+        # replace. If the named vendor/api does not exist (typo, wrong vendor, or
+        # an api that was never imported), fail HERE — before the import CLI runs
+        # — rather than silently importing a brand-new folder. That would be a
+        # plain import masquerading as a replace, which is not what was asked.
+        if: steps.extract_info.outputs.extract_failed != 'true'
+        id: verify_existing
+        env:
+          # The label originates from untrusted input — env only, and validated
+          # into a strict "<vendor>/<api>" shape upstream.
+          LABEL: ${{ steps.extract_info.outputs.apitools_label }}
+        run: |
+          # The label is always the fully-qualified "<vendor>/<api>" (the
+          # dispatch path builds it, the issue path validates it), so the repo
+          # folder to replace is simply apis/openapi/<vendor>/<api>.
+          TARGET_API_CONTENT_PATH="apis/openapi/$LABEL"
+          echo "Expecting an existing api folder at '$TARGET_API_CONTENT_PATH'."
+
+          if [ ! -d "$TARGET_API_CONTENT_PATH" ]; then
+            echo "::error::No existing api folder at '$TARGET_API_CONTENT_PATH' — nothing to replace."
+            echo "not_found=true" >> $GITHUB_OUTPUT
+            # Reuse the standard extract/error surface so the failure comment and
+            # summary steps report a clear message.
+            echo "error_message=Replace was requested for '$LABEL' but 'apis/openapi/$LABEL' does not exist, so there is nothing to delete and replace. Check the vendor/api name. If you meant to add a NEW api, use the Import workflow instead — replace only re-imports over an existing folder." >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          echo "Found existing api folder at '$TARGET_API_CONTENT_PATH'. Proceeding with delete-and-replace."
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -440,16 +470,22 @@ jobs:
             exit 1
           fi
 
-          if [ -d "$TARGET_API_CONTENT_PATH" ]; then
-            echo "Existing api folder found at '$TARGET_API_CONTENT_PATH'. Deleting it entirely (all versions + meta.json)..."
-            echo "Contents being removed:"
-            ls -lA "$TARGET_API_CONTENT_PATH" || true
-            rm -rf "$TARGET_API_CONTENT_PATH"
-            echo "folder_deleted=true" >> $GITHUB_OUTPUT
-          else
-            echo "No existing folder at '$TARGET_API_CONTENT_PATH'. Nothing to delete; this behaves as a plain import."
-            echo "folder_deleted=false" >> $GITHUB_OUTPUT
+          # Existence was already asserted in "Verify Existing API Folder to
+          # Replace" before the import ran. Re-check here as a safety net (the
+          # label-derived path there and this zip-content-derived path should
+          # agree): if it is somehow absent now, fail rather than fall through to
+          # a plain import — replace must never import when there was nothing to
+          # replace.
+          if [ ! -d "$TARGET_API_CONTENT_PATH" ]; then
+            echo "::error::Expected existing api folder '$TARGET_API_CONTENT_PATH' to replace, but it is not present. Aborting rather than importing a new folder."
+            exit 1
           fi
+
+          echo "Existing api folder found at '$TARGET_API_CONTENT_PATH'. Deleting it entirely (all versions + meta.json)..."
+          echo "Contents being removed:"
+          ls -lA "$TARGET_API_CONTENT_PATH" || true
+          rm -rf "$TARGET_API_CONTENT_PATH"
+          echo "folder_deleted=true" >> $GITHUB_OUTPUT
 
           # If the vendor folder is now empty (the deleted api was its only api),
           # remove the empty vendor folder too. `rmdir` is intentional: it only
@@ -653,12 +689,14 @@ jobs:
             });
 
       - name: Comment on Issue if Replace Failed
-        if: failure() && steps.extract_info.outputs.has_issue == 'true' && (steps.extract_info.outputs.extract_failed == 'true' || steps.call_apitools.outputs.api_failed == 'true')
+        if: failure() && steps.extract_info.outputs.has_issue == 'true' && (steps.extract_info.outputs.extract_failed == 'true' || steps.verify_existing.outputs.not_found == 'true' || steps.call_apitools.outputs.api_failed == 'true')
         uses: actions/github-script@v7
         env:
           API_ERROR_RESPONSE: ${{ steps.call_apitools.outputs.error_response }}
           EXTRACT_FAILED: ${{ steps.extract_info.outputs.extract_failed }}
           EXTRACT_ERROR_MESSAGE: ${{ steps.extract_info.outputs.error_message }}
+          NOT_FOUND: ${{ steps.verify_existing.outputs.not_found }}
+          NOT_FOUND_MESSAGE: ${{ steps.verify_existing.outputs.error_message }}
           API_FAILED: ${{ steps.call_apitools.outputs.api_failed }}
           ISSUE_NUMBER: ${{ steps.extract_info.outputs.issue_number }}
         with:
@@ -672,6 +710,9 @@ jobs:
               errorMessage += "Please check your issue format and ensure it contains the required fields:\n";
               errorMessage += "- \`replace_oas_url: <your-openapi-url>\`\n";
               errorMessage += "- \`vendor_name: <your-vendor-name>\`\n\n";
+            } else if (process.env.NOT_FOUND === 'true') {
+              errorMessage += `**Error:** ${process.env.NOT_FOUND_MESSAGE}\n\n`;
+              errorMessage += "No files were changed. If you meant to add a brand-new API, use the [Import OpenAPI to Jentic Public APIs](https://github.com/jentic/jentic-public-apis/issues/new?template=import-openapi-to-jentic-public-apis.md) template instead.\n\n";
             } else if (process.env.API_FAILED === 'true') {
               const errorResponse = process.env.API_ERROR_RESPONSE || '';
               errorMessage += `**Error:** Import service failed\n\n`;
@@ -705,11 +746,13 @@ jobs:
             });
 
       - name: Write Error to Workflow Summary
-        if: failure() && (steps.extract_info.outputs.extract_failed == 'true' || steps.call_apitools.outputs.api_failed == 'true')
+        if: failure() && (steps.extract_info.outputs.extract_failed == 'true' || steps.verify_existing.outputs.not_found == 'true' || steps.call_apitools.outputs.api_failed == 'true')
         env:
           API_ERROR_RESPONSE: ${{ steps.call_apitools.outputs.error_response }}
           EXTRACT_ERROR: ${{ steps.extract_info.outputs.error_message }}
           EXTRACT_FAILED: ${{ steps.extract_info.outputs.extract_failed }}
+          NOT_FOUND: ${{ steps.verify_existing.outputs.not_found }}
+          NOT_FOUND_ERROR: ${{ steps.verify_existing.outputs.error_message }}
           API_FAILED: ${{ steps.call_apitools.outputs.api_failed }}
         run: |
           echo "## ❌ Replace Failed" >> $GITHUB_STEP_SUMMARY
@@ -717,6 +760,8 @@ jobs:
 
           if [ "$EXTRACT_FAILED" = "true" ]; then
             echo "**Error:** $EXTRACT_ERROR" >> $GITHUB_STEP_SUMMARY
+          elif [ "$NOT_FOUND" = "true" ]; then
+            echo "**Error:** $NOT_FOUND_ERROR" >> $GITHUB_STEP_SUMMARY
           elif [ "$API_FAILED" = "true" ]; then
             echo "**Error:** Import service returned an error." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
