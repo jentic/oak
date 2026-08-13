@@ -1,6 +1,6 @@
 # APIs — L
 
-Browsing 88 APIs starting with **L**.
+Browsing 89 APIs starting with **L**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · **L** · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -36,6 +36,7 @@ Browsing 88 APIs starting with **L**.
 | [lexalytics.com](../../../../apis/openapi/lexalytics.com) | [main](../../../../apis/openapi/lexalytics.com/main) |
 | [lexamica.com](../../../../apis/openapi/lexamica.com) | [main](../../../../apis/openapi/lexamica.com/main) |
 | [lgtm.com](../../../../apis/openapi/lgtm.com) | [lgtm-api-specification](../../../../apis/openapi/lgtm.com/lgtm-api-specification) · [main](../../../../apis/openapi/lgtm.com/main) |
+| [libretranslate.com](../../../../apis/openapi/libretranslate.com) | [main](../../../../apis/openapi/libretranslate.com/main) |
 | [licensius.com](../../../../apis/openapi/licensius.com) | [main](../../../../apis/openapi/licensius.com/main) |
 | [lichess.org](../../../../apis/openapi/lichess.org) | [lichess](../../../../apis/openapi/lichess.org/lichess) · [main](../../../../apis/openapi/lichess.org/main) |
 | [licitalab.cl](../../../../apis/openapi/licitalab.cl) | [main](../../../../apis/openapi/licitalab.cl/main) |
