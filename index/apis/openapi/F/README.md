@@ -1,6 +1,6 @@
 # APIs — F
 
-Browsing 104 APIs starting with **F**.
+Browsing 105 APIs starting with **F**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · **F** · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -14,6 +14,7 @@ Browsing 104 APIs starting with **F**.
 | [faktoora.com](../../../../apis/openapi/faktoora.com) | [main](../../../../apis/openapi/faktoora.com/main) |
 | [fakturoid.cz](../../../../apis/openapi/fakturoid.cz) | [fakturoid-api](../../../../apis/openapi/fakturoid.cz/fakturoid-api) |
 | [fal.ai](../../../../apis/openapi/fal.ai) | [main](../../../../apis/openapi/fal.ai/main) |
+| [fantasy.premierleague.com](../../../../apis/openapi/fantasy.premierleague.com) | [main](../../../../apis/openapi/fantasy.premierleague.com/main) |
 | [faraday.ai](../../../../apis/openapi/faraday.ai) | [main](../../../../apis/openapi/faraday.ai/main) |
 | [fareharbor.com](../../../../apis/openapi/fareharbor.com) | [fareharbor-api](../../../../apis/openapi/fareharbor.com/fareharbor-api) |
 | [faretrotter.com](../../../../apis/openapi/faretrotter.com) | [main](../../../../apis/openapi/faretrotter.com/main) |
