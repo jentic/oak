@@ -119,7 +119,7 @@ Browsing 141 APIs starting with **E**.
 | [evetech.net](../../../../apis/openapi/evetech.net) | [main](../../../../apis/openapi/evetech.net/main) |
 | [evolio.cloud](../../../../apis/openapi/evolio.cloud) | [evolio-api](../../../../apis/openapi/evolio.cloud/evolio-api) |
 | [evoliz.io](../../../../apis/openapi/evoliz.io) | [evoliz-api](../../../../apis/openapi/evoliz.io/evoliz-api) |
-| [exa.ai](../../../../apis/openapi/exa.ai) | [search-api](../../../../apis/openapi/exa.ai/search-api) |
+| [exa.ai](../../../../apis/openapi/exa.ai) | [main](../../../../apis/openapi/exa.ai/main) · [search-api](../../../../apis/openapi/exa.ai/search-api) |
 | [example.com](../../../../apis/openapi/example.com) | [main](../../../../apis/openapi/example.com/main) |
 | [example.ilucca.net](../../../../apis/openapi/example.ilucca.net) | [lucca-cleemy-expenses](../../../../apis/openapi/example.ilucca.net/lucca-cleemy-expenses) · [lucca-directory](../../../../apis/openapi/example.ilucca.net/lucca-directory) · [lucca-organization](../../../../apis/openapi/example.ilucca.net/lucca-organization) · [lucca-timmi-absences](../../../../apis/openapi/example.ilucca.net/lucca-timmi-absences) · [lucca-timmi-timesheet](../../../../apis/openapi/example.ilucca.net/lucca-timmi-timesheet) |
 | [exavault.com](../../../../apis/openapi/exavault.com) | [main](../../../../apis/openapi/exavault.com/main) |
