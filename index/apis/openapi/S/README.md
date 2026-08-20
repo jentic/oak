@@ -1,6 +1,6 @@
 # APIs — S
 
-Browsing 654 APIs starting with **S**.
+Browsing 655 APIs starting with **S**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · **S** · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -65,6 +65,7 @@ Browsing 654 APIs starting with **S**.
 | [scoop.it](../../../../apis/openapi/scoop.it) | [main](../../../../apis/openapi/scoop.it/main) |
 | [scorly.io](../../../../apis/openapi/scorly.io) | [main](../../../../apis/openapi/scorly.io/main) |
 | [scoro.com](../../../../apis/openapi/scoro.com) | [main](../../../../apis/openapi/scoro.com/main) |
+| [scrapecreators.com](../../../../apis/openapi/scrapecreators.com) | [main](../../../../apis/openapi/scrapecreators.com/main) |
 | [scrapeninja.net](../../../../apis/openapi/scrapeninja.net) | [main](../../../../apis/openapi/scrapeninja.net/main) |
 | [scraperapi.com](../../../../apis/openapi/scraperapi.com) | [main](../../../../apis/openapi/scraperapi.com/main) |
 | [scraperbox.com](../../../../apis/openapi/scraperbox.com) | [main](../../../../apis/openapi/scraperbox.com/main) |
