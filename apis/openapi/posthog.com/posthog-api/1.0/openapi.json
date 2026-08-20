@@ -23,6 +23,69 @@
       }
     }
   ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "error"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object"
+          }
+        }
+      },
+      "PaginatedResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  },
   "paths": {
     "/api/projects/{project_id}/events": {
       "get": {
@@ -1303,71 +1366,377 @@
           }
         }
       }
-    }
-  },
-  "components": {
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer"
-      }
     },
-    "schemas": {
-      "ErrorResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "error"
-            ]
-          },
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
+    "/api/projects/{project_id}/external_data_sources": {
+      "get": {
+        "operationId": "listExternalDataSources",
+        "summary": "List external data sources",
+        "description": "Lists the Data Warehouse external data sources configured for the project, including each source's sync status, most recent error, and schemas. Use this to check whether a scheduled warehouse sync (e.g. a GitHub or Stripe source) has fetched fresh data or is failing.",
+        "tags": [
+          "Data Warehouse"
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "The project (team) ID.",
+            "schema": {
+              "type": "string"
+            }
           }
-        }
-      },
-      "SuccessResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string"
-          },
-          "data": {
-            "type": "object"
-          }
-        }
-      },
-      "PaginatedResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "type": "object"
+        ],
+        "responses": {
+          "200": {
+            "description": "A paginated list of external data sources.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "next": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "previous": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "An external data source. Key status fields: status (e.g. Running, Completed, Error, Paused), latest_error, prefix, source_type, and schemas (per-table sync state).",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "source_type": {
+                            "type": "string"
+                          },
+                          "prefix": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "latest_error": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "schemas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": true
+                            }
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
             }
           },
-          "total": {
-            "type": "integer"
+          "403": {
+            "description": "Authentication or permission error (missing external_data_source:read scope)."
+          }
+        }
+      },
+      "post": {
+        "operationId": "createExternalDataSource",
+        "summary": "Create an external data source",
+        "description": "Creates a new Data Warehouse external data source for the project.",
+        "tags": [
+          "Data Warehouse"
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "The project (team) ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "The source definition. Common fields: source_type, prefix, and a payload object with connection/credential details specific to the source type.",
+                "properties": {
+                  "source_type": {
+                    "type": "string"
+                  },
+                  "prefix": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created external data source.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
           },
-          "page": {
-            "type": "integer"
+          "400": {
+            "description": "Malformed request."
           },
-          "per_page": {
-            "type": "integer"
+          "403": {
+            "description": "Authentication or permission error."
+          }
+        }
+      }
+    },
+    "/api/projects/{project_id}/external_data_sources/{id}": {
+      "get": {
+        "operationId": "getExternalDataSource",
+        "summary": "Retrieve an external data source",
+        "description": "Retrieves a single Data Warehouse external data source, including its current sync status, latest error, and per-table schemas.",
+        "tags": [
+          "Data Warehouse"
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "The project (team) ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The external data source ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The external data source.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authentication or permission error."
+          },
+          "404": {
+            "description": "Source not found."
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateExternalDataSource",
+        "summary": "Update an external data source",
+        "description": "Partially updates an external data source's configuration.",
+        "tags": [
+          "Data Warehouse"
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "The project (team) ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The external data source ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated external data source.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request."
+          },
+          "403": {
+            "description": "Authentication or permission error."
+          },
+          "404": {
+            "description": "Source not found."
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteExternalDataSource",
+        "summary": "Delete an external data source",
+        "description": "Deletes an external data source.",
+        "tags": [
+          "Data Warehouse"
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "The project (team) ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The external data source ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "403": {
+            "description": "Authentication or permission error."
+          },
+          "404": {
+            "description": "Source not found."
+          }
+        }
+      }
+    },
+    "/api/projects/{project_id}/external_data_sources/{id}/jobs": {
+      "get": {
+        "operationId": "listExternalDataSourceJobs",
+        "summary": "List sync jobs for an external data source",
+        "description": "Lists the individual sync jobs (runs) for a Data Warehouse external data source, each with its status and timestamps. This is the authoritative way to determine when the source last fetched data and whether the most recent run completed or errored.",
+        "tags": [
+          "Data Warehouse"
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "description": "The project (team) ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The external data source ID.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of sync jobs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "next": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "previous": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "A sync job run. Key fields: status (e.g. Running, Completed, Failed), created_at, finished_at, rows_synced, and latest_error.",
+                        "additionalProperties": true
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authentication or permission error."
+          },
+          "404": {
+            "description": "Source not found."
           }
         }
       }
     }
   },
-  "security": [
-    {
-      "bearerAuth": []
-    }
-  ],
   "tags": [
     {
       "name": "Actions"
@@ -1405,6 +1774,10 @@
     {
       "name": "Query",
       "description": "Run HogQL and insight queries and retrieve computed results."
+    },
+    {
+      "name": "Data Warehouse",
+      "description": "Data Warehouse external data sources: list, inspect, and manage scheduled syncs (e.g. Stripe, GitHub, Postgres) and view their sync jobs/status."
     }
   ]
 }
