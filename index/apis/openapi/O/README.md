@@ -1,6 +1,6 @@
 # APIs — O
 
-Browsing 170 APIs starting with **O**.
+Browsing 171 APIs starting with **O**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · **O** · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -109,6 +109,7 @@ Browsing 170 APIs starting with **O**.
 | [openqr.io](../../../../apis/openapi/openqr.io) | [main](../../../../apis/openapi/openqr.io/main) |
 | [openrouter.ai](../../../../apis/openapi/openrouter.ai) | [main](../../../../apis/openapi/openrouter.ai/main) |
 | [opensanctions.org](../../../../apis/openapi/opensanctions.org) | [main](../../../../apis/openapi/opensanctions.org/main) |
+| [opensearch.org](../../../../apis/openapi/opensearch.org) | [main](../../../../apis/openapi/opensearch.org/main) |
 | [openstack.org](../../../../apis/openapi/openstack.org) | [main](../../../../apis/openapi/openstack.org/main) |
 | [openstates.org](../../../../apis/openapi/openstates.org) | [main](../../../../apis/openapi/openstates.org/main) |
 | [openstf.io](../../../../apis/openapi/openstf.io) | [main](../../../../apis/openapi/openstf.io/main) |
