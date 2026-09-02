@@ -1,6 +1,6 @@
 # APIs — A
 
-Browsing 395 APIs starting with **A**.
+Browsing 396 APIs starting with **A**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · **A** · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -52,6 +52,7 @@ Browsing 395 APIs starting with **A**.
 | [adobe.com](../../../../apis/openapi/adobe.com) | [aem](../../../../apis/openapi/adobe.com/aem) |
 | [adoptapet.com](../../../../apis/openapi/adoptapet.com) | [adoptapet-api](../../../../apis/openapi/adoptapet.com/adoptapet-api) |
 | [adp.com](../../../../apis/openapi/adp.com) | [main](../../../../apis/openapi/adp.com/main) |
+| [ads-api.twitter.com](../../../../apis/openapi/ads-api.twitter.com) | [main](../../../../apis/openapi/ads-api.twitter.com/main) |
 | [adsabs.harvard.edu](../../../../apis/openapi/adsabs.harvard.edu) | [main](../../../../apis/openapi/adsabs.harvard.edu/main) |
 | [adsapi.snapchat.com](../../../../apis/openapi/adsapi.snapchat.com) | [main](../../../../apis/openapi/adsapi.snapchat.com/main) |
 | [adsbexchange.com](../../../../apis/openapi/adsbexchange.com) | [main](../../../../apis/openapi/adsbexchange.com/main) |
