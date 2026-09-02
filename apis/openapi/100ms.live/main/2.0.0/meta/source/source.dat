@@ -1,0 +1,686 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "100ms Video Conferencing API",
+    "description": "Server-side API for 100ms video/audio conferencing platform. Manage rooms, sessions, active rooms, peers, and room codes.",
+    "version": "2.0.0",
+    "contact": {
+      "name": "100ms",
+      "url": "https://www.100ms.live"
+    },
+    "x-jentic-source-url": "https://www.100ms.live/docs/server-side/v2/api-reference/Rooms/object",
+    "x-provenance": "jentic-generated"
+  },
+  "servers": [
+    {
+      "url": "https://api.100ms.live/v2",
+      "description": "100ms Production API"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/rooms": {
+      "post": {
+        "operationId": "createRoom",
+        "summary": "Create a new room",
+        "description": "Creates a new video conferencing room. If a room with the same name already exists, returns that room's details.",
+        "tags": ["Rooms"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Room alias (case-insensitive, accepts a-z, A-Z, 0-9, ., -, :, _)"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Room usage description"
+                  },
+                  "template_id": {
+                    "type": "string",
+                    "description": "Template ID to associate with room"
+                  },
+                  "recording_info": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "upload_info": {
+                        "type": "object",
+                        "properties": {
+                          "type": { "type": "string" },
+                          "location": { "type": "string" },
+                          "prefix": { "type": "string" }
+                        }
+                      }
+                    }
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": ["eu", "in", "us", "auto"],
+                    "default": "auto"
+                  },
+                  "large_room": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable for more than 2500 peers"
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 20000,
+                    "description": "Max peers expected (0-2500, or 0-20000 if large_room enabled)"
+                  },
+                  "max_duration_seconds": {
+                    "type": "integer",
+                    "minimum": 120,
+                    "maximum": 43200,
+                    "description": "Session duration limit in seconds"
+                  },
+                  "webhook": {
+                    "type": "object",
+                    "properties": {
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "headers": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Room created or existing room returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listRooms",
+        "summary": "List rooms",
+        "description": "Retrieve a list of rooms with optional filtering and pagination.",
+        "tags": ["Rooms"],
+        "parameters": [
+          {
+            "name": "enabled",
+            "in": "query",
+            "schema": { "type": "boolean", "default": true },
+            "description": "Filter by room enabled status"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Filter rooms created after this timestamp"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Filter rooms created before this timestamp"
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by room name"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 10, "maximum": 100, "default": 10 },
+            "description": "Number of rooms to return"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Pagination cursor from previous response's 'last' field"
+          },
+          {
+            "name": "template_id",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by template ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of rooms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "limit": { "type": "integer" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Room" }
+                    },
+                    "last": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          }
+        }
+      }
+    },
+    "/rooms/{room_id}": {
+      "get": {
+        "operationId": "getRoom",
+        "summary": "Retrieve a specific room",
+        "description": "Get details of a specific room by its unique identifier.",
+        "tags": ["Rooms"],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier of the room"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Room details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          },
+          "404": {
+            "description": "Room not found"
+          }
+        }
+      },
+      "post": {
+        "operationId": "updateRoom",
+        "summary": "Update a room",
+        "description": "Update properties of an existing room. Can also be used to enable or disable a room.",
+        "tags": ["Rooms"],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier of the room"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Set to false to disable the room"
+                  },
+                  "recording_info": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": { "type": "boolean" }
+                    }
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": ["eu", "in", "us", "auto"]
+                  },
+                  "large_room": { "type": "boolean" },
+                  "size": { "type": "integer" },
+                  "max_duration_seconds": {
+                    "type": "integer",
+                    "minimum": 120,
+                    "maximum": 43200
+                  },
+                  "polls": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "webhook": {
+                    "type": "object",
+                    "properties": {
+                      "url": { "type": "string", "format": "uri" },
+                      "headers": {
+                        "type": "object",
+                        "additionalProperties": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated room details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          },
+          "404": {
+            "description": "Room not found"
+          }
+        }
+      }
+    },
+    "/active-rooms/{room_id}": {
+      "get": {
+        "operationId": "getActiveRoom",
+        "summary": "Retrieve an active room",
+        "description": "Get details of a currently active room including session and peer information.",
+        "tags": ["Active Rooms"],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier of the active room"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active room details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "name": { "type": "string" },
+                    "customer_id": { "type": "string" },
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string" },
+                        "created_at": { "type": "string", "format": "date-time" },
+                        "peers": {
+                          "type": "array",
+                          "items": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          },
+          "404": {
+            "description": "Room not found or not active"
+          }
+        }
+      }
+    },
+    "/active-rooms/{room_id}/peers": {
+      "get": {
+        "operationId": "listPeers",
+        "summary": "List peers in an active room",
+        "description": "Retrieve a list of peers currently connected to an active room.",
+        "tags": ["Active Rooms"],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier of the active room"
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter peers by user ID"
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter peers by role"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of peers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "peers": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "$ref": "#/components/schemas/Peer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          },
+          "404": {
+            "description": "Room not found or not active"
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "get": {
+        "operationId": "listSessions",
+        "summary": "List sessions",
+        "description": "Retrieve a list of sessions with optional filtering and pagination.",
+        "tags": ["Sessions"],
+        "parameters": [
+          {
+            "name": "active",
+            "in": "query",
+            "schema": { "type": "boolean", "default": true },
+            "description": "Filter by active status"
+          },
+          {
+            "name": "room_id",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by room ID"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Filter sessions created after this timestamp"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Filter sessions created before this timestamp"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 10, "maximum": 100, "default": 10 },
+            "description": "Number of sessions to return"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Pagination cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "limit": { "type": "integer" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Session" }
+                    },
+                    "last": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          }
+        }
+      }
+    },
+    "/room-codes/room/{room_id}": {
+      "post": {
+        "operationId": "createRoomCodes",
+        "summary": "Create room codes for all roles",
+        "description": "Generate room codes for all roles defined in the room's template.",
+        "tags": ["Room Codes"],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier of the room"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Room codes created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/RoomCode" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          },
+          "403": {
+            "description": "Room is disabled"
+          },
+          "404": {
+            "description": "Room not found"
+          }
+        }
+      }
+    },
+    "/room-codes/room/{room_id}/role/{role}": {
+      "post": {
+        "operationId": "createRoomCodeForRole",
+        "summary": "Create room code for a specific role",
+        "description": "Generate a room code for a specific role in the room's template.",
+        "tags": ["Room Codes"],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Unique identifier of the room"
+          },
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Role name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Room code created for role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomCode"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          },
+          "403": {
+            "description": "Room is disabled"
+          },
+          "404": {
+            "description": "Room or role not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Management token generated using app access key and secret. Pass as 'Authorization: Bearer <management_token>'"
+      }
+    },
+    "schemas": {
+      "Room": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "description": { "type": "string" },
+          "customer_id": { "type": "string" },
+          "app_id": { "type": "string" },
+          "recording_source_template": { "type": "boolean" },
+          "recording_info": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "upload_info": {
+                "type": "object",
+                "properties": {
+                  "type": { "type": "string" },
+                  "location": { "type": "string" },
+                  "prefix": { "type": "string" }
+                }
+              }
+            }
+          },
+          "template_id": { "type": "string" },
+          "template": { "type": "string" },
+          "region": { "type": "string" },
+          "large_room": { "type": "boolean" },
+          "size": { "type": "integer" },
+          "max_duration_seconds": { "type": "integer" },
+          "polls": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string" },
+              "headers": {
+                "type": "object",
+                "additionalProperties": { "type": "string" }
+              }
+            }
+          },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Peer": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "user_id": { "type": "string" },
+          "metadata": { "type": "string" },
+          "role": { "type": "string" },
+          "joined_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "room_id": { "type": "string" },
+          "customer_id": { "type": "string" },
+          "active": { "type": "boolean" },
+          "peers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "session_id": { "type": "string" },
+                "name": { "type": "string" },
+                "role": { "type": "string" },
+                "user_id": { "type": "string" },
+                "joined_at": { "type": "string", "format": "date-time" },
+                "left_at": { "type": "string", "format": "date-time" }
+              }
+            }
+          },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "RoomCode": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "room_id": { "type": "string" },
+          "role": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}
