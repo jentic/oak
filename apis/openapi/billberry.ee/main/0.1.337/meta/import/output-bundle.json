@@ -1,0 +1,2227 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Billberry API",
+    "version": "0.1.337",
+    "description": "The public API of [Billberry](https://billberry.ee), the Estonian e-invoice\noperator.\n\nBoth the client and partner APIs have [longer guides](https://billberry.ee/help/dev/) that go through additional considerations. Available both in Estonian and English:\n- [Billberry Client API](https://billberry.ee/help/dev/billberry-client-api)\n- [Billberry Partner API](https://billberry.ee/help/dev/billberry-partner-api/)\n\nThere's also a thorough guide on the [Estonian e-invoice format](https://billberry.ee/help/dev/estonian-einvoice-standard/) that may be useful.\n\nDon't forget to set the `Accept` header. ;)\n\nThere's also a staging environment where you can test the API out. Register an account at <https://dev.billberry.ee> and email <hello@billberry.ee> to get some test-organizations associated with your testing account.\n",
+    "contact": {
+      "name": "Billberry",
+      "url": "https://billberry.ee"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/billberry/billberry/0.1.337"
+  },
+  "servers": [
+    {
+      "url": "https://api.billberry.ee",
+      "description": "Billberry's production API"
+    },
+    {
+      "url": "https://dev-api.billberry.ee",
+      "description": "Billberry's staging API"
+    }
+  ],
+  "paths": {
+    "/invoices": {
+      "post": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "Create (and send) a new invoice.",
+        "description": "Create an invoice under your organization's account and, if requested via the `X-Send` header, send it immediately.  \nIf sending fails, the invoice doesn't get created.\n\nWhen sending as a Billberry partner and using your partner API session, use the `POST /partners/invoices` endpoint.\n\nAll operator forwarding requests are set to time out in 15 seconds. If another operator does not respond in time, you'll see `504 {Operator} Timeout`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/X-Send"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/bodies/Einvoice"
+        },
+        "responses": {
+          "201": {
+            "description": "### Sent",
+            "content": {
+              "application/vnd.billberry.invoice+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceV1"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "### Invoice Not From Your Organization\nThe invoice seems to be from an organization that doesn't match the\nauthenticated session.\n\n### Only Immediate Sending Permitted\nDeprecated in favor of `Invalid X-Send Header`.\n\n### Sending Not Enabled For Partner's Organization\nThis is only returned if the current authenticated session was\ncreated by a partner via\n`/partners/{partnerId}/organizations/{registryCode}/sessions`.\n\nWhile the invoice seems to be from an organization that's registered\nunder this partner, its sending is disabled. See\n`PUT /partners/{partnerId}/organizations/{registryCode}` to enable\nsending.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "### Organization Doesn't Accept E-Invoices\n### Finbite Rejected Duplicate Invoice\n### Telema Rejected Duplicate Invoice\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "### Only E-Invoice XML Supported\nDeprecated in favor of `Unsupported Content Type`.\n\n### Unsupported Content Type\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "### Missing E-Invoice\n### Unknown XML E-Invoice\n### XML Parsing Failed\n### E-Arve Parsing Failed\n### E-Arve Empty\n### Multiple E-Arve Invoices\n### Finvoice Parsing Failed\n### TEAPPS Parsing Failed\n### TEAPPS Empty\n### Multiple TEAPPS Invoices\n### UBL Parsing Failed\n### Finbite Error\n### Finbite Rejected Invalid Invoice\n### Telema Error\n### Telema Rejected Invalid Invoice\n\n### Invalid X-Send Header\nUse the `X-Send: immediately` header to request sending the invoice.\n\n### Unknown Channel\nArises when the Estonian e-invoice's `<Invoice channelId>` attribute contains an unknown channel identifier. The channel identifier is used, for example, for directing Estonian e-invoices to banks instead of their default destination — another local operator. In that case, the `channelId` is expected to be the bank's BIC, and the `channelAddress` attribute the recipient's IBAN. If you don't intend to direct the invoice elsewhere, leave the `channelId` attribute out entirely.\n\n### No Bank Channel Plan\nIndicates that sending e-invoices to banks isn't yet enabled on Billberry's website. As sending e-invoices to banks is a paid feature, it's not enabled automatically.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "### Cannot Send To {Operator}\nReturned when the receiver uses an operator that's unknown to Billberry. Billberry is connected to all Estonian operators, so you should never see this.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "### Sending Failed\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "### E-arveldaja Timeout\n### Finbite Timeout\n### Telema Timeout\n### Unifiedpost Timeout\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invoices/received": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "Get all received invoices.",
+        "description": "Returns an array of metadata of received invoices for your\norganization.  \nTo get the original e-invoice XML for a given invoice, see\n`/invoices/:id.xml`.\n\nSee the `Link` header documentation below for how to request updates, that is, only new invoices.\n",
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.invoice+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvoiceV1"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Link": {
+                "$ref": "#/components/headers/InvoiceLink"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invoices/{invoiceId}": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "Get the invoice metadata or its e-invoice file.",
+        "description": "Note that the returned MIME types of the e-invoice files may have metadata attributes not listed here. For example, the Estonian e-arve may include a version — `application/vnd.billberry.earve+xml; v=1.2`. The UBL invoice may include the values of `<CustomizationID>` and `<ProfileID>` to help you identify the customization (e.g. compatibility with EN 16931 or with PEPPOL's BIS 3.0).\n\nIf your app supports multiple formats, you can pass them via the HTTP `Accept` header:\n\n```\nGET /invoices/{invoiceId}\nAccept:\n  application/vnd.billberry.ubl-invoice+xml,\n  application/vnd.billberry.ubl-credit-note+xml,\n  application/vnd.billberry.earve+xml\n```\n\nBillberry will pick the first suitable format, preferring to avoid conversions. If the e-invoice is in a format you don't supply in `Accept`, Billberry will convert to your preferred accepted format.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/invoiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.invoice+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceV1"
+                }
+              },
+              "application/vnd.billberry.earve+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/Earve"
+                }
+              },
+              "application/vnd.billberry.finvoice+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/Finvoice"
+                }
+              },
+              "application/vnd.billberry.teapps+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/Teapps"
+                }
+              },
+              "application/vnd.billberry.ubl-invoice+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/UblInvoice"
+                }
+              },
+              "application/vnd.billberry.ubl-credit-note+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/UblCreditNote"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "### Invoice Not For Partner\nCan only happen when requesting with a session (API key) associated with a partner of Billberry.\n\nIndicates the invoice exists and belongs to the organization, but isn't available for the partner. This can happen for a couple of reasons:\n\n- For received invoices, the organization wasn't a client of the partner at the time.\n- For received invoices, the organization was a client of the partner, but the partner hadn't enabled receiving invoices.\n- For sent invoices, the partner didn't send the invoice.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Invoice Not Found",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invoices/{invoiceId}.xml": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "Get the invoice in the Estonian e-Invoice XML format.",
+        "description": "The XML follows the [Estonian e-Invoice XML format](https://itl.ee/e-arve-kirjeldus/) specification.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/invoiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/Earve"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Invoice Not Found",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invoices/{invoiceId}.pdf": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "Get the secondary PDF of the invoice.",
+        "deprecated": true,
+        "description": "One Estonian e-invoice operator (namely\n[E-arveldaja](https://e-arveldaja.rik.ee)) also sends the PDF version of the invoice separately. That is, not via the `<E_Invoice>`'s `<AttachmentFile>` tag, but through a proprietary channel. This path can be used to obtain it. You can use the `pdfSize` invoice attribute to confirm its existence.\n\nAs of Feb 23, 2023 **Billberry reattaches this externally sent PDF to the e-invoice as an `<AttachmentFile>` element**, making this path redundant. While it is theoretically possible for E-arveldaja to both send an attachment and a secondary PDF, it's unlikely and in our view not worth handling. Most other operators tend not to accept invoices with non-PDF attachments anyways, making them rare.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/invoiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pdf"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Invoice Not Found\n### PDF Not Found\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invoices/{invoiceId}/acknowledgements": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "Get acknowledgements for a specific invoice.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/invoiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.invoice-acknowledgement+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvoiceAcknowledgementV1"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "### Invoice Not For Partner\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Invoice Not Found",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invoice-acknowledgements": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "Get invoice acknowledgements.",
+        "description": "Returns an array of invoice acknowledgements for your organization's invoices, both for sent and received invoices.\n\nAn acknowledgement indicates whether a particular delivery of an invoice was confirmed or rejected by the recipient or their operator. Note that not all e-invoice networks, operators or recipients acknowledge invoices, so the lack of an acknowledgement doesn't indicate failure.\n\nThe `ok` attribute is `true` when the delivery was confirmed as accepted and `false` when rejected. Generally rejected deliveries include a `message` explaining the reason.\n\nNote that there may be multiple acknowledgements sent for a single invoice and delivery. It's up to the recipient, after all, to send them.\n\nSee the `Link` header documentation below for how to request updates, that is, only new acknowledgements.\n\nTo simplify getting only acknowledgements for your sent invoices, there's an `invoice-direction` query parameter, which you can set to `sent`. Querying for sent invoices' acknowledgements also returns the updates URL in a `Link` header for fetching only updates later.\n",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "invoice-direction",
+            "description": "Filter acknowledgements by invoice direction.\n",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sent",
+                "received"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.invoice-acknowledgement+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvoiceAcknowledgementV1"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Link": {
+                "$ref": "#/components/headers/InvoiceAcknowledgementLink"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invoice-acknowledgements/{acknowledgementId}": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "summary": "Get an invoice acknowledgement.",
+        "description": "Returns a single invoice acknowledgement by its id.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/acknowledgementId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.invoice-acknowledgement+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceAcknowledgementV1"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "### Invoice Acknowledgement Not For Partner",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Invoice Acknowledgement Not Found",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/countries/{countryCode}/organizations": {
+      "get": {
+        "tags": [
+          "Country Organizations"
+        ],
+        "summary": "Get a list of every organization in the country accepting e-invoices.",
+        "description": "Don't forget the `receiving=true` query parameter. This is for forward-compability for when the organization list starts including information not only related to receiving operators.\n\nNote that the Estonian e-invoice receiver database is updated only once per day at midnight Tallinn time, so if you're downloading the entire list, there's no benefit in doing it more often than once per day.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/countryCode"
+          },
+          {
+            "in": "query",
+            "name": "receiving",
+            "description": "Whether to only return organizations that accept e-invoices.\n",
+            "required": true,
+            "schema": {
+              "type": "boolean",
+              "example": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "include[]",
+            "description": "Which fields in the organization object to include in addition to the defaults.\n\nE.g. if you want to get the organization name, add `include[]=name` to the query.\n",
+            "default": [
+              "country",
+              "registryCode",
+              "receivingOperator"
+            ],
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "country",
+                  "registryCode",
+                  "name",
+                  "receivingOperator"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.country-organization+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CountryOrganizationV1"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "### Invalid Country Code\n\n### Invalid Receiving Query Parameter\nThe `receiving` query parameter can only take `true` or `false` values.\n\n### Only E-Invoice-Receiving Organizations Available\nAdd the `receiving=true` query parameter.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/countries/{countryCode}/organizations/{registryCode}": {
+      "get": {
+        "tags": [
+          "Country Organizations"
+        ],
+        "summary": "Get info and the receiving e-invoice operator for a single organization in the country.\n",
+        "description": "Note that this returns `404 Organization Not Found` if the organization has never been seen to receive e-invoices. If the organization has at one point received e-invoices, but doesn't any more, `receivingOperator` is `null`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/countryCode"
+          },
+          {
+            "$ref": "#/components/parameters/registryCode"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.country-organization+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CountryOrganizationV1"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "### Invalid Country Code\n### Invalid Estonian Registry Code\n### Invalid Finnish Registry Code\n### Invalid Latvian Registry Code\n### Invalid Lithuanian Registry Code\n### Invalid Swedish Registry Code\n### Invalid Slovakian Registry Code\n### Invalid Italian Registry Code\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Organization Not Found",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/organizations": {
+      "get": {
+        "tags": [
+          "Partner Organizations"
+        ],
+        "summary": "Get a list of partner's registered organizations.",
+        "description": "This returns only active registrations and skips deleted ones.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.partner-organization+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PartnerOrganizationV1"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/organizations/{countryCode}:{registryCode}": {
+      "get": {
+        "tags": [
+          "Partner Organizations"
+        ],
+        "summary": "Get the info of a partner's registered organization.",
+        "description": "This returns only active registrations.  \nPreviously registered, but deleted ones, result in 410.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/countryCode"
+          },
+          {
+            "$ref": "#/components/parameters/registryCode"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.partner-organization+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PartnerOrganizationV1"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Organization Not Registered",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "### Organization Unregistered",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Partner Organizations"
+        ],
+        "summary": "Register an organization as a client of the partner.",
+        "description": "Registering is idempotent. That is, if the organization was already\nregistered when you `PUT`, it'll do nothing, and return `200\nOrganization Up-to-Date` or `200 Organization Updated` depending on\nwhether you updated any attributes.\n\nIf you don't include a request body (and leave `Content-Type` empty), it'll default to enabling e-invoice sending, but not receiving. In other words, it's as if you'd set the body to:\n\n```json\n{\"sendingEnabled\": true}\n```\n\n## Receiving for Estonian Organizations\nNote than when you enable receiving for an Estonian organization, Billberry also sets itself as the client's e-invoice operator in the Estonian Business Register. To complete the process, you'll need to direct your client to the [Estonian Business Register](https://ariregister.rik.ee) to confirm their new operator.\n\nConfirming Billberry is available in the Business Register for 7 days (their limit). If you want to retrigger the confirmation once expired, you can `PUT` again. Retriggering prior to 7 days (86400 * 7 seconds) does nothing.\n\nThe Estonian Business Register request is set to time out in 15 seconds. If it does not respond in time, you'll see `504 Estonian Business Register Timeout`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/countryCode"
+          },
+          {
+            "$ref": "#/components/parameters/registryCode"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/vnd.billberry.partner-organization+json; v=1": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sendingEnabled": {
+                    "$ref": "#/components/schemas/PartnerOrganizationV1/properties/sendingEnabled"
+                  },
+                  "receivingEnabled": {
+                    "$ref": "#/components/schemas/PartnerOrganizationV1/properties/receivingEnabled"
+                  },
+                  "receivingNetworks": {
+                    "$ref": "#/components/schemas/PartnerOrganizationV1/properties/receivingNetworks"
+                  },
+                  "creatingReceivedEnabled": {
+                    "$ref": "#/components/schemas/PartnerOrganizationV1/properties/creatingReceivedEnabled"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "### Organization Up-to-Date\n### Organization Updated\n\n### Estonian Business Register Updated\nReturned only if receiving was previously enabled and the operator confirmation in the business register is expired at the time of the request.\n",
+            "content": {
+              "application/vnd.billberry.partner-organization+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerOrganizationV1"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "### Organization Registered",
+            "content": {
+              "application/vnd.billberry.partner-organization+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerOrganizationV1"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "### Partner Sending Disabled\nNot all partners may need sending, so it's possible sending is disabled.\n\n### Partner Receiving Disabled\nNot all partners may need receiving, so it's possible receiving is disabled.\n\n### Partner Creating Received Disabled\nNot all partners may need creating received invoices, so it's possible receiving is disabled.\n\n### Organization Disabled Partner Sending\nIt's possible for organizations that also use Billberry directly to limit partner sending for security reasons.\n\n### Organization Disabled Partner Receiving\nIt's possible for organizations that also use Billberry directly to limit partner receiving for security reasons.\n\n### Organization Disabled Partner Creating Received\nIt's possible for organizations that also use Billberry directly to limit partners from creating received invoices for security reasons.\n\n### Receiving in Estonia Only Supported For Estonian Organizations\nWhen registering a non-Estonian organization, but explicitly setting `receivingNetworks.estonia` to `true`.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "### Estonian Business Register Timeout",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Partner Organizations"
+        ],
+        "summary": "Unregister an organization as a client of the partner.",
+        "description": "Unregistering is idempotent. That is, if the organization was already\nunregistered when invoked `DELETE`, it'll return `410 Organization\nAlready Unregistered`.\n\nAny organization-scoped sessions created with `POST /partners/{partnerId}/organizations/{registryCode}/sessions` will also be deleted.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/countryCode"
+          },
+          {
+            "$ref": "#/components/parameters/registryCode"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "### Organization Unregistered",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Organization Not Registered",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "### Organization Already Unregistered",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/organizations/{estonianRegistryCode}": {
+      "get": {
+        "tags": [
+          "Partner Organizations"
+        ],
+        "summary": "Get the info of a partner's registered Estonian organization.",
+        "description": "This returns only active registrations.  \nPreviously registered, but deleted ones, result in 410.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/estonianRegistryCode"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.partner-organization+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PartnerOrganizationV1"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Organization Not Registered",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "### Organization Unregistered",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Partner Organizations"
+        ],
+        "summary": "Register an Estonian organization as a client of the partner.",
+        "description": "Registering is idempotent. That is, if the organization was already\nregistered when you `PUT`, it'll do nothing, and return `200\nOrganization Up-to-Date` or `200 Organization Updated` depending on\nwhether you updated any attributes.\n\nIf you don't include a request body (and leave `Content-Type` empty), it'll default to enabling e-invoice sending, but not receiving. In other words, it's as if you'd set the body to:\n\n```json\n{\"sendingEnabled\": true}\n```\n\n## Receiving for Estonian Organizations\nNote than when you enable receiving for an Estonian organization, Billberry also sets itself as the client's e-invoice operator in the Estonian Business Register. To complete the process, you'll need to direct your client to the [Estonian Business Register](https://ariregister.rik.ee) to confirm their new operator.\n\nConfirming Billberry is available in the Business Register for 7 days (their limit). If you want to retrigger the confirmation once expired, you can `PUT` again. Retriggering prior to 7 days (86400 * 7 seconds) does nothing.\n\nThe Estonian Business Register request is set to time out in 15 seconds. If it does not respond in time, you'll see `504 Estonian Business Register Timeout`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/estonianRegistryCode"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/vnd.billberry.partner-organization+json; v=1": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sendingEnabled": {
+                    "$ref": "#/components/schemas/PartnerOrganizationV1/properties/sendingEnabled"
+                  },
+                  "receivingEnabled": {
+                    "$ref": "#/components/schemas/PartnerOrganizationV1/properties/receivingEnabled"
+                  },
+                  "creatingReceivedEnabled": {
+                    "$ref": "#/components/schemas/PartnerOrganizationV1/properties/creatingReceivedEnabled"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": "ref_0"
+      },
+      "delete": {
+        "tags": [
+          "Partner Organizations"
+        ],
+        "summary": "Unregister an Estonian organization as a client of the partner.",
+        "description": "Unregistering is idempotent. That is, if the organization was already\nunregistered when invoked `DELETE`, it'll return `410 Organization\nAlready Unregistered`.\n\nAny organization-scoped sessions created with `POST /partners/{partnerId}/organizations/{registryCode}/sessions` will also be deleted.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/estonianRegistryCode"
+          }
+        ],
+        "responses": "ref_1"
+      }
+    },
+    "/partners/{partnerId}/organizations/{countryCode}:{registryCode}/sessions": {
+      "get": {
+        "tags": [
+          "Partner Organizations"
+        ],
+        "summary": "Get a list of organization's sessions (API keys) created by the partner.",
+        "description": "This returns only valid sessions and skips deleted ones.\n\nNote that session tokens won't be returned and will be `null`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/countryCode"
+          },
+          {
+            "$ref": "#/components/parameters/registryCode"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.session+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionV1"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Organization Not Registered",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Partner Organizations"
+        ],
+        "summary": "Create a new API key (session) scoped to a single organization.",
+        "description": "In situations where you need to permit your client to access the Billberry API directly (in desktop software, for example), you can create API keys scoped to a single client.\n\nThe returned session object contains both the API key `id` and `token`, which you can then use for HTTP Basic Authentication's username and password respectively.\n\nNote that for the sending and receiving e-invoices using a scoped API key, you'll need to use the general `/invoices` and `/invoices/received` endpoints, rather than the ones prefixed with `/partners`. While it may seem odd, this means the API endpoints for all organization-scoped API keys are the same — regardless of whether they were generated by a partner or generated by an organization themselves on Billberry's website. A partner fetching invoices for all of their clients in one request is sufficiently different to warrant a prefixed path (`/partners/{partnerId}/invoices`).\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/countryCode"
+          },
+          {
+            "$ref": "#/components/parameters/registryCode"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "### Session Created",
+            "content": {
+              "application/vnd.billberry.session+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionV1"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Organization Not Registered",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/organizations/{estonianRegistryCode}/sessions": {
+      "get": {
+        "tags": "ref_2",
+        "summary": "Get a list of organization's sessions (API keys) created by the partner.",
+        "description": "This returns only valid sessions and skips deleted ones.\n\nNote that session tokens won't be returned and will be `null`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/estonianRegistryCode"
+          }
+        ],
+        "responses": "ref_3"
+      },
+      "post": {
+        "tags": "ref_4",
+        "summary": "Create a new API key (session) scoped to a single organization.",
+        "description": "In situations where you need to permit your client to access the Billberry API directly (in desktop software, for example), you can create API keys scoped to a single client.\n\nThe returned session object contains both the API key `id` and `token`, which you can then use for HTTP Basic Authentication's username and password respectively.\n\nNote that for the sending and receiving e-invoices using a scoped API key, you'll need to use the general `/invoices` and `/invoices/received` endpoints, rather than the ones prefixed with `/partners`. While it may seem odd, this means the API endpoints for all organization-scoped API keys are the same — regardless of whether they were generated by a partner or generated by an organization themselves on Billberry's website. A partner fetching invoices for all of their clients in one request is sufficiently different to warrant a prefixed path (`/partners/{partnerId}/invoices`).\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/estonianRegistryCode"
+          }
+        ],
+        "responses": "ref_5"
+      }
+    },
+    "/partners/{partnerId}/organizations/{countryCode}:{registryCode}/sessions/{sessionId}": {
+      "delete": {
+        "tags": [
+          "Partner Organizations"
+        ],
+        "summary": "Delete a session.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/countryCode"
+          },
+          {
+            "$ref": "#/components/parameters/registryCode"
+          },
+          {
+            "$ref": "#/components/parameters/sessionId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "### Session Deleted"
+          },
+          "404": {
+            "description": "### Session Not Found",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "### Session Deleted",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/organizations/{estonianRegistryCode}/sessions/{sessionId}": {
+      "delete": {
+        "tags": "ref_6",
+        "summary": "Delete a session.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/estonianRegistryCode"
+          },
+          {
+            "$ref": "#/components/parameters/sessionId"
+          }
+        ],
+        "responses": "ref_7"
+      }
+    },
+    "/partners/{partnerId}/invoices": {
+      "post": {
+        "tags": [
+          "Partner Invoices"
+        ],
+        "summary": "Create (and send) a new invoice.",
+        "description": "Send a new invoice as Billberry's partner on behalf of your client.  \nIf sending fails, the invoice doesn't get created.\n\nAll operator forwarding requests are set to time out in 15 seconds. If another operator does not respond in time, you'll see `504 {Operator} Timeout`.\n\nNote that this endpoint only works with the partner API key. If you're using API keys scoped to an organization (from `POST /partners/{partnerId}/organizations/${registryCode}/sessions`), you'll need to use `/invoices` for sending.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/X-Send"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/bodies/Einvoice"
+        },
+        "responses": {
+          "201": {
+            "description": "### Sent",
+            "content": {
+              "application/vnd.billberry.invoice+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceV1"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "### Invoice Not From A Partner's Organization\nThe invoice seems to be from an organization that hasn't been registered under this partner.\n\n### Sending Not Enabled For Partner's Organization\nWhile the invoice seems to be from an organization that's registered under this partner, its sending is disabled. See `PUT /partners/{partnerId}/organizations/{registryCode}` to enable sending.\n\n### Only Immediate Sending Permitted\nDeprecated in favor of `Invalid X-Send Header`.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "### Organization Doesn't Accept E-Invoices\n### Finbite Rejected Duplicate Invoice\n### Telema Rejected Duplicate Invoice\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "### Only E-Invoice XML Supported\nDeprecated in favor of `Unsupported Content Type`.\n\n### Unsupported Content Type\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "### Missing E-Invoice\n### Unknown XML E-Invoice\n### XML Parsing Failed\n### E-Arve Parsing Failed\n### E-Arve Empty\n### Multiple E-Arve Invoices\n### Finvoice Parsing Failed\n### TEAPPS Parsing Failed\n### TEAPPS Empty\n### Multiple TEAPPS Invoices\n### UBL Parsing Failed\n### Finbite Error\n### Finbite Rejected Invalid Invoice\n### Telema Error\n### Telema Rejected Invalid Invoice\n\n### Invalid X-Send Header\nUse the `X-Send: immediately` header to request sending the invoice.\n\n### Unknown Channel\nArises when the Estonian e-invoice's `<Invoice channelId>` attribute contains an unknown channel identifier. The channel identifier is used, for example, for directing Estonian e-invoices to banks instead of their default destination — another local operator. In that case, the `channelId` is expected to be the bank's BIC, and the `channelAddress` attribute the recipient's IBAN. If you don't intend to direct the invoice elsewhere, leave the `channelId` attribute out entirely.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "### Cannot Send To {Operator}\nReturned when the receiver uses an operator that's unknown to Billberry. Billberry is connected to all Estonian operators, so you should never see this.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "### Sending Failed\n### Telema Error\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "### E-arveldaja Timeout\n### Finbite Timeout\n### Telema Timeout\n### Unifiedpost Timeout\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/invoices/received": {
+      "get": {
+        "tags": [
+          "Partner Invoices"
+        ],
+        "summary": "Get received invoices on behalf of all of your clients.",
+        "description": "Returns an array of metadata of received invoices for your all of your clients.  \nTo get the original e-invoice XML for a given invoice, see `/invoices/:id`.\n\nYou can identify the owner of an invoice via the `registryCode` attribute. As this endpoint only returns received invoices, the `registryCode` attribute matches `receiverRegistryCode`.\n\nYou'll only see received invoices for clients that were associated with your partner account (via `PUT /partners/{partnerId}/organizations/{registryCode}`) at the time of receiving. If you `DELETE` a client, their old invoices will still be visible to you, but new arrivals won't.\n\nSee the `Link` header documentation below for how to request updates, that is, only new invoices.\n\nNote that this endpoint only works with the partner API key. If you're using API keys scoped to an organization (from `POST /partners/{partnerId}/organizations/${registryCode}/sessions`), you'll need to use `/invoices/received`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.invoice+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvoiceV1"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Link": {
+                "$ref": "#/components/headers/InvoiceLink"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Partner Invoices"
+        ],
+        "summary": "Create (or upload) received invoices.",
+        "description": "Creating received invoices is meant for uploading invoices received externally, such as scanned purchase receipts, to Billberry, where they'll become available to the client's accounting software just like regular received invoices.\n\nBy default **the created received invoices will only be visible within Billberry** (and its API). That is, the organization isn't require to have enabled e-invoice receiving at any operator or they could be using a different operator.\n\nIf you do want such received invoices **forwarded to other operators**, **pass the `X-Forward` header** along with your request. Billberry will then only accept invoices when the organization has enabled e-invoices at _some_ operator, and forward the invoice to the appropriate operator. If the organization hasn't enabled e-invoice receiving, you'll get `409 Organization Doesn't Accept E-Invoices` error. If sending fails, the invoice doesn't get created.\n\nIf you wish to *optionally* forward invoices — for example only forward when the organization uses another operator and create locally when they don't — let us know! Right now you'd have to first try the request with `X-Forward` and upon seeing `409 Organization Doesn't Accept E-Invoices`, try again without `X-Forward`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/X-Forward"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/bodies/Einvoice"
+        },
+        "responses": {
+          "201": {
+            "description": "### Received\nIf the invoice was received successfully and not forwarded to another oeprator.\n\nThat may be because forwarding wasn't requested (e.g. no `X-Forward` header) or the organization received invoices at Billberry.\n\n### Received and Forwarded\nIf the invoice was successfully received and forwarded to another operator (i.e not Billberry).\n\nThis will only be returned if you request forwarding with `X-Forward`, e.g. with `X-Forward: immediately`.\n",
+            "content": {
+              "application/vnd.billberry.invoice+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceV1"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "### Invoice Not To A Partner's Organization\nThe invoice seems to be for an organization that wasn't registered under this partner.\n\n### Creating Received Invoices Not Enabled For Partner's Organization\nWhile the invoice seems to be for an organization that's registered under this partner, creating received invoices for it disabled. See `PUT /partners/{partnerId}/organizations/{registryCode}` to enable creating received invoices.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "### Organization Doesn't Accept E-Invoices\nReturned only if forwarding is requested (e.g. with `X-Forward: immediately`) and the organization isn't set to receive invoices with any operator.\n\n### Finbite Rejected Duplicate Invoice\n### Telema Rejected Duplicate Invoice\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "### Only E-Invoice XML Supported\nDeprecated in favor of `Unsupported Content Type`.\n\n### Unsupported Content Type\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "### Missing E-Invoice\n### Unknown XML E-Invoice\n### XML Parsing Failed\n### E-Arve Parsing Failed\n### E-Arve Empty\n### Multiple E-Arve Invoices\n### Finvoice Parsing Failed\n### TEAPPS Parsing Failed\n### TEAPPS Empty\n### Multiple TEAPPS Invoices\n### UBL Parsing Failed\n### Finbite Error\n### Finbite Rejected Invalid Invoice\n### Telema Error\n### Telema Rejected Invalid Invoice\n\n### Invalid X-Forward Header\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "### Cannot Send To {Operator}\nReturned when requesting forwarding (e.g. `X-Forward: immediately`) and the receiver uses an operator that's unknown to Billberry. Billberry is connected to all Estonian operators, so you should never see this.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "### Forwarding Failed\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "### E-arveldaja Timeout\n### Finbite Timeout\n### Telema Timeout\n### Unifiedpost Timeout\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/invoices/{invoiceId}": {
+      "get": {
+        "tags": [
+          "Partner Invoices"
+        ],
+        "summary": "Get the invoice metadata or its e-invoice file.",
+        "description": "Note that the returned MIME types of the e-invoice files may have metadata attributes not listed here. For example, the Estonian e-arve may include a version — `application/vnd.billberry.earve+xml; v=1.2`. The UBL invoice may include the values of `<CustomizationID>` and `<ProfileID>` to help you identify the customization (e.g. compatibility with EN 16931 or with PEPPOL's BIS 3.0).\n\nIf your app supports multiple formats, you can pass them via the HTTP `Accept` header:\n\n```\nGET /partners/{partnerId}/{invoiceId}\nAccept:\n  application/vnd.billberry.ubl-invoice+xml,\n  application/vnd.billberry.ubl-credit-note+xml,\n  application/vnd.billberry.earve+xml\n```\n\nBillberry will pick the first suitable format, preferring to avoid conversions. If the e-invoice is in a format you don't supply in `Accept`, Billberry will convert to your preferred accepted format.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/invoiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.invoice+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceV1"
+                }
+              },
+              "application/vnd.billberry.earve+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/Earve"
+                }
+              },
+              "application/vnd.billberry.finvoice+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/Finvoice"
+                }
+              },
+              "application/vnd.billberry.teapps+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/Teapps"
+                }
+              },
+              "application/vnd.billberry.ubl-invoice+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/UblInvoice"
+                }
+              },
+              "application/vnd.billberry.ubl-credit-note+xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/UblCreditNote"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "### Invoice Not For Partner Organization\nIndicates the invoice exists, but isn't associated with an organization that's a current client of the partner.  \nOnce a partner's client is deleted, the partner can no longer access their invoices.\n\n### Invoice Not For Partner\nIndicates the invoice exists, but isn't available for the partner. This can happen for a couple of reasons:\n\n- For received invoices, the organization wasn't a client of the partner at the time.\n- For received invoices, the organization was a client of the partner, but the partner hadn't enabled receiving invoices.\n- For sent invoices, the partner didn't send the invoice.\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Invoice Not Found",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/invoices/{invoiceId}.xml": {
+      "get": {
+        "tags": [
+          "Partner Invoices"
+        ],
+        "summary": "Get the invoice in the Estonian e-Invoice XML format.",
+        "description": "The XML follows the [Estonian e-Invoice XML\nformat](https://itl.ee/e-arve-kirjeldus/) specification.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/invoiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/Earve"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Invoice Not Found",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/invoices/{invoiceId}.pdf": {
+      "get": {
+        "tags": [
+          "Partner Invoices"
+        ],
+        "summary": "Get the associated PDF of the invoice.",
+        "deprecated": true,
+        "description": "One Estonian e-invoice operator (namely\n[E-arveldaja](https://e-arveldaja.rik.ee)) also sends the PDF version of the invoice separately. That is, not via the `<E_Invoice>`'s `<AttachmentFile>` tag, but through a proprietary channel. This path can be used to obtain it. You can use the `pdfSize` invoice attribute to confirm its existence.\n\nAs of Feb 23, 2023 **Billberry reattaches this externally sent PDF to the e-invoice as an `<AttachmentFile>` element**, making this path redundant. While it is theoretically possible for E-arveldaja to both send an attachment and a secondary PDF, it's unlikely and in our view not worth handling. Most other operators tend not to accept invoices with non-PDF attachments anyways, making them rare.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/invoiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pdf"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Invoice Not Found\n### PDF Not Found\n",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/invoices/{invoiceId}/acknowledgements": {
+      "get": {
+        "tags": [
+          "Partner Invoices"
+        ],
+        "summary": "Get acknowledgements for a specific invoice.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/invoiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.invoice-acknowledgement+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvoiceAcknowledgementV1"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Invoice Not Found",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/invoice-acknowledgements": {
+      "get": {
+        "tags": [
+          "Partner Invoices"
+        ],
+        "summary": "Get invoice acknowledgements.",
+        "description": "Returns an array of invoice acknowledgements for your clients' invoices, both for sent and received invoices.\n\nAn acknowledgement indicates whether a particular delivery of an invoice was confirmed or rejected by the recipient or their operator. Note that not all e-invoice networks, operators or recipients acknowledge invoices, so the lack of an acknowledgement doesn't indicate failure.\n\nThe `ok` attribute is `true` when the delivery was confirmed as accepted and `false` when rejected. Generally rejected deliveries include a `message` explaining the reason.\n\nNote that there may be multiple acknowledgements sent for a single invoice and delivery. It's up to the recipient, after all, to send them.\n\nSee the `Link` header documentation below for how to request updates, that is, only new acknowledgements.\n\nTo simplify getting only acknowledgements for your sent invoices, there's an `invoice-direction` query parameter, which you can set to `sent`. Querying for sent invoices' acknowledgements also returns the updates URL in a `Link` header for fetching only updates later.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "in": "query",
+            "name": "invoice-direction",
+            "description": "Filter acknowledgements by invoice direction.\n",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sent",
+                "received"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.invoice-acknowledgement+json; v=1": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvoiceAcknowledgementV1"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Link": {
+                "$ref": "#/components/headers/InvoiceAcknowledgementLink"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/partners/{partnerId}/invoice-acknowledgements/{acknowledgementId}": {
+      "get": {
+        "tags": [
+          "Partner Invoices"
+        ],
+        "summary": "Get an invoice acknowledgement.",
+        "description": "Returns a single invoice acknowledgement by its id.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/partnerId"
+          },
+          {
+            "$ref": "#/components/parameters/acknowledgementId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "### OK",
+            "content": {
+              "application/vnd.billberry.invoice-acknowledgement+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceAcknowledgementV1"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "### Invoice Acknowledgement Not For Partner",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "### Invoice Acknowledgement Not Found",
+            "content": {
+              "application/vnd.billberry.error+json; v=1": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Get API credentials for your organization from\n<https://app.billberry.ee/accounts/me>.\n\nUse the session id as the HTTP Basic Authentication username and the\nsession token as the password.\n"
+      }
+    },
+    "parameters": {
+      "invoiceId": {
+        "in": "path",
+        "name": "invoiceId",
+        "description": "Invoice's id",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "example": 42
+        }
+      },
+      "countryCode": {
+        "in": "path",
+        "name": "countryCode",
+        "description": "Country [ISO 3166 alpha-2](https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes) (two letter) code\n",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "EE",
+            "FI",
+            "LV",
+            "LT",
+            "SE",
+            "SK",
+            "IT"
+          ]
+        }
+      },
+      "partnerId": {
+        "in": "path",
+        "name": "partnerId",
+        "description": "Partner's id",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "bookie"
+        }
+      },
+      "acknowledgementId": {
+        "in": "path",
+        "name": "acknowledgementId",
+        "description": "Acknowledgement's id",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "example": 13
+        }
+      },
+      "sessionId": {
+        "in": "path",
+        "name": "sessionId",
+        "description": "Session's id",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "example": 68
+        }
+      },
+      "registryCode": {
+        "in": "path",
+        "name": "registryCode",
+        "description": "Organization's registry code",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "16122596"
+        }
+      },
+      "estonianRegistryCode": {
+        "in": "path",
+        "name": "estonianRegistryCode",
+        "description": "Organization's Estonian registry code",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "example": "16122596"
+        }
+      },
+      "X-Send": {
+        "in": "header",
+        "name": "X-Send",
+        "description": "Request sending the invoice after creation.",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "immediately"
+          ]
+        }
+      },
+      "X-Forward": {
+        "in": "header",
+        "name": "X-Forward",
+        "description": "Request forwarding the (received) invoice to the organization's operator.  \nIf the organization doesn't accept e-invoices at any operator, you'll get `409 Organization Doesn't Accept E-Invoices`.\n\nWithout the `X-Forward` header, the invoice will always be accepted, regardless of which operator, if any, the organization uses. It'll be only available locally from Billberry (and its API).\n",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "immediately"
+          ]
+        }
+      }
+    },
+    "headers": {
+      "InvoiceLink": {
+        "schema": {
+          "type": "string",
+          "example": "</invoices/received?id%3e42>; rel=\"updates\"\n"
+        },
+        "description": "The `updates` URL can be used to request invoices added after the current response. This is useful for polling new invoices.\n\nSee [RFC 8288](https://datatracker.ietf.org/doc/html/rfc8288) for the specification of the `Link` header. Note that link URLs can be either relative or absolute and there may be more than one link (with different `rel` values, though).\n\nThe general pattern is that your first ever request should be to the `/received` path, but every consecutive request should go to the `updates` link returned by the last successful request. You can think of the `updates` link as a cursor to invoice changes or analogous to keeping track of the last request's date and time manually, except the updates link is abstract, more robust and simpler. Always save the entire updates link and don't depend on its implementation.\n\nYou should save the updates link *after* a successful import on your side, not immediately when you get the response. When your importing fails mid-invoice, for example, you can fix your bug and just request again using the last updates link. This way you get everything you got before, but also anything that might've arrived after your last attempt. Don't forget to ignore invoices you've already successfully imported, though, as otherwise you'd create duplicates when retrying.\n"
+      },
+      "InvoiceAcknowledgementLink": {
+        "schema": {
+          "type": "string",
+          "example": "</invoice-acknowledgements?id%3e13>; rel=\"updates\"\n"
+        },
+        "description": "The `updates` URL can be used to request acknowledgements added after the current response. This is useful for polling new acknowledgements.\n\nSee [RFC 8288](https://datatracker.ietf.org/doc/html/rfc8288) for the specification of the `Link` header. Note that link URLs can be either relative or absolute and there may be more than one link (with different `rel` values, though).\n\nThe general pattern is that your first ever request should be to the `/invoice-acknowledgements` path, but every consecutive request should go to the `updates` link returned by the last successful request. You can think of the `updates` link as a cursor to acknowledgement changes or analogous to keeping track of the last request's date and time manually, except the updates link is abstract, more robust and simpler. Always save the entire updates link and don't depend on its implementation.\n\nYou should save the updates link *after* a successful import on your side, not immediately when you get the response. When your importing fails mid-acknowledgement, for example, you can fix your bug and just request again using the last updates link. This way you get everything you got before, but also anything that might've arrived after your last attempt.\n"
+      }
+    },
+    "bodies": {
+      "Einvoice": {
+        "required": true,
+        "content": {
+          "application/xml": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Earve"
+                },
+                {
+                  "$ref": "#/components/schemas/Teapps"
+                },
+                {
+                  "$ref": "#/components/schemas/UblInvoice"
+                },
+                {
+                  "$ref": "#/components/schemas/UblCreditNote"
+                }
+              ],
+              "description": "Detects the e-invoice type based on the XML element name.\n",
+              "xml": {
+                "name": "E_Invoice"
+              }
+            }
+          },
+          "application/vnd.billberry.earve+xml": {
+            "schema": {
+              "$ref": "#/components/schemas/Earve"
+            }
+          },
+          "application/vnd.billberry.finvoice+xml": {
+            "schema": {
+              "$ref": "#/components/schemas/Finvoice"
+            }
+          },
+          "application/vnd.billberry.teapps+xml": {
+            "schema": {
+              "$ref": "#/components/schemas/Teapps"
+            }
+          },
+          "application/vnd.billberry.ubl-invoice+xml": {
+            "schema": {
+              "$ref": "#/components/schemas/UblInvoice"
+            }
+          },
+          "application/vnd.billberry.ubl-credit-note+xml": {
+            "schema": {
+              "$ref": "#/components/schemas/UblCreditNote"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "InvoiceV1": {
+        "type": "object",
+        "description": "`application/vnd.billberry.invoice+json; v=1`\n",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 42,
+            "description": "The invoice's id.  \nGenerated by Billberry. Not from the `<E_Invoice>`.\n"
+          },
+          "type": {
+            "type": "string",
+            "example": "debit",
+            "description": "The invoice's type — credit or debit.  \nFor example, from the Estonian e-invoice format's `<E_Invoice>` `<Type>` element.\n",
+            "enum": [
+              "debit",
+              "credit"
+            ]
+          },
+          "registryCode": {
+            "type": "string",
+            "example": "16122596",
+            "description": "The organization the invoice belongs to.  \nMatches either `senderRegistryCode` if it's a sent invoice and `receiverRegistryCode` if it was received.\n"
+          },
+          "senderRegistryCode": {
+            "type": "string",
+            "example": "16122596",
+            "description": "The invoice sender/seller's registry code.  \nFrom `<E_Invoice>` `<Invoice sellerRegnumber>`.\n"
+          },
+          "senderName": {
+            "type": "string",
+            "example": "Example Company OÜ",
+            "nullable": true,
+            "description": "The invoice sender/seller's name.  \nFrom `<E_Invoice>` `<SellerParty>` `<Name>`\n"
+          },
+          "receiverRegistryCode": {
+            "type": "string",
+            "example": "16122596",
+            "description": "The invoice receiver/buyer's registry code.  \nFrom `<E_Invoice>` `<Invoice regNumber>`.\n"
+          },
+          "receiverName": {
+            "type": "string",
+            "example": "Example Company OÜ",
+            "nullable": true,
+            "description": "The invoice receiver/buyer's name.  \nFrom `<E_Invoice>` `<BuyerParty>` `<Name>`\n"
+          },
+          "number": {
+            "type": "string",
+            "example": "INV123",
+            "description": "The invoice's number as set by the sender.  \nFrom `<E_Invoice>` `<InvoiceNumber>`.\n"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "The date of the invoice as set by the sender.  \nFrom `<E_Invoice>` `<InvoiceDate>`.\n",
+            "example": "2020-06-18"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "example": "2020-06-25",
+            "description": "The due date of the invoice.  \nFrom `<E_Invoice>` `<InvoiceInformation>` `<DueDate>`.\n"
+          },
+          "receivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "example": "2020-06-18T13:37:42.666Z",
+            "description": "Time when the invoice was received."
+          },
+          "receivedFromOperator": {
+            "nullable": true,
+            "example": "billberry",
+            "description": "The operator who sent the invoice to Billberry.\n\nNote that the operator list may change with time as operators enter and exit the market. A single operator's identifier will remain static however and won't be re-used.\n\nIf you want to show the operator in a human-readable way to your app users, you may want a list of operator brand names, websites etc. Let us know and we'll add an API endpoint for that.\n",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "billberry",
+                  "earveldaja",
+                  "finbite",
+                  "telema",
+                  "unifiedpost",
+                  "peppol"
+                ]
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "receivedFileId": {
+            "type": "string",
+            "nullable": true,
+            "deprecated": true,
+            "example": "EMK_2021_153500000",
+            "description": "The received `<E_Invoice>` `<FileId>`.  \nAlso set for invoices uploaded to Billberry for sending. May help with tracing invoices if problems occur.\n\nOnly applicable to invoices received in the Estonian e-arve format.\n"
+          },
+          "receivedExternalId": {
+            "type": "string",
+            "nullable": true,
+            "example": "2221337",
+            "description": "The invoice id from an external operator.  \nSome operators, like [E-arveldaja](https://e-arveldaja.rik.ee), assign invoices an id of their own.  \nMay help with tracing invoices if problems occur.\n"
+          },
+          "sentAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "example": "2020-06-18T13:37:42.666Z",
+            "description": "Time when the invoice was sent."
+          },
+          "sentToOperator": {
+            "nullable": true,
+            "example": "billberry",
+            "anyOf": "ref_8",
+            "description": "The operator to whom the invoice was sent to.\n\nNote that the operator list may change with time as operators enter and exit the market. A single operator's identifier will remain static however and won't be re-used.\n\nIf you want to show the operator in a human-readable way to your app users, you may want a list of operator brand names, websites etc. Let us know and we'll add an API endpoint for that.\n"
+          },
+          "sentFileId": {
+            "type": "string",
+            "nullable": true,
+            "example": "42",
+            "description": "The sent `<E_Invoice>` `<FileId>` element.  \nGenerated by Billberry and usually identical to the invoice id.  \nMay help with tracing invoices if problems occur.\n"
+          },
+          "sentExternalId": {
+            "type": "string",
+            "nullable": true,
+            "example": "2221337",
+            "description": "The invoice id from an external operator.  \nSome operators, like [E-arveldaja](https://e-arveldaja.rik.ee), assign invoices an id of their own.  \nMay help with tracing invoices if problems occur.\n"
+          },
+          "delivery": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InvoiceDeliveryV1"
+              }
+            ],
+            "description": "For now, present if you just sent the invoice.\n"
+          },
+          "fileType": {
+            "nullable": true,
+            "example": "application/vnd.billberry.earve+xml; v=1.2",
+            "description": "The MIME type of the e-invoice file.\n\nNote that the MIME type of the e-invoice files may have metadata attributes not listed here. For example, the Estonian e-arve may include a version — `application/vnd.billberry.earve+xml; v=1.2`. The UBL invoice may include the values of `<CustomizationID>` and `<ProfileID>` to help you identify the customization (e.g. compatibility with EN 16931 or with PEPPOL's BIS 3.0).\n",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "application/vnd.billberry.earve+xml",
+                  "application/vnd.billberry.finvoice+xml",
+                  "application/vnd.billberry.teapps+xml",
+                  "application/vnd.billberry.ubl-invoice+xml",
+                  "application/vnd.billberry.ubl-credit-note+xml"
+                ]
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "pdfSize": {
+            "type": "integer",
+            "example": 128,
+            "minimum": 0,
+            "description": "The size in bytes of the secondary accompanying PDF that one Estonian e-invoice operator (namely [E-arveldaja](https://e-arveldaja.rik.ee)) sends. That is, not via the `<E_Invoice>`'s `<AttachmentFile>` tag, but through a proprietary channel.\n\nAs of Feb 23, 2023 **Billberry reattaches this externally sent PDF** to the e-invoice as an `<AttachmentFile>` element, making this path redundant. While it is theoretically possible for E-arveldaja to both send an attachment and a secondary PDF, it's unlikely and in our view not worth handling. Most other operators tend not to accept invoices with non-PDF attachments anyways, making them rare.\n\nIf the size is non-zero, you can request the PDF via `/invoices/{invoiceId}.pdf`.\n\nNote that there might still be an attachment in the invoice, which you can get by downloading the original XML from `/invoices/{invoiceId}.xml` and extracting `<AttachmentFile>`.\n"
+          }
+        }
+      },
+      "InvoiceDeliveryV1": {
+        "type": "object",
+        "description": "`application/vnd.billberry.invoice-delivery+json; v=1`\n",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 42,
+            "description": "The invoice delivery's id.\n"
+          },
+          "sentFileTypes": {
+            "nullable": true,
+            "example": [
+              "application/vnd.billberry.earve+xml; v=1.2"
+            ],
+            "description": "If the invoice was successfully sent, an array of MIME types of e-invoice file formats that were handed to the recipient's e-invoice operator. Usually a single type, but on the off chance a recipient supports and requests multiple formats (e.g. the original and a converted variant), this has to be an array.\n\nAlso, theoretically it could be an empty array if all Billberry does is notify a recipient there's something to fetch from Billberry. As of 2025, there are no e-invoice operators that work in a pull-based fashion though.\n\nNote that the MIME type of the e-invoice files may have metadata attributes not listed here. For example, the Estonian e-arve may include a version — `application/vnd.billberry.earve+xml; v=1.2`. The UBL invoice may include the values of `<CustomizationID>` and `<ProfileID>` to help you identify the customization (e.g. compatibility with EN 16931 or with PEPPOL's BIS 3.0).\n",
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "application/vnd.billberry.earve+xml",
+                    "application/vnd.billberry.finvoice+xml",
+                    "application/vnd.billberry.teapps+xml",
+                    "application/vnd.billberry.ubl-invoice+xml",
+                    "application/vnd.billberry.ubl-credit-note+xml"
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "InvoiceAcknowledgementV1": {
+        "type": "object",
+        "description": "`application/vnd.billberry.invoice-acknowledgement+json; v=1`\n\nAn acknowledgement indicates whether a particular delivery of an invoice was confirmed or rejected by the recipient or their operator. Note that not all e-invoice networks, operators or recipients acknowledge invoices, so the lack of an acknowledgement doesn't indicate failure.\n\nNote that there may be multiple acknowledgements sent for a single invoice and delivery. It's up to the recipient, after all, to send them.\n",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 42,
+            "description": "The acknowledgement's id.\n"
+          },
+          "invoiceId": {
+            "type": "integer",
+            "example": 13,
+            "description": "The invoice's id.\n"
+          },
+          "invoiceDeliveryId": {
+            "type": "integer",
+            "nullable": true,
+            "example": 37,
+            "description": "The invoice delivery's id related to the acknowledgement.\nMost acknowledgements are related to a single delivery. For example, since it's theoretically possible to request a single invoice to be delivered to two e-invoice networks in parallel, the delivery id helps identify which delivery was rejected by the recipient."
+          },
+          "ok": {
+            "type": "boolean",
+            "example": false,
+            "description": "Whether the delivery was accepted by the recipient or their operator.\n"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true,
+            "example": "Duplicate invoice",
+            "description": "A message from the recipient or their operator explaining the acknowledgement. Usually present when `ok` is `false`.\n"
+          },
+          "receivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "example": "2015-06-18T13:37:42Z",
+            "description": "Time when the acknowledgement was received from the recipient's system.\n\nIf the acknowledgement was instead sent from Billberry to a sender, `receivedAt` will be `null`. That would be the case for rejections of received invoices, for example.\n"
+          }
+        }
+      },
+      "Earve": {
+        "type": "object",
+        "description": "`application/vnd.billberry.earve+xml`\n\nThe Estonian e-invoice format.  \nDescribed in detail at <https://billberry.ee/help/dev/estonian-einvoice-standard/>.\n",
+        "xml": {
+          "name": "E_Invoice"
+        }
+      },
+      "Finvoice": {
+        "type": "object",
+        "description": "`application/vnd.billberry.finvoice+xml`\n\nThe Finnish e-invoice format \"Finvoice\".  \nDescribed in detail at <https://www.finanssiala.fi/en/topics/finvoice-standard/>.\n",
+        "xml": {
+          "name": "Finvoice"
+        }
+      },
+      "Teapps": {
+        "type": "object",
+        "description": "`application/vnd.billberry.teapps+xml`\n\nThe Finnish e-invoice format \"TEAPPS\".  \nDescribed in detail at <https://bix.tieto.com/#/teappsxml>.\n",
+        "xml": {
+          "name": "INVOICE_CENTER"
+        }
+      },
+      "UblInvoice": {
+        "type": "object",
+        "description": "`application/vnd.billberry.ubl-invoice+xml`\n\nThe UBL e-invoice format.  \nUBL v2.1 described in detail at <https://www.oasis-open.org/standard/ublv2-1/>.\n",
+        "xml": {
+          "name": "Invoice",
+          "namespace": "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+        }
+      },
+      "UblCreditNote": {
+        "type": "object",
+        "description": "`application/vnd.billberry.ubl-credit-note+xml`\n\nThe UBL e-invoice format.  \nUBL v2.1 described in detail at <https://www.oasis-open.org/standard/ublv2-1/>.\n",
+        "xml": {
+          "name": "CreditNote",
+          "namespace": "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
+        }
+      },
+      "CountryOrganizationV1": {
+        "type": "object",
+        "description": "`application/vnd.billberry.country-organization+json; v=1`\n",
+        "properties": {
+          "country": {
+            "type": "string",
+            "example": "EE",
+            "enum": "ref_9",
+            "description": "The country of the organization's registration."
+          },
+          "registryCode": {
+            "type": "string",
+            "example": "16122596",
+            "description": "The registry code of the organization.\n\nIn Estonia this will be the 8-digit code assigned by the Estonian Business Register.\n"
+          },
+          "name": {
+            "type": "string",
+            "example": "Example Company OÜ",
+            "nullable": true
+          },
+          "receivingOperator": {
+            "nullable": true,
+            "example": "billberry",
+            "anyOf": "ref_8",
+            "description": "The e-invoice operator the organization uses for receiving. If you send an invoice via `POST /invoices`, Billberry will forward it to this operator.\n\nNote that the operator list may change with time as operators enter and exit the market. A single operator's identifier will remain static however and won't be re-used.\n\nIf you want to show the operator in a human-readable way to your app users, you may want a list of operator brand names, websites etc. Let us know and we'll add an API endpoint for that.\n"
+          }
+        }
+      },
+      "PartnerOrganizationV1": {
+        "type": "object",
+        "description": "`application/vnd.billberry.partner-organization+json; v=1`\n",
+        "properties": {
+          "country": {
+            "type": "string",
+            "example": "EE",
+            "enum": "ref_9",
+            "description": "The country of the registered organization and its registry code.\n"
+          },
+          "registryCode": {
+            "type": "string",
+            "example": "16122596",
+            "description": "The registry code of the registered organization.\n"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2020-06-18T13:37:42.666Z",
+            "description": "Time when the organization was registered to the partner.\n"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "example": "2020-06-18T13:37:42.666Z",
+            "description": "Time when the organization was unregistered from the partner.\n"
+          },
+          "sendingEnabled": {
+            "type": "boolean",
+            "example": true,
+            "default": true,
+            "description": "Whether e-invoice sending is enabled for this client.\n"
+          },
+          "receivingEnabled": {
+            "type": "boolean",
+            "example": false,
+            "default": false,
+            "description": "Whether e-invoice receiving is enabled for this client.\n\n## Receiving for Estonian Organizations\nNote than when you enable receiving for an Estonian organization, Billberry also sets itself as the client's e-invoice operator in the Estonian Business Register. To complete the process, you'll need to direct your client to the [Estonian Business Register](https://ariregister.rik.ee) to confirm their new operator.\n"
+          },
+          "receivingNetworks": {
+            "type": "object",
+            "nullable": true,
+            "example": {
+              "estonia": true,
+              "peppol": false
+            },
+            "description": "Which e-invoice networks to enable receiving for this client. Takes effect only if `receivingEnabled` is `true`. If not given, uses country-specific defaults for new partner organizations.\n\n## New Partner Organizations\nWhen registering a new partner organization without an explicit `receivingNetworks` object, it defaults to a country specific set of networks. Defaults listed below, but they may change as networks come and go. If an object _is_ given, it only sets the requested networks and leaves others off.\n\n### Estonian Defaults\n- `estonia`\n\n### Finnish Defaults\n_None for now_\n\n### Latvian Defaults\n_None for now_\n\n### Lithuanian Defaults\n_None for now_\n\n### Swedish Defaults\n_None for now_\n\n### Slovakian Defaults\n_None for now_\n\n### Italian Defaults\n_None for now_\n\n## Old Partner Organizations\nWhen updating existing partner organizations, the passed-in `receivingNetworks` will be merged with old values. For example, if `receivingNetworks` was `{\"estonia\": true}` and your request sets only `{\"peppol\": true}`, the result will be `{\"estonia\": true, \"peppol\": true}`. To disable a network without removing the partner organization, set it to `false` (e.g. `{\"peppol\": false}`).\n",
+            "properties": {
+              "estonia": {
+                "nullable": true,
+                "example": true,
+                "default": false,
+                "description": "Whether to enable receiving in the Estonian network if `receivingEnabled` was requested.\n"
+              },
+              "peppol": {
+                "nullable": true,
+                "example": false,
+                "default": false,
+                "description": "Whether to enable receiving in the international PEPPOL network if `receivingEnabled` was requested.\n"
+              }
+            }
+          },
+          "receivingOperator": {
+            "nullable": true,
+            "example": "billberry",
+            "anyOf": "ref_8",
+            "description": "The current receiving e-invoice operator for this client.\n\nIf you've just enabled receiving for this client and the current operator is not \"billberry\", you'll need to direct your client to the [Estonian Business Register](https://ariregister.rik.ee) to confirm their new operator.\n"
+          },
+          "creatingReceivedEnabled": {
+            "type": "boolean",
+            "example": true,
+            "default": false,
+            "description": "Whether creating received e-invoices is enabled for this client.\n\nCreating received invoices is meant for uploading invoices received externally, such as scanned purchase receipts, to Billberry, where they'll become available to the client's accounting software.\n"
+          }
+        }
+      },
+      "SessionV1": {
+        "type": "object",
+        "description": "`application/vnd.billberry.session+json; v=1`\n",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 42,
+            "description": "The session's id.  \nThis will become the HTTP Basic Authentication username for authentication.  \nFor the password, see `token`.\n"
+          },
+          "country": {
+            "type": "string",
+            "example": "EE",
+            "enum": "ref_9",
+            "description": "The country of the organization's registry code.\n"
+          },
+          "registryCode": {
+            "type": "string",
+            "example": "16122596",
+            "description": "The registry code of the organization this session gives access to.\n"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2020-06-18T13:37:42.666Z",
+            "description": "Time when the session was created.\n"
+          },
+          "token": {
+            "type": "string",
+            "format": "password",
+            "pattern": "^[0-9a-z]$",
+            "nullable": true,
+            "example": "2ab96390c7dbe3439de74d0c9b0b1767",
+            "description": "The session token.  \nThis will become the HTTP Basic Authentication password for authentication.\n\nThis is only returned once after creating the session.\n"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "description": "`application/vnd.billberry.error+json; v=1`\n",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Some Error",
+            "description": "The title-cased error message. Same as the HTTP status message.\n"
+          },
+          "description": {
+            "type": "string",
+            "example": "Something went wrong when fooing the bars.",
+            "nullable": true,
+            "description": "A human readable multiline explanation of what went wrong. Currently available only in English, but in the future could be translated based on the `Accept-Language` HTTP header. For example, feel free to set it to `Accept-Language: et` for Estonian. Given an unknown language code, English will be returned.\n\nIt's safe to show to end-users, although it may contain technical details from other operators. Could be better than just showing \"Something went wrong\" though. ;)\n\nIf you're going to display it, make sure to honor newlines. It could be a long message should it include technical errors from other operators.\n"
+          }
+        }
+      },
+      "Pdf": {
+        "type": "string",
+        "format": "binary",
+        "example": "%PDF-1.0\n1 0 obj<</Pages 2 0 R>>endobj 2 0 obj<</Kids[3 0 R]/Count 1>>endobj 3 0 obj<</MediaBox[0 0 3 3]>>endobj\ntrailer<</Root 1 0 R>>"
+      }
+    }
+  },
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Invoices",
+      "description": "Endpoints to manage an account's or organization's invoices."
+    },
+    {
+      "name": "Partner Organizations",
+      "description": "Endpoints to manage a partner's organizations (clients)."
+    },
+    {
+      "name": "Partner Invoices",
+      "description": "Endpoints for a partner to manage their clients' invoices."
+    }
+  ]
+}
