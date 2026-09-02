@@ -1,0 +1,1028 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Strapi CMS REST API",
+    "version": "5.0.0",
+    "description": "The REST API exposed by any self-hosted or Strapi Cloud instance of Strapi 5, the open-source headless CMS.\n\nThis specification describes the *generic* Strapi 5 REST surface. Strapi is a headless CMS in which content types are defined by the developer of each individual instance, so the resource segment of each route is a variable, not a fixed name:\n\n- **Collection types** are addressed by their plural API ID, e.g. `/api/articles`, `/api/products`. They support list, create, read-one, update and delete.\n- **Single types** are addressed by their singular API ID, e.g. `/api/homepage`, `/api/global-setting`. There is only ever one document, so they support read, update and delete — but not list or create.\n\nBecause both forms occupy the same position in the path, they are described here by the shared `{apiId}` path parameter. Substitute the plural API ID of a collection type, or the singular API ID of a single type, as documented per operation.\n\n## Documents and documentId\n\nStrapi 5 replaced Strapi 4's numeric entry `id` with a `documentId`: an opaque string that identifies a *document* — the set of all variations of an entry across locales and across its draft and published versions. All collection-type item routes are keyed by `documentId`. A numeric `id` is still returned for backwards compatibility, but it identifies a single underlying database row rather than the document, and should not be used to address entries. The Upload plugin is the exception: its routes are still keyed by the numeric file `id`.\n\n## Response shape\n\nEvery content response is wrapped in `data` and `meta`. Strapi 5 flattened the response compared to Strapi 4 — fields now appear directly on the document rather than nested under an `attributes` object.\n\n## Draft & Publish caveats\n\nThe `status` query parameter selects the draft or published version and is well defined for read operations. Its behaviour on **create and update is not**, and there are long-standing open bugs:\n\n- Documents created through the REST API are auto-published even when `status=draft` is supplied ([strapi/strapi#21544](https://github.com/strapi/strapi/issues/21544), [#24860](https://github.com/strapi/strapi/issues/24860), [#23196](https://github.com/strapi/strapi/issues/23196)).\n- Updating an entry publishes it, with no REST route to unpublish it again ([strapi/strapi#24547](https://github.com/strapi/strapi/issues/24547)).\n\nSetting `publishedAt: null` to force a draft is deprecated in Strapi 5 and does not reliably work either. There are no built-in REST publish/unpublish routes; publishing state is authoritative only through the Document Service API in server-side code, or the admin panel. Instances that need REST-driven publish/unpublish typically add custom controllers, which are outside the scope of this specification.\n\nA client that must guarantee draft creation should verify `publishedAt` on the response and take corrective action rather than assume `status=draft` was honoured.",
+    "contact": {
+      "name": "Strapi",
+      "url": "https://strapi.io"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/strapi/strapi/blob/main/LICENSE"
+    }
+  },
+  "externalDocs": {
+    "description": "Strapi 5 REST API documentation",
+    "url": "https://docs.strapi.io/cms/api/rest"
+  },
+  "servers": [
+    {
+      "url": "{baseUrl}/api",
+      "description": "A Strapi instance. Strapi is self-hosted or run on Strapi Cloud, so the host is specific to each deployment. The API is served under the /api prefix by default; this can be changed via the `rest.prefix` setting in config/api.js.",
+      "variables": {
+        "baseUrl": {
+          "default": "http://localhost:1337",
+          "description": "Origin of the Strapi instance, e.g. http://localhost:1337 for a local development server, or https://your-project.strapiapp.com on Strapi Cloud."
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Collection types",
+      "description": "Content types that hold many documents, addressed by their plural API ID."
+    },
+    {
+      "name": "Single types",
+      "description": "Content types that hold exactly one document, addressed by their singular API ID."
+    },
+    {
+      "name": "Upload",
+      "description": "The Upload plugin, which backs Strapi's Media Library."
+    }
+  ],
+  "paths": {
+    "/{apiId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ApiId"
+        }
+      ],
+      "get": {
+        "operationId": "findDocuments",
+        "tags": [
+          "Collection types",
+          "Single types"
+        ],
+        "summary": "List documents in a collection type, or get a single type",
+        "description": "For a **collection type** (plural API ID, e.g. `articles`) this returns a paginated list of documents, and `meta.pagination` is populated.\n\nFor a **single type** (singular API ID, e.g. `homepage`) this returns the one document, and `data` is an object rather than an array.\n\nOnly published versions are returned unless `status=draft` is supplied.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Sort"
+          },
+          {
+            "$ref": "#/components/parameters/Filters"
+          },
+          {
+            "$ref": "#/components/parameters/Populate"
+          },
+          {
+            "$ref": "#/components/parameters/Fields"
+          },
+          {
+            "$ref": "#/components/parameters/Pagination"
+          },
+          {
+            "$ref": "#/components/parameters/Status"
+          },
+          {
+            "$ref": "#/components/parameters/Locale"
+          },
+          {
+            "$ref": "#/components/parameters/PublicationFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of documents (collection type) or a single document (single type).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/DocumentListResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DocumentResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createDocument",
+        "tags": [
+          "Collection types"
+        ],
+        "summary": "Create a document in a collection type",
+        "description": "Creates a new document in the collection type identified by its plural API ID. Not applicable to single types, which are created implicitly by a PUT.\n\nThe payload must be wrapped in a `data` object. Fields not defined on the content type are silently ignored.\n\nSee the Draft & Publish caveats in the API description: on instances with Draft & Publish enabled, documents created through this route are known to be auto-published regardless of the `status` parameter. Verify `publishedAt` on the response rather than assuming a draft was created.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Status"
+          },
+          {
+            "$ref": "#/components/parameters/Locale"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The created document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateSingleType",
+        "tags": [
+          "Single types"
+        ],
+        "summary": "Update (or create) a single type",
+        "description": "Updates the single type identified by its singular API ID. If the single type does not yet have a document, one is created.\n\nFor collection types, use `PUT /{apiId}/{documentId}` instead.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Status"
+          },
+          {
+            "$ref": "#/components/parameters/Locale"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated single type document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteSingleType",
+        "tags": [
+          "Single types"
+        ],
+        "summary": "Delete a single type",
+        "description": "Deletes the document held by the single type identified by its singular API ID.\n\nFor collection types, use `DELETE /{apiId}/{documentId}` instead.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Locale"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted. No content is returned."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/{apiId}/{documentId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ApiIdPlural"
+        },
+        {
+          "$ref": "#/components/parameters/DocumentId"
+        }
+      ],
+      "get": {
+        "operationId": "findDocument",
+        "tags": [
+          "Collection types"
+        ],
+        "summary": "Get one document from a collection type",
+        "description": "Returns a single document by its `documentId`. Only the published version is returned unless `status=draft` is supplied.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Populate"
+          },
+          {
+            "$ref": "#/components/parameters/Fields"
+          },
+          {
+            "$ref": "#/components/parameters/Status"
+          },
+          {
+            "$ref": "#/components/parameters/Locale"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateDocument",
+        "tags": [
+          "Collection types"
+        ],
+        "summary": "Update a document in a collection type",
+        "description": "Updates the document identified by `documentId`. Only the fields present in the payload are modified; omitted fields are left untouched.\n\nSee the Draft & Publish caveats in the API description: updating a document is known to publish it, and there is no REST route to unpublish it again.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Status"
+          },
+          {
+            "$ref": "#/components/parameters/Locale"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteDocument",
+        "tags": [
+          "Collection types"
+        ],
+        "summary": "Delete a document from a collection type",
+        "description": "Deletes the document identified by `documentId`, including all of its locale and draft/published variations.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Locale"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted. No content is returned."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/upload": {
+      "post": {
+        "operationId": "upload",
+        "tags": [
+          "Upload"
+        ],
+        "summary": "Upload files to the Media Library",
+        "description": "Uploads one or more files. The request must be `multipart/form-data`.\n\nFiles can optionally be attached to an entry in the same request by supplying `ref` (the content type UID, e.g. `api::article.article`), `refId` (the entry id) and `field` (the media attribute name on that content type).\n\nSupplying the `id` query parameter instead updates the metadata of an existing file rather than uploading a new one.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "When supplied, updates the `fileInfo` of the existing file with this id instead of creating a new one."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "files"
+                ],
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "description": "One or more files to upload."
+                  },
+                  "fileInfo": {
+                    "type": "string",
+                    "description": "JSON-encoded metadata for the uploaded file: `name`, `alternativeText` and `caption`."
+                  },
+                  "ref": {
+                    "type": "string",
+                    "description": "UID of the content type to attach the file to, e.g. `api::article.article`."
+                  },
+                  "refId": {
+                    "type": "string",
+                    "description": "Id of the entry to attach the file to. Required when `ref` is supplied."
+                  },
+                  "field": {
+                    "type": "string",
+                    "description": "Name of the media attribute on the target content type. Required when `ref` is supplied."
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "Optional destination folder, used by providers that support it."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The uploaded files.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UploadFile"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "description": "Payload too large — the file exceeds the instance's configured size limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload/files": {
+      "get": {
+        "operationId": "listFiles",
+        "tags": [
+          "Upload"
+        ],
+        "summary": "List files in the Media Library",
+        "description": "Returns all files. Unlike content routes, this returns a bare array rather than a `data`/`meta` envelope. Use `/upload/files/page` for a paginated response.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Sort"
+          },
+          {
+            "$ref": "#/components/parameters/Filters"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The files in the Media Library.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UploadFile"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/upload/files/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          },
+          "description": "Numeric id of the file. Note that the Upload plugin is keyed by numeric id, not by `documentId`."
+        }
+      ],
+      "get": {
+        "operationId": "getFile",
+        "tags": [
+          "Upload"
+        ],
+        "summary": "Get a file by id",
+        "description": "Returns a single file from the Media Library by its numeric id. This is the id carried by media fields on documents, so it is the value to look up after populating a media relation.",
+        "responses": {
+          "200": {
+            "description": "The requested file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadFile"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteFile",
+        "tags": [
+          "Upload"
+        ],
+        "summary": "Delete a file by id",
+        "description": "Removes the file from the Media Library and from the configured storage provider.",
+        "responses": {
+          "200": {
+            "description": "The deleted file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadFile"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Either an API token, created in the admin panel under Settings > API Tokens, or a JWT issued by the Users & Permissions plugin. Routes must also be enabled for the calling role under Settings > Roles; a route that is not enabled returns 403 even with a valid token. Public routes may be called without a token if the Public role permits them."
+      }
+    },
+    "parameters": {
+      "ApiId": {
+        "name": "apiId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "The API ID of the content type. Use the **plural** API ID for a collection type (e.g. `articles`, `products`) or the **singular** API ID for a single type (e.g. `homepage`). This is defined per instance by whoever modelled the content types.",
+        "example": "articles"
+      },
+      "ApiIdPlural": {
+        "name": "apiId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "The plural API ID of a collection type, e.g. `articles`. Single types have no per-document routes.",
+        "example": "articles"
+      },
+      "DocumentId": {
+        "name": "documentId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "The document's `documentId`. This is the Strapi 5 identifier for a document; it is not the numeric `id` returned alongside it.",
+        "example": "clkgylw7d0002lc08z9nuxxxx"
+      },
+      "Sort": {
+        "name": "sort",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "description": "Sort order. A field name optionally suffixed with `:asc` (default) or `:desc`, e.g. `sort=createdAt:desc`. Sort by several fields with indexed syntax: `sort[0]=title:asc&sort[1]=createdAt:desc`.",
+        "example": "createdAt:desc"
+      },
+      "Filters": {
+        "name": "filters",
+        "in": "query",
+        "required": false,
+        "style": "deepObject",
+        "explode": true,
+        "schema": {
+          "type": "object"
+        },
+        "description": "Filter the result set, using the syntax `filters[field][$operator]=value`, e.g. `filters[slug][$eq]=hello-world`.\n\nOperators: `$eq`, `$eqi`, `$ne`, `$nei`, `$lt`, `$lte`, `$gt`, `$gte`, `$in`, `$notIn`, `$contains`, `$notContains`, `$containsi`, `$notContainsi`, `$startsWith`, `$startsWithi`, `$endsWith`, `$endsWithi`, `$null`, `$notNull`, `$between`, `$and`, `$or`, `$not`.\n\nMultiple fields are combined with `$and` implicitly. Relations can be traversed: `filters[author][name][$eq]=Kai`. Array values use indexed syntax: `filters[id][$in][0]=3&filters[id][$in][1]=6`."
+      },
+      "Populate": {
+        "name": "populate",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object"
+            }
+          ]
+        },
+        "description": "Relations, components, dynamic zones and media to include. Relations are **not** returned unless populated.\n\nUse `populate=*` for all first-level relations, a field name for one relation, indexed syntax for several (`populate[0]=author&populate[1]=categories`), or nested objects for deeper population (`populate[author][populate][0]=avatar`).",
+        "example": "*"
+      },
+      "Fields": {
+        "name": "fields",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "description": "Restrict the returned attributes, e.g. `fields[0]=title&fields[1]=slug`. `documentId` and `id` are always returned."
+      },
+      "Pagination": {
+        "name": "pagination",
+        "in": "query",
+        "required": false,
+        "style": "deepObject",
+        "explode": true,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "page": {
+              "type": "integer",
+              "default": 1,
+              "description": "Page number, for page-based pagination."
+            },
+            "pageSize": {
+              "type": "integer",
+              "default": 25,
+              "description": "Documents per page, for page-based pagination."
+            },
+            "start": {
+              "type": "integer",
+              "default": 0,
+              "description": "Number of documents to skip, for offset-based pagination."
+            },
+            "limit": {
+              "type": "integer",
+              "default": 25,
+              "description": "Maximum number of documents to return, for offset-based pagination."
+            },
+            "withCount": {
+              "type": "boolean",
+              "default": true,
+              "description": "Whether to run the count query and return totals in `meta.pagination`."
+            }
+          }
+        },
+        "description": "Pagination, e.g. `pagination[page]=2&pagination[pageSize]=50`.\n\nThe two pagination styles **cannot be mixed**: use either `page` with `pageSize`, or `start` with `limit`."
+      },
+      "Status": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "published",
+            "draft"
+          ],
+          "default": "published"
+        },
+        "description": "Selects the draft or the published version. Omitting it is equivalent to `published`. Drafts have `publishedAt: null`.\n\nOnly meaningful when Draft & Publish is enabled for the content type. See the Draft & Publish caveats in the API description before relying on this parameter for create or update."
+      },
+      "Locale": {
+        "name": "locale",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Locale code of the version to operate on, e.g. `en` or `fr-FR`. Only meaningful when the Internationalization (i18n) plugin is enabled and the content type is localized.",
+        "example": "en"
+      },
+      "PublicationFilter": {
+        "name": "publicationFilter",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Selects documents by how their draft and published versions relate to each other — for example to find documents whose draft differs from what is currently published. See the Strapi documentation for the accepted values, which vary by version."
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request — typically a validation failure or an invalid query parameter.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized — the token is missing, malformed or expired.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Forbidden — the token is valid but the route is not enabled for its role under Settings > Roles.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Not found — no such content type, document or locale.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Document": {
+        "type": "object",
+        "description": "A Strapi document. Beyond the fields below, a document carries whatever attributes were modelled for its content type; these appear directly on the object. In Strapi 4 they were nested under `attributes`, which was removed in Strapi 5.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Numeric id of the underlying database row. Retained for backwards compatibility; use `documentId` to address the document."
+          },
+          "documentId": {
+            "type": "string",
+            "description": "Identifier of the document across all of its locales and draft/published versions. This is the identifier used by all collection-type routes.",
+            "example": "clkgylw7d0002lc08z9nuxxxx"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When the document was published. `null` for a draft, which is the reliable way to tell a draft from a published document."
+          },
+          "locale": {
+            "type": "string",
+            "nullable": true,
+            "description": "Locale of this version. Present when the i18n plugin is enabled."
+          }
+        },
+        "additionalProperties": true
+      },
+      "DocumentRequest": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "description": "Request payload for creating or updating a document. Attributes go inside `data` and are specific to the content type being written.",
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The attributes to write. Relations are set by passing the related `documentId` (or an array of them). Media fields are set by passing the numeric file `id` returned by the Upload plugin.",
+            "additionalProperties": true
+          }
+        }
+      },
+      "DocumentResponse": {
+        "type": "object",
+        "description": "Envelope returned for a single document.",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "meta": {
+            "type": "object"
+          }
+        }
+      },
+      "DocumentListResponse": {
+        "type": "object",
+        "description": "Envelope returned for a list of documents.",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "pagination": {
+                "$ref": "#/components/schemas/Pagination"
+              }
+            }
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "description": "Pagination metadata. Page-based requests return `page`, `pageSize`, `pageCount` and `total`; offset-based requests return `start`, `limit` and `total`. `total` and `pageCount` are omitted when `pagination[withCount]=false`.",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "pageCount": {
+            "type": "integer"
+          },
+          "start": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "UploadFile": {
+        "type": "object",
+        "description": "A file in the Media Library. Note that media routes and media relations are keyed by the numeric `id`, not by `documentId`.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Numeric id. This is the value to pass when setting a media field on a document."
+          },
+          "documentId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "alternativeText": {
+            "type": "string",
+            "nullable": true
+          },
+          "caption": {
+            "type": "string",
+            "nullable": true
+          },
+          "width": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Pixel width, for images."
+          },
+          "height": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Pixel height, for images."
+          },
+          "formats": {
+            "type": "object",
+            "nullable": true,
+            "description": "Generated responsive variants for images, keyed by name — typically `thumbnail`, `small`, `medium` and `large`. Which are generated depends on the source dimensions.",
+            "additionalProperties": {
+              "type": "object"
+            }
+          },
+          "hash": {
+            "type": "string"
+          },
+          "ext": {
+            "type": "string",
+            "description": "File extension, including the leading dot."
+          },
+          "mime": {
+            "type": "string"
+          },
+          "size": {
+            "type": "number",
+            "description": "Size in kilobytes."
+          },
+          "url": {
+            "type": "string",
+            "description": "Public URL. Relative to the instance origin for local storage; absolute when an upload provider such as S3 or Cloudinary is configured."
+          },
+          "previewUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "description": "Upload provider that stored the file, e.g. `local`."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "description": "Strapi's uniform error envelope.",
+        "properties": {
+          "data": {
+            "nullable": true,
+            "description": "Always null on an error."
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code."
+              },
+              "name": {
+                "type": "string",
+                "description": "Error class, e.g. `ValidationError` (400), `UnauthorizedError` (401), `ForbiddenError` (403), `NotFoundError` (404), `PayloadTooLargeError` (413), `PaginationError` (400), `NotImplementedError` (501) or `ApplicationError` (500)."
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "description": "Error-specific detail. For validation failures this carries the offending fields."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
