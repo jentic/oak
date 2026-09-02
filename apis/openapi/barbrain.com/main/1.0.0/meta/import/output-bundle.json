@@ -1,0 +1,713 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "BarBrain Inventory API",
+    "description": "The BarBrain Inventory API allows authorized external systems to retrieve detailed \ninventory data for a company. This is useful for:\n- Daily inventory sync to external systems\n- Automated reporting and analytics\n- Integration with accounting software\n- Data backup and archiving\n",
+    "version": "1.0.0",
+    "contact": {
+      "name": "BarBrain Support",
+      "url": "",
+      "email": "lucia@barbrain.com"
+    },
+    "x-owner": "Lucia Schlegel",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/barbrain/barbrain-inventory-api/1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.barbrain.com/v2-live",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/fetchInventories": {
+      "get": {
+        "tags": [
+          "Inventories"
+        ],
+        "summary": "Fetch inventories",
+        "description": "Retrieve detailed inventory data for the company associated with the API token.\nUse date filters to limit the response to a specific time range.\n",
+        "operationId": "fetchInventories",
+        "security": [
+          {
+            "BearerApiToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "description": "Filter inventories created on or after this date (ISO 8601 format)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "example": "2025-01-01T00:00:00Z"
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "description": "Filter inventories created on or before this date (ISO 8601 format)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "example": "2025-01-07T23:59:59Z"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with inventory data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FetchInventoriesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid, expired, or revoked API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "errorCode": 401,
+                    "message": "Invalid or expired API token"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Company associated with the token no longer exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "errorCode": 404,
+                    "message": "Company not found: comp-123"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{companyId}/api-tokens": {
+      "get": {
+        "tags": [
+          "Token Management"
+        ],
+        "summary": "List API tokens",
+        "description": "Retrieve all API tokens for a company. Requires Firebase authentication with admin role.",
+        "operationId": "listApiTokens",
+        "security": [
+          {
+            "FirebaseAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/companyId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of API tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApiTokenInfo"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid Firebase token or insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Company not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Token Management"
+        ],
+        "summary": "Create API token",
+        "description": "Create a new API token for the company. Requires Firebase authentication with admin role.\n\n**Important:** The token value is only shown once in the response. Store it securely immediately after generation.\n",
+        "operationId": "createApiToken",
+        "security": [
+          {
+            "FirebaseAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/companyId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Token created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid Firebase token or insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Company not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{companyId}/api-tokens/{tokenId}/rotate": {
+      "post": {
+        "tags": [
+          "Token Management"
+        ],
+        "summary": "Rotate API token",
+        "description": "Rotate an existing API token. This generates a new token and immediately revokes the old one.\nRequires Firebase authentication with admin role.\n\n**Recommendation:** Rotate tokens before they expire to maintain uninterrupted access.\nDefault expiration is 30 days; plan rotation at ~25 days.\n",
+        "operationId": "rotateApiToken",
+        "security": [
+          {
+            "FirebaseAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/companyId"
+          },
+          {
+            "$ref": "#/components/parameters/tokenId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token rotated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid Firebase token or insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Company or token not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{companyId}/api-tokens/{tokenId}": {
+      "delete": {
+        "tags": [
+          "Token Management"
+        ],
+        "summary": "Revoke API token",
+        "description": "Permanently revoke an API token. Requires Firebase authentication with admin role.",
+        "operationId": "revokeApiToken",
+        "security": [
+          {
+            "FirebaseAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/companyId"
+          },
+          {
+            "$ref": "#/components/parameters/tokenId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Token revoked successfully"
+          },
+          "401": {
+            "description": "Unauthorized - Invalid Firebase token or insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Company or token not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerApiToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API token generated through the BarBrain app or Token Management API.\nTokens are company-specific and have an expiration date.\n"
+      },
+      "FirebaseAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Firebase ID token for authenticated admin users.\nRequired for token management operations.\n"
+      }
+    },
+    "parameters": {
+      "companyId": {
+        "name": "companyId",
+        "in": "path",
+        "required": true,
+        "description": "Unique identifier for the company",
+        "schema": {
+          "type": "string"
+        },
+        "example": "comp-123"
+      },
+      "tokenId": {
+        "name": "tokenId",
+        "in": "path",
+        "required": true,
+        "description": "Unique identifier for the API token",
+        "schema": {
+          "type": "string"
+        },
+        "example": "token-uuid-123"
+      }
+    },
+    "schemas": {
+      "FetchInventoriesResponse": {
+        "type": "object",
+        "required": [
+          "requestDate",
+          "companyId",
+          "companyName",
+          "totalInventories",
+          "inventories"
+        ],
+        "properties": {
+          "requestDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp of when the request was made",
+            "example": "2025-01-08T10:30:00Z"
+          },
+          "dateFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "The dateFrom filter used (null if not provided)",
+            "example": "2025-01-07T00:00:00Z"
+          },
+          "dateTo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "The dateTo filter used (null if not provided)",
+            "example": "2025-01-08T00:00:00Z"
+          },
+          "companyId": {
+            "type": "string",
+            "description": "The company ID associated with the API token",
+            "example": "comp-123"
+          },
+          "companyName": {
+            "type": "string",
+            "description": "Human-readable company name",
+            "example": "Tapped Bar Munich"
+          },
+          "totalInventories": {
+            "type": "integer",
+            "description": "Number of inventories in the response",
+            "example": 2
+          },
+          "inventories": {
+            "type": "array",
+            "description": "List of inventory objects",
+            "items": {
+              "$ref": "#/components/schemas/Inventory"
+            }
+          }
+        }
+      },
+      "Inventory": {
+        "type": "object",
+        "required": [
+          "inventoryId",
+          "inventoryDate",
+          "shelfId",
+          "shelfName",
+          "creatorName",
+          "creatorEmail",
+          "totalValue",
+          "totalItems",
+          "rows"
+        ],
+        "properties": {
+          "inventoryId": {
+            "type": "string",
+            "description": "Unique identifier for this inventory",
+            "example": "inv-001"
+          },
+          "inventoryDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when inventory was created",
+            "example": "2025-01-07T14:30:00Z"
+          },
+          "shelfId": {
+            "type": "string",
+            "description": "Identifier of the shelf inventoried",
+            "example": "shelf-main"
+          },
+          "shelfName": {
+            "type": "string",
+            "description": "Human-readable shelf name",
+            "example": "Bar Main Shelf"
+          },
+          "creatorName": {
+            "type": "string",
+            "description": "Name of the user who created the inventory",
+            "example": "John Smith"
+          },
+          "creatorEmail": {
+            "type": "string",
+            "format": "email",
+            "description": "Email of the user who created the inventory",
+            "example": "john@bar.com"
+          },
+          "totalValue": {
+            "type": "number",
+            "format": "double",
+            "description": "Sum of all row values in this inventory",
+            "example": 2543.5
+          },
+          "totalItems": {
+            "type": "integer",
+            "description": "Number of product rows in this inventory",
+            "example": 45
+          },
+          "rows": {
+            "type": "array",
+            "description": "List of inventory row objects",
+            "items": {
+              "$ref": "#/components/schemas/InventoryRow"
+            }
+          }
+        }
+      },
+      "InventoryRow": {
+        "type": "object",
+        "required": [
+          "productId",
+          "productName",
+          "fullUnits",
+          "openedUnits",
+          "totalUnits",
+          "unitType",
+          "pricePerUnit",
+          "depositPerUnit",
+          "totalValue",
+          "totalDeposit",
+          "categoryId",
+          "categoryName"
+        ],
+        "properties": {
+          "productId": {
+            "type": "string",
+            "description": "Unique product identifier",
+            "example": "prod-vodka-1"
+          },
+          "productName": {
+            "type": "string",
+            "description": "Product name",
+            "example": "Vodka Premium"
+          },
+          "productDescription": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional product description/SKU",
+            "example": "SKU-12345"
+          },
+          "supplier": {
+            "type": "string",
+            "nullable": true,
+            "description": "Supplier name (if set)",
+            "example": "Spirits GmbH"
+          },
+          "fullUnits": {
+            "type": "number",
+            "format": "double",
+            "description": "Count of full/unopened units",
+            "example": 3
+          },
+          "openedUnits": {
+            "type": "number",
+            "format": "double",
+            "description": "Amount in opened units (in base unit)",
+            "example": 0.5
+          },
+          "totalUnits": {
+            "type": "number",
+            "format": "double",
+            "description": "Total units (full + opened converted)",
+            "example": 3.5
+          },
+          "unitSize": {
+            "type": "string",
+            "nullable": true,
+            "description": "Size per unit (e.g., \"700ml\", \"500g\")",
+            "example": "700ml"
+          },
+          "unitType": {
+            "type": "string",
+            "description": "Unit type (Litre, Kilogram, Piece, etc.)",
+            "example": "Litre"
+          },
+          "pricePerUnit": {
+            "type": "number",
+            "format": "double",
+            "description": "Purchase price per unit",
+            "example": 25.5
+          },
+          "depositPerUnit": {
+            "type": "number",
+            "format": "double",
+            "description": "Deposit price per unit",
+            "example": 0.25
+          },
+          "totalValue": {
+            "type": "number",
+            "format": "double",
+            "description": "Calculated total value for this row",
+            "example": 89.25
+          },
+          "totalDeposit": {
+            "type": "number",
+            "format": "double",
+            "description": "Calculated total deposit for this row",
+            "example": 0.875
+          },
+          "categoryId": {
+            "type": "integer",
+            "description": "Product category ID",
+            "example": 1
+          },
+          "categoryName": {
+            "type": "string",
+            "description": "Localized category name",
+            "example": "Spirits"
+          }
+        }
+      },
+      "CreateTokenRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human-readable name for the token",
+            "example": "Daily Inventory Sync"
+          },
+          "expiresInDays": {
+            "type": "integer",
+            "description": "Number of days until the token expires (default 30)",
+            "default": 30,
+            "minimum": 1,
+            "maximum": 365,
+            "example": 30
+          }
+        }
+      },
+      "CreateTokenResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "token",
+          "name",
+          "expiresAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the token",
+            "example": "token-uuid-123"
+          },
+          "token": {
+            "type": "string",
+            "description": "The API token value (64 hex characters).\n**Important:** This value is only shown once. Store it securely immediately.\n",
+            "example": "a1b2c3d4e5f6..."
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name for the token",
+            "example": "Daily Inventory Sync"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix timestamp (milliseconds) when the token expires",
+            "example": 1734567890000
+          }
+        }
+      },
+      "ApiTokenInfo": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "expiresAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the token",
+            "example": "token-uuid-123"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name for the token",
+            "example": "Daily Inventory Sync"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix timestamp (milliseconds) when the token expires",
+            "example": 1734567890000
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix timestamp (milliseconds) when the token was created",
+            "example": 1731975890000
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "errorCode",
+              "message"
+            ],
+            "properties": {
+              "errorCode": {
+                "type": "integer",
+                "description": "HTTP status code",
+                "example": 401
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error message",
+                "example": "Invalid or expired API token"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "BearerApiToken": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Inventories",
+      "description": "Inventory data retrieval"
+    },
+    {
+      "name": "Token Management",
+      "description": "API token lifecycle management (requires Firebase authentication)"
+    }
+  ]
+}
