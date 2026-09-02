@@ -1,6 +1,6 @@
 # APIs — M
 
-Browsing 219 APIs starting with **M**.
+Browsing 220 APIs starting with **M**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · **M** · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -89,6 +89,7 @@ Browsing 219 APIs starting with **M**.
 | [mercedes-benz.com](../../../../apis/openapi/mercedes-benz.com) | [12 APIs](../../../../apis/openapi/mercedes-benz.com) |
 | [merchantsafeunipay.com](../../../../apis/openapi/merchantsafeunipay.com) | [main](../../../../apis/openapi/merchantsafeunipay.com/main) |
 | [mercure.local](../../../../apis/openapi/mercure.local) | [main](../../../../apis/openapi/mercure.local/main) |
+| [mercury.com](../../../../apis/openapi/mercury.com) | [main](../../../../apis/openapi/mercury.com/main) |
 | [merithub.com](../../../../apis/openapi/merithub.com) | [main](../../../../apis/openapi/merithub.com/main) |
 | [mermade.org.uk](../../../../apis/openapi/mermade.org.uk) | [openapi-converter](../../../../apis/openapi/mermade.org.uk/openapi-converter) |
 | [merren.io](../../../../apis/openapi/merren.io) | [main](../../../../apis/openapi/merren.io/main) |

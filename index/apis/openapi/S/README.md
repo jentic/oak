@@ -1,6 +1,6 @@
 # APIs — S
 
-Browsing 656 APIs starting with **S**.
+Browsing 657 APIs starting with **S**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · **S** · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -379,6 +379,7 @@ Browsing 656 APIs starting with **S**.
 | [storyblok.com](../../../../apis/openapi/storyblok.com) | [main](../../../../apis/openapi/storyblok.com/main) |
 | [straddle.com](../../../../apis/openapi/straddle.com) | [main](../../../../apis/openapi/straddle.com/main) |
 | [straker.ai](../../../../apis/openapi/straker.ai) | [main](../../../../apis/openapi/straker.ai/main) |
+| [strapi.io](../../../../apis/openapi/strapi.io) | [strapi-rest-api](../../../../apis/openapi/strapi.io/strapi-rest-api) |
 | [strava.com](../../../../apis/openapi/strava.com) | [main](../../../../apis/openapi/strava.com/main) |
 | [streak.com](../../../../apis/openapi/streak.com) | [main](../../../../apis/openapi/streak.com/main) |
 | [stream-io-api.com](../../../../apis/openapi/stream-io-api.com) | [main](../../../../apis/openapi/stream-io-api.com/main) |
