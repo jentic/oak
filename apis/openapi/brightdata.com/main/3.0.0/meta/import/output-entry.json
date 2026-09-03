@@ -1,0 +1,645 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Bright Data Web Scraper API",
+    "description": "Bright Data's Web Scraper API for triggering data collection, monitoring progress, downloading results, and managing scraping snapshots. Supports asynchronous batch collection with webhook delivery.",
+    "version": "3.0.0",
+    "x-jentic-source-url": "https://docs.brightdata.com/scraping-automation/web-scraper-api/overview",
+    "x-jentic-provenance": "jentic-generated"
+  },
+  "servers": [
+    {
+      "url": "https://api.brightdata.com",
+      "description": "Bright Data API"
+    }
+  ],
+  "paths": {
+    "/datasets/v3/trigger": {
+      "post": {
+        "operationId": "triggerCollection",
+        "summary": "Trigger a data collection",
+        "description": "Triggers a new asynchronous data collection job for a specified dataset. Supply input URLs or parameters in the request body. Returns a snapshot_id for tracking.",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "query",
+            "required": true,
+            "description": "The dataset identifier (found in the specific dataset API page)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "custom_output_fields",
+            "in": "query",
+            "description": "Filter response fields using pipe-separated format (e.g., url|about.updated_on)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Set to 'discover_new' to enable discovery phase",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discover_new"
+              ]
+            }
+          },
+          {
+            "name": "discover_by",
+            "in": "query",
+            "description": "Discovery method",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "keyword",
+                "best_sellers_url",
+                "category_url",
+                "location"
+              ]
+            }
+          },
+          {
+            "name": "include_errors",
+            "in": "query",
+            "description": "Include error reports in results",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit_per_input",
+            "in": "query",
+            "description": "Maximum results per input (minimum: 1)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit_multiple_results",
+            "in": "query",
+            "description": "Total result limit (minimum: 1)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "notify",
+            "in": "query",
+            "description": "Enable webhook notifications",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endpoint",
+            "in": "query",
+            "description": "Webhook URL for delivery",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Output format",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "ndjson",
+                "jsonl",
+                "csv"
+              ]
+            }
+          },
+          {
+            "name": "auth_header",
+            "in": "query",
+            "description": "Authorization header value for webhook",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uncompressed_webhook",
+            "in": "query",
+            "description": "Send uncompressed data to webhook",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Array of input objects with dataset-specific properties (e.g., URLs to scrape)",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Target URL to scrape"
+                    },
+                    "keyword": {
+                      "type": "string",
+                      "description": "Search keyword (for discovery mode)"
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "Country code for geo-targeting"
+                    }
+                  }
+                },
+                "example": [
+                  {
+                    "url": "https://www.example.com/product/123"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Collection triggered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "snapshot_id": {
+                      "type": "string",
+                      "description": "Unique identifier for tracking this collection job",
+                      "example": "s_m4x7enmven8djfqak"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters"
+          },
+          "401": {
+            "description": "Missing or invalid API key"
+          }
+        }
+      }
+    },
+    "/datasets/v3/progress/{snapshot_id}": {
+      "get": {
+        "operationId": "monitorProgress",
+        "summary": "Monitor collection progress",
+        "description": "Returns the current status of a data collection job identified by snapshot_id.",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "description": "The snapshot ID returned when the collection was triggered",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection progress status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "User authentication is required"
+          },
+          "404": {
+            "description": "Snapshot not found"
+          }
+        }
+      }
+    },
+    "/datasets/v3/snapshot/{snapshot_id}": {
+      "get": {
+        "operationId": "downloadSnapshot",
+        "summary": "Download snapshot data",
+        "description": "Downloads the collected data for a completed snapshot. Maximum download size is 5 GB per request. Data is retained for 16 days after collection.",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "description": "The snapshot ID returned when collection was triggered",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Output format for the data",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "ndjson",
+                "jsonl",
+                "csv"
+              ]
+            }
+          },
+          {
+            "name": "compress",
+            "in": "query",
+            "description": "Whether to compress results",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "batch_size",
+            "in": "query",
+            "description": "Divide into batches (minimum 1000 records)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1000
+            }
+          },
+          {
+            "name": "part",
+            "in": "query",
+            "description": "Batch part number to download (use with batch_size)",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot data in requested format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters"
+          },
+          "401": {
+            "description": "User authentication is required"
+          },
+          "404": {
+            "description": "Snapshot not found"
+          },
+          "409": {
+            "description": "Snapshot is not ready for download"
+          }
+        }
+      }
+    },
+    "/datasets/v3/snapshots": {
+      "get": {
+        "operationId": "listSnapshots",
+        "summary": "List snapshots",
+        "description": "Returns a list of snapshots for a specified dataset with optional filtering by status, date range, and trigger type.",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "query",
+            "required": true,
+            "description": "The dataset identifier",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by snapshot status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "starting",
+                "running",
+                "ready",
+                "failed"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "Number of snapshots to skip",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of snapshots to return",
+            "schema": {
+              "type": "integer",
+              "default": 1000,
+              "maximum": 5000
+            }
+          },
+          {
+            "name": "from_date",
+            "in": "query",
+            "description": "List only snapshots created after this date",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to_date",
+            "in": "query",
+            "description": "List only snapshots created before this date",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "with_total",
+            "in": "query",
+            "description": "Include total snapshot count in response",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "trigger_type",
+            "in": "query",
+            "description": "Filter by how snapshot was triggered",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "CP",
+                "API"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of snapshots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Snapshot"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Dataset not found"
+          }
+        }
+      }
+    },
+    "/datasets/v3/snapshot/{snapshot_id}/cancel": {
+      "post": {
+        "operationId": "cancelSnapshot",
+        "summary": "Cancel a running collection",
+        "description": "Cancels a running data collection job identified by snapshot_id.",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "description": "The snapshot ID to cancel",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot cancelled successfully",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "OK"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Snapshot not found"
+          }
+        }
+      }
+    },
+    "/request": {
+      "post": {
+        "operationId": "scrapeUrl",
+        "summary": "Scrape a single URL",
+        "description": "Performs a synchronous scrape of a single URL through Bright Data's proxy network. Returns the page content in the requested format.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "zone",
+                  "url"
+                ],
+                "properties": {
+                  "zone": {
+                    "type": "string",
+                    "description": "Proxy/API zone name"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Target URL to access"
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "Response format (e.g., json)",
+                    "enum": [
+                      "json",
+                      "raw"
+                    ]
+                  },
+                  "method": {
+                    "type": "string",
+                    "description": "HTTP method to use",
+                    "enum": [
+                      "GET",
+                      "POST",
+                      "PUT",
+                      "DELETE"
+                    ],
+                    "default": "GET"
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "Country code for geo-targeting (e.g., us, gb)"
+                  },
+                  "data_format": {
+                    "type": "string",
+                    "description": "Output format (e.g., markdown)",
+                    "enum": [
+                      "html",
+                      "markdown",
+                      "json"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scraped content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden - zone not accessible"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key from Bright Data account settings (https://brightdata.com/cp/setting/users)"
+      }
+    },
+    "schemas": {
+      "ProgressResponse": {
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "description": "Snapshot identifier"
+          },
+          "dataset_id": {
+            "type": "string",
+            "description": "Associated dataset identifier"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "starting",
+              "running",
+              "ready",
+              "failed"
+            ],
+            "description": "Current collection status"
+          }
+        }
+      },
+      "Snapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Snapshot identifier"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when collection was requested"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "starting",
+              "running",
+              "ready",
+              "failed"
+            ],
+            "description": "Current status"
+          },
+          "dataset_id": {
+            "type": "string",
+            "description": "Associated dataset ID"
+          },
+          "dataset_size": {
+            "type": "integer",
+            "description": "Number of records collected"
+          },
+          "trigger": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "CP",
+                  "API"
+                ],
+                "description": "How the snapshot was created (CP=control panel, API=programmatic)"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
+}
