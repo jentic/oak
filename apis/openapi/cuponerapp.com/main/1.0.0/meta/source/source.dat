@@ -1,0 +1,1284 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Cuponerapp API - Error Handling Documentation",
+    "description": "Documentaci\u00f3n de manejo de errores actualizado para la API de Cuponerapp.\n\n## Cambios Importantes v1.0\n\n### Estructura de Errores (UNIFICADA)\n- **ANTES:** `{\"msg\": \"Error de solicitud\"}` o `{\"errors\": {\"campo\": [\"mensaje\"]}}`\n- **AHORA:** `{\"error\": \"Mensaje descriptivo del error\"}` (SIEMPRE formato string)\n\n### C\u00f3digos HTTP Corregidos\n- Errores de validaci\u00f3n de entrada: `400` (campos faltantes, tipos incorrectos)\n- Errores de validaci\u00f3n de negocio: `422` (producto inv\u00e1lido, sin stock, etc.)\n- Recursos no encontrados: `404` (antes `500`)\n- Sin permisos: `403` (antes `500`)\n- Servicios no disponibles: `503` (antes `500`)\n\n### Formato Unificado\n**TODOS** los errores ahora usan el mismo formato:\n```json\n    {\n      \"error\": \"Mensaje claro y descriptivo\"\n    }\n```\n\nEsto simplifica el manejo en apps m\u00f3viles - siempre lees `response.data.error`.\n",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Cuponerapp Backend Team",
+      "email": "backend@cuponerapp.com"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/DESARROLLO_24/cuponerapp-api-error-handling-documentation/1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.cuponerapp.com",
+      "description": "Producci\u00f3n"
+    },
+    {
+      "url": "https://api-staging.cuponerapp.com",
+      "description": "Staging"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Subscriptions",
+      "description": "Gesti\u00f3n de suscripciones y estado del usuario"
+    },
+    {
+      "name": "Checkout",
+      "description": "C\u00e1lculo de precios y validaci\u00f3n de productos"
+    },
+    {
+      "name": "Payment",
+      "description": "Procesamiento de pagos"
+    },
+    {
+      "name": "Coupons",
+      "description": "Gesti\u00f3n y redenci\u00f3n de cupones"
+    }
+  ],
+  "paths": {
+    "/api/subscription/status": {
+      "get": {
+        "tags": [
+          "Subscriptions"
+        ],
+        "summary": "Obtener estado de suscripci\u00f3n del usuario",
+        "description": "Devuelve el estado de la suscripci\u00f3n Pro del usuario y su disponibilidad de beneficio reward.\n\n**Nuevo en v1.0:**\n- Campo `hasReward` indica si el usuario puede comprar productos reward este mes\n- Se debe llamar al abrir la app para cachear el estado localmente\n\n**Uso recomendado:**\n- iOS/Android: Guardar `hasReward` en UserDefaults/SharedPreferences\n- Usar este valor para habilitar/deshabilitar bot\u00f3n \"Agregar al carrito\" en productos reward\n\n**Actualizaci\u00f3n del estado:**\n- `hasReward` cambia de `true` a `false` despu\u00e9s de comprar un producto reward\n- Se resetea a `true` el primer d\u00eda del siguiente mes (para usuarios Pro activos)\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado obtenido exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionStatusResponse"
+                },
+                "examples": {
+                  "pro_with_reward": {
+                    "summary": "Usuario Pro con beneficio disponible",
+                    "value": {
+                      "prime": true,
+                      "hasReward": true,
+                      "subscription": {
+                        "id": 123,
+                        "status": "active",
+                        "plan": "monthly",
+                        "start": "2025-12-12 10:00:00",
+                        "end": "2026-02-12 23:59:59"
+                      }
+                    }
+                  },
+                  "pro_without_reward": {
+                    "summary": "Usuario Pro sin beneficio (ya consumido)",
+                    "value": {
+                      "prime": true,
+                      "hasReward": false,
+                      "subscription": {
+                        "id": 123,
+                        "status": "active",
+                        "plan": "monthly",
+                        "start": "2025-12-12 10:00:00",
+                        "end": "2026-02-12 23:59:59"
+                      }
+                    }
+                  },
+                  "free_user": {
+                    "summary": "Usuario Free (no Pro)",
+                    "value": {
+                      "prime": false,
+                      "hasReward": false,
+                      "subscription": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/coupon-detail": {
+      "get": {
+        "tags": [
+          "Coupons"
+        ],
+        "summary": "Obtener detalles de un cup\u00f3n",
+        "description": "Devuelve informaci\u00f3n completa del cup\u00f3n incluyendo productos disponibles.\n\n**Nuevo en v1.0:**\n- Campo `reward` en productos ahora es boolean (antes integer 0/1)\n- Consistente con campo `hasReward` de `/subscriptions/status`\n\n**Validaci\u00f3n en cliente:**\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cupon",
+            "in": "query",
+            "required": true,
+            "description": "ID del cup\u00f3n",
+            "schema": {
+              "type": "integer",
+              "example": 123
+            }
+          },
+          {
+            "name": "id_ciudad",
+            "in": "query",
+            "required": true,
+            "description": "ID de la ciudad",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          },
+          {
+            "name": "latitud",
+            "in": "query",
+            "required": true,
+            "description": "Latitud del usuario",
+            "schema": {
+              "type": "number",
+              "format": "float",
+              "minimum": -90,
+              "maximum": 90,
+              "example": 19.0414
+            }
+          },
+          {
+            "name": "longitud",
+            "in": "query",
+            "required": true,
+            "description": "Longitud del usuario",
+            "schema": {
+              "type": "number",
+              "format": "float",
+              "minimum": -180,
+              "maximum": 180,
+              "example": -98.2063
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalles del cup\u00f3n obtenidos exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponDetailResponse"
+                },
+                "examples": {
+                  "with_reward_product": {
+                    "summary": "Cup\u00f3n con producto reward",
+                    "value": {
+                      "info": {
+                        "nombre": "McDonald's",
+                        "promocion": "2x1 en Big Mac",
+                        "marca_id": 456,
+                        "compra": 1
+                      },
+                      "productos": [
+                        {
+                          "id": 123,
+                          "nombre": "2x1 Big Mac (Reward)",
+                          "precio": 100.0,
+                          "reward": true
+                        },
+                        {
+                          "id": 124,
+                          "nombre": "McFlurry",
+                          "precio": 50.0,
+                          "reward": false
+                        }
+                      ]
+                    }
+                  },
+                  "without_reward": {
+                    "summary": "Cup\u00f3n sin productos reward",
+                    "value": {
+                      "info": {
+                        "nombre": "Starbucks",
+                        "promocion": "Caf\u00e9 del d\u00eda gratis",
+                        "marca_id": 789,
+                        "compra": 0
+                      },
+                      "productos": [
+                        {
+                          "id": 125,
+                          "nombre": "Caf\u00e9 del d\u00eda",
+                          "precio": 0.0,
+                          "reward": false
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error de validaci\u00f3n de par\u00e1metros",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "missing_cupon": {
+                    "summary": "Falta par\u00e1metro cupon",
+                    "value": {
+                      "error": "The cupon field is required."
+                    }
+                  },
+                  "invalid_latitude": {
+                    "summary": "Latitud inv\u00e1lida",
+                    "value": {
+                      "error": "The latitud must be between -90 and 90."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Cup\u00f3n no encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Coupon not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/checkout/price": {
+      "post": {
+        "tags": [
+          "Checkout"
+        ],
+        "summary": "Calcular precio de checkout",
+        "description": "Calcula el precio total del checkout incluyendo comisiones y validaciones de productos.\n\n**Validaciones realizadas:**\n- Producto existe y est\u00e1 activo\n- Usuario tiene permisos para el producto (reward)\n- Stock disponible\n- M\u00e9todo de pago v\u00e1lido para el producto\n- L\u00edmites de cantidad por producto\n- Restricciones de reward products\n\n**Validaci\u00f3n de Reward Products:**\n- Si el producto tiene `reward: true`, el usuario DEBE tener `hasReward: true`\n- Solo se permite 1 producto reward por compra\n- Usuarios Free no pueden comprar productos reward\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "products",
+                  "method"
+                ],
+                "properties": {
+                  "products": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id_product",
+                        "quantity"
+                      ],
+                      "properties": {
+                        "id_product": {
+                          "type": "integer",
+                          "example": 1745,
+                          "description": "ID del producto"
+                        },
+                        "quantity": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "example": 1,
+                          "description": "Cantidad a comprar"
+                        }
+                      }
+                    }
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "oxxo",
+                      "conekta",
+                      "stripe",
+                      "paypal",
+                      "1",
+                      "default"
+                    ],
+                    "example": "conekta",
+                    "description": "M\u00e9todo de pago"
+                  },
+                  "months": {
+                    "type": "integer",
+                    "enum": [
+                      1,
+                      3,
+                      6,
+                      12
+                    ],
+                    "example": 1,
+                    "description": "N\u00famero de meses para pago diferido (opcional)"
+                  }
+                }
+              },
+              "examples": {
+                "single_product": {
+                  "summary": "Producto \u00fanico",
+                  "value": {
+                    "products": [
+                      {
+                        "id_product": 1745,
+                        "quantity": 1
+                      }
+                    ],
+                    "method": "conekta",
+                    "months": 1
+                  }
+                },
+                "reward_product": {
+                  "summary": "Producto reward (requiere hasReward=true)",
+                  "value": {
+                    "products": [
+                      {
+                        "id_product": 123,
+                        "quantity": 1
+                      }
+                    ],
+                    "method": "conekta"
+                  }
+                },
+                "multiple_products": {
+                  "summary": "M\u00faltiples productos",
+                  "value": {
+                    "products": [
+                      {
+                        "id_product": 1745,
+                        "quantity": 2
+                      },
+                      {
+                        "id_product": 1598,
+                        "quantity": 1
+                      }
+                    ],
+                    "method": "stripe"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "C\u00e1lculo exitoso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutPriceResponse"
+                },
+                "example": {
+                  "subtotal": "120.00",
+                  "comision_bancaria": "5.50",
+                  "comision_cuponerapp": "6.00",
+                  "comision_mensualidad": "0.00",
+                  "total": "131.50",
+                  "meses": 1,
+                  "mensualidad": "131.50"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error de validaci\u00f3n de entrada (campos faltantes o formato incorrecto)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "missing_products": {
+                    "summary": "Falta campo products",
+                    "value": {
+                      "error": "The products field is required."
+                    }
+                  },
+                  "invalid_method": {
+                    "summary": "M\u00e9todo de pago inv\u00e1lido",
+                    "value": {
+                      "error": "The selected method is invalid."
+                    }
+                  },
+                  "invalid_quantity": {
+                    "summary": "Cantidad inv\u00e1lida",
+                    "value": {
+                      "error": "The products.0.quantity must be at least 1."
+                    }
+                  },
+                  "invalid_product_id": {
+                    "summary": "ID de producto inv\u00e1lido",
+                    "value": {
+                      "error": "The selected products.0.id_product is invalid."
+                    }
+                  },
+                  "empty_products_array": {
+                    "summary": "Array de productos vac\u00edo",
+                    "value": {
+                      "error": "The products must have at least 1 items."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Sin permisos para realizar la compra",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "no_reward_privilege": {
+                    "summary": "Sin privilegios para producto reward",
+                    "value": {
+                      "error": "Esta promoci\u00f3n es exclusiva para usuarios Pro con beneficio mensual disponible. Ya has consumido tu beneficio de este mes."
+                    }
+                  },
+                  "user_blocked": {
+                    "summary": "Usuario bloqueado",
+                    "value": {
+                      "error": "Transacci\u00f3n rechazada"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Producto no encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Producto no encontrado"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de validaci\u00f3n de negocio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "product_inactive": {
+                    "summary": "Producto inactivo",
+                    "value": {
+                      "error": "Esta promoci\u00f3n ya no est\u00e1 disponible: Combo Palomitas $30"
+                    }
+                  },
+                  "reward_quantity_limit": {
+                    "summary": "L\u00edmite de cantidad reward",
+                    "value": {
+                      "error": "Solo puedes adquirir 1 producto reward por compra"
+                    }
+                  },
+                  "multiple_rewards": {
+                    "summary": "M\u00faltiples productos reward",
+                    "value": {
+                      "error": "Solo puedes adquirir 1 producto reward por compra"
+                    }
+                  },
+                  "product_limit": {
+                    "summary": "L\u00edmite por producto",
+                    "value": {
+                      "error": "Solo puedes comprar 1 unidad de esta promoci\u00f3n"
+                    }
+                  },
+                  "invalid_payment_method": {
+                    "summary": "M\u00e9todo de pago no v\u00e1lido",
+                    "value": {
+                      "error": "Esta promoci\u00f3n solo est\u00e1 disponible con tarjeta de cr\u00e9dito/d\u00e9bito"
+                    }
+                  },
+                  "insufficient_stock": {
+                    "summary": "Stock insuficiente",
+                    "value": {
+                      "error": "No hay suficientes folios disponibles de: Combo Palomitas $30"
+                    }
+                  },
+                  "card_already_used": {
+                    "summary": "Tarjeta ya utilizada",
+                    "value": {
+                      "error": "Esta tarjeta ya fue utilizada en esta promoci\u00f3n"
+                    }
+                  },
+                  "payment_method_restricted": {
+                    "summary": "M\u00e9todo de pago restringido",
+                    "value": {
+                      "error": "Esta promoci\u00f3n solo est\u00e1 disponible pagando en OXXO"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/process-payment": {
+      "post": {
+        "tags": [
+          "Payment"
+        ],
+        "summary": "Procesar pago",
+        "description": "Procesa el pago con el gateway seleccionado (Conekta, Stripe, Oxxo).\n\n**Gateways soportados:**\n- `stripe`: Pagos con tarjeta (internacional)\n- `conekta`: Pagos con tarjeta (M\u00e9xico)\n- `oxxo`: Pago en efectivo (Oxxo)\n- `orkestapay`: Otro procesador\n\n**Validaciones:**\n- Tarjeta pertenece al usuario\n- Productos v\u00e1lidos (incluye validaci\u00f3n de reward)\n- Gateway disponible\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "products",
+                  "method"
+                ],
+                "properties": {
+                  "products": {
+                    "type": "string",
+                    "example": "[{\"id_product\":1745,\"quantity\":1}]",
+                    "description": "JSON string con productos"
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "stripe",
+                      "conekta",
+                      "oxxo",
+                      "orkestapay"
+                    ],
+                    "example": "stripe"
+                  },
+                  "card_id": {
+                    "type": "integer",
+                    "example": 123,
+                    "description": "ID de la tarjeta (requerido para stripe/conekta)"
+                  },
+                  "months": {
+                    "type": "integer",
+                    "enum": [
+                      1,
+                      3,
+                      6,
+                      12
+                    ],
+                    "example": 1
+                  },
+                  "subscription": {
+                    "type": "boolean",
+                    "example": false,
+                    "description": "Si es una suscripci\u00f3n"
+                  }
+                }
+              },
+              "examples": {
+                "stripe_payment": {
+                  "summary": "Pago con Stripe",
+                  "value": {
+                    "products": "[{\"id_product\":1745,\"quantity\":1}]",
+                    "method": "stripe",
+                    "card_id": 123,
+                    "months": 1,
+                    "subscription": false
+                  }
+                },
+                "oxxo_payment": {
+                  "summary": "Pago con Oxxo",
+                  "value": {
+                    "products": "[{\"id_product\":1598,\"quantity\":2}]",
+                    "method": "oxxo",
+                    "months": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pago procesado o redireccionado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Pago exitoso",
+                    "value": {
+                      "state": "200",
+                      "status_msg": "Ok",
+                      "data": {
+                        "id": "pi_3ABC123...",
+                        "url": null
+                      }
+                    }
+                  },
+                  "redirect": {
+                    "summary": "Requiere 3D Secure",
+                    "value": {
+                      "state": "200",
+                      "status_msg": "Ok",
+                      "data": {
+                        "id": "pi_3ABC123...",
+                        "url": "https://checkout.stripe.com/..."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Sin permisos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthorized_card": {
+                    "summary": "Tarjeta no autorizada",
+                    "value": {
+                      "error": "Tarjeta no autorizada"
+                    }
+                  },
+                  "user_blocked": {
+                    "summary": "Usuario bloqueado",
+                    "value": {
+                      "error": "Transacci\u00f3n rechazada"
+                    }
+                  },
+                  "no_reward": {
+                    "summary": "Sin beneficio reward",
+                    "value": {
+                      "error": "Esta promoci\u00f3n es exclusiva para usuarios Pro con beneficio mensual disponible. Ya has consumido tu beneficio de este mes."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso no encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "card_not_found": {
+                    "summary": "Tarjeta no encontrada",
+                    "value": {
+                      "error": "Tarjeta no encontrada"
+                    }
+                  },
+                  "product_not_found": {
+                    "summary": "Producto no encontrado",
+                    "value": {
+                      "error": "Producto no encontrado"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de gateway o validaci\u00f3n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "zero_subtotal": {
+                    "summary": "Subtotal cero",
+                    "value": {
+                      "error": "Error al procesar la venta"
+                    }
+                  },
+                  "no_valid_products": {
+                    "summary": "Sin productos v\u00e1lidos",
+                    "value": {
+                      "error": "No hay productos v\u00e1lidos en la orden"
+                    }
+                  },
+                  "foreign_card": {
+                    "summary": "Tarjeta extranjera (Conekta)",
+                    "value": {
+                      "error": "Solo se aceptan tarjetas emitidas en M\u00e9xico. Por favor intenta con otra tarjeta."
+                    }
+                  },
+                  "card_declined": {
+                    "summary": "Tarjeta rechazada",
+                    "value": {
+                      "error": "Tarjeta rechazada. Por favor intenta con otra tarjeta."
+                    }
+                  },
+                  "insufficient_funds": {
+                    "summary": "Fondos insuficientes",
+                    "value": {
+                      "error": "Fondos insuficientes. Por favor intenta con otra tarjeta."
+                    }
+                  },
+                  "expired_card": {
+                    "summary": "Tarjeta vencida",
+                    "value": {
+                      "error": "Tarjeta vencida. Por favor usa una tarjeta vigente."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Demasiadas solicitudes. Intenta nuevamente en un momento."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error del servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Error al procesar el pago"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Gateway no disponible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "conekta_unavailable": {
+                    "summary": "Conekta no disponible",
+                    "value": {
+                      "error": "Error de conexi\u00f3n con Conekta"
+                    }
+                  },
+                  "stripe_unavailable": {
+                    "summary": "Stripe no disponible",
+                    "value": {
+                      "error": "Error de conexi\u00f3n con Stripe"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cupones/{id}/usar": {
+      "post": {
+        "tags": [
+          "Coupons"
+        ],
+        "summary": "Redimir/usar un cup\u00f3n",
+        "description": "Permite a un usuario redimir un cup\u00f3n en un local espec\u00edfico.\n\n**Proceso de redenci\u00f3n:**\n1. Valida que el usuario cumpla con los requisitos del cup\u00f3n\n2. Verifica l\u00edmites de uso para usuarios no prime\n3. Genera un c\u00f3digo de redenci\u00f3n (folio)\n4. Crea registro de uso en la base de datos\n5. Elimina folio de inventario (si aplica)\n6. Genera c\u00f3digo de barras/QR\n7. Actualiza perfil del usuario (intereses, nivel socioecon\u00f3mico)\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID del cup\u00f3n a redimir",
+            "schema": {
+              "type": "integer",
+              "example": 1234
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "local_id"
+                ],
+                "properties": {
+                  "local_id": {
+                    "type": "integer",
+                    "example": 456,
+                    "description": "ID del local donde se usar\u00e1 el cup\u00f3n"
+                  },
+                  "lat": {
+                    "type": "number",
+                    "format": "float",
+                    "example": 19.4326,
+                    "description": "Latitud de ubicaci\u00f3n del usuario (opcional)",
+                    "nullable": true
+                  },
+                  "lon": {
+                    "type": "number",
+                    "format": "float",
+                    "example": -99.1332,
+                    "description": "Longitud de ubicaci\u00f3n del usuario (opcional)",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cup\u00f3n redimido exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponRedemptionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error de validaci\u00f3n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Sin permisos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cup\u00f3n no encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de autenticaci\u00f3n Bearer.\n\n**Ejemplo:** `Authorization: Bearer {token}`\n"
+      }
+    },
+    "schemas": {
+      "SubscriptionStatusResponse": {
+        "type": "object",
+        "required": [
+          "prime",
+          "hasReward"
+        ],
+        "properties": {
+          "prime": {
+            "type": "boolean",
+            "example": true,
+            "description": "Si el usuario tiene suscripci\u00f3n Pro activa\n- `true`: Usuario Pro\n- `false`: Usuario Free\n"
+          },
+          "hasReward": {
+            "type": "boolean",
+            "example": true,
+            "description": "Si el usuario tiene beneficio reward disponible este mes\n- `true`: Puede comprar productos reward\n- `false`: Ya consumi\u00f3 su beneficio mensual\n\n**Importante para frontend:**\n- Guardar este valor al abrir la app\n- Usar para habilitar/deshabilitar bot\u00f3n \"Agregar al carrito\"\n- Se resetea mensualmente para usuarios Pro\n"
+          },
+          "subscription": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer",
+                "example": 123
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "in_trial",
+                  "past_due",
+                  "canceled"
+                ],
+                "example": "active"
+              },
+              "plan": {
+                "type": "string",
+                "example": "monthly"
+              },
+              "start": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2025-12-12 10:00:00"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-02-12 23:59:59"
+              }
+            }
+          }
+        }
+      },
+      "CouponDetailResponse": {
+        "type": "object",
+        "properties": {
+          "info": {
+            "type": "object",
+            "description": "Informaci\u00f3n b\u00e1sica del cup\u00f3n"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "sucursales": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "info_marca": {
+            "type": "object"
+          },
+          "productos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "nombre",
+                "precio",
+                "reward"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "example": 123
+                },
+                "marca": {
+                  "type": "string",
+                  "example": "McDonald's"
+                },
+                "nombre": {
+                  "type": "string",
+                  "example": "2x1 Big Mac"
+                },
+                "precio": {
+                  "type": "number",
+                  "format": "float",
+                  "example": 100.0
+                },
+                "precio_max": {
+                  "type": "number",
+                  "format": "float",
+                  "example": 0.0
+                },
+                "valor_promocion": {
+                  "type": "number",
+                  "format": "float",
+                  "example": 0.0
+                },
+                "provider_product_id": {
+                  "type": "string",
+                  "nullable": true,
+                  "example": null
+                },
+                "envio": {
+                  "type": "integer",
+                  "example": 1
+                },
+                "reward": {
+                  "type": "boolean",
+                  "example": true,
+                  "description": "**NUEVO EN V1.0:** Ahora es boolean (antes integer)\n\nIndica si el producto es exclusivo para usuarios Pro con reward\n- `true`: Producto reward (requiere hasReward=true)\n- `false`: Producto normal\n\n**Validaci\u00f3n en cliente:**\n"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CheckoutPriceResponse": {
+        "type": "object",
+        "properties": {
+          "subtotal": {
+            "type": "string",
+            "example": "120.00",
+            "description": "Subtotal de productos (string con 2 decimales)"
+          },
+          "comision_bancaria": {
+            "type": "string",
+            "example": "5.50",
+            "description": "Comisi\u00f3n del gateway (string con 2 decimales)"
+          },
+          "comision_cuponerapp": {
+            "type": "string",
+            "example": "6.00",
+            "description": "Comisi\u00f3n de Cuponerapp (string con 2 decimales, 0 para usuarios Pro)"
+          },
+          "comision_mensualidad": {
+            "type": "string",
+            "example": "0.00",
+            "description": "Comisi\u00f3n por mensualidades (string con 2 decimales)"
+          },
+          "total": {
+            "type": "string",
+            "example": "131.50",
+            "description": "Total a pagar (string con 2 decimales)"
+          },
+          "meses": {
+            "type": "integer",
+            "example": 1,
+            "description": "N\u00famero de meses"
+          },
+          "mensualidad": {
+            "type": "string",
+            "example": "131.50",
+            "description": "Pago mensual (string con 2 decimales)"
+          }
+        }
+      },
+      "PaymentResponse": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "example": "200",
+            "description": "Estado de la operaci\u00f3n"
+          },
+          "status_msg": {
+            "type": "string",
+            "example": "Ok",
+            "description": "Mensaje de estado"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "pi_3ABC123...",
+                "description": "ID de la transacci\u00f3n en el gateway"
+              },
+              "url": {
+                "type": "string",
+                "nullable": true,
+                "example": "https://checkout.stripe.com/...",
+                "description": "URL de redirecci\u00f3n (solo si requiere 3D Secure)"
+              }
+            }
+          }
+        }
+      },
+      "CouponRedemptionResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "barcode",
+          "requiresNps"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "ABC123",
+            "description": "C\u00f3digo de redenci\u00f3n generado"
+          },
+          "barcode": {
+            "type": "string",
+            "format": "base64",
+            "example": "iVBORw0KGgoAAAANSUhEUgAA...",
+            "description": "Imagen del c\u00f3digo de barras o QR en formato Base64"
+          },
+          "requiresNps": {
+            "type": "boolean",
+            "example": true,
+            "description": "Indica si el usuario debe calificar la marca (NPS)"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Mensaje descriptivo del error",
+            "description": "**FORMATO UNIFICADO v1.0**\n\nMensaje de error user-friendly que puedes mostrar directamente en la UI.\n\n**Cambios importantes:**\n- **ANTES:** `{\"msg\": \"...\"}` o `{\"errors\": {\"campo\": [\"...\"]}}`\n- **AHORA:** `{\"error\": \"...\"}` (siempre formato string)\n\n**Ventajas:**\n- Un solo formato para todos los errores (400, 403, 404, 422, 500, 503)\n- M\u00e1s simple de manejar en apps m\u00f3viles\n- Mensajes claros y directos\n\n**Uso en apps:**\n```javascript\n            const errorMessage = response.data.error;\n            Alert.alert('Error', errorMessage);\n```\n"
+          }
+        }
+      },
+      "ValidationError": {
+        "deprecated": true,
+        "type": "object",
+        "required": [
+          "errors"
+        ],
+        "properties": {
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "example": {
+              "products": [
+                "The products field is required."
+              ],
+              "method": [
+                "The selected method is invalid."
+              ]
+            },
+            "description": "**DEPRECADO en v1.0** - Ya no se usa este formato.\n\nAhora todos los errores de validaci\u00f3n usan formato unificado:\n```json\n            {\n              \"error\": \"The products field is required.\"\n            }\n```\n\nEste schema se mantiene solo para referencia hist\u00f3rica.\n"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "No autenticado",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string",
+                  "example": "Unauthenticated"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Token inv\u00e1lido o no proporcionado"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Error interno del servidor",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "Server Error"
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-tagGroups": [
+    {
+      "name": "User & Subscriptions",
+      "tags": [
+        "Subscriptions"
+      ]
+    },
+    {
+      "name": "Commerce",
+      "tags": [
+        "Checkout",
+        "Payment"
+      ]
+    },
+    {
+      "name": "Coupons",
+      "tags": [
+        "Coupons"
+      ]
+    }
+  ]
+}
