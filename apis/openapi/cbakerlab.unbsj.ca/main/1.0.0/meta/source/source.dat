@@ -1,0 +1,693 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "AUTONOC API",
+    "version": "1.0.0",
+    "description": "API for automatic job classification using NOC (National Occupational Classification) codes. Submit job descriptions and retrieve classification results with detailed occupational attributes including stress indices.",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/none-cdf/autonoc-api/1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://cbakerlab.unbsj.ca:6500/api/v1",
+      "description": "Production server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Shared class token. All students use the same token but must provide unique student_id in requests."
+      }
+    },
+    "schemas": {
+      "AutocodeRequest": {
+        "type": "object",
+        "required": [
+          "input_text",
+          "student_id"
+        ],
+        "properties": {
+          "input_text": {
+            "type": "string",
+            "description": "Job description text (1-10,000 characters)",
+            "minLength": 1,
+            "maxLength": 10000,
+            "example": "Software developer responsible for writing Python code, debugging applications, and conducting code reviews."
+          },
+          "student_id": {
+            "type": "string",
+            "description": "Unique student identifier (e.g., student number, username)",
+            "example": "john_doe_123"
+          }
+        }
+      },
+      "AutocodeResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "status": {
+            "type": "string",
+            "example": "submitted"
+          },
+          "message": {
+            "type": "string",
+            "example": "Job queued for processing"
+          },
+          "check_url": {
+            "type": "string",
+            "example": "/api/v1/results/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          }
+        }
+      },
+      "JobResult": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "completed",
+              "failed"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Array of NOC codes (can be multiple codes per job)",
+                "example": [
+                  "2173",
+                  "2174",
+                  "-1"
+                ]
+              },
+              "jobTitle": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Array of job titles corresponding to each NOC code",
+                "example": [
+                  "Computer Programmer",
+                  "Software Developer"
+                ]
+              },
+              "groupTitle": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Array of group titles"
+              },
+              "leadStatement": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Array of lead statements"
+              }
+            }
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message if status is 'failed'"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health check",
+        "description": "Check if API is running. No authentication required.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "healthy"
+                    },
+                    "service": {
+                      "type": "string",
+                      "example": "AUTONOC API v1"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/autocode": {
+      "post": {
+        "tags": [
+          "Autocode"
+        ],
+        "summary": "Submit job for classification",
+        "description": "Submit a job description for NOC code classification. Requires both authentication token and student_id.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutocodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Job accepted and queued for processing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutocodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing or invalid input_text or student_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/results/{job_id}": {
+      "get": {
+        "tags": [
+          "Results"
+        ],
+        "summary": "Get job result",
+        "description": "Retrieve the classification result for a submitted job by job ID.",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "description": "Unique job identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResult"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Job still processing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "processing"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/results": {
+      "get": {
+        "tags": [
+          "Results"
+        ],
+        "summary": "List your jobs",
+        "description": "Get a list of recent jobs. Optionally filter by student_id.",
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "query",
+            "description": "Student identifier to filter jobs",
+            "schema": {
+              "type": "string",
+              "example": "john_doe_123"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of jobs to return",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "student_id": {
+                      "type": "string"
+                    },
+                    "user_email": {
+                      "type": "string"
+                    },
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/JobResult"
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/job-attributes/available": {
+      "get": {
+        "tags": [
+          "Attributes"
+        ],
+        "summary": "List available attributes",
+        "description": "Get a list of all available attribute names that can be queried. NOTE: o_net_psych_stress_index is excluded.",
+        "responses": {
+          "200": {
+            "description": "List of available attributes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "total_attributes": {
+                      "type": "integer",
+                      "description": "Total number of available attributes (86 total, stress_index excluded)",
+                      "example": 86
+                    },
+                    "all_attributes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Flat array of all attribute names",
+                      "example": [
+                        "o_net_psych_strict_deadlines",
+                        "o_net_psych_competition",
+                        "ch_env_hazards"
+                      ]
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "List of attribute category prefixes",
+                      "example": [
+                        "ch_apt",
+                        "ch_env",
+                        "ch_phys",
+                        "o_net_env",
+                        "o_net_phys",
+                        "o_net_psych"
+                      ]
+                    },
+                    "categorized_attributes": {
+                      "type": "object",
+                      "description": "Attributes grouped by category prefix",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/job-attributes/{noc_code}": {
+      "get": {
+        "tags": [
+          "Attributes"
+        ],
+        "summary": "Get job attributes for NOC code",
+        "description": "Retrieve occupational attributes for a given NOC code. Returns attributes for all NOC/SOC pairs unless soc_code is specified. NOTE: o_net_psych_stress_index is excluded.",
+        "parameters": [
+          {
+            "name": "noc_code",
+            "in": "path",
+            "required": true,
+            "description": "NOC code (e.g., 2173 or 2173.1). Without decimal returns all variants.",
+            "schema": {
+              "type": "string",
+              "example": "2173.1"
+            }
+          },
+          {
+            "name": "soc_code",
+            "in": "query",
+            "description": "Optional SOC code to get specific NOC/SOC pair attributes",
+            "schema": {
+              "type": "string",
+              "example": "15-1252"
+            }
+          },
+          {
+            "name": "attributes",
+            "in": "query",
+            "description": "Comma-separated list of specific attributes to return. If omitted, all 86 attributes are returned. NOTE: o_net_psych_stress_index is always excluded.",
+            "schema": {
+              "type": "string",
+              "example": "o_net_psych_strict_deadlines,o_net_psych_competition,ch_env_hazards"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success - returns different structures based on whether soc_code is provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "description": "Response when soc_code is provided (single NOC/SOC pair)",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "noc_code": {
+                          "type": "string",
+                          "example": "2173.1"
+                        },
+                        "soc_code": {
+                          "type": "string",
+                          "example": "15-1252"
+                        },
+                        "titles": {
+                          "type": "object",
+                          "properties": {
+                            "nocCodeTitle": {
+                              "type": "string",
+                              "example": "Software engineers and designers"
+                            },
+                            "socCodeTitle": {
+                              "type": "string",
+                              "example": "Software Developers"
+                            }
+                          }
+                        },
+                        "attributes": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Attribute values (86 total if no filter, or filtered subset)",
+                          "example": {
+                            "o_net_psych_strict_deadlines": "61.0",
+                            "o_net_psych_competition": "46.0",
+                            "ch_env_hazards": "30.0"
+                          }
+                        },
+                        "requested_attributes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Only present if attributes parameter was provided"
+                        },
+                        "found_attributes": {
+                          "type": "integer",
+                          "description": "Only present if attributes parameter was provided"
+                        },
+                        "missing_attributes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Only present if attributes parameter was provided"
+                        },
+                        "excluded_attributes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Attributes that were excluded (e.g., stress_index)",
+                          "example": [
+                            "o_net_psych_stress_index"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "description": "Response when soc_code is NOT provided (multiple NOC/SOC pairs)",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "noc_code": {
+                          "type": "string",
+                          "example": "2171"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "description": "Number of NOC/SOC pairs returned",
+                          "example": 4
+                        },
+                        "matched_noc_codes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "If NOC has variants (e.g., 2171 -> 2171.1, 2171.2, etc.)",
+                          "example": [
+                            "2171.1",
+                            "2171.2",
+                            "2171.3",
+                            "2171.4"
+                          ]
+                        },
+                        "note": {
+                          "type": "string",
+                          "description": "Explanatory note if multiple variants found"
+                        },
+                        "results": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "nocCode": {
+                                "type": "string"
+                              },
+                              "nocCodeTitle": {
+                                "type": "string"
+                              },
+                              "socCode": {
+                                "type": "string"
+                              },
+                              "socCodeTitle": {
+                                "type": "string"
+                              },
+                              "attributes": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "requested_attributes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Only present if attributes parameter was provided"
+                        },
+                        "excluded_attributes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Attributes that were excluded (e.g., stress_index)"
+                        },
+                        "missing_attributes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Only present if attributes parameter was provided"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOC code not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
