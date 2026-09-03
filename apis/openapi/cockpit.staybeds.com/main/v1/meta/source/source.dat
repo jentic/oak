@@ -1,0 +1,4459 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Staybeds Distributor API",
+    "version": "v1",
+    "description": "Welcome to the Staybeds Distributor API. This document covers every endpoint available to distributor partners for searching hotels, creating prebookings, confirming reservations, managing cancellations, and retrieving booking history.\n\n## Prerequisites\n- A **distributor** account provided by Staybeds.\n- All requests must include a valid JWT token (see Authentication section).\n\n## Rate Limits\n\n| Operation | Limit |\n|---|---|\n| Search endpoints | 600 requests / minute |\n| Booking endpoints | 100 requests / hour |\n\nRate limit headers are included in every response:\n- `X-RateLimit-Limit` \u2014 Maximum requests allowed\n- `X-RateLimit-Remaining` \u2014 Requests remaining in window\n- `X-RateLimit-Reset` \u2014 Timestamp when limit resets\n\n## X-Request-ID\n\nEvery API response includes the **X-Request-ID** header, a unique identifier for the request. You may send this header in your request (optional); if omitted, the server generates one (e.g. UUID v4) and returns it in the response. Use it to correlate server-side logs when contacting support.\n\n## Idempotency\n\nTo prevent duplicate bookings or cancellations due to network timeouts or retried requests, the Staybeds API supports **Idempotency Keys**.\n\n### X-Idempotency-Key Header\n\nFor write operations (`POST /bookings/create` and `POST /bookings/cancelBooking`), you can include a unique identifier in the `X-Idempotency-Key` header.\n\n- **Unique Key**: Usually a UUID v4 or a high-entropy random string (max 64 characters).\n- **TTL**: Idempotency keys are stored and valid for **24 hours**.\n- **Behavior**:\n  - If a request with the same key and same user is retried after a successful completion, the API returns the **cached response** immediately (including HTTP status and body).\n  - Responses returned from cache include the `X-Idempotent-Replayed: true` header.\n  - If a second request arrives while the first one is still being processed, the API returns `409 Conflict`.\n  - Internal server errors (5xx) are **never cached**, allowing you to retry with the same key.\n\nExample: `X-Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000`\n\n## Search Flow Guide\n\nThis section describes the recommended integration flow for searching hotel availability.\n\n### Step 1: Start a Search\n\nChoose one entry point:\n- **By coordinates:** `GET /prices/boundary?lat=...&lng=...&checkin=...&checkout=...&guests=...&nationality=...`\n- **By country:** `GET /prices/country/{countryCode}?checkin=...&checkout=...&guests=...&nationality=...`\n- **By city:** `GET /prices/cities/{city}?country=ES&checkin=...&checkout=...&guests=...&nationality=...`\n\nSave the returned `searchId` for pagination and pricing calls.\n\n### Step 2: Handle Pricing Status\n\nEach hotel in results may have a `pricingStatus`:\n\n| Status | Meaning | Action |\n|---|---|---|\n| `\"priced\"` or absent | Price available in `minRate` | Display normally |\n| `\"pending\"` | Price not yet available | Show placeholder, call pricing endpoint |\n\n### Step 3: Lazy Pricing (if needed)\n\nIf any hotels have `pricingStatus: \"pending\"`, call:\n```\nGET /prices/pricing/{searchId}?limit=50\n```\n- Run in background, don't block rendering.\n- Repeat while `hotelsRemaining > 0`.\n- After each call, re-fetch results with `/prices/search/{searchId}`.\n- Failed hotels are automatically filtered out.\n\n### Step 4: Pagination\n\nUse cached results for fast pagination:\n```\nGET /prices/search/{searchId}?page=2&pageSize=50\n```\n\n### Step 5: Session Expiration\n\nHandle expired sessions:\n\n| Status | Code | Action |\n|---|---|---|\n| 200 | \u2014 | Session valid, proceed |\n| 410 | `SEARCH_SESSION_EXPIRED` | Show \"results expired\", prompt new search |\n| 404 | `NOT_FOUND` | Invalid session ID |\n\n### Complete Integration Flow\n\n**Full workflow from authentication to booking:**\n\n1. **Authentication**\n   - `POST /auth/login` \u2192 Receive JWT token\n   - Include token in all subsequent requests: `Authorization: Bearer {token}`\n\n2. **Search for Hotels**\n   - `GET /prices/boundary` (or `/country/{code}` or `/cities/{city}`)\n   - Receive `searchId` + first page of hotels\n   - Save `searchId` for pagination and pricing\n\n3. **Lazy Pricing Loop** (if hotels have `pricingStatus: \"pending\"`)\n   - While `hotelsRemaining > 0`:\n     - `GET /prices/pricing/{searchId}?limit=50`\n     - `GET /prices/search/{searchId}` to get updated results\n   - Continue until all hotels are priced or failed\n\n4. **Pagination** (optional)\n   - `GET /prices/search/{searchId}?page={N}&pageSize=50`\n   - Fast retrieval from cached results\n\n5. **Select Option & Create Prebook**\n   - User selects a hotel option\n   - `POST /bookings/prebook` with `optionRefId`\n   - Receive offer reference (`ref_xxxx`) and expiration time\n\n6. **Validate Booking** (optional but recommended)\n   - `POST /bookings/create/simulate` with offer + guest data\n   - Verify pricing, availability, and guest information\n   - Review validation errors/warnings before confirming\n\n7. **Confirm Booking**\n   - `POST /bookings/create` with `offerId` + guest details\n   - Include `X-Idempotency-Key` header to prevent duplicates\n   - Receive confirmed booking with `publicReference`\n\n8. **Cancel Booking** (if needed)\n   - **Simulate first:** `POST /bookings/cancel/{bookingId}/simulate` \u2192 Get cancellation fees\n   - **Then cancel:** `POST /bookings/cancelBooking` with `bookingNumber`\n   - Include `X-Idempotency-Key` to prevent duplicate cancellations\n\n**Key Points:**\n- Search sessions expire (typically 24 hours) - handle `410 SEARCH_SESSION_EXPIRED`\n- Prebook offers expire (**10 minutes**) - handle `REFERENCE_EXPIRED`\n- Always use idempotency keys for booking creation and cancellation\n- Guest data in booking creation is optional but strongly recommended for confirmations\n",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/destinationbookings/Staybeds/v1"
+  },
+  "servers": [
+    {
+      "url": "https://cockpit.staybeds.com/api/v1",
+      "description": "Production server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "summary": "Authenticate distributor user",
+        "description": "Authenticates a distributor user and returns a JWT token.",
+        "operationId": "login",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Registered email address"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "Account password"
+                  }
+                }
+              },
+              "examples": {
+                "loginExample": {
+                  "value": {
+                    "email": "partner@example.com",
+                    "password": "mySecurePassword123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                },
+                "examples": {
+                  "successExample": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+                        "user": {
+                          "id": 123,
+                          "name": "Partner Corp",
+                          "surname": null,
+                          "username": "partner@example.com",
+                          "email": "partner@example.com",
+                          "isActivated": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalidCredentials": {
+                    "value": {
+                      "error": {
+                        "code": "INVALID_CREDENTIALS",
+                        "message": "Email or password incorrect",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "internalError": {
+                    "value": {
+                      "error": {
+                        "code": "INTERNAL_ERROR",
+                        "message": "Server error generating token",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "summary": "Refresh JWT token",
+        "description": "Refreshes an existing JWT token before it expires.\nThe token can be sent via **one** of: query param `token`, body field `token`, or `Authorization: Bearer` header.\n",
+        "operationId": "refreshToken",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "JWT token (alternative to header or body)"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "JWT token (alternative to header or query)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token refreshed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshTokenResponse"
+                },
+                "examples": {
+                  "successExample": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "validationError": {
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Token not provided",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token invalid or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "tokenInvalid": {
+                    "value": {
+                      "error": {
+                        "code": "TOKEN_INVALID",
+                        "message": "Token invalid or expired",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/invalidate": {
+      "post": {
+        "summary": "Invalidate JWT token",
+        "description": "Invalidates (logs out) a JWT token. The token is no longer valid after this call.",
+        "operationId": "invalidateToken",
+        "tags": [
+          "Authentication"
+        ],
+        "responses": {
+          "200": {
+            "description": "Token invalidated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidateTokenResponse"
+                },
+                "examples": {
+                  "successExample": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "message": "Token invalidated successfully."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/signup": {
+      "post": {
+        "summary": "Create new distributor account",
+        "description": "Creates a new distributor account.",
+        "operationId": "signup",
+        "tags": [
+          "Authentication"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password",
+                  "password_confirmation"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Unique email for the account"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "minLength": 8,
+                    "description": "Password (min. 8 characters)"
+                  },
+                  "password_confirmation": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "Password confirmation"
+                  }
+                }
+              },
+              "examples": {
+                "signupExample": {
+                  "value": {
+                    "email": "newpartner@example.com",
+                    "password": "mySecurePassword123",
+                    "password_confirmation": "mySecurePassword123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupResponse"
+                },
+                "examples": {
+                  "successExample": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+                        "user": {
+                          "id": 124,
+                          "name": null,
+                          "surname": null,
+                          "username": "partner@example.com",
+                          "email": "partner@example.com",
+                          "isActivated": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "validationError": {
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Duplicate email, passwords don't match, etc.",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hotels/details/{hotelId}": {
+      "get": {
+        "summary": "Get hotel details",
+        "description": "Returns full details for a specific hotel including rooms, rate plans, meal plans, extras, and sample pricing.",
+        "operationId": "getHotelDetails",
+        "tags": [
+          "Hotels"
+        ],
+        "parameters": [
+          {
+            "name": "hotelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Hotel ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hotel details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelDetailsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "validationError": {
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "hotelId missing or not numeric",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Hotel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "hotelNotFound": {
+                    "value": {
+                      "error": {
+                        "code": "HOTEL_NOT_FOUND",
+                        "message": "Hotel does not exist",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hotels/list": {
+      "get": {
+        "summary": "List all hotels (paginated)",
+        "description": "Returns a paginated list of all hotels (ID and name only).",
+        "operationId": "listHotels",
+        "tags": [
+          "Hotels"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Page number (\u2265 1)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hotels list retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelsListResponse"
+                },
+                "examples": {
+                  "successExample": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "currentPage": 1,
+                        "hotels": [
+                          {
+                            "hotelId": 485,
+                            "hotelName": "Hotel Example"
+                          },
+                          {
+                            "hotelId": 486,
+                            "hotelName": "Another Hotel"
+                          }
+                        ],
+                        "firstPageUrl": "https://cockpit.staybeds.com/api/v1/hotels/list?page=1",
+                        "lastPageUrl": "https://cockpit.staybeds.com/api/v1/hotels/list?page=20",
+                        "perPage": 50,
+                        "total": 1000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hotels/autocomplete": {
+      "get": {
+        "summary": "Autocomplete hotel search",
+        "description": "Returns a small list of hotels matching the search query, designed for\ntypeahead/autocomplete UI components. Results are ordered by relevance\n(prefix matches first, then substring matches, alphabetically).\n",
+        "operationId": "autocompleteHotels",
+        "tags": [
+          "Hotels"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2
+            },
+            "description": "Search text to match against hotel names (minimum 2 characters)",
+            "examples": {
+              "ritz": {
+                "value": "ritz"
+              },
+              "beach": {
+                "value": "beach resort"
+              }
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 10
+            },
+            "description": "Maximum number of results to return (1\u201325, default 10)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching hotels retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelAutocompleteResponse"
+                },
+                "examples": {
+                  "successExample": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "hotels": [
+                          {
+                            "hotelId": 485,
+                            "hotelName": "Hotel Ritz Madrid",
+                            "city": "Madrid",
+                            "countryCode": "ES"
+                          },
+                          {
+                            "hotelId": 486,
+                            "hotelName": "Ritz-Carlton Barcelona",
+                            "city": "Barcelona",
+                            "countryCode": "ES"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error (q missing or too short)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "examples": {
+                  "missingQuery": {
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "The request contains invalid data.",
+                        "details": {
+                          "q": [
+                            "The search query must be at least 2 characters."
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cities": {
+      "get": {
+        "summary": "Get cities with active hotels",
+        "description": "Returns cities with active hotels, optionally filtered by country.",
+        "operationId": "getCities",
+        "tags": [
+          "Hotels"
+        ],
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "description": "ISO 3166-1 alpha-2 country code (e.g. ES)",
+            "examples": {
+              "spain": {
+                "value": "ES"
+              },
+              "portugal": {
+                "value": "PT"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cities retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitiesResponse"
+                },
+                "examples": {
+                  "successExample": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "cities": [
+                          {
+                            "name": "Madrid",
+                            "countryCode": "ES",
+                            "hotelCount": 120
+                          },
+                          {
+                            "name": "Barcelona",
+                            "countryCode": "ES",
+                            "hotelCount": 95
+                          }
+                        ],
+                        "total": 2,
+                        "countryFilter": "ES"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/countries": {
+      "get": {
+        "summary": "Get countries with active hotels",
+        "description": "Returns countries with active hotels.",
+        "operationId": "getCountries",
+        "tags": [
+          "Hotels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Countries retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountriesResponse"
+                },
+                "examples": {
+                  "successExample": {
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "countries": [
+                          {
+                            "code": "ES",
+                            "hotelCount": 520
+                          },
+                          {
+                            "code": "PT",
+                            "hotelCount": 210
+                          }
+                        ],
+                        "total": 2
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prices/boundary": {
+      "get": {
+        "summary": "Search hotels within 5km radius",
+        "description": "Search hotels within a **5 km radius** from coordinates.",
+        "operationId": "searchByBoundary",
+        "tags": [
+          "Search & Availability"
+        ],
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "description": "Latitude (-90 to 90)"
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "description": "Longitude (-180 to 180)"
+          },
+          {
+            "name": "checkin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Check-in date (YYYY-MM-DD)"
+          },
+          {
+            "name": "checkout",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Check-out date (YYYY-MM-DD)"
+          },
+          {
+            "name": "guests",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]([0-9\\-,]*[0-9])?$"
+            },
+            "description": "Occupancy for one room. Format: adults or adults-child1age,child2age (e.g. 2, 2-5,12). Multi-room not supported in v1.",
+            "examples": {
+              "twoAdults": {
+                "value": "2"
+              },
+              "familyRoom": {
+                "value": "2-5,12"
+              }
+            }
+          },
+          {
+            "name": "nationality",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "description": "Guest nationality, ISO alpha-2 (e.g. ES, GB)"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "price_asc",
+                "price_desc",
+                "name_asc",
+                "name_desc",
+                "stars_asc",
+                "stars_desc"
+              ],
+              "default": "price_asc"
+            },
+            "description": "Sort order"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "validationError": {
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Missing or invalid parameters (lat/lng, dates, guests, nationality)",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prices/country/{country_code}": {
+      "get": {
+        "summary": "Search hotels by country",
+        "description": "Search hotels by country.",
+        "operationId": "searchByCountry",
+        "tags": [
+          "Search & Availability"
+        ],
+        "parameters": [
+          {
+            "name": "country_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "description": "ISO 3166-1 alpha-2 country code"
+          },
+          {
+            "name": "checkin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Check-in date (YYYY-MM-DD)"
+          },
+          {
+            "name": "checkout",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Check-out date (YYYY-MM-DD)"
+          },
+          {
+            "name": "guests",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]([0-9\\-,]*[0-9])?$"
+            },
+            "description": "Occupancy for one room. Format: adults or adults-child1age,child2age. Multi-room not supported in v1."
+          },
+          {
+            "name": "nationality",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "description": "Guest nationality, ISO alpha-2"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "price_asc",
+                "price_desc",
+                "name_asc",
+                "name_desc",
+                "stars_asc",
+                "stars_desc"
+              ],
+              "default": "price_asc"
+            },
+            "description": "Sort order"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prices/cities/{city}": {
+      "get": {
+        "summary": "Search hotels by city",
+        "description": "Search hotels by city.",
+        "operationId": "searchByCity",
+        "tags": [
+          "Search & Availability"
+        ],
+        "parameters": [
+          {
+            "name": "city",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "City name (exact match, case-insensitive)"
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "description": "ISO 3166-1 alpha-2 country code"
+          },
+          {
+            "name": "checkin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Check-in date (YYYY-MM-DD)"
+          },
+          {
+            "name": "checkout",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Check-out date (YYYY-MM-DD)"
+          },
+          {
+            "name": "guests",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]([0-9\\-,]*[0-9])?$"
+            },
+            "description": "Occupancy for one room. Format: adults or adults-child1age,child2age. Multi-room not supported in v1."
+          },
+          {
+            "name": "nationality",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "description": "Guest nationality, ISO alpha-2"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "price_asc",
+                "price_desc",
+                "name_asc",
+                "name_desc",
+                "stars_asc",
+                "stars_desc"
+              ],
+              "default": "price_asc"
+            },
+            "description": "Sort order"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prices/hotel": {
+      "get": {
+        "summary": "Get availability for single hotel",
+        "description": "Returns availability and pricing for a **single hotel**.",
+        "operationId": "searchSingleHotel",
+        "tags": [
+          "Search & Availability"
+        ],
+        "parameters": [
+          {
+            "name": "hotelId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Hotel ID"
+          },
+          {
+            "name": "checkin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Check-in date (YYYY-MM-DD)"
+          },
+          {
+            "name": "checkout",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Check-out date (YYYY-MM-DD)"
+          },
+          {
+            "name": "guests",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]([0-9\\-,]*[0-9])?$"
+            },
+            "description": "Occupancy for one room (same format as search). Multi-room not supported in v1."
+          },
+          {
+            "name": "nationality",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "description": "Guest nationality (ISO alpha-2)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hotel availability retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleHotelResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Hotel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "hotelNotFound": {
+                    "value": {
+                      "error": {
+                        "code": "HOTEL_NOT_FOUND",
+                        "message": "Hotel does not exist",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prices/search/{searchId}": {
+      "get": {
+        "summary": "Retrieve cached search results",
+        "description": "Retrieve a cached page of results from a previous search session.",
+        "operationId": "getSearchResults",
+        "tags": [
+          "Search & Availability"
+        ],
+        "parameters": [
+          {
+            "name": "searchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search session ID from a search endpoint"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Page number (\u2265 1)"
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Results per page (1\u2013100)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cached search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "validationError": {
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Invalid page or pageSize",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "notFound": {
+                    "value": {
+                      "error": {
+                        "code": "NOT_FOUND",
+                        "message": "Session does not exist",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Search session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "sessionExpired": {
+                    "value": {
+                      "error": {
+                        "code": "SEARCH_SESSION_EXPIRED",
+                        "message": "Session expired \u2014 perform a new search",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/prices/pricing/{searchId}": {
+      "get": {
+        "summary": "Fetch on-demand pricing",
+        "description": "Fetches on-demand pricing for hotels with pricingStatus pending.",
+        "operationId": "fetchPricing",
+        "tags": [
+          "Search & Availability"
+        ],
+        "parameters": [
+          {
+            "name": "searchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search session ID"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Max hotels to price per call (1\u2013200, default 50)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pricing fetched successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "notFound": {
+                    "value": {
+                      "error": {
+                        "code": "NOT_FOUND",
+                        "message": "Session does not exist",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Search session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "sessionExpired": {
+                    "value": {
+                      "error": {
+                        "code": "SEARCH_SESSION_EXPIRED",
+                        "message": "Session expired",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/prebook": {
+      "post": {
+        "summary": "Create temporary offer",
+        "description": "Creates a **temporary offer** from a selected option. The offer has a limited validity window (**10 minutes**) during which you must confirm the booking.\n\n**Important:** Do not send `packagePrice`, `rooms`, or `cancelPolicy`. The server retrieves these from the search cache.\n",
+        "operationId": "createPrebook",
+        "tags": [
+          "Prebooking"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrebookRequest"
+              },
+              "examples": {
+                "basicPrebook": {
+                  "value": {
+                    "optionRefId": "ref_a1b2c3",
+                    "hotelRemarks": null
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Prebook created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrebookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "validationError": {
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "optionRefId not provided",
+                        "details": null
+                      }
+                    }
+                  },
+                  "referenceInvalid": {
+                    "value": {
+                      "error": {
+                        "code": "REFERENCE_INVALID",
+                        "message": "Reference expired or cannot be resolved \u2014 perform a new search",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/create/simulate": {
+      "post": {
+        "summary": "Simulate booking creation",
+        "description": "Validates all booking data **without creating a reservation**. Use this to check guest data, availability, pricing, and extras before confirming.",
+        "operationId": "simulateBooking",
+        "tags": [
+          "Booking"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingSimulateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Simulation completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingSimulateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or reference error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "referenceInvalid": {
+                    "value": {
+                      "error": {
+                        "code": "REFERENCE_INVALID",
+                        "message": "Numeric offerId sent instead of ref_xxxx",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "referenceExpired": {
+                    "value": {
+                      "error": {
+                        "code": "REFERENCE_EXPIRED",
+                        "message": "Offer expired or already used",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Hotel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/create": {
+      "post": {
+        "summary": "Confirm booking",
+        "description": "Confirms a reservation from a prebooked offer.",
+        "operationId": "createBooking",
+        "tags": [
+          "Booking"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Booking created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or reference error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "referenceInvalid": {
+                    "value": {
+                      "error": {
+                        "code": "REFERENCE_INVALID",
+                        "message": "Numeric offerId sent, or booking validation failures",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "referenceExpired": {
+                    "value": {
+                      "error": {
+                        "code": "REFERENCE_EXPIRED",
+                        "message": "Offer expired or already converted",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Hotel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/my-reservations": {
+      "get": {
+        "summary": "Get user reservations",
+        "description": "Returns the authenticated user's reservations with optional filters and pagination (10 per page).",
+        "operationId": "getMyReservations",
+        "tags": [
+          "Reservations"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Confirmed",
+                "Cancelled"
+              ]
+            },
+            "description": "Filter by status"
+          },
+          {
+            "name": "fromDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Filter check-in from date"
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Filter check-in up to date"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number (default 1)"
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "checkIn",
+                "checkOut",
+                "createdAt",
+                "updatedAt",
+                "amount",
+                "hotelName",
+                "status"
+              ],
+              "default": "createdAt"
+            },
+            "description": "Sort field (check-in, check-out, creation, update, amount, hotel name, status)"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "description": "Sort direction"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reservations retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyReservationsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "value": {
+                      "error": {
+                        "code": "UNAUTHORIZED",
+                        "message": "Invalid or missing token",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "FORBIDDEN",
+                        "message": "Insufficient permissions",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/cancel/{bookingId}/simulate": {
+      "post": {
+        "summary": "Simulate cancellation",
+        "description": "Simulates cancellation costs for a confirmed booking **without actually cancelling**.",
+        "operationId": "simulateCancellation",
+        "tags": [
+          "Cancellation"
+        ],
+        "parameters": [
+          {
+            "name": "bookingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Booking reference (ref_xxxx) or public reference (BK-ymd-XXXXXXXX)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation simulation completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancellationSimulateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or reference error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "validationError": {
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Invalid booking reference",
+                        "details": null
+                      }
+                    }
+                  },
+                  "referenceInvalid": {
+                    "value": {
+                      "error": {
+                        "code": "REFERENCE_INVALID",
+                        "message": "Numeric ID sent instead of ref_xxxx",
+                        "details": null
+                      }
+                    }
+                  },
+                  "bookingNotFound": {
+                    "value": {
+                      "error": {
+                        "code": "BOOKING_NOT_FOUND",
+                        "message": "Booking doesn't exist or already cancelled",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/cancelBooking": {
+      "post": {
+        "summary": "Cancel booking",
+        "description": "Cancels a confirmed booking. Supports simulation mode with isTest=true.",
+        "operationId": "cancelBooking",
+        "tags": [
+          "Cancellation"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelBookingRequest"
+              },
+              "examples": {
+                "realCancellation": {
+                  "value": {
+                    "bookingNumber": "ref_bk9876"
+                  }
+                },
+                "testCancellation": {
+                  "value": {
+                    "bookingNumber": "ref_bk9876",
+                    "isTest": "true"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Booking cancelled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelBookingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or reference error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "bookingNotFound": {
+                    "value": {
+                      "error": {
+                        "code": "BOOKING_NOT_FOUND",
+                        "message": "Booking doesn't exist, not yours, or already cancelled",
+                        "details": null
+                      }
+                    }
+                  },
+                  "validationError": {
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Cannot cancel a booking in the past",
+                        "details": null
+                      }
+                    }
+                  },
+                  "referenceInvalid": {
+                    "value": {
+                      "error": {
+                        "code": "REFERENCE_INVALID",
+                        "message": "Numeric ID sent instead of ref_xxxx",
+                        "details": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token obtained from /auth/login or /auth/signup.\n\n**Important:** Distributor accounts must be **activated** by the platform before they can call protected endpoints. If the account is not yet activated, requests return **403** with code `ACCOUNT_NOT_ACTIVATED`.\n"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "User ID"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "User name"
+          },
+          "surname": {
+            "type": "string",
+            "nullable": true,
+            "description": "User surname"
+          },
+          "username": {
+            "type": "string",
+            "description": "Username"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User email address"
+          },
+          "isActivated": {
+            "type": "boolean",
+            "description": "Whether the account is activated"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "JWT authentication token"
+              },
+              "user": {
+                "$ref": "#/components/schemas/User"
+              }
+            }
+          }
+        }
+      },
+      "RefreshTokenResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "Refreshed JWT authentication token"
+              }
+            }
+          }
+        }
+      },
+      "InvalidateTokenResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "examples": [
+                  "Token invalidated successfully."
+                ]
+              }
+            }
+          }
+        }
+      },
+      "SignupResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "JWT authentication token"
+              },
+              "user": {
+                "$ref": "#/components/schemas/User"
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code",
+                "enum": [
+                  "INVALID_CREDENTIALS",
+                  "TOKEN_EXPIRED",
+                  "TOKEN_INVALID",
+                  "UNAUTHORIZED",
+                  "FORBIDDEN",
+                  "ACCOUNT_NOT_ACTIVATED",
+                  "NOT_FOUND",
+                  "HOTEL_NOT_FOUND",
+                  "BOOKING_NOT_FOUND",
+                  "VALIDATION_ERROR",
+                  "REFERENCE_INVALID",
+                  "REFERENCE_EXPIRED",
+                  "SEARCH_SESSION_EXPIRED",
+                  "RATE_LIMIT_EXCEEDED",
+                  "INTERNAL_ERROR"
+                ]
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable description"
+              },
+              "details": {
+                "nullable": true,
+                "description": "Additional error details"
+              }
+            }
+          }
+        }
+      },
+      "HotelDetailsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "hotel": {
+                "$ref": "#/components/schemas/Hotel"
+              },
+              "rooms": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              },
+              "ratePlans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RatePlan"
+                }
+              },
+              "mealPlans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/MealPlan"
+                }
+              },
+              "hotelExtras": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HotelExtra"
+                }
+              },
+              "pricingInfo": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/RatePlanPricing"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Hotel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Hotel ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Hotel name"
+          },
+          "address": {
+            "type": "string",
+            "description": "Street address"
+          },
+          "city": {
+            "type": "string",
+            "description": "City name"
+          },
+          "postalCode": {
+            "type": "string",
+            "description": "Postal code"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country code (ISO 3166-1 alpha-2)"
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "description": "Latitude coordinate"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "description": "Longitude coordinate"
+          },
+          "description": {
+            "type": "string",
+            "description": "Hotel description"
+          },
+          "stars": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Hotel star rating"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Active",
+              "Inactive"
+            ],
+            "description": "Hotel operational status"
+          },
+          "giata": {
+            "type": "string",
+            "nullable": true,
+            "description": "GIATA code"
+          },
+          "contact": {
+            "$ref": "#/components/schemas/HotelContact"
+          },
+          "checkInOut": {
+            "$ref": "#/components/schemas/CheckInOut"
+          },
+          "childAges": {
+            "$ref": "#/components/schemas/AgeRange"
+          },
+          "taxesAndFees": {
+            "type": "string",
+            "nullable": true,
+            "description": "Information about taxes and fees"
+          },
+          "amenities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Amenity"
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Hotel image URLs"
+          }
+        }
+      },
+      "HotelContact": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "person": {
+            "type": "string",
+            "nullable": true,
+            "description": "Contact person name"
+          },
+          "reservationEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "tel1": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CheckInOut": {
+        "type": "object",
+        "properties": {
+          "checkInFrom": {
+            "type": "string",
+            "pattern": "^\\d{2}:\\d{2}$",
+            "description": "Check-in start time (HH:mm format)"
+          },
+          "checkInTo": {
+            "type": "string",
+            "pattern": "^\\d{2}:\\d{2}$",
+            "description": "Check-in end time (HH:mm format)"
+          },
+          "checkOutFrom": {
+            "type": "string",
+            "pattern": "^\\d{2}:\\d{2}$",
+            "description": "Check-out start time (HH:mm format)"
+          },
+          "checkOutTo": {
+            "type": "string",
+            "pattern": "^\\d{2}:\\d{2}$",
+            "description": "Check-out end time (HH:mm format)"
+          }
+        }
+      },
+      "AgeRange": {
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max": {
+            "type": "integer"
+          }
+        }
+      },
+      "Amenity": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          }
+        }
+      },
+      "Room": {
+        "type": "object",
+        "properties": {
+          "roomCode": {
+            "type": "string",
+            "description": "Unique room code"
+          },
+          "type": {
+            "type": "string",
+            "description": "Room type name"
+          },
+          "adultsNumber": {
+            "type": "integer",
+            "description": "Standard number of adults"
+          },
+          "childrenNumber": {
+            "type": "integer",
+            "description": "Standard number of children"
+          },
+          "minOccupancy": {
+            "type": "integer",
+            "description": "Minimum occupancy"
+          },
+          "maxOccupancy": {
+            "type": "integer",
+            "description": "Maximum occupancy"
+          },
+          "childAges": {
+            "$ref": "#/components/schemas/ChildAges"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "amenities": {
+            "nullable": true
+          }
+        }
+      },
+      "ChildAges": {
+        "type": "object",
+        "properties": {
+          "child1Min": {
+            "type": "integer",
+            "nullable": true
+          },
+          "child1Max": {
+            "type": "integer",
+            "nullable": true
+          },
+          "child2Min": {
+            "type": "integer",
+            "nullable": true
+          },
+          "child2Max": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "RatePlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Rate plan ID"
+          },
+          "code": {
+            "type": "string",
+            "description": "Rate plan code"
+          },
+          "description": {
+            "type": "string",
+            "description": "Rate plan description"
+          },
+          "boardCode": {
+            "type": "string",
+            "description": "Board type code (e.g., RO, BB, HB, FB)"
+          },
+          "boardDescription": {
+            "type": "string",
+            "description": "Board type description"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code (ISO 4217)"
+          },
+          "mlos": {
+            "type": "integer",
+            "description": "Minimum length of stay"
+          },
+          "releaseDays": {
+            "type": "integer",
+            "description": "Release days before check-in"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Active",
+              "Inactive"
+            ]
+          },
+          "bookingWindow": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "cancellationPolicies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CancellationPolicy"
+            }
+          }
+        }
+      },
+      "DateRange": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "CancellationPolicy": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "daysBefore": {
+            "type": "integer",
+            "description": "Days before check-in when penalty applies"
+          },
+          "penaltyType": {
+            "type": "string",
+            "enum": [
+              "amount",
+              "percentage"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "description": "Penalty amount (if penaltyType is 'amount')"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MealPlan": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Meal plan code"
+          },
+          "name": {
+            "type": "string",
+            "description": "Meal plan name"
+          }
+        }
+      },
+      "HotelExtra": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Extra service name"
+          },
+          "adultPrice": {
+            "type": "string",
+            "description": "Price per adult"
+          },
+          "childPrice": {
+            "type": "string",
+            "description": "Price per child"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "chargeType": {
+            "type": "string",
+            "enum": [
+              "per_person",
+              "per_room",
+              "per_stay"
+            ]
+          },
+          "isRequired": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RatePlanPricing": {
+        "type": "object",
+        "properties": {
+          "ratePlanCode": {
+            "type": "string"
+          },
+          "ratePlanDescription": {
+            "type": "string"
+          },
+          "samplePrices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SamplePrice"
+            }
+          }
+        }
+      },
+      "SamplePrice": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "adults": {
+            "type": "integer"
+          },
+          "children": {
+            "type": "integer"
+          },
+          "paxType": {
+            "type": "string",
+            "description": "Passenger configuration (e.g., \"2+0\", \"2+1\")"
+          },
+          "price": {
+            "type": "string",
+            "description": "Price amount"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code (ISO 4217)"
+          },
+          "mealPlan": {
+            "type": "string",
+            "description": "Meal plan code"
+          },
+          "roomId": {
+            "type": "string",
+            "description": "Room code"
+          },
+          "minStay": {
+            "type": "integer",
+            "description": "Minimum stay requirement"
+          },
+          "allotment": {
+            "type": "integer",
+            "description": "Available rooms"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "Limited",
+              "Unavailable"
+            ]
+          }
+        }
+      },
+      "HotelsListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "type": "integer",
+                "description": "Current page number"
+              },
+              "hotels": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HotelListItem"
+                }
+              },
+              "firstPageUrl": {
+                "type": "string",
+                "format": "uri",
+                "description": "URL to first page"
+              },
+              "lastPageUrl": {
+                "type": "string",
+                "format": "uri",
+                "description": "URL to last page"
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "Items per page"
+              },
+              "total": {
+                "type": "integer",
+                "description": "Total number of hotels"
+              }
+            }
+          }
+        }
+      },
+      "HotelListItem": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "integer",
+            "description": "Hotel ID"
+          },
+          "hotelName": {
+            "type": "string",
+            "description": "Hotel name"
+          }
+        }
+      },
+      "HotelAutocompleteResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "hotels": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HotelAutocompleteItem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "HotelAutocompleteItem": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "integer",
+            "description": "Hotel ID"
+          },
+          "hotelName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hotel name"
+          },
+          "city": {
+            "type": "string",
+            "nullable": true,
+            "description": "City where the hotel is located"
+          },
+          "countryCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO 3166-1 alpha-2 country code (e.g. ES)"
+          }
+        }
+      },
+      "CitiesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "cities": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CityItem"
+                }
+              },
+              "total": {
+                "type": "integer",
+                "description": "Total number of cities"
+              },
+              "countryFilter": {
+                "type": "string",
+                "nullable": true,
+                "description": "Applied country filter (if any)"
+              }
+            }
+          }
+        }
+      },
+      "CityItem": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "City name"
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code"
+          },
+          "hotelCount": {
+            "type": "integer",
+            "description": "Number of active hotels in this city"
+          }
+        }
+      },
+      "CountriesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "countries": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CountryItem"
+                }
+              },
+              "total": {
+                "type": "integer",
+                "description": "Total number of countries"
+              }
+            }
+          }
+        }
+      },
+      "CountryItem": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code"
+          },
+          "hotelCount": {
+            "type": "integer",
+            "description": "Number of active hotels in this country"
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "searchId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Search session ID for pagination and pricing"
+              },
+              "hotels": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HotelSearchResult"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/SearchPagination"
+              },
+              "metadata": {
+                "$ref": "#/components/schemas/SearchMetadata"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When search results expire"
+              }
+            }
+          }
+        }
+      },
+      "HotelSearchResult": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "integer"
+          },
+          "hotelName": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "stars": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "city": {
+            "type": "string"
+          },
+          "area": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "hotelRemarks": {
+            "type": "string",
+            "nullable": true
+          },
+          "hoteltype": {
+            "type": "string"
+          },
+          "minRate": {
+            "type": "string",
+            "description": "Minimum rate amount"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "pricingStatus": {
+            "type": "string",
+            "enum": [
+              "priced",
+              "pending"
+            ],
+            "description": "Whether hotel has been priced or needs lazy loading"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchOption"
+            }
+          }
+        }
+      },
+      "SearchOption": {
+        "type": "object",
+        "properties": {
+          "optionId": {
+            "type": "string"
+          },
+          "optionRefId": {
+            "type": "string"
+          },
+          "isPackage": {
+            "type": "boolean"
+          },
+          "packagePrice": {
+            "type": "object",
+            "properties": {
+              "gross": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              }
+            }
+          },
+          "refundable": {
+            "type": "boolean"
+          },
+          "refundableStatus": {
+            "type": "string"
+          },
+          "refundableDisplay": {
+            "type": "string"
+          },
+          "cancelPolicy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CancelPolicyItem"
+            }
+          },
+          "mealCode": {
+            "type": "string"
+          },
+          "mealDescription": {
+            "type": "string"
+          },
+          "surcharges": {
+            "nullable": true
+          },
+          "ratePlan": {
+            "nullable": true,
+            "type": "object",
+            "description": "Rate plan identifier (code and name).",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Rate plan code"
+              },
+              "name": {
+                "type": "string",
+                "description": "Rate plan name/description"
+              }
+            }
+          },
+          "isEarlyBooking": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Whether this option is an early-booking rate."
+          },
+          "earlyBookingInfo": {
+            "type": "object",
+            "nullable": true,
+            "description": "Early-booking window and description when applicable.",
+            "additionalProperties": true
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchRoom"
+            }
+          }
+        }
+      },
+      "SearchRoom": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string"
+          },
+          "roomTypeCode": {
+            "type": "string"
+          },
+          "roomType": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date"
+          },
+          "pax": {
+            "type": "object",
+            "properties": {
+              "adults": {
+                "type": "integer"
+              },
+              "children": {
+                "type": "integer"
+              }
+            }
+          },
+          "allotment": {
+            "type": "integer",
+            "description": "Available rooms"
+          },
+          "roomSettings": {
+            "nullable": true
+          },
+          "beds": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "rates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchRate"
+            }
+          }
+        }
+      },
+      "SearchRate": {
+        "type": "object",
+        "properties": {
+          "totalGrossPrice": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "rateplanKey": {
+            "type": "string"
+          },
+          "rateplanId": {
+            "type": "string"
+          },
+          "occupancy": {
+            "type": "string",
+            "description": "Passenger configuration (e.g., \"2+0\", \"2+1\")"
+          },
+          "rateplanDescription": {
+            "type": "string"
+          },
+          "mealCode": {
+            "type": "string"
+          },
+          "mealDescription": {
+            "type": "string"
+          },
+          "refundable": {
+            "type": "string"
+          },
+          "refundableStatus": {
+            "type": "string"
+          },
+          "isRefundable": {
+            "type": "boolean"
+          },
+          "cancellationPolicy": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "CancelPolicyItem": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SearchPagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "totalResults": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SearchMetadata": {
+        "type": "object",
+        "properties": {
+          "searchType": {
+            "type": "string",
+            "enum": [
+              "boundary",
+              "country",
+              "city",
+              "hotel"
+            ]
+          },
+          "searchArea": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              },
+              "radiusKm": {
+                "type": "integer"
+              }
+            }
+          },
+          "countryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "dates": {
+            "type": "object",
+            "properties": {
+              "checkin": {
+                "type": "string",
+                "format": "date"
+              },
+              "checkout": {
+                "type": "string",
+                "format": "date"
+              },
+              "nights": {
+                "type": "integer"
+              }
+            }
+          },
+          "guests": {
+            "type": "string"
+          },
+          "executionTime": {
+            "type": "string"
+          },
+          "sort": {
+            "type": "string"
+          }
+        }
+      },
+      "SingleHotelResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "hotel": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/HotelSearchResult"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "message": {
+                "type": "string",
+                "nullable": true
+              },
+              "suggestions": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tryDifferentDates": {
+                    "type": "boolean"
+                  },
+                  "checkRoomAvailability": {
+                    "type": "boolean"
+                  },
+                  "contactHotelDirectly": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "searchMetadata": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "hotelId": {
+                    "type": "string"
+                  },
+                  "dates": {
+                    "type": "object",
+                    "properties": {
+                      "checkin": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "checkout": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "nights": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "guests": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "PricingResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "searchId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "hotelsPriced": {
+                "type": "integer",
+                "description": "Number of hotels priced in this call"
+              },
+              "hotelsRemaining": {
+                "type": "integer",
+                "description": "Number of hotels still pending pricing"
+              },
+              "fromCache": {
+                "type": "boolean"
+              },
+              "cacheHits": {
+                "type": "integer"
+              },
+              "executionTime": {
+                "type": "string"
+              },
+              "circuitOpen": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "PrebookRequest": {
+        "type": "object",
+        "required": [
+          "optionRefId"
+        ],
+        "properties": {
+          "optionRefId": {
+            "type": "string",
+            "description": "The optionRefId from search results (as ref_xxxx). Server resolves reference from search cache."
+          },
+          "hotelRemarks": {
+            "type": "string",
+            "nullable": true,
+            "description": "Special remarks for the hotel"
+          }
+        }
+      },
+      "PrebookResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "offer": {
+                "$ref": "#/components/schemas/OfferDetails"
+              },
+              "rooms": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PrebookRoom"
+                }
+              },
+              "summary": {
+                "$ref": "#/components/schemas/BookingSummary"
+              }
+            }
+          }
+        }
+      },
+      "OfferDetails": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Offer reference ID"
+          },
+          "totalPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "expiresOn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Offer expiration timestamp"
+          },
+          "checkInDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOutDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "hotelId": {
+            "type": "integer"
+          },
+          "hotelName": {
+            "type": "string"
+          },
+          "remarks": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PrebookRoom": {
+        "type": "object",
+        "properties": {
+          "roomDescription": {
+            "type": "string"
+          },
+          "mealCode": {
+            "type": "string"
+          },
+          "mealDescription": {
+            "type": "string"
+          },
+          "ratePlanCode": {
+            "type": "string"
+          },
+          "ratePlanName": {
+            "type": "string"
+          },
+          "pax": {
+            "type": "object",
+            "properties": {
+              "adults": {
+                "type": "integer"
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "grossPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "refundable": {
+            "type": "boolean"
+          },
+          "dailyBreakdown": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "cancellationPolicy": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date"
+          },
+          "optionRefId": {
+            "type": "string"
+          },
+          "rateplanKey": {
+            "type": "string"
+          }
+        }
+      },
+      "BookingSummary": {
+        "type": "object",
+        "properties": {
+          "totalRooms": {
+            "type": "integer"
+          },
+          "totalNights": {
+            "type": "integer"
+          },
+          "totalPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          }
+        }
+      },
+      "BookingSimulateRequest": {
+        "type": "object",
+        "required": [
+          "offerId",
+          "leadPaxName",
+          "leadPaxSurname",
+          "leadPaxEmail",
+          "leadPaxPhone",
+          "countryCode"
+        ],
+        "properties": {
+          "offerId": {
+            "type": "string",
+            "description": "Offer reference from prebook (ref_xxxx)"
+          },
+          "leadPaxName": {
+            "type": "string",
+            "description": "Lead guest first name"
+          },
+          "leadPaxSurname": {
+            "type": "string",
+            "description": "Lead guest last name"
+          },
+          "leadPaxEmail": {
+            "type": "string",
+            "format": "email",
+            "description": "Lead guest email"
+          },
+          "leadPaxPhone": {
+            "type": "string",
+            "description": "Lead guest phone"
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "Country code (ISO alpha-2)"
+          },
+          "leadPaxAge": {
+            "type": "integer",
+            "minimum": 18,
+            "description": "Lead guest age (must be \u2265 18)"
+          },
+          "companions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Companion"
+            },
+            "description": "Additional guests"
+          },
+          "specialRequest": {
+            "type": "string",
+            "nullable": true,
+            "description": "Special requests for the hotel"
+          },
+          "hotelExtras": {
+            "description": "Selected extras (if applicable)"
+          },
+          "additionalInfoJson": {
+            "type": "string",
+            "nullable": true,
+            "description": "Additional info as JSON array"
+          }
+        }
+      },
+      "BookingSimulateResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "simulation": {
+                "type": "object",
+                "properties": {
+                  "valid": {
+                    "type": "boolean"
+                  },
+                  "offerId": {
+                    "type": "string"
+                  },
+                  "hotelName": {
+                    "type": "string"
+                  },
+                  "simulatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                }
+              },
+              "validation": {
+                "type": "object",
+                "properties": {
+                  "errors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "warnings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "results": {
+                    "type": "object"
+                  }
+                }
+              },
+              "pricing": {
+                "$ref": "#/components/schemas/BookingPricing"
+              },
+              "booking": {
+                "$ref": "#/components/schemas/BookingDetails"
+              }
+            }
+          }
+        }
+      },
+      "BookingCreateRequest": {
+        "type": "object",
+        "required": [
+          "offerId"
+        ],
+        "properties": {
+          "offerId": {
+            "type": "string",
+            "description": "Offer reference from prebook (ref_xxxx)"
+          },
+          "leadPaxName": {
+            "type": "string",
+            "description": "Lead guest first name (recommended)"
+          },
+          "leadPaxSurname": {
+            "type": "string",
+            "description": "Lead guest last name (recommended)"
+          },
+          "leadPaxEmail": {
+            "type": "string",
+            "format": "email",
+            "description": "Lead guest email (recommended)"
+          },
+          "leadPaxPhone": {
+            "type": "string",
+            "description": "Lead guest phone (recommended)"
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "Country code (recommended)"
+          },
+          "leadPaxAge": {
+            "type": "integer",
+            "minimum": 18,
+            "description": "Guest age"
+          },
+          "companions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Companion"
+            }
+          },
+          "specialRequest": {
+            "type": "string",
+            "nullable": true
+          },
+          "additionalInfoJson": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BookingCreateResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "booking": {
+                "$ref": "#/components/schemas/ConfirmedBooking"
+              },
+              "payment": {
+                "$ref": "#/components/schemas/PaymentInfo"
+              }
+            }
+          }
+        }
+      },
+      "ConfirmedBooking": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Booking reference (ref_xxxx)"
+          },
+          "publicReference": {
+            "type": "string",
+            "description": "Public booking reference"
+          },
+          "offerId": {
+            "type": "string"
+          },
+          "hotelId": {
+            "type": "integer"
+          },
+          "hotelName": {
+            "type": "string"
+          },
+          "checkInDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOutDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Confirmed",
+              "Pending",
+              "Cancelled"
+            ]
+          },
+          "totalPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "leadPax": {
+            "$ref": "#/components/schemas/LeadPax"
+          },
+          "companions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Companion"
+            }
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "specialRequest": {
+            "type": "string",
+            "nullable": true
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "LeadPax": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "surname": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "age": {
+            "type": "integer"
+          }
+        }
+      },
+      "Companion": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "surname": {
+            "type": "string"
+          },
+          "age": {
+            "type": "integer"
+          }
+        }
+      },
+      "PaymentInfo": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "transfer",
+              "card",
+              "cash"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "completed",
+              "failed"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          }
+        }
+      },
+      "BookingPricing": {
+        "type": "object",
+        "properties": {
+          "originalTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "additionalFees": {
+            "type": "number",
+            "format": "double"
+          },
+          "finalTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "breakdown": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "BookingDetails": {
+        "type": "object",
+        "properties": {
+          "checkInDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOutDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "leadPax": {
+            "$ref": "#/components/schemas/LeadPax"
+          },
+          "companions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Companion"
+            }
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "specialRequest": {
+            "type": "string",
+            "nullable": true
+          },
+          "hotelExtras": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "CancellationSimulateResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "simulation": {
+                "type": "object",
+                "properties": {
+                  "bookingId": {
+                    "type": "string"
+                  },
+                  "isSimulation": {
+                    "type": "boolean"
+                  },
+                  "simulatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              },
+              "cancellation": {
+                "$ref": "#/components/schemas/CancellationInfo"
+              },
+              "cancellationDetails": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "booking": {
+                "$ref": "#/components/schemas/BookingSnapshot"
+              },
+              "notes": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "CancelBookingRequest": {
+        "type": "object",
+        "required": [
+          "bookingNumber"
+        ],
+        "properties": {
+          "bookingNumber": {
+            "type": "string",
+            "description": "Booking reference (ref_xxxx) or public reference (BK-ymd-XXXXXXXX)"
+          },
+          "isTest": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "description": "Set to \"true\" to simulate without cancelling"
+          }
+        }
+      },
+      "CancelBookingResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "cancellation": {
+                "type": "object",
+                "properties": {
+                  "bookingId": {
+                    "type": "string"
+                  },
+                  "totalCancellationFee": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "currency": {
+                    "type": "string"
+                  },
+                  "isSimulation": {
+                    "type": "boolean"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "Cancelled",
+                      "Simulation"
+                    ]
+                  },
+                  "processedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              },
+              "cancellationDetails": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "booking": {
+                "$ref": "#/components/schemas/BookingSnapshot"
+              }
+            }
+          }
+        }
+      },
+      "CancellationInfo": {
+        "type": "object",
+        "properties": {
+          "totalCancellationFee": {
+            "type": "number",
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "BookingSnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "publicReference": {
+            "type": "string"
+          },
+          "hotelId": {
+            "type": "integer"
+          },
+          "checkInDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOutDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "originalAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "leadPax": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "surname": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "MyReservationsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "examples": [
+              true
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "reservations": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Reservation"
+                }
+              },
+              "summary": {
+                "$ref": "#/components/schemas/ReservationsSummary"
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/ReservationsPagination"
+              }
+            }
+          }
+        }
+      },
+      "Reservation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Internal reservation ID"
+          },
+          "publicReference": {
+            "type": "string",
+            "description": "Public booking reference"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Confirmed",
+              "Cancelled",
+              "Pending"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "hotel": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "Hotel ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Hotel name"
+              }
+            }
+          },
+          "stay": {
+            "type": "object",
+            "properties": {
+              "checkIn": {
+                "type": "string",
+                "format": "date"
+              },
+              "checkOut": {
+                "type": "string",
+                "format": "date"
+              },
+              "nights": {
+                "type": "integer"
+              }
+            }
+          },
+          "pricing": {
+            "type": "object",
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "grossAmount": {
+                "type": "number",
+                "format": "double"
+              },
+              "cancelledFee": {
+                "type": "number",
+                "format": "double",
+                "nullable": true
+              }
+            }
+          },
+          "leadGuest": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "surname": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "phone": {
+                "type": "string"
+              }
+            }
+          },
+          "address": {
+            "type": "object",
+            "properties": {
+              "street": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "string",
+                "nullable": true
+              },
+              "postalCode": {
+                "type": "string",
+                "nullable": true
+              },
+              "country": {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              }
+            }
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "companions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Companion"
+            }
+          },
+          "specialRequest": {
+            "type": "string",
+            "nullable": true
+          },
+          "remarks": {
+            "type": "string",
+            "nullable": true
+          },
+          "documentStatus": {
+            "type": "object",
+            "properties": {
+              "invoiceSent": {
+                "type": "boolean"
+              },
+              "voucherIssued": {
+                "type": "boolean"
+              },
+              "invoiceNumber": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "ReservationsSummary": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Total number of reservations"
+          },
+          "confirmed": {
+            "type": "integer",
+            "description": "Number of confirmed reservations"
+          },
+          "cancelled": {
+            "type": "integer",
+            "description": "Number of cancelled reservations"
+          }
+        }
+      },
+      "ReservationsPagination": {
+        "type": "object",
+        "properties": {
+          "currentPage": {
+            "type": "integer"
+          },
+          "perPage": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "lastPage": {
+            "type": "integer"
+          },
+          "firstPageUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "lastPageUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "parameters": {
+      "ApiVersionHeader": {
+        "name": "X-API-Version",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "default": "v1"
+        },
+        "description": "API version header"
+      },
+      "IdempotencyKeyHeader": {
+        "name": "X-Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "description": "Unique idempotency key for write operations (usually UUID v4).\nValid for 24 hours. Prevents duplicate bookings/cancellations.\n",
+        "examples": {
+          "uuid": {
+            "value": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        }
+      }
+    },
+    "headers": {
+      "X-RateLimit-Limit": {
+        "description": "Maximum requests allowed in the current window",
+        "schema": {
+          "type": "integer",
+          "examples": [
+            600
+          ]
+        }
+      },
+      "X-RateLimit-Remaining": {
+        "description": "Requests remaining in the current window",
+        "schema": {
+          "type": "integer",
+          "examples": [
+            599
+          ]
+        }
+      },
+      "X-RateLimit-Reset": {
+        "description": "Timestamp when the rate limit resets",
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "examples": [
+            1640995200
+          ]
+        }
+      },
+      "X-Idempotent-Replayed": {
+        "description": "Indicates the response was returned from cache (idempotent replay)",
+        "schema": {
+          "type": "boolean",
+          "examples": [
+            true
+          ]
+        }
+      },
+      "X-Request-ID": {
+        "description": "Unique request identifier. Sent in every response; client may send it in the request (optional). Use for log correlation when contacting support.",
+        "schema": {
+          "type": "string",
+          "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "Authentication and token management endpoints"
+    },
+    {
+      "name": "Hotels",
+      "description": "Hotel information and details endpoints"
+    },
+    {
+      "name": "Search & Availability",
+      "description": "Search endpoints for hotel availability and pricing.\n\nAll search endpoints return a `searchId` that you use for pagination and lazy pricing. Results are subject to **market restrictions** \u2014 hotels are only returned if the guest's nationality is enabled for that hotel.\n\n**Common Search Parameters:**\n- `checkin`: Check-in date (YYYY-MM-DD)\n- `checkout`: Check-out date (YYYY-MM-DD)\n- `guests`: Occupancy for **one room**. Format: `adults` or `adults-child1age,child2age` (e.g. `2`, `2-5,12`). **API v1:** Only single room is supported; multi-room (format with `.`) returns a validation error.\n- `nationality`: Guest nationality, ISO alpha-2 (e.g. `ES`, `GB`)\n- `sort`: Sort order - `price_asc` (default), `price_desc`, `name_asc`, `name_desc`, `stars_asc`, `stars_desc`\n\n**Guest format rules (API v1):** Single room only. Use `adults` or `adults-child1,child2`. Only digits, `-` and `,`. Must start and end with a digit. Child ages: 0\u201317. Multi-room (e.g. `2.2-5`) is not supported in v1 and returns a validation error.\n"
+    },
+    {
+      "name": "Prebooking",
+      "description": "Create temporary offers before confirming reservations"
+    },
+    {
+      "name": "Booking",
+      "description": "Create and simulate bookings from prebooked offers"
+    },
+    {
+      "name": "Reservations",
+      "description": "Retrieve and manage user reservations"
+    },
+    {
+      "name": "Cancellation",
+      "description": "Cancel bookings and simulate cancellation costs"
+    }
+  ]
+}
