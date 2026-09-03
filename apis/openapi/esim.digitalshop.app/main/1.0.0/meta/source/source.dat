@@ -1,0 +1,541 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "eSIM Zones API",
+    "description": "API for querying eSIM location zones, operators/providers per zone,\nand price ranges per gigabyte.\n\nAll requests go through OpenCart's single entry point:\n`GET /index.php?route=<path>&param=value`\n",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/ALEKSANDRBURDENKOV/esim-zones-api/1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://esim.digitalshop.app/index.php",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "ApiTokenQuery": []
+    },
+    {
+      "ApiTokenHeader": []
+    },
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/login": {
+      "post": {
+        "summary": "Login and obtain API token",
+        "description": "Authenticates using an API key (configured in OpenCart admin: System > Users > API).\nNo authentication is required for this endpoint itself.\n\nOn success returns a `token` (valid for 3 hours) that must be passed\nto all subsequent API requests using one of the following methods:\n- Query parameter: `?token=<token>`\n- Header: `X-API-Token: <token>`\n- Header: `Authorization: Bearer <token>`\n\n**Actual URL:** `POST /index.php?route=api/login`\n",
+        "operationId": "login",
+        "security": [],
+        "parameters": [
+          {
+            "name": "route",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "api/login"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "key"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "API key from OpenCart admin panel (System > Users > API).\nThis is the only parameter required \u2014 no token or other\nauthentication is needed for the login request itself.\n",
+                    "example": "mySeCrEtApIkEy123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/LoginSuccess"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoginError"
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Successful login",
+                    "value": {
+                      "success": "Success: API session successfully started!",
+                      "token": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+                    }
+                  },
+                  "error": {
+                    "summary": "Invalid API key",
+                    "value": {
+                      "error": {
+                        "key": "Warning: No match found for the API key!"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/esim/zones/providers": {
+      "get": {
+        "summary": "Get providers by location zone",
+        "description": "Returns a list of mobile operators (providers) available in the given\nlocation zone, including per-MB and per-GB pricing, LTE/5G support info.\n\n**Actual URL:** `GET /index.php?route=api/esim/zones/providers&location_id=X&token=X`\n",
+        "operationId": "getProvidersByLocation",
+        "parameters": [
+          {
+            "name": "route",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "api/esim/zones/providers"
+              ]
+            }
+          },
+          {
+            "name": "location_id",
+            "in": "query",
+            "required": true,
+            "description": "Location zone ID (LZ ID from zone data)",
+            "schema": {
+              "type": "integer",
+              "example": 75603
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "description": "API authentication token (alternative to header)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Provider"
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "example": 2
+                    },
+                    "location_id": {
+                      "type": "integer",
+                      "example": 75603
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/esim/zones/priceRange": {
+      "get": {
+        "summary": "Get price range per GB for a location zone",
+        "description": "Returns min and max price per 1 GB (in EUR) across all operators\nin the given location zone. If the optional `gb` parameter is provided,\nalso returns total min/max cost for the specified data volume.\n\n**Actual URL:** `GET /index.php?route=api/esim/zones/priceRange&location_id=X&token=X`\n",
+        "operationId": "getPriceRange",
+        "parameters": [
+          {
+            "name": "route",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "api/esim/zones/priceRange"
+              ]
+            }
+          },
+          {
+            "name": "location_id",
+            "in": "query",
+            "required": true,
+            "description": "Location zone ID (LZ ID)",
+            "schema": {
+              "type": "integer",
+              "example": 75603
+            }
+          },
+          {
+            "name": "gb",
+            "in": "query",
+            "required": false,
+            "description": "Number of gigabytes. When provided, response includes\n`min_total` and `max_total` fields with the cost for this volume.\n",
+            "schema": {
+              "type": "number",
+              "format": "float",
+              "example": 5
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "description": "API authentication token (alternative to header)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Price range data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PriceRangeBasic"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PriceRangeWithTotal"
+                    }
+                  ]
+                },
+                "examples": {
+                  "without_gb": {
+                    "summary": "Response without gb parameter",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "location_zone_id": 75603,
+                        "zone_name": "Germany",
+                        "min_price_per_gb": 0.520958,
+                        "max_price_per_gb": 1.03379,
+                        "currency": "EUR",
+                        "operators_count": 2
+                      }
+                    }
+                  },
+                  "with_gb": {
+                    "summary": "Response with gb=5",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "location_zone_id": 75603,
+                        "zone_name": "Germany",
+                        "gb": 5,
+                        "min_total": 2.60479,
+                        "max_total": 5.16895,
+                        "min_price_per_gb": 0.520958,
+                        "max_price_per_gb": 1.03379,
+                        "currency": "EUR",
+                        "operators_count": 2
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiTokenQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "token"
+      },
+      "ApiTokenHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Token"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "LoginSuccess": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "string",
+            "example": "Success: API session successfully started!"
+          },
+          "token": {
+            "type": "string",
+            "description": "Bearer token to use for authenticated requests",
+            "example": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+          }
+        }
+      },
+      "LoginError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "example": "Warning: No match found for the API key!"
+              }
+            }
+          }
+        }
+      },
+      "Provider": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "example": "Germany"
+          },
+          "operator": {
+            "type": "string",
+            "example": "O2 Germany"
+          },
+          "mccmnc": {
+            "type": "string",
+            "example": "26207"
+          },
+          "price_per_mb_eur": {
+            "type": "number",
+            "format": "float",
+            "description": "Price per megabyte in EUR",
+            "example": 0.000508748046875
+          },
+          "price_per_gb_eur": {
+            "type": "number",
+            "format": "float",
+            "description": "Price per gigabyte in EUR (price_per_mb * 1024)",
+            "example": 0.520958
+          },
+          "lte": {
+            "type": "boolean",
+            "description": "LTE support",
+            "example": true
+          },
+          "nsa_5g": {
+            "type": "boolean",
+            "description": "NSA 5G support",
+            "example": true
+          },
+          "charging_interval_kb": {
+            "type": "integer",
+            "description": "Data charging interval in KB",
+            "example": 1
+          },
+          "has_pricing": {
+            "type": "boolean",
+            "description": "Whether pricing data is available for this operator",
+            "example": true
+          }
+        }
+      },
+      "PriceRangeBasic": {
+        "type": "object",
+        "description": "Response when gb parameter is NOT provided",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "location_zone_id": {
+                "type": "integer",
+                "example": 75603
+              },
+              "zone_name": {
+                "type": "string",
+                "example": "Germany"
+              },
+              "min_price_per_gb": {
+                "type": "number",
+                "format": "float",
+                "nullable": true,
+                "description": "Minimum price per 1 GB in EUR",
+                "example": 0.520958
+              },
+              "max_price_per_gb": {
+                "type": "number",
+                "format": "float",
+                "nullable": true,
+                "description": "Maximum price per 1 GB in EUR",
+                "example": 1.03379
+              },
+              "currency": {
+                "type": "string",
+                "example": "EUR"
+              },
+              "operators_count": {
+                "type": "integer",
+                "description": "Number of operators with pricing data",
+                "example": 2
+              }
+            }
+          }
+        }
+      },
+      "PriceRangeWithTotal": {
+        "type": "object",
+        "description": "Response when gb parameter IS provided",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "location_zone_id": {
+                "type": "integer",
+                "example": 75603
+              },
+              "zone_name": {
+                "type": "string",
+                "example": "Germany"
+              },
+              "gb": {
+                "type": "number",
+                "format": "float",
+                "description": "Requested data volume in GB",
+                "example": 5
+              },
+              "min_total": {
+                "type": "number",
+                "format": "float",
+                "description": "Minimum total cost for the requested volume",
+                "example": 2.60479
+              },
+              "max_total": {
+                "type": "number",
+                "format": "float",
+                "description": "Maximum total cost for the requested volume",
+                "example": 5.16895
+              },
+              "min_price_per_gb": {
+                "type": "number",
+                "format": "float",
+                "description": "Minimum price per 1 GB in EUR",
+                "example": 0.520958
+              },
+              "max_price_per_gb": {
+                "type": "number",
+                "format": "float",
+                "description": "Maximum price per 1 GB in EUR",
+                "example": 1.03379
+              },
+              "currency": {
+                "type": "string",
+                "example": "EUR"
+              },
+              "operators_count": {
+                "type": "integer",
+                "example": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "AuthError": {
+        "description": "Authentication required",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Authentication required. Please provide valid API token."
+                },
+                "code": {
+                  "type": "string",
+                  "example": "AUTH_REQUIRED"
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotFoundError": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Location zone not found"
+                },
+                "code": {
+                  "type": "string",
+                  "example": "NOT_FOUND"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
