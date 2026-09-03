@@ -1,0 +1,1125 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ePayServices Open API",
+    "description": "ePayServices Open API providing Account Information Services (AIS) and Payment Initiation Services (PIS) for payment providers and third-party developers. Supports OAuth2 and OpenID Connect for secure authentication. Enables access to account history, transaction data, internal transfers, and payment initiation with customer-authorized data access.",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://epayservices.com/en/open-api.html",
+    "contact": {
+      "name": "ePayServices Developer Portal",
+      "url": "https://epayservices.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://online.epayservices.com/open_api/v1",
+      "description": "ePayServices Production API"
+    }
+  ],
+  "security": [
+    {
+      "OAuth2": ["ais", "pis"]
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "OAuth2 and OpenID Connect token management"
+    },
+    {
+      "name": "Account Information",
+      "description": "Account Information Service (AIS) - account details and history"
+    },
+    {
+      "name": "Payment Initiation",
+      "description": "Payment Initiation Service (PIS) - transfers and payments"
+    }
+  ],
+  "paths": {
+    "/auth/token": {
+      "post": {
+        "operationId": "requestOAuthToken",
+        "summary": "Request OAuth2 Access Token",
+        "description": "Obtain an OAuth2 access token using authorization code or client credentials grant. The token is required for all subsequent API requests.",
+        "tags": ["Authentication"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Access token issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid grant type or parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid client credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/authorize": {
+      "get": {
+        "operationId": "authorizeUser",
+        "summary": "OAuth2 Authorization Endpoint",
+        "description": "Redirect the user to the ePayServices authorization page to grant consent for accessing their account data. Implements the OAuth2 authorization code flow with OpenID Connect.",
+        "tags": ["Authentication"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "description": "OAuth2 response type, must be 'code'",
+            "schema": {
+              "type": "string",
+              "enum": ["code"]
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "description": "Application client ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "description": "URI to redirect the user to after authorization",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "description": "Space-separated list of scopes (e.g., 'openid ais pis')",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "Opaque value to prevent CSRF attacks, returned in callback",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to ePayServices authorization page"
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - unknown client_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/userinfo": {
+      "get": {
+        "operationId": "getUserInfo",
+        "summary": "Get User Info (OpenID Connect)",
+        "description": "Retrieve the authenticated user's profile information via the OpenID Connect UserInfo endpoint.",
+        "tags": ["Authentication"],
+        "responses": {
+          "200": {
+            "description": "User profile information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfoResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or expired token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts": {
+      "get": {
+        "operationId": "listAccounts",
+        "summary": "List User Accounts",
+        "description": "Retrieve the list of accounts accessible to the authenticated user under the granted AIS consent.",
+        "tags": ["Account Information"],
+        "responses": {
+          "200": {
+            "description": "List of accounts retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid token or insufficient scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}": {
+      "get": {
+        "operationId": "getAccountDetails",
+        "summary": "Get Account Details",
+        "description": "Retrieve detailed information for a specific account including balance and account status.",
+        "tags": ["Account Information"],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "description": "Unique identifier of the account",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account details retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Account not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/balance": {
+      "get": {
+        "operationId": "getAccountBalance",
+        "summary": "Get Account Balance",
+        "description": "Retrieve the current available balance for a specific account.",
+        "tags": ["Account Information"],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "description": "Unique identifier of the account",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Balance retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Account not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/transactions": {
+      "get": {
+        "operationId": "getAccountTransactions",
+        "summary": "Get Account Transaction History",
+        "description": "Retrieve the transaction history for a specific account. Supports pagination and date range filtering.",
+        "tags": ["Account Information"],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "description": "Unique identifier of the account",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "description": "Start date for transaction history (ISO 8601 format)",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "description": "End date for transaction history (ISO 8601 format)",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "type_act",
+            "in": "query",
+            "required": false,
+            "description": "Filter by transaction direction",
+            "schema": {
+              "type": "string",
+              "enum": ["in", "out"]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "description": "Number of transactions per page",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction history retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid date range or parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Account not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{accountId}/transactions/{transactionId}": {
+      "get": {
+        "operationId": "getTransactionDetails",
+        "summary": "Get Transaction Details",
+        "description": "Retrieve detailed information about a specific transaction.",
+        "tags": ["Account Information"],
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "description": "Unique identifier of the account",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "description": "Unique identifier of the transaction",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction details retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Transaction not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments/internal-transfer": {
+      "post": {
+        "operationId": "initiateInternalTransfer",
+        "summary": "Initiate Internal Transfer (P2P)",
+        "description": "Initiate an internal peer-to-peer transfer between ePayServices accounts. Requires PIS scope and customer authorization.",
+        "tags": ["Payment Initiation"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalTransferRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transfer initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid transfer parameters or insufficient funds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid token or insufficient PIS scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - transfer not authorized by customer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments/{paymentId}": {
+      "get": {
+        "operationId": "getPaymentStatus",
+        "summary": "Get Payment Status",
+        "description": "Retrieve the current status and details of a previously initiated payment.",
+        "tags": ["Payment Initiation"],
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "description": "Unique identifier of the payment",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Payment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments": {
+      "get": {
+        "operationId": "listPayments",
+        "summary": "List Initiated Payments",
+        "description": "Retrieve a paginated list of payments initiated by the application.",
+        "tags": ["Payment Initiation"],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Filter by payment status",
+            "schema": {
+              "type": "string",
+              "enum": ["pending", "paid", "failed", "cancelled"]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of payments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "description": "OAuth2 authorization with OpenID Connect for user authentication and consent-based data access",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://online.epayservices.com/open_api/v1/auth/authorize",
+            "tokenUrl": "https://online.epayservices.com/open_api/v1/auth/token",
+            "scopes": {
+              "openid": "OpenID Connect user identity",
+              "ais": "Account Information Service - read account data and history",
+              "pis": "Payment Initiation Service - initiate transfers and payments"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "TokenRequest": {
+        "type": "object",
+        "required": ["grant_type"],
+        "properties": {
+          "grant_type": {
+            "type": "string",
+            "description": "OAuth2 grant type",
+            "enum": ["authorization_code", "refresh_token", "client_credentials"]
+          },
+          "code": {
+            "type": "string",
+            "description": "Authorization code (required for authorization_code grant)"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "format": "uri",
+            "description": "Redirect URI used in the authorization request"
+          },
+          "client_id": {
+            "type": "string",
+            "description": "Application client ID"
+          },
+          "client_secret": {
+            "type": "string",
+            "description": "Application client secret"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Refresh token (required for refresh_token grant)"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Space-separated list of requested scopes"
+          }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "OAuth2 access token"
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Token type, always 'Bearer'",
+            "enum": ["Bearer"]
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Token lifetime in seconds"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Refresh token for obtaining new access tokens"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Granted scopes"
+          },
+          "id_token": {
+            "type": "string",
+            "description": "OpenID Connect ID token (JWT)"
+          }
+        }
+      },
+      "UserInfoResponse": {
+        "type": "object",
+        "properties": {
+          "sub": {
+            "type": "string",
+            "description": "Subject identifier (unique user ID)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Full name"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "email_verified": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AccountListResponse": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountDetails"
+            }
+          }
+        }
+      },
+      "AccountDetails": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique account identifier"
+          },
+          "account_id": {
+            "type": "string",
+            "description": "Public account number"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "status": {
+            "type": "string",
+            "description": "Account status",
+            "enum": ["active", "inactive", "blocked"]
+          },
+          "available_balance": {
+            "type": "string",
+            "description": "Current available balance as decimal string"
+          },
+          "account_type": {
+            "type": "string",
+            "description": "Type of account"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Account creation timestamp"
+          }
+        }
+      },
+      "BalanceResponse": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "description": "Account identifier"
+          },
+          "available_balance": {
+            "type": "string",
+            "description": "Available balance as decimal string"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last balance update timestamp"
+          }
+        }
+      },
+      "TransactionListResponse": {
+        "type": "object",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransactionDetails"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "TransactionDetails": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique transaction identifier"
+          },
+          "account_id": {
+            "type": "string",
+            "description": "Account the transaction belongs to"
+          },
+          "type_act": {
+            "type": "string",
+            "description": "Transaction direction",
+            "enum": ["in", "out"]
+          },
+          "description": {
+            "type": "string",
+            "description": "Transaction description"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Additional comment on the transaction"
+          },
+          "status": {
+            "type": "string",
+            "description": "Transaction status",
+            "enum": ["pending", "paid", "failed", "cancelled"]
+          },
+          "amount": {
+            "type": "string",
+            "description": "Transaction amount as decimal string"
+          },
+          "tax": {
+            "type": "string",
+            "description": "Tax/fee amount applied to the transaction"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Transaction creation timestamp"
+          },
+          "transaction_type": {
+            "type": "string",
+            "description": "Type of transaction (e.g., internal_transfer, external_payment)"
+          },
+          "available_balance": {
+            "type": "string",
+            "description": "Account balance after this transaction"
+          }
+        }
+      },
+      "InternalTransferRequest": {
+        "type": "object",
+        "required": ["source_account_id", "destination_account_id", "amount", "currency"],
+        "properties": {
+          "source_account_id": {
+            "type": "string",
+            "description": "Source account identifier"
+          },
+          "destination_account_id": {
+            "type": "string",
+            "description": "Destination ePayServices account identifier"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Transfer amount as decimal string",
+            "pattern": "^\\d+\\.\\d{2}$"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "description": {
+            "type": "string",
+            "description": "Transfer description/memo",
+            "maxLength": 255
+          },
+          "reference": {
+            "type": "string",
+            "description": "External reference for the transfer"
+          }
+        }
+      },
+      "PaymentResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique payment identifier"
+          },
+          "source_account_id": {
+            "type": "string",
+            "description": "Source account"
+          },
+          "destination_account_id": {
+            "type": "string",
+            "description": "Destination account"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Payment amount"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency code"
+          },
+          "status": {
+            "type": "string",
+            "description": "Payment status",
+            "enum": ["pending", "paid", "failed", "cancelled"]
+          },
+          "description": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PaymentListResponse": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentResponse"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "Current page number"
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Items per page"
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of items"
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error code"
+          },
+          "error_description": {
+            "type": "string",
+            "description": "Human-readable error description"
+          },
+          "status": {
+            "type": "integer",
+            "description": "HTTP status code"
+          }
+        }
+      }
+    }
+  }
+}
