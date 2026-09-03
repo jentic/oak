@@ -1,0 +1,925 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Dusupay African Payments API",
+    "description": "Dusupay is an African payments platform that enables merchants to collect and disburse funds via mobile money, bank transfers, and card payments across 15+ African countries. It supports collections (inbound payments), payouts/disbursements (outbound transfers), and provides utility endpoints for balance inquiries, payment provider listings, and transaction verification.",
+    "version": "1",
+    "x-jentic-source-url": "https://developer.dusupay.com/"
+  },
+  "servers": [
+    {
+      "url": "https://payments.dusupay.com",
+      "description": "Production"
+    },
+    {
+      "url": "https://sandboxapi.dusupay.com",
+      "description": "Sandbox"
+    }
+  ],
+  "security": [
+    {
+      "PublicKey": []
+    }
+  ],
+  "paths": {
+    "/data/wallet-balances": {
+      "get": {
+        "operationId": "getWalletBalances",
+        "summary": "Get wallet balances",
+        "description": "Retrieve the merchant's wallet balances across all currencies or filtered by a specific currency. Requires both public and secret keys.",
+        "tags": ["Utility"],
+        "parameters": [
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3
+            },
+            "description": "Filter by ISO 3-character currency code (e.g., UGX, KES, NGN)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Wallet balances retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Request Successful"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "merchant_wallets": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/WalletBalance"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing API keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/payment-providers": {
+      "get": {
+        "operationId": "getPaymentProviders",
+        "summary": "List available payment providers",
+        "description": "Retrieve a list of available payment providers filtered by currency and transaction type. Use this to determine which providers are available for collections or payouts in a given currency.",
+        "tags": ["Utility"],
+        "parameters": [
+          {
+            "name": "currency",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3
+            },
+            "description": "ISO 3-character currency code (e.g., UGX, KES, NGN)"
+          },
+          {
+            "name": "transaction_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["COLLECTION", "PAYOUT"]
+            },
+            "description": "The type of transaction"
+          },
+          {
+            "name": "country_code",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 2
+            },
+            "description": "ISO 2-character country code to further filter providers"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment providers retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "payment_providers": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PaymentProvider"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/payout-bank-codes": {
+      "get": {
+        "operationId": "getPayoutBankCodes",
+        "summary": "Get payout bank codes",
+        "description": "Retrieve a list of supported bank codes for a given payment provider. Required when initiating bank transfer payouts to specify the recipient's bank.",
+        "tags": ["Utility"],
+        "parameters": [
+          {
+            "name": "provider_code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The payment provider code obtained from the payment providers list"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bank codes retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "payout_banks": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PayoutBank"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/transaction/verify/{reference}": {
+      "get": {
+        "operationId": "verifyTransactionStatus",
+        "summary": "Verify transaction status",
+        "description": "Verify the current status of a transaction using the merchant reference. Note: status checks are rate-limited and will be denied if made less than 2 minutes after transaction initiation. Recommended polling interval is 5 minutes.",
+        "tags": ["Utility"],
+        "parameters": [
+          {
+            "name": "reference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The merchant reference ID used when initiating the transaction"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TransactionDetails"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid reference",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests - status check rate limit exceeded (minimum 2-minute grace period)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collections/initialize": {
+      "post": {
+        "operationId": "initializeCollection",
+        "summary": "Initialize a collection request",
+        "description": "Initiate a funds collection (inbound payment) via mobile money, bank transfer, or card. Supports both direct charge and hosted page workflows. For mobile money hosted pages, set mobile_money_hpp to true and provide a redirect_url.",
+        "tags": ["Collections"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["merchant_reference", "transaction_method", "currency", "amount", "provider_code", "description"],
+                "properties": {
+                  "merchant_reference": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Unique reference for this request. Must be at least 8 characters. Use 'auto' for auto-generation."
+                  },
+                  "transaction_method": {
+                    "type": "string",
+                    "enum": ["MOBILE_MONEY", "BANK", "CARD"],
+                    "description": "The payment method to use"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 3,
+                    "description": "ISO 3-character currency code"
+                  },
+                  "amount": {
+                    "type": "number",
+                    "description": "The amount to collect"
+                  },
+                  "provider_code": {
+                    "type": "string",
+                    "description": "The payment provider code from the payment options list"
+                  },
+                  "msisdn": {
+                    "type": "string",
+                    "description": "Payer's phone number in international format (required for direct mobile money)"
+                  },
+                  "customer_name": {
+                    "type": "string",
+                    "description": "Name of the payer"
+                  },
+                  "customer_email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address of the payer"
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 30,
+                    "description": "Transaction narration (10-30 characters)"
+                  },
+                  "charge_customer": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Whether to charge transaction fees to the customer"
+                  },
+                  "allow_final_status_change": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Allow the transaction to change to a final status after initial completion"
+                  },
+                  "mobile_money_hpp": {
+                    "type": "boolean",
+                    "description": "Set to true for hosted page workflow (mobile money only)"
+                  },
+                  "redirect_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL to redirect to after hosted page payment (required when mobile_money_hpp is true)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Collection request accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 202
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "accepted"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Request Accepted"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "internal_reference": {
+                          "type": "string",
+                          "description": "System-generated transaction reference"
+                        },
+                        "merchant_reference": {
+                          "type": "string",
+                          "description": "The merchant's reference"
+                        },
+                        "payment_url": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "Hosted payment page URL (only for hosted page workflows)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collections/authorize": {
+      "post": {
+        "operationId": "authorizeCollection",
+        "summary": "Authorize a collection with OTP",
+        "description": "Authorize a pending collection transaction by providing the OTP received by the customer. This is used for mobile money direct charge flows that require OTP verification.",
+        "tags": ["Collections"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["internal_reference", "otp"],
+                "properties": {
+                  "internal_reference": {
+                    "type": "string",
+                    "description": "The internal reference returned from the initialize endpoint"
+                  },
+                  "otp": {
+                    "type": "string",
+                    "description": "The one-time password received by the customer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Collection authorized successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Authorization Successful"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "internal_reference": {
+                          "type": "string"
+                        },
+                        "merchant_reference": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid OTP or reference",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payout/send-funds": {
+      "post": {
+        "operationId": "initiatePayout",
+        "summary": "Send funds (payout/disbursement)",
+        "description": "Initiate a payout to send funds to a recipient via mobile money or bank transfer. For bank transfers, include extra_params.bank_code obtained from the payout bank codes endpoint.",
+        "tags": ["Payouts"],
+        "security": [
+          {
+            "PublicKey": [],
+            "SecretKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["merchant_reference", "transaction_method", "currency", "amount", "provider_code", "account_number", "customer_name", "description"],
+                "properties": {
+                  "merchant_reference": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Unique reference for this payout. Must be at least 8 characters."
+                  },
+                  "transaction_method": {
+                    "type": "string",
+                    "enum": ["MOBILE_MONEY", "BANK"],
+                    "description": "The payout method"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 3,
+                    "description": "ISO 3-character currency code"
+                  },
+                  "amount": {
+                    "type": "number",
+                    "description": "The amount to send"
+                  },
+                  "provider_code": {
+                    "type": "string",
+                    "description": "The payment provider code from the payment options list"
+                  },
+                  "account_number": {
+                    "type": "string",
+                    "description": "Recipient phone number (mobile money) or bank account number"
+                  },
+                  "customer_name": {
+                    "type": "string",
+                    "description": "Name of the recipient"
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 30,
+                    "description": "Transaction narration (10-30 characters)"
+                  },
+                  "extra_params": {
+                    "type": "object",
+                    "properties": {
+                      "bank_code": {
+                        "type": "string",
+                        "description": "Recipient bank code (required for BANK payouts, from payout bank codes endpoint)"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Payout request accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "example": 202
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "accepted"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Request Accepted"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "internal_reference": {
+                          "type": "string",
+                          "description": "System-generated transaction reference"
+                        },
+                        "merchant_reference": {
+                          "type": "string",
+                          "description": "The merchant's reference"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "PublicKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "public-key",
+        "description": "Merchant's public API key"
+      },
+      "SecretKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "secret-key",
+        "description": "Merchant's secret API key (required for payouts and balance inquiries)"
+      }
+    },
+    "schemas": {
+      "WalletBalance": {
+        "type": "object",
+        "properties": {
+          "available_balance": {
+            "type": "number",
+            "description": "Available balance for transactions"
+          },
+          "actual_balance": {
+            "type": "number",
+            "description": "Actual total balance"
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 3-character currency code"
+          },
+          "uncleared_balance": {
+            "type": "number",
+            "description": "Balance pending clearing"
+          },
+          "reserve_balance": {
+            "type": "number",
+            "description": "Reserved balance"
+          },
+          "wallet_type": {
+            "type": "string",
+            "enum": ["MERCHANT_COLLECTION", "MERCHANT_PAYOUT"],
+            "description": "Type of wallet"
+          }
+        }
+      },
+      "PaymentProvider": {
+        "type": "object",
+        "properties": {
+          "provider_code": {
+            "type": "string",
+            "description": "Unique provider identifier"
+          },
+          "provider_name": {
+            "type": "string",
+            "description": "Human-readable provider name"
+          },
+          "transaction_method": {
+            "type": "string",
+            "enum": ["MOBILE_MONEY", "BANK", "CARD"],
+            "description": "The transaction method"
+          },
+          "transaction_type": {
+            "type": "string",
+            "enum": ["COLLECTION", "PAYOUT"],
+            "description": "The transaction type"
+          },
+          "transaction_currency": {
+            "type": "string",
+            "description": "Supported currency"
+          },
+          "min_amount": {
+            "type": "number",
+            "description": "Minimum transaction amount"
+          },
+          "max_amount": {
+            "type": "number",
+            "description": "Maximum transaction amount"
+          },
+          "max_daily_amount": {
+            "type": "number",
+            "description": "Maximum daily transaction amount"
+          },
+          "is_active": {
+            "type": "boolean",
+            "description": "Whether the provider is currently active"
+          },
+          "option_prefixes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Supported phone number prefixes"
+          }
+        }
+      },
+      "PayoutBank": {
+        "type": "object",
+        "properties": {
+          "bank_code": {
+            "type": "string",
+            "description": "The bank code to use in payout requests"
+          },
+          "bank_name": {
+            "type": "string",
+            "description": "Human-readable bank name"
+          },
+          "is_active": {
+            "type": "boolean",
+            "description": "Whether the bank is active for payouts"
+          }
+        }
+      },
+      "TransactionDetails": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Internal transaction ID"
+          },
+          "merchant_reference": {
+            "type": "string",
+            "description": "Merchant's reference"
+          },
+          "internal_reference": {
+            "type": "string",
+            "description": "System-generated reference"
+          },
+          "transaction_type": {
+            "type": "string",
+            "enum": ["COLLECTION", "PAYOUT"],
+            "description": "Type of transaction"
+          },
+          "request_currency": {
+            "type": "string",
+            "description": "Requested currency code"
+          },
+          "request_amount": {
+            "type": "number",
+            "description": "Requested amount"
+          },
+          "transaction_amount": {
+            "type": "number",
+            "description": "Actual transaction amount"
+          },
+          "transaction_currency": {
+            "type": "string",
+            "description": "Transaction currency code"
+          },
+          "transaction_charge": {
+            "type": "number",
+            "description": "Transaction fee charged"
+          },
+          "transaction_account": {
+            "type": "string",
+            "description": "Account used for the transaction"
+          },
+          "charge_customer": {
+            "type": "boolean",
+            "description": "Whether fees were charged to the customer"
+          },
+          "total_credit": {
+            "type": "number",
+            "description": "Total amount credited to merchant"
+          },
+          "provider_code": {
+            "type": "string",
+            "description": "Payment provider used"
+          },
+          "customer_name": {
+            "type": "string",
+            "description": "Customer name"
+          },
+          "transaction_status": {
+            "type": "string",
+            "enum": ["PENDING", "PROCESSING", "FAILED", "COMPLETED", "CANCELLED"],
+            "description": "Current transaction status"
+          },
+          "status_message": {
+            "type": "string",
+            "description": "Detailed status message"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "HTTP status code"
+          },
+          "status": {
+            "type": "string",
+            "example": "error"
+          },
+          "message": {
+            "type": "string",
+            "description": "Error description"
+          },
+          "data": {
+            "type": "object",
+            "description": "Additional error details (usually empty)"
+          }
+        }
+      }
+    }
+  }
+}
