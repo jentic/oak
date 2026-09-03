@@ -1,0 +1,4842 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "LendAutomate API",
+    "description": "## Overview\nThe LendAutomate REST API enables third-party platforms to integrate with the private lending\nmanagement system. It provides programmatic access to all core modules: Leads, Deals, Loan\nServicing, Fund Management, Investors, Reports, Automation, and Administration.\n\n## Authentication\nAll API requests (except `/auth/login`) require a valid **Bearer token** obtained from the\nauthentication endpoint. Include the token in the `Authorization` header:\n\n```\nAuthorization: Bearer <your_access_token>\n```\n\nTokens expire after **24 hours**. Use the `/auth/refresh` endpoint to obtain a new token\nwithout re-authenticating.\n\n## Tenant Isolation\nLendAutomate is a multi-tenant platform. Every resource (leads, deals, loans, funds, etc.)\nis scoped to the authenticated user's tenant. You cannot access or modify data belonging to\nanother tenant.\n\n## Rate Limiting\nAPI requests are rate-limited to **1,000 requests per minute** per tenant. Exceeding this\nlimit returns HTTP 429. The response headers include:\n- `X-RateLimit-Limit` \u2014 requests allowed per minute\n- `X-RateLimit-Remaining` \u2014 requests remaining in the current window\n- `X-RateLimit-Reset` \u2014 Unix timestamp when the window resets\n\n## Pagination\nList endpoints support cursor-based pagination via `page` and `limit` query parameters.\nResponses include a `pagination` object with `total`, `page`, `limit`, and `totalPages`.\n\n## Error Handling\nAll errors follow a consistent structure:\n```json\n{\n  \"error\": {\n    \"code\": \"NOT_FOUND\",\n    \"message\": \"Lead with id 123 not found\"\n  }\n}\n```\n\nStandard HTTP status codes are used: 200 OK, 201 Created, 400 Bad Request, 401 Unauthorized,\n403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity, 429 Too Many Requests,\n500 Internal Server Error.\n\n## Webhooks\nLendAutomate can push real-time event notifications to your endpoint via webhooks. Configure\nwebhook URLs in the Integrations module. Events include deal stage changes, payment postings,\ncapital call issuances, and e-sign completions.\n",
+    "version": "1.0.0",
+    "contact": {
+      "name": "LendAutomate Support",
+      "email": "support@lendautomate.com",
+      "url": "https://lendautomate.com"
+    },
+    "license": {
+      "name": "Proprietary",
+      "url": "https://lendautomate.com/terms"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/lendautomatecom/lendautomate-api/1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://eapp-og9uragp.manus.space/api",
+      "description": "Production"
+    },
+    {
+      "url": "https://3000-iwrefru70o35xz4xho7wo-2d37c5b9.sg1.manus.computer/api",
+      "description": "Development / Sandbox"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "Login, logout, and token management"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Aggregated KPIs and activity feed"
+    },
+    {
+      "name": "Leads",
+      "description": "Prospective borrower lead management"
+    },
+    {
+      "name": "Deals",
+      "description": "Loan origination pipeline management"
+    },
+    {
+      "name": "Servicing",
+      "description": "Active loan servicing, payments, and payoff"
+    },
+    {
+      "name": "Funds",
+      "description": "Private lending fund management"
+    },
+    {
+      "name": "Investors",
+      "description": "Investor profiles and subscriptions"
+    },
+    {
+      "name": "Capital Calls",
+      "description": "Fund capital call issuance and tracking"
+    },
+    {
+      "name": "Distributions",
+      "description": "Fund distribution management"
+    },
+    {
+      "name": "Borrower Portal",
+      "description": "Borrower self-service endpoints"
+    },
+    {
+      "name": "Investor Portal",
+      "description": "Investor self-service endpoints"
+    },
+    {
+      "name": "E-Sign",
+      "description": "Electronic signature envelope management"
+    },
+    {
+      "name": "Documents",
+      "description": "Document template and generation management"
+    },
+    {
+      "name": "Reports",
+      "description": "Analytics and reporting"
+    },
+    {
+      "name": "Collections",
+      "description": "Delinquency and collections case management"
+    },
+    {
+      "name": "KYC",
+      "description": "Know Your Customer verification"
+    },
+    {
+      "name": "Syndication",
+      "description": "Loan syndication room management"
+    },
+    {
+      "name": "Automation",
+      "description": "Workflow automation rules"
+    },
+    {
+      "name": "Integrations",
+      "description": "Third-party integration configuration"
+    },
+    {
+      "name": "Tax Forms",
+      "description": "1098 and 1099 tax form generation"
+    },
+    {
+      "name": "Administration",
+      "description": "Users, roles, tenant configuration, and audit log"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT access token obtained from POST /auth/login"
+      }
+    },
+    "schemas": {
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "example": 150
+          },
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 20
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 8
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "NOT_FOUND"
+              },
+              "message": {
+                "type": "string",
+                "example": "Resource not found"
+              }
+            }
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "officer@lendautomate.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "example": "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+          }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Vivek Ghai"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "user"
+            ],
+            "example": "admin"
+          },
+          "tenantId": {
+            "type": "integer",
+            "example": 1
+          }
+        }
+      },
+      "Lead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 42
+          },
+          "firstName": {
+            "type": "string",
+            "example": "James"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Morrison"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+1-555-0123"
+          },
+          "companyName": {
+            "type": "string",
+            "example": "Morrison Holdings LLC"
+          },
+          "loanPurpose": {
+            "type": "string",
+            "example": "Acquisition"
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "bridge",
+              "construction",
+              "rehab",
+              "commercial"
+            ]
+          },
+          "requestedAmount": {
+            "type": "number",
+            "example": 1500000
+          },
+          "propertyAddress": {
+            "type": "string",
+            "example": "123 Main St, Austin TX 78701"
+          },
+          "propertyType": {
+            "type": "string",
+            "example": "Single Family"
+          },
+          "propertyValue": {
+            "type": "number",
+            "example": 2000000
+          },
+          "creditScore": {
+            "type": "integer",
+            "example": 720
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "contacted",
+              "qualified",
+              "proposal_sent",
+              "negotiating",
+              "converted",
+              "lost",
+              "duplicate"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "website",
+              "referral",
+              "broker",
+              "direct",
+              "social",
+              "email_campaign",
+              "phone",
+              "other"
+            ]
+          },
+          "assignedTo": {
+            "type": "integer",
+            "example": 5
+          },
+          "referredBy": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": "string"
+          },
+          "followUpAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateLeadRequest": {
+        "type": "object",
+        "required": [
+          "firstName",
+          "lastName"
+        ],
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "companyName": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "loanPurpose": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "bridge",
+              "construction",
+              "rehab",
+              "commercial"
+            ]
+          },
+          "requestedAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "propertyAddress": {
+            "type": "string"
+          },
+          "propertyType": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "propertyValue": {
+            "type": "number",
+            "minimum": 0
+          },
+          "creditScore": {
+            "type": "integer",
+            "minimum": 300,
+            "maximum": 850
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ],
+            "default": "medium"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "website",
+              "referral",
+              "broker",
+              "direct",
+              "social",
+              "email_campaign",
+              "phone",
+              "other"
+            ]
+          },
+          "assignedTo": {
+            "type": "integer"
+          },
+          "referredBy": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": "string"
+          },
+          "followUpAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Deal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 101
+          },
+          "loanNumber": {
+            "type": "string",
+            "example": "DL-2025-0042"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "application",
+              "processing",
+              "underwriting",
+              "approved",
+              "conditional_approval",
+              "clear_to_close",
+              "closing",
+              "funded",
+              "withdrawn",
+              "declined"
+            ]
+          },
+          "borrowerFirstName": {
+            "type": "string"
+          },
+          "borrowerLastName": {
+            "type": "string"
+          },
+          "borrowerEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "borrowerPhone": {
+            "type": "string"
+          },
+          "borrowerCompany": {
+            "type": "string"
+          },
+          "coBorrowerName": {
+            "type": "string"
+          },
+          "propertyAddress": {
+            "type": "string"
+          },
+          "propertyCity": {
+            "type": "string"
+          },
+          "propertyState": {
+            "type": "string"
+          },
+          "propertyZip": {
+            "type": "string"
+          },
+          "propertyType": {
+            "type": "string"
+          },
+          "propertyValue": {
+            "type": "number"
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "bridge",
+              "construction",
+              "rehab",
+              "commercial"
+            ]
+          },
+          "loanPurpose": {
+            "type": "string"
+          },
+          "loanAmount": {
+            "type": "number",
+            "example": 1200000
+          },
+          "interestRate": {
+            "type": "number",
+            "example": 10.5
+          },
+          "termMonths": {
+            "type": "integer",
+            "example": 12
+          },
+          "ltv": {
+            "type": "number",
+            "example": 65
+          },
+          "arv": {
+            "type": "number"
+          },
+          "arvLtv": {
+            "type": "number"
+          },
+          "originationFee": {
+            "type": "number"
+          },
+          "originationFeePercent": {
+            "type": "number"
+          },
+          "processingFee": {
+            "type": "number"
+          },
+          "paymentType": {
+            "type": "string",
+            "enum": [
+              "interest_only",
+              "amortizing",
+              "balloon"
+            ]
+          },
+          "prepaymentPenalty": {
+            "type": "boolean"
+          },
+          "prepaymentMonths": {
+            "type": "integer"
+          },
+          "creditScore": {
+            "type": "integer"
+          },
+          "assignedLO": {
+            "type": "integer"
+          },
+          "assignedUW": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "CAD"
+            ],
+            "default": "USD"
+          },
+          "targetCloseDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateDealRequest": {
+        "type": "object",
+        "required": [
+          "borrowerFirstName",
+          "borrowerLastName",
+          "productType",
+          "loanAmount"
+        ],
+        "properties": {
+          "borrowerFirstName": {
+            "type": "string"
+          },
+          "borrowerLastName": {
+            "type": "string"
+          },
+          "borrowerEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "borrowerPhone": {
+            "type": "string"
+          },
+          "borrowerCompany": {
+            "type": "string"
+          },
+          "coBorrowerName": {
+            "type": "string"
+          },
+          "propertyAddress": {
+            "type": "string"
+          },
+          "propertyCity": {
+            "type": "string"
+          },
+          "propertyState": {
+            "type": "string"
+          },
+          "propertyZip": {
+            "type": "string"
+          },
+          "propertyType": {
+            "type": "string"
+          },
+          "propertyValue": {
+            "type": "number"
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "bridge",
+              "construction",
+              "rehab",
+              "commercial"
+            ]
+          },
+          "loanPurpose": {
+            "type": "string"
+          },
+          "loanAmount": {
+            "type": "number",
+            "minimum": 1
+          },
+          "interestRate": {
+            "type": "number"
+          },
+          "termMonths": {
+            "type": "integer"
+          },
+          "ltv": {
+            "type": "number"
+          },
+          "arv": {
+            "type": "number"
+          },
+          "arvLtv": {
+            "type": "number"
+          },
+          "originationFee": {
+            "type": "string"
+          },
+          "originationFeePercent": {
+            "type": "string"
+          },
+          "processingFee": {
+            "type": "string"
+          },
+          "paymentType": {
+            "type": "string",
+            "enum": [
+              "interest_only",
+              "amortizing",
+              "balloon"
+            ]
+          },
+          "prepaymentPenalty": {
+            "type": "boolean"
+          },
+          "prepaymentMonths": {
+            "type": "integer"
+          },
+          "creditScore": {
+            "type": "integer",
+            "minimum": 300,
+            "maximum": 850
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "CAD"
+            ],
+            "default": "USD"
+          },
+          "targetCloseDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "leadId": {
+            "type": "integer",
+            "description": "Link to originating lead"
+          },
+          "seedDefaults": {
+            "type": "boolean",
+            "default": true,
+            "description": "Auto-seed conditions and document checklist"
+          }
+        }
+      },
+      "Loan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 55
+          },
+          "loanNumber": {
+            "type": "string",
+            "example": "LN-2025-0055"
+          },
+          "dealId": {
+            "type": "integer"
+          },
+          "borrowerName": {
+            "type": "string"
+          },
+          "propertyAddress": {
+            "type": "string"
+          },
+          "originalPrincipal": {
+            "type": "number",
+            "example": 1200000
+          },
+          "currentPrincipal": {
+            "type": "number",
+            "example": 1185000
+          },
+          "interestRate": {
+            "type": "number",
+            "example": 10.5
+          },
+          "termMonths": {
+            "type": "integer",
+            "example": 12
+          },
+          "originationDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "maturityDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "nextPaymentDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "nextPaymentAmount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "delinquent",
+              "default",
+              "paid_off",
+              "in_foreclosure"
+            ]
+          },
+          "paymentType": {
+            "type": "string",
+            "enum": [
+              "interest_only",
+              "amortizing",
+              "balloon"
+            ]
+          },
+          "accruedInterest": {
+            "type": "number"
+          },
+          "totalFees": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "loanId": {
+            "type": "integer"
+          },
+          "paymentDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "totalAmount": {
+            "type": "number",
+            "example": 10500
+          },
+          "principalAmount": {
+            "type": "number"
+          },
+          "interestAmount": {
+            "type": "number"
+          },
+          "feesAmount": {
+            "type": "number"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "wire",
+              "ach",
+              "check",
+              "other"
+            ]
+          },
+          "referenceNumber": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "postedBy": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PayoffQuote": {
+        "type": "object",
+        "properties": {
+          "loanId": {
+            "type": "integer"
+          },
+          "goodThroughDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "principalBalance": {
+            "type": "number"
+          },
+          "accruedInterest": {
+            "type": "number"
+          },
+          "perDiem": {
+            "type": "number"
+          },
+          "fees": {
+            "type": "number"
+          },
+          "totalPayoff": {
+            "type": "number"
+          },
+          "calculatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Fund": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Meridian Bridge Fund I"
+          },
+          "fundType": {
+            "type": "string",
+            "enum": [
+              "mortgage_fund",
+              "bridge_fund",
+              "construction_fund",
+              "mezzanine_fund",
+              "debt_fund"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed",
+              "winding_down"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "targetSize": {
+            "type": "number",
+            "example": 10000000
+          },
+          "calledCapital": {
+            "type": "number"
+          },
+          "navPerUnit": {
+            "type": "number"
+          },
+          "totalUnits": {
+            "type": "number"
+          },
+          "managementFee": {
+            "type": "number"
+          },
+          "performanceFee": {
+            "type": "number"
+          },
+          "inceptionDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "closingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateFundRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "fundType",
+          "currency",
+          "targetSize"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "fundType": {
+            "type": "string",
+            "enum": [
+              "mortgage_fund",
+              "bridge_fund",
+              "construction_fund",
+              "mezzanine_fund",
+              "debt_fund"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "CAD",
+              "GBP",
+              "EUR"
+            ],
+            "default": "USD"
+          },
+          "targetSize": {
+            "type": "number",
+            "minimum": 1
+          },
+          "managementFee": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "performanceFee": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "inceptionDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "closingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "Investor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 200
+          },
+          "name": {
+            "type": "string",
+            "example": "Apex Capital Partners"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "investorType": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "corporate",
+              "trust",
+              "joint",
+              "pension",
+              "ira"
+            ]
+          },
+          "kycStatus": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ]
+          },
+          "accreditationStatus": {
+            "type": "string",
+            "enum": [
+              "accredited",
+              "non_accredited",
+              "pending"
+            ]
+          },
+          "taxCountry": {
+            "type": "string",
+            "example": "US"
+          },
+          "taxId": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateInvestorRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "investorType"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "investorType": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "corporate",
+              "trust",
+              "joint",
+              "pension",
+              "ira"
+            ]
+          },
+          "kycStatus": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "default": "pending"
+          },
+          "accreditationStatus": {
+            "type": "string",
+            "enum": [
+              "accredited",
+              "non_accredited",
+              "pending"
+            ],
+            "default": "pending"
+          },
+          "taxCountry": {
+            "type": "string",
+            "default": "US"
+          },
+          "taxId": {
+            "type": "string"
+          }
+        }
+      },
+      "CapitalCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "fundId": {
+            "type": "integer"
+          },
+          "callNumber": {
+            "type": "integer"
+          },
+          "totalAmount": {
+            "type": "number",
+            "example": 2000000
+          },
+          "collectedAmount": {
+            "type": "number"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "issued",
+              "partially_funded",
+              "fully_funded",
+              "cancelled"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ESignEnvelope": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "dealId": {
+            "type": "integer"
+          },
+          "loanId": {
+            "type": "integer"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "sent",
+              "delivered",
+              "signed",
+              "completed",
+              "voided",
+              "declined"
+            ]
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string",
+                  "format": "email"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CollectionCase": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "loanId": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "monitoring",
+              "legal",
+              "resolved",
+              "closed"
+            ]
+          },
+          "escalationLevel": {
+            "type": "string",
+            "enum": [
+              "pre_foreclosure",
+              "foreclosure",
+              "reo"
+            ]
+          },
+          "assignedTo": {
+            "type": "integer"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "DashboardStats": {
+        "type": "object",
+        "properties": {
+          "loans": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "active": {
+                "type": "integer"
+              },
+              "delinquent": {
+                "type": "integer"
+              },
+              "totalPortfolio": {
+                "type": "number"
+              },
+              "totalAccruedInterest": {
+                "type": "number"
+              }
+            }
+          },
+          "funds": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "active": {
+                "type": "integer"
+              },
+              "totalAUM": {
+                "type": "number"
+              },
+              "totalCommitted": {
+                "type": "number"
+              },
+              "totalInvestors": {
+                "type": "integer"
+              }
+            }
+          },
+          "deals": {
+            "type": "object",
+            "properties": {
+              "pipelineCount": {
+                "type": "integer"
+              },
+              "fundedCount": {
+                "type": "integer"
+              },
+              "stageCounts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "stage": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Authenticate and obtain access token",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "example": {
+                "email": "officer@lendautomate.com",
+                "password": "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Invalidate the current session token",
+        "responses": {
+          "200": {
+            "description": "Logged out successfully"
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Get the currently authenticated user's profile",
+        "responses": {
+          "200": {
+            "description": "Current user profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/stats": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Get aggregated portfolio KPIs",
+        "description": "Returns loan portfolio stats, fund AUM, deal pipeline counts, and pending action items for the authenticated tenant.",
+        "responses": {
+          "200": {
+            "description": "Dashboard statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardStats"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/activity": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Get recent activity feed",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent activity events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "eventType": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "entityType": {
+                        "type": "string"
+                      },
+                      "entityId": {
+                        "type": "string"
+                      },
+                      "userId": {
+                        "type": "integer"
+                      },
+                      "userName": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leads": {
+      "get": {
+        "tags": [
+          "Leads"
+        ],
+        "summary": "List all leads",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "contacted",
+                "qualified",
+                "proposal_sent",
+                "negotiating",
+                "converted",
+                "lost",
+                "duplicate"
+              ]
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "urgent"
+              ]
+            }
+          },
+          {
+            "name": "productType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "bridge",
+                "construction",
+                "rehab",
+                "commercial"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedTo",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Full-text search on name, company, address"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "name",
+                "amount",
+                "priority"
+              ],
+              "default": "createdAt"
+            }
+          },
+          {
+            "name": "sortDir",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of leads",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Lead"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Leads"
+        ],
+        "summary": "Create a new lead",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLeadRequest"
+              },
+              "example": {
+                "firstName": "James",
+                "lastName": "Morrison",
+                "email": "james@morrisonholdings.com",
+                "phone": "+1-555-0123",
+                "productType": "bridge",
+                "requestedAmount": 1500000,
+                "propertyAddress": "123 Main St, Austin TX 78701",
+                "priority": "high",
+                "source": "referral"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Lead created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lead"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leads/{id}": {
+      "get": {
+        "tags": [
+          "Leads"
+        ],
+        "summary": "Get a lead by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lead detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Lead not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Leads"
+        ],
+        "summary": "Update a lead",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLeadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lead updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lead"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Leads"
+        ],
+        "summary": "Archive a lead",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Lead archived"
+          }
+        }
+      }
+    },
+    "/leads/{id}/status": {
+      "patch": {
+        "tags": [
+          "Leads"
+        ],
+        "summary": "Update lead status",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "new",
+                      "contacted",
+                      "qualified",
+                      "proposal_sent",
+                      "negotiating",
+                      "converted",
+                      "lost",
+                      "duplicate"
+                    ]
+                  },
+                  "lostReason": {
+                    "type": "string",
+                    "maxLength": 255
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status updated"
+          }
+        }
+      }
+    },
+    "/leads/{id}/assign": {
+      "patch": {
+        "tags": [
+          "Leads"
+        ],
+        "summary": "Assign a lead to a loan officer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "assignedTo"
+                ],
+                "properties": {
+                  "assignedTo": {
+                    "type": "integer",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lead assigned"
+          }
+        }
+      }
+    },
+    "/leads/{id}/convert": {
+      "post": {
+        "tags": [
+          "Leads"
+        ],
+        "summary": "Convert a lead to a deal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Deal created from lead",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dealId": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals": {
+      "get": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "List deals",
+        "parameters": [
+          {
+            "name": "stage",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "bridge",
+                "construction",
+                "rehab",
+                "commercial"
+              ]
+            }
+          },
+          {
+            "name": "assignedLO",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "assignedUW",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of deals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Deal"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Create a new deal",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDealRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Deal created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deals/{id}": {
+      "get": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Get a deal by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deal detail with documents, conditions, notes, and activity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Update deal fields",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDealRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deal updated"
+          }
+        }
+      }
+    },
+    "/deals/{id}/stage": {
+      "patch": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Advance or change deal stage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "stage"
+                ],
+                "properties": {
+                  "stage": {
+                    "type": "string",
+                    "enum": [
+                      "application",
+                      "processing",
+                      "underwriting",
+                      "approved",
+                      "conditional_approval",
+                      "clear_to_close",
+                      "closing",
+                      "funded",
+                      "withdrawn",
+                      "declined"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Required when declining or withdrawing"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stage updated"
+          }
+        }
+      }
+    },
+    "/deals/{id}/assign": {
+      "patch": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Assign LO and/or UW to a deal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assignedLO": {
+                    "type": "integer"
+                  },
+                  "assignedUW": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assignment updated"
+          }
+        }
+      }
+    },
+    "/deals/{id}/conditions": {
+      "post": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Add a condition to a deal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title"
+                ],
+                "properties": {
+                  "conditionType": {
+                    "type": "string",
+                    "enum": [
+                      "ptd",
+                      "ptc",
+                      "ptp"
+                    ],
+                    "description": "Prior to Draw / Close / Purchase"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "assignedTo": {
+                    "type": "integer"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Condition added"
+          }
+        }
+      }
+    },
+    "/deals/{id}/notes": {
+      "post": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Add a note to a deal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  },
+                  "isPinned": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Note added"
+          }
+        }
+      }
+    },
+    "/deals/pipeline": {
+      "get": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Get deal counts grouped by stage",
+        "responses": {
+          "200": {
+            "description": "Pipeline stage counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "stage": {
+                        "type": "string"
+                      },
+                      "count": {
+                        "type": "integer"
+                      },
+                      "totalAmount": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/servicing/loans": {
+      "get": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "List all loans",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "delinquent",
+                "default",
+                "paid_off",
+                "in_foreclosure"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of loans",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Loan"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/servicing/loans/{id}": {
+      "get": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "Get a loan by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loan detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loan"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/servicing/loans/{id}/schedule": {
+      "get": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "Get the amortisation schedule for a loan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Full amortisation schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "paymentNumber": {
+                        "type": "integer"
+                      },
+                      "dueDate": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "totalPayment": {
+                        "type": "number"
+                      },
+                      "principalPayment": {
+                        "type": "number"
+                      },
+                      "interestPayment": {
+                        "type": "number"
+                      },
+                      "balance": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/servicing/loans/{id}/payments": {
+      "get": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "Get payment history for a loan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment transaction list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Payment"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "Post a payment to a loan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "paymentDate",
+                  "totalAmount"
+                ],
+                "properties": {
+                  "paymentDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "totalAmount": {
+                    "type": "number",
+                    "minimum": 0.01
+                  },
+                  "paymentMethod": {
+                    "type": "string",
+                    "enum": [
+                      "wire",
+                      "ach",
+                      "check",
+                      "other"
+                    ]
+                  },
+                  "referenceNumber": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payment posted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/servicing/loans/{id}/payoff": {
+      "get": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "Calculate payoff quote for a loan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "goodThroughDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "The date through which the payoff amount is valid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payoff quote",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayoffQuote"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/servicing/loans/{id}/extend": {
+      "post": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "Extend a loan's maturity date",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "extensionMonths"
+                ],
+                "properties": {
+                  "extensionMonths": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "extensionFee": {
+                    "type": "number"
+                  },
+                  "newInterestRate": {
+                    "type": "number"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loan extended"
+          }
+        }
+      }
+    },
+    "/servicing/loans/delinquent": {
+      "get": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "List all delinquent loans",
+        "responses": {
+          "200": {
+            "description": "Delinquent loan list with DPD buckets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Loan"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "daysPastDue": {
+                            "type": "integer"
+                          },
+                          "overdueAmount": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/servicing/loans/maturing": {
+      "get": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "List loans maturing within 30 days",
+        "responses": {
+          "200": {
+            "description": "Maturing loan list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Loan"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/servicing/payoff-requests": {
+      "get": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "List all payoff requests",
+        "responses": {
+          "200": {
+            "description": "Payoff request list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Servicing"
+        ],
+        "summary": "Submit a payoff request for a loan",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "loanId",
+                  "goodThroughDate"
+                ],
+                "properties": {
+                  "loanId": {
+                    "type": "integer"
+                  },
+                  "goodThroughDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payoff request created"
+          }
+        }
+      }
+    },
+    "/funds": {
+      "get": {
+        "tags": [
+          "Funds"
+        ],
+        "summary": "List all funds",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "closed",
+                "winding_down"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fund list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Fund"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Funds"
+        ],
+        "summary": "Create a new fund",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Fund created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Fund"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{id}": {
+      "get": {
+        "tags": [
+          "Funds"
+        ],
+        "summary": "Get a fund by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fund detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Fund"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Funds"
+        ],
+        "summary": "Update a fund",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Fund updated"
+          }
+        }
+      }
+    },
+    "/funds/{id}/capital-calls": {
+      "get": {
+        "tags": [
+          "Capital Calls"
+        ],
+        "summary": "List capital calls for a fund",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Capital call list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CapitalCall"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Capital Calls"
+        ],
+        "summary": "Create a capital call for a fund",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "totalAmount",
+                  "dueDate"
+                ],
+                "properties": {
+                  "totalAmount": {
+                    "type": "number",
+                    "minimum": 1
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Capital call created"
+          }
+        }
+      }
+    },
+    "/funds/{id}/capital-calls/{callId}/issue": {
+      "post": {
+        "tags": [
+          "Capital Calls"
+        ],
+        "summary": "Issue a capital call (notifies all investors)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "callId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Capital call issued and investors notified"
+          }
+        }
+      }
+    },
+    "/funds/{id}/distributions": {
+      "get": {
+        "tags": [
+          "Distributions"
+        ],
+        "summary": "List distributions for a fund",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Distribution list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Distributions"
+        ],
+        "summary": "Create a distribution for a fund",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "distributionDate",
+                  "totalAmount",
+                  "distributionType"
+                ],
+                "properties": {
+                  "distributionDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "totalAmount": {
+                    "type": "number"
+                  },
+                  "distributionType": {
+                    "type": "string",
+                    "enum": [
+                      "income",
+                      "return_of_capital",
+                      "capital_gain"
+                    ]
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Distribution created"
+          }
+        }
+      }
+    },
+    "/funds/{id}/subscriptions": {
+      "get": {
+        "tags": [
+          "Investors"
+        ],
+        "summary": "List investor subscriptions for a fund",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription list"
+          }
+        }
+      }
+    },
+    "/investors": {
+      "get": {
+        "tags": [
+          "Investors"
+        ],
+        "summary": "List all investors",
+        "parameters": [
+          {
+            "name": "kycStatus",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "approved",
+                "rejected"
+              ]
+            }
+          },
+          {
+            "name": "investorType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated investor list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Investor"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Investors"
+        ],
+        "summary": "Create a new investor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvestorRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Investor created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/investors/{id}": {
+      "get": {
+        "tags": [
+          "Investors"
+        ],
+        "summary": "Get an investor by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Investor detail with subscriptions and distributions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Investor"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Investors"
+        ],
+        "summary": "Update an investor",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvestorRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Investor updated"
+          }
+        }
+      }
+    },
+    "/investors/{id}/subscribe": {
+      "post": {
+        "tags": [
+          "Investors"
+        ],
+        "summary": "Subscribe an investor to a fund",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "fundId",
+                  "committedAmount"
+                ],
+                "properties": {
+                  "fundId": {
+                    "type": "integer"
+                  },
+                  "committedAmount": {
+                    "type": "number",
+                    "minimum": 1
+                  },
+                  "preferredReturnRate": {
+                    "type": "number"
+                  },
+                  "dripEnabled": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "subscriptionDate": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subscription created"
+          }
+        }
+      }
+    },
+    "/investors/{id}/kyc": {
+      "patch": {
+        "tags": [
+          "KYC"
+        ],
+        "summary": "Update KYC status for an investor",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "approved",
+                      "rejected"
+                    ]
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "KYC status updated"
+          }
+        }
+      }
+    },
+    "/esign/envelopes": {
+      "get": {
+        "tags": [
+          "E-Sign"
+        ],
+        "summary": "List e-sign envelopes",
+        "parameters": [
+          {
+            "name": "dealId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "loanId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "sent",
+                "delivered",
+                "signed",
+                "completed",
+                "voided",
+                "declined"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Envelope list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ESignEnvelope"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "E-Sign"
+        ],
+        "summary": "Send a document for e-signature",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "subject",
+                  "documentId",
+                  "signers"
+                ],
+                "properties": {
+                  "dealId": {
+                    "type": "integer"
+                  },
+                  "loanId": {
+                    "type": "integer"
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "documentId": {
+                    "type": "integer"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "signers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "name",
+                        "email",
+                        "role"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "borrower",
+                            "co_borrower",
+                            "guarantor",
+                            "lender",
+                            "investor"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Envelope sent"
+          }
+        }
+      }
+    },
+    "/esign/envelopes/{id}/sync": {
+      "post": {
+        "tags": [
+          "E-Sign"
+        ],
+        "summary": "Sync envelope status from the e-sign provider",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Envelope status synced"
+          }
+        }
+      }
+    },
+    "/esign/envelopes/{id}/void": {
+      "post": {
+        "tags": [
+          "E-Sign"
+        ],
+        "summary": "Void an envelope",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Envelope voided"
+          }
+        }
+      }
+    },
+    "/collections/cases": {
+      "get": {
+        "tags": [
+          "Collections"
+        ],
+        "summary": "List collection cases",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "monitoring",
+                "legal",
+                "resolved",
+                "closed"
+              ]
+            }
+          },
+          {
+            "name": "assignedTo",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection case list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CollectionCase"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Collections"
+        ],
+        "summary": "Open a collection case for a loan",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "loanId"
+                ],
+                "properties": {
+                  "loanId": {
+                    "type": "integer"
+                  },
+                  "assignedTo": {
+                    "type": "integer"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Collection case opened"
+          }
+        }
+      }
+    },
+    "/collections/cases/{id}/activities": {
+      "post": {
+        "tags": [
+          "Collections"
+        ],
+        "summary": "Log a contact activity on a collection case",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "activityType",
+                  "outcome"
+                ],
+                "properties": {
+                  "activityType": {
+                    "type": "string",
+                    "enum": [
+                      "call",
+                      "email",
+                      "letter",
+                      "sms",
+                      "field_visit"
+                    ]
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "no_answer",
+                      "left_voicemail",
+                      "spoke_with_borrower",
+                      "promise_to_pay",
+                      "refused_to_pay"
+                    ]
+                  },
+                  "contactedPerson": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Activity logged"
+          }
+        }
+      }
+    },
+    "/collections/cases/{id}/promise-to-pay": {
+      "post": {
+        "tags": [
+          "Collections"
+        ],
+        "summary": "Record a promise-to-pay arrangement",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "promisedAmount",
+                  "promisedDate"
+                ],
+                "properties": {
+                  "promisedAmount": {
+                    "type": "number"
+                  },
+                  "promisedDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Promise to pay recorded"
+          }
+        }
+      }
+    },
+    "/reports/kpis": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Get portfolio KPI metrics",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Portfolio KPIs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalAUM": {
+                      "type": "number"
+                    },
+                    "avgLtv": {
+                      "type": "number"
+                    },
+                    "wair": {
+                      "type": "number"
+                    },
+                    "wam": {
+                      "type": "number"
+                    },
+                    "portfolioYield": {
+                      "type": "number"
+                    },
+                    "delinquencyRate": {
+                      "type": "number"
+                    },
+                    "fundNav": {
+                      "type": "number"
+                    },
+                    "conversionRate": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/loan-portfolio": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Get detailed loan portfolio analytics",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Loan portfolio analytics"
+          }
+        }
+      }
+    },
+    "/reports/origination-trend": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Get monthly origination volume trend",
+        "parameters": [
+          {
+            "name": "months",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 12
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly origination data"
+          }
+        }
+      }
+    },
+    "/reports/pipeline-funnel": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Get deal pipeline funnel conversion rates",
+        "responses": {
+          "200": {
+            "description": "Pipeline funnel data"
+          }
+        }
+      }
+    },
+    "/reports/lo-performance": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Get loan officer performance metrics",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LO performance table"
+          }
+        }
+      }
+    },
+    "/reports/fund-performance": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Get fund performance analytics",
+        "parameters": [
+          {
+            "name": "fundId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fund performance data"
+          }
+        }
+      }
+    },
+    "/reports/geography": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Get loan distribution by geography (state)",
+        "responses": {
+          "200": {
+            "description": "Geographic breakdown"
+          }
+        }
+      }
+    },
+    "/syndication/rooms": {
+      "post": {
+        "tags": [
+          "Syndication"
+        ],
+        "summary": "Create a syndication room for a deal",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "dealId",
+                  "totalSyndicationAmount"
+                ],
+                "properties": {
+                  "dealId": {
+                    "type": "integer"
+                  },
+                  "totalSyndicationAmount": {
+                    "type": "number"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Syndication room created"
+          }
+        }
+      }
+    },
+    "/syndication/rooms/{id}": {
+      "get": {
+        "tags": [
+          "Syndication"
+        ],
+        "summary": "Get syndication room details",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Syndication room with participants"
+          }
+        }
+      }
+    },
+    "/syndication/rooms/{id}/participants": {
+      "post": {
+        "tags": [
+          "Syndication"
+        ],
+        "summary": "Invite a lender participant to a syndication room",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "lenderName",
+                  "lenderEmail",
+                  "shareAmount"
+                ],
+                "properties": {
+                  "lenderName": {
+                    "type": "string"
+                  },
+                  "lenderEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "shareAmount": {
+                    "type": "number"
+                  },
+                  "sharePercent": {
+                    "type": "number"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Participant invited"
+          }
+        }
+      }
+    },
+    "/automation/rules": {
+      "get": {
+        "tags": [
+          "Automation"
+        ],
+        "summary": "List automation rules",
+        "responses": {
+          "200": {
+            "description": "Automation rule list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Automation"
+        ],
+        "summary": "Create an automation rule",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "triggerEvent",
+                  "actions"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "triggerEvent": {
+                    "type": "string",
+                    "description": "e.g. deal.stage_changed, payment.posted, lead.created"
+                  },
+                  "conditions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string"
+                        },
+                        "operator": {
+                          "type": "string",
+                          "enum": [
+                            "equals",
+                            "not_equals",
+                            "greater_than",
+                            "less_than",
+                            "contains"
+                          ]
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "actions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "actionType": {
+                          "type": "string",
+                          "enum": [
+                            "send_email",
+                            "send_sms",
+                            "create_task",
+                            "update_field",
+                            "notify_owner",
+                            "webhook"
+                          ]
+                        },
+                        "config": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  },
+                  "isActive": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Automation rule created"
+          }
+        }
+      }
+    },
+    "/automation/rules/{id}/toggle": {
+      "patch": {
+        "tags": [
+          "Automation"
+        ],
+        "summary": "Enable or disable an automation rule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "isActive"
+                ],
+                "properties": {
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rule toggled"
+          }
+        }
+      }
+    },
+    "/integrations": {
+      "get": {
+        "tags": [
+          "Integrations"
+        ],
+        "summary": "List all configured integrations",
+        "responses": {
+          "200": {
+            "description": "Integration list with connection status"
+          }
+        }
+      }
+    },
+    "/integrations/{key}": {
+      "put": {
+        "tags": [
+          "Integrations"
+        ],
+        "summary": "Configure or update an integration",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Integration key, e.g. docusign, experian, quickbooks, twilio"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "apiKey"
+                ],
+                "properties": {
+                  "apiKey": {
+                    "type": "string"
+                  },
+                  "apiSecret": {
+                    "type": "string"
+                  },
+                  "webhookUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "sandbox",
+                      "production"
+                    ]
+                  },
+                  "config": {
+                    "type": "object",
+                    "description": "Integration-specific configuration"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Integration configured"
+          }
+        }
+      }
+    },
+    "/integrations/{key}/test": {
+      "post": {
+        "tags": [
+          "Integrations"
+        ],
+        "summary": "Test an integration connection",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connection test result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tax-forms/1098": {
+      "post": {
+        "tags": [
+          "Tax Forms"
+        ],
+        "summary": "Generate Form 1098 (Mortgage Interest Statement) for a loan",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "loanId",
+                  "taxYear"
+                ],
+                "properties": {
+                  "loanId": {
+                    "type": "integer"
+                  },
+                  "taxYear": {
+                    "type": "integer",
+                    "example": 2025
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Form 1098 generated"
+          }
+        }
+      }
+    },
+    "/tax-forms/1099": {
+      "post": {
+        "tags": [
+          "Tax Forms"
+        ],
+        "summary": "Generate Form 1099-INT for an investor",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "investorId",
+                  "taxYear"
+                ],
+                "properties": {
+                  "investorId": {
+                    "type": "integer"
+                  },
+                  "taxYear": {
+                    "type": "integer",
+                    "example": 2025
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Form 1099 generated"
+          }
+        }
+      }
+    },
+    "/tax-forms/batch-1098": {
+      "post": {
+        "tags": [
+          "Tax Forms"
+        ],
+        "summary": "Batch generate Form 1098 for all loans in a tax year",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "taxYear"
+                ],
+                "properties": {
+                  "taxYear": {
+                    "type": "integer",
+                    "example": 2025
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Batch generation started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": [
+          "Administration"
+        ],
+        "summary": "List all users in the tenant",
+        "responses": {
+          "200": {
+            "description": "User list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Administration"
+        ],
+        "summary": "Create a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email",
+                  "role"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "user"
+                    ]
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created"
+          }
+        }
+      }
+    },
+    "/admin/users/{id}": {
+      "patch": {
+        "tags": [
+          "Administration"
+        ],
+        "summary": "Update a user's role or status",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "user"
+                    ]
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated"
+          }
+        }
+      }
+    },
+    "/admin/audit-log": {
+      "get": {
+        "tags": [
+          "Administration"
+        ],
+        "summary": "Query the audit log",
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "deal",
+                "loan",
+                "fund",
+                "investor",
+                "lead",
+                "user",
+                "capital_call"
+              ]
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "created",
+                "updated",
+                "deleted",
+                "stage_changed",
+                "payment_posted"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit log entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "userId": {
+                            "type": "integer"
+                          },
+                          "userName": {
+                            "type": "string"
+                          },
+                          "entityType": {
+                            "type": "string"
+                          },
+                          "entityId": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "before": {
+                            "type": "object"
+                          },
+                          "after": {
+                            "type": "object"
+                          },
+                          "ipAddress": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "tags": [
+          "Integrations"
+        ],
+        "summary": "List configured webhook endpoints",
+        "responses": {
+          "200": {
+            "description": "Webhook list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Integrations"
+        ],
+        "summary": "Register a new webhook endpoint",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url",
+                  "events"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "example": "https://yourplatform.com/webhooks/lendautomate"
+                  },
+                  "secret": {
+                    "type": "string",
+                    "description": "HMAC signing secret for payload verification"
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "deal.created",
+                        "deal.stage_changed",
+                        "deal.funded",
+                        "loan.activated",
+                        "loan.payment_posted",
+                        "loan.delinquent",
+                        "loan.paid_off",
+                        "fund.capital_call_issued",
+                        "fund.distribution_approved",
+                        "investor.kyc_approved",
+                        "esign.completed",
+                        "lead.created",
+                        "lead.converted"
+                      ]
+                    }
+                  },
+                  "isActive": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook registered"
+          }
+        }
+      }
+    }
+  }
+}
