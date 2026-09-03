@@ -1,0 +1,1895 @@
+{
+  "openapi": "3.0.0",
+  "tags": [
+    {
+      "name": "Control Center Authentication"
+    },
+    {
+      "name": "OIDC Authentication"
+    },
+    {
+      "name": "Other Authentication Methods"
+    },
+    {
+      "name": "OAuth"
+    },
+    {
+      "name": "Tokens"
+    },
+    {
+      "name": "Signing keys"
+    }
+  ],
+  "info": {
+    "version": "1.0.0",
+    "title": "Portal Framework Authentication API",
+    "license": {
+      "name": "CenturyLink"
+    },
+    "description": "This document describes the Authentication API of Portal Framework, an authentication API for CenturyLink portals. It comprises endpoints to obtain and handle session tokens, request user details and manage admin settings.<br/>All authentication endpoints return two tokens: a refresh token and an access token. The refresh token is long lived, can be extended and can be used to obtain a new access token, whereas the access token is short lived, cannot be extended and cannot be used for authentication purposes.<br/><br/>The access token purpose is then to grant access to resource APIs. These tokens contain basic user details (see the `jwt_token` schema in the Identity API documentation). One such details is the `enterprise`: it may not be present (for users not linked to a Control Center account, include the default enterprise ID or, if requested with the `/token` endpoint using the `refresh_token` grant type, a specific enterprise ID. This token can be used by applications APIs to identify the enterprise on which the user is acting.<br/><br/>Applications may user endpoints under the **User information** section to obtain additional information about the user, such as Control Center user ID, default enterprise ID, linked enterprises and accounts, etc. These endpoints must be called with an access token.<br/><br/>Some of the identity endpoints as served with a different path when served behind an API gateway (production and beta, mainly). For instance, `/services/identity/profile` will be served on `/Enterprise/v1/Security/portalIdentity/profile`. In order to develop locally, those paths are also exposed as aliases of the main paths, so the client can be written to access the same paths as it will need to access in production or testing. Authorization and authentication are identical in both paths.",
+    "contact": {
+      "name": "Portal Framework team",
+      "url": "https://teams.microsoft.com/l/channel/19%3ac3cf1049c886450c9f08ed76b9686f9d%40thread.tacv2/portal-framework?groupId=fc6373fa-8b87-4243-83b6-fcf9696fcbcc&tenantId=72b17115-9915-42c0-9f1b-4f98e5a4bcd2"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/CenturyLink_APIs/po-auth/1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://controlcenter-test1.lumen.com/services/security",
+      "description": "Test environment ENV1 URL"
+    },
+    {
+      "url": "https://controlcenter-test2.lumen.com/services/security",
+      "description": "Test environment ENV2 URL"
+    },
+    {
+      "url": "https://controlcenter-test3.lumen.com/services/security",
+      "description": "Test environment ENV3 URL"
+    },
+    {
+      "url": "https://controlcenter-test4.lumen.com/services/security",
+      "description": "Test environment ENV4 URL"
+    },
+    {
+      "url": "https://eks.portalshell-prod.aws.corp.intranet/portal-shell-ns-prod-po-auth/services/security",
+      "description": "Production URL (internal, direct to ingress)"
+    },
+    {
+      "url": "https://controlcenter.lumen.com/services/security",
+      "description": "Production URL"
+    },
+    {
+      "url": "https://eks.portalshell-nonprod.aws.corp.intranet/portal-shell-test-ns-master-po-auth/services/security",
+      "description": "Direct access URL"
+    },
+    {
+      "url": "https://auth-dev.local/services/security",
+      "description": "Dev-env local URL"
+    }
+  ],
+  "paths": {
+    "/token": {
+      "post": {
+        "summary": "Create an API access token and a refresh token.",
+        "description": "Create an API access token that can be used for API authentication. This token will be short-lived and will grant access to product APIs. This endpoint also returns a refresh token that can be used in this same endpoint to generate additional access tokens, but that cannot be used to access product APIs not meant for authentication. <br/> Accepted grant types are `client_credentials` and `refresh_token`. The `client_credentials` option expect user and password and it's only meant for local access. A valid refresh token must be provided for `refresh_token`. If a refresh token is provided, it is itself invalidated and a new refresh token is provided.",
+        "operationId": "postTokenRequest",
+        "tags": [
+          "Tokens"
+        ],
+        "security": [],
+        "requestBody": {
+          "description": "Token request",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/access-token-request"
+              },
+              "examples": {
+                "example1": {
+                  "value": {
+                    "client_id": "7a19b074-d9c5-48a2-a8b8-9433aa693880",
+                    "client_secret": "smQAEwWNq6P7Go5EhiLxy1lJdjVjHMcXpK97vSQF3qM",
+                    "audience": "api://dev",
+                    "grant_type": "client_credentials"
+                  },
+                  "summary": "Client credentials (client_id and client_secret)",
+                  "description": "These creedentials can be obtained with the OAuth Credentials API."
+                },
+                "example2": {
+                  "value": {
+                    "email": "myuser@lumen.com",
+                    "password": "mypassword",
+                    "grant_type": "client_credentials",
+                    "schema": "http://elasticbox.net/schemas/access-token-request"
+                  },
+                  "summary": "Local user credentials (user and password)",
+                  "description": "This is only enabled for `po-auth` local users."
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/refresh-access-token-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload"
+          },
+          "401": {
+            "description": "Invalid token"
+          },
+          "403": {
+            "description": "Invalid enterprise ID"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/session_token": {
+      "get": {
+        "summary": "Create an API access token from a valid Apache sesion.",
+        "description": "Create an API access token that can be used for API authentication. This endpoint is restricted to requests coming from Control Center Apache servers. It will get the session if from cookie `JSESSIONID` and the username from headers `Janus_XCTLPartnerUser_Name` or `ct-remote-user`. No refresh token is returned on this call.",
+        "operationId": "getSessionToken",
+        "tags": [
+          "Tokens"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "JSESSIONID",
+            "in": "cookie",
+            "required": false,
+            "description": "Valid session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/access-token-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Username does not match session username"
+          },
+          "401": {
+            "description": "Session cookie not present, invalid session or username header not present"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/tokens/{token_value}": {
+      "delete": {
+        "summary": "Invalidate a refresh token",
+        "description": "Invalidate a refresh token. Programmatic access from a web application will better use the `/logout` endpoint.",
+        "operationId": "delToken",
+        "tags": [
+          "Tokens"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "token_value",
+            "in": "path",
+            "required": true,
+            "description": "Token UUID value or JWT format",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Operation"
+          },
+          "401": {
+            "description": "Invalid token"
+          },
+          "403": {
+            "description": "Not authorized"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/username_password": {
+      "post": {
+        "summary": "Log in with username and password (local)",
+        "description": "Create a session using username and password using the local user database.",
+        "operationId": "loginUsernamePassword",
+        "tags": [
+          "Other Authentication Methods"
+        ],
+        "security": [],
+        "requestBody": {
+          "description": "User email and password",
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "User email address"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "User password"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "headers": {
+              "Set-Cookie: token": {
+                "$ref": "#/components/headers/SetCookieToken"
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid email or password"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/saml": {
+      "get": {
+        "deprecated": true,
+        "summary": "Access SAML login page",
+        "description": "Redirect the user to the SAML login page. This URL should be returned in as the `saml_url` in the /auth_methods endpoint",
+        "operationId": "redirectSaml",
+        "tags": [
+          "Other Authentication Methods"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "query",
+            "required": true,
+            "description": "User organization.",
+            "schema": {
+              "type": "string",
+              "example": "public"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Redirect to SAML login page.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Path to the SAML login page."
+              }
+            }
+          },
+          "403": {
+            "description": "SAML not allowed"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      },
+      "post": {
+        "deprecated": true,
+        "summary": "Callback URL for SAML authentication",
+        "description": "Callback URL for SAML authentication. SAML login page will redirect here after a successful user login.",
+        "operationId": "postSaml",
+        "tags": [
+          "Other Authentication Methods"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "query",
+            "required": true,
+            "description": "User organization.",
+            "schema": {
+              "type": "string",
+              "example": "public"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "SAML data",
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "SAMLResponse"
+                ],
+                "properties": {
+                  "SAMLResponse": {
+                    "type": "string",
+                    "description": "SAML response"
+                  },
+                  "RelayState": {
+                    "type": "string",
+                    "description": "Redirect URL after login"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {
+            "description": "Landing page found.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Path to the landing page. It includes an `error` query parameter with the error message if login was not successful."
+              },
+              "Set-Cookie: token": {
+                "$ref": "#/components/headers/SetCookieToken"
+              }
+            }
+          },
+          "400": {
+            "description": "Missing SAML Response, missing organization or non-existent organization"
+          },
+          "401": {
+            "description": "SAML user not authenticated"
+          },
+          "403": {
+            "description": "SAML not allowed"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/control_center": {
+      "get": {
+        "summary": "Access Control Center login page",
+        "description": "Redirect the user to the Control Center login page. This URL should be returned in as the `control_center_url` in the /auth_methods endpoint",
+        "operationId": "redirectControlCenter",
+        "tags": [
+          "Control Center Authentication"
+        ],
+        "security": [],
+        "responses": {
+          "303": {
+            "description": "Redirect to Control Center login page.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Path to the Control Center login page."
+              }
+            }
+          },
+          "403": {
+            "description": "Control Center not allowed"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Callback URL for Control Center authentication",
+        "description": "Callback URL for Control Center authentication (actually a SAML response). Control Center login page will redirect here after a successful user login.",
+        "operationId": "postControlCenter",
+        "tags": [
+          "Control Center Authentication"
+        ],
+        "security": [],
+        "requestBody": {
+          "description": "Control Center data",
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "SAMLResponse"
+                ],
+                "properties": {
+                  "SAMLResponse": {
+                    "type": "string",
+                    "description": "SAML response"
+                  },
+                  "RelayState": {
+                    "type": "string",
+                    "description": "Redirect URL after login"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {
+            "description": "Landing page found.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Path to the landing page. It includes an `error` query parameter with the error message if login was not successful."
+              },
+              "Set-Cookie: token": {
+                "$ref": "#/components/headers/SetCookieToken"
+              }
+            }
+          },
+          "400": {
+            "description": "Missing SAML Response, missing organization or non-existent organization"
+          },
+          "401": {
+            "description": "Control Center user not authenticated"
+          },
+          "403": {
+            "description": "Control Center not allowed"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/saml_sp_metadata": {
+      "get": {
+        "deprecated": true,
+        "summary": "SAML metadata",
+        "description": "SAML metadata download",
+        "operationId": "samlMetadata",
+        "tags": [
+          "Other Authentication Methods"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "query",
+            "required": true,
+            "description": "User organization.",
+            "schema": {
+              "type": "string",
+              "example": "public"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SAML metadata payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/saml_metadata"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "SAML is disabled"
+          },
+          "403": {
+            "description": "SAML not allowed"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/oauth/authorize": {
+      "get": {
+        "summary": "OAuth Authorize endpoint.",
+        "description": "OAuth Authorize endpoint.",
+        "operationId": "redirectOauth",
+        "tags": [
+          "OAuth"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "organization_name",
+            "in": "query",
+            "required": false,
+            "description": "User organization.",
+            "schema": {
+              "type": "string",
+              "example": "public"
+            }
+          },
+          {
+            "name": "authentication_method",
+            "in": "query",
+            "required": false,
+            "description": "Authentication method used to login.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ldap",
+                "saml",
+                "password"
+              ],
+              "example": "password"
+            }
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "description": "Required response type; only `token` is supported.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "token"
+              ],
+              "example": "token"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "description": "OAuth client ID (shell-application, internal-application).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": false,
+            "description": "If present, valid redirect URI for this OAuth client. If not present, the client must be configured with at least one redirect URI.",
+            "schema": {
+              "type": "string",
+              "example": "https://controlcenter.lumen.com/enterprise/network/map"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "description": "OAuth scope.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "OAuth state",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Redirect to OAuth callback login page.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "example": "https://controlcenter-test1.lumen.com/enterprise/network/map/?code=1234b111-abcd-bbbb-dddd-1234abcd1348"
+                },
+                "description": "Path to the SAML login page."
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid `organization`, `authentication_method`, `client_id`, `redirect_uri` or `response_type`"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/oauth/token": {
+      "post": {
+        "summary": "OAuth token endpoint.",
+        "description": "An oauth client may use this endpoint to retrieve a valid refresh and access token pair for an user. The client must use a code provided by the authorization server. Only authorization_code grant method is available.",
+        "operationId": "oauthAccesToken",
+        "tags": [
+          "OAuth"
+        ],
+        "security": [],
+        "requestBody": {
+          "description": "Token request",
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "client_id",
+                  "client_secret"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "User email address"
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "description": "OAuth client ID"
+                  },
+                  "client_secret": {
+                    "type": "string",
+                    "description": "OAuth client secret."
+                  },
+                  "code": {
+                    "type": "string",
+                    "example": "1234b111-abcd-bbbb-dddd...",
+                    "description": "OAuth code"
+                  },
+                  "grant_type": {
+                    "description": "Grant type: only `authorization_code` is allowed.",
+                    "type": "string",
+                    "example": "authorization_code"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refresh and access tokens in JWT format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/oauth_token_response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/oidc/authorize": {
+      "get": {
+        "summary": "OIDC Authorize endpoint.",
+        "description": "OIDC Authorize Request endpoint. If a `token` cookie is included, then the redirect URI will be returned with the code, state and nonce parameters. Otherwise, a login page with the state parameter will be returned.",
+        "operationId": "authorizeOidc",
+        "tags": [
+          "OIDC Authentication"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "description": "Required response type; only `code` is supported.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "code"
+              ],
+              "example": "code"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "description": "OAuth client ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": false,
+            "description": "If present, valid redirect URI for this OpenID client. If not present, the client must be configured with at least one redirect URI.",
+            "schema": {
+              "type": "string",
+              "example": "https://controlcenter.lumen.com/sercurity/services/oidc_callback"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "description": "Scope must include openid",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "OpenID state",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nonce",
+            "in": "query",
+            "required": false,
+            "description": "OAuth state",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "cookie",
+            "required": false,
+            "description": "Valid token",
+            "schema": {
+              "$ref": "#/components/schemas/token"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Redirect to OIDC callback login page.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "example": "https://controlcenter-test1.lumen.com/enterprise/network/map/?state=ey..."
+                },
+                "description": "Path to the OIDC login page."
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid `client_id`, `redirect_uri`, `response_type`, `state` or `response_type`"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/oidc/token": {
+      "post": {
+        "summary": "OIDC Token Request endpoint.",
+        "description": "OIDC Token Request endpoint. The `Authorization` header must be present with `Basic` authentication, where user is the client ID and password is the client secret",
+        "operationId": "tokenOidc",
+        "tags": [
+          "OIDC Authentication"
+        ],
+        "security": [
+          {
+            "OIDCBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "grant_type",
+            "in": "query",
+            "required": true,
+            "description": "Required grant type; only `authorization_code` is supported.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "authorization_code"
+              ],
+              "example": "authorization_code"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "description": "OpenID code.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": false,
+            "description": "If present, valid redirect URI for this OpenID client. If not present, the client must be configured with at least one redirect URI.",
+            "schema": {
+              "type": "string",
+              "example": "https://controlcenter.lumen.com/sercurity/services/oidc_callback"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bearer token in JWT format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/token_response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid `code`, `grant_type`, `redirect_uri`, or invalid Basic authentication with client_id and client_secret"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/oidc/userinfo": {
+      "get": {
+        "summary": "OIDC user information summary.",
+        "description": "Returns a subset of user information summary endpoint. The user is identified by the access token. No information for different users can be requested.",
+        "operationId": "userinfoOidc",
+        "tags": [
+          "OIDC Authentication"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "User info details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/user_details"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Authorization header not present"
+          },
+          "401": {
+            "description": "Invalid token"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/oidc/jwks": {
+      "get": {
+        "summary": "OIDC JSON Web Keys request.",
+        "description": "Returns OIDC JSON Web Keys.",
+        "operationId": "jwksOidc",
+        "tags": [
+          "OIDC Authentication"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OIDC JSON Web Keys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/jwks"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/oidc/.well-known/openid-configuration": {
+      "get": {
+        "summary": "OpenID configuration details.",
+        "description": "Returns a summary of the configuration details of OpenID.",
+        "operationId": "wellknownOidc",
+        "tags": [
+          "OIDC Authentication"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OIDC JSON Web Keys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/openid-configuration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/oidc_callback": {
+      "get": {
+        "summary": "Callback URL for GLUU-AUTH authentication",
+        "description": "Callback URL for GLUU-AUTH authentication. After the uses logs into GLUU-AUTH and authorizes the trust between both accounts. The user will be logged in if a valid and unlocked principal already exists; if a principal does not exist but the organization is enabled for GLUU-AUTH, a new principal will be created.",
+        "operationId": "callbackOidc",
+        "tags": [
+          "OIDC Authentication"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "description": "The authorization_code that the app requested. The app can use the authorization code to request an access token for the target resource. Authorization_codes are short lived, typically they expire after about 10 minutes.",
+            "schema": {
+              "type": "string",
+              "example": "0.AAAAFXGxc..."
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "description": "Session ID.",
+            "schema": {
+              "type": "string",
+              "example": "a93bc0fc-2806-4d8a-9b6e-68c4ab952c98"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "description": "JWT-encoded data sent by po-auth and returned by GLUU-AUTH.",
+            "schema": {
+              "type": "string",
+              "example": "eyJ0eX..."
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "description": "Message providing context in case of failure.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Landing page found.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Path to the landing page. It includes an `error` query parameter with the error message if login was not successful."
+              },
+              "Set-Cookie: token": {
+                "$ref": "#/components/headers/SetCookieToken"
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/azure_callback": {
+      "get": {
+        "summary": "Callback URL for Azure authentication",
+        "description": "Callback URL for Azure authentication. After the uses logs into Azure and authorizes the trust between both accounts. The user will be logged in if a valid and unlocked principal already exists; if a principal does not exist but the organization is enabled for Azure, a new principal will be created.",
+        "operationId": "callbackAzure",
+        "tags": [
+          "OIDC Authentication"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "description": "The authorization_code that the app requested. The app can use the authorization code to request an access token for the target resource. Authorization_codes are short lived, typically they expire after about 10 minutes.",
+            "schema": {
+              "type": "string",
+              "example": "0.AAAAFXGxc..."
+            }
+          },
+          {
+            "name": "session_state",
+            "in": "query",
+            "required": false,
+            "description": "Session ID generated by Microsoft.",
+            "schema": {
+              "type": "string",
+              "example": "a93bc0fc-2806-4d8a-9b6e-68c4ab952c98"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "description": "JWT-encoded data sent by po-auth and returned by Azure.",
+            "schema": {
+              "type": "string",
+              "example": "eyJ0eX..."
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "description": "Message providing context in case of failure.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Landing page found.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Path to the landing page. It includes an `error` query parameter with the error message if login was not successful."
+              },
+              "Set-Cookie: token": {
+                "$ref": "#/components/headers/SetCookieToken"
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/logout": {
+      "get": {
+        "summary": "Closes the session",
+        "description": "Removes all cookies and invalidates the existing refresh token. If response_type, client_id and redirect_uri are present and are valid parameters of an OAuth client, the Location header is set to the redirect_uri. Otherwise, Location is set to `/login`.",
+        "operationId": "logout",
+        "tags": [
+          "Tokens",
+          "Control Center Authentication",
+          "OIDC Authentication"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": false,
+            "description": "Required response type; only `logout` is supported in this endpoint",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "logout"
+              ],
+              "example": "logout"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": false,
+            "description": "OAuth client ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": false,
+            "description": "Valid redirect URI for this OAuth client.",
+            "schema": {
+              "type": "string",
+              "example": "https://business-auth-test.centurylink.com/oxauth/signoff.htm"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Operation"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/auth_methods": {
+      "get": {
+        "summary": "Retrieve available authentication methods.",
+        "description": "List available authentication methods for a given user.",
+        "operationId": "authMethods",
+        "tags": [
+          "Other Authentication Methods"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "description": "Valid token of a user",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "description": "Email of an existing user",
+            "schema": {
+              "type": "string",
+              "example": "user@centurylink.com"
+            }
+          },
+          {
+            "name": "accept_terms",
+            "in": "query",
+            "required": true,
+            "description": "Whether the user checked the Accept Terms checkbox",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "description": "State",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auth_methods"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/jwt_keys/current": {
+      "get": {
+        "summary": "Retrieve the current JWT public signing key.",
+        "description": "Retrieve a PEM-formatted public key that can be used to verify Portal Framework JWTs. Unexpired tokens may have been signed with other, still valid key (for instance, right after a key rotation). The `Accept` header sets the return format: `application/json` returns a JSON document with the key ID and a serialized public key with `\n` instead of new lines, while `text/plain` or `application/x-x509-ca-cert` returns the public key as plain text with valid new line characters.",
+        "operationId": "getJwtKeyCurrent",
+        "tags": [
+          "Signing keys"
+        ],
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-key-response"
+                }
+              },
+              "application/x-x509-ca-cert": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "example1": {
+                    "value": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAvpPXNkFbmnNc4wSB21Tb\np9hdCf1rq+urFaXr2BvWQ3kvJG3FBYs43kUHxif8+rqJ+o3ATMWcnmZUPpqxbJFZ\nPknpSO/dJPZnzBCFz6dG5PA5GlLEByw0/39GtDAZMtt/UYNNNc03LGKWrxsvXnjQ\nGnNrtOYgzTVk66GAFbfEg6OuobQVriPdGqPjCM41M9aE9PcwkBYTdcSBn3fBv9o+\n55yBE3lq6o4wcz2Q43eUTUqTRWRZm9Nu2fDOuAzTcA/Ehk+Eqg7ftaFAAZClVKKw\nUsWaR55mGvbdTabMBS2EbuOz4kflJI14HOVBL4bnkURSyxfp9tOehpcsDnKqaYPp\nLaZfCeJGf8pWFwVFXTttbRaCRk65zcEATrgDPCki/OjuVCdWAfqISxcufhKaQvsM\nOstKjgpFcMSG9+r965t7xwl7dngT4n2vXYBO2LB9J21h86yn7qtxnKlyqpgwP144\nStq7z7Au6rhDXyCglRRiX1K9qac/OVN7SjCud50EmfjnSBkpoxXRcepchjVZc3Oa\nf1lmbBFh6y1fnA7bVug4V+PBOh1SqgRfAcDLICiRd2D8EXd2KYM9Unr7nTRn8UtG\n0b0v1mB0AtfTyZCZSTm5J8vC8Vfe+BZJDILjmHkQ+ORfoz0FYG4/HpQjgaHuXqWu\n5PW15y7ej7d3eCjSMRKyUskCAwEAAQ==\n-----END PUBLIC KEY-----\n",
+                    "summary": "PEM encoded public key.",
+                    "description": "The PEM encoded payload can be used directly as a public key."
+                  },
+                  "example2": {
+                    "value": "-----BEGIN CERTIFICATE-----\nMIIFZjCCA04CCQCftJIS98uvnDANBgkqhkiG9w0BAQsFADB1MQswCQYDVQQGEwJV\nUzESMBAGA1UECAwJTG91aXNpYW5hMQ8wDQYDVQQHDAZNb25yb2UxFDASBgNVBAoM\nC0NlbnR1cnlMaW5rMRkwFwYDVQQLDBBQb3J0YWwgRnJhbWV3b3JrMRAwDgYDVQQD\nDAdiYXN0aW9uMB4XDTE5MTAyNDA5MTU1OFoXDTIzMTAyMzA5MTU1OFowdTELMAkG\nA1UEBhMCVVMxEjAQBgNVBAgMCUxvdWlzaWFuYTEPMA0GA1UEBwwGTW9ucm9lMRQw\nEgYDVQQKDAtDZW50dXJ5TGluazEZMBcGA1UECwwQUG9ydGFsIEZyYW1ld29yazEQ\nMA4GA1UEAwwHYmFzdGlvbjCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIB\nAOhLv/n4eDX1a/hvCkB01YCB+J+E4DWl638KUN4fE9ICcHxMApHLm2+5yMuCzUbh\n5xPbs2KL4/ZBSa8hDRs9hSn7i/SykSAMJ9mAvVw22lf3orntfMC41gSiuqxUrBlJ\nxeR8TE4fK1d+RGx6Q+nH3/f7isfx3aDLwJZ9qSWy3igh5tEdADCiUfCGubEhAubs\ne1Rxn6UQ3k0GUQDLx9UUuyRjWJJUuXmhk/fl32YqwOthbx09MXvom6uxpv83QOHl\nBzxC0002dmm4VNqgfuzAt62NtJo/Io5HXHnpyAmm2gxsWBRQtffunPTHErseQLA1\nIyv+anAQELX9RN8aWphKO8nZ5SSMrUrxYrH7cgkwgu/g0e+YUHDEM3/vg4Z6yho8\ndD6UupMDB/1FRR31axb3m/XW+HqpFwBtdAUdwoFzze5N3W/XN40uuBsRBBXl2wra\ngW151AAcYuSV+VY2vwhFVNZAYwfpmyPjgvhCLkjFe+ySeSQ7uvn5wgAO/ct1MKK4\nFQY3n0l5ttSg/GJ5urr1LSUNFF+ytL+jUPG0NIyHeZbBrju/mzPGuS6/eT1taz2m\nEwA9+Z0IiEjituIWGzpf5e2igK5IIM/B2o4FhHepGuAXMY6ifQtsItE208YNPAcQ\nrGzrcnERCg5Vw+QymfJWAc3jFmM2YIwGtWkuM+18cbFzAgMBAAEwDQYJKoZIhvcN\nAQELBQADggIBAKuS4hDRPhhaHTT75mhHtMCGNvwhOW7MJtM4PD5IPusv0aPHWefM\ncCTZUUgf5FgjlftIgK/vv+YYhVAc2Yp/s3yRBG1Gzb7TGg9OuJZH0/1507a1/50r\nszevC1NLLOas3EL+UgVDfrZ5S/GqvDleRDBo3ZJuzNi74gRe1BjVczs6bVK/xWs5\n14WYD76w1KR98yWXFK5D8y06NOryYVv3swGUkbdwBcGE2JANG+IliW5UyPtRlbSj\n679TuuxqaHO/hqH1tbsTE+7Jsq+P8ro12WqyHapDBYqOwh4QrHZqBj8AqA1RFiyP\nIYLPBTHkMwkMfO5wsi314+O8Ke4PeQ3+n3ce7yS7PITwWy0ixh9NQysjqo6DrE8W\nAgh1hc8Co1E3BGbozg4a+ZRw7Fm2txXll8qI82f62W8ZCzVrHjjqAIQ0oTKymXFL\nMryYgsqXp1Dsk3zZ5nXok4FsVOxC4vdwreJx1gQtwbB4RITYzdU0Cyfut/YP5jO7\nxIwKYvygROA2I4RaJrLDV2bBW4VwiTJKlaA01tpru0pydhrZKDumkS1pFox9RJ2m\nkEYPcgD7dphEMZhyevF9PyZISIYUYezEELPbE0lQWM1ZL+vMzNb4VeRYV9fUzSB5\n77YBAFFG6SBZO7R37CyOybb54NRmWrmNJP1MWiqG+kaXmoY7foPqFVr6\n-----END CERTIFICATE-----\n",
+                    "summary": "PEM encoded certificate.",
+                    "description": "The PEM encoded payload is a certificate that contains the public key."
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "example1": {
+                    "value": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAvpPXNkFbmnNc4wSB21Tb\np9hdCf1rq+urFaXr2BvWQ3kvJG3FBYs43kUHxif8+rqJ+o3ATMWcnmZUPpqxbJFZ\nPknpSO/dJPZnzBCFz6dG5PA5GlLEByw0/39GtDAZMtt/UYNNNc03LGKWrxsvXnjQ\nGnNrtOYgzTVk66GAFbfEg6OuobQVriPdGqPjCM41M9aE9PcwkBYTdcSBn3fBv9o+\n55yBE3lq6o4wcz2Q43eUTUqTRWRZm9Nu2fDOuAzTcA/Ehk+Eqg7ftaFAAZClVKKw\nUsWaR55mGvbdTabMBS2EbuOz4kflJI14HOVBL4bnkURSyxfp9tOehpcsDnKqaYPp\nLaZfCeJGf8pWFwVFXTttbRaCRk65zcEATrgDPCki/OjuVCdWAfqISxcufhKaQvsM\nOstKjgpFcMSG9+r965t7xwl7dngT4n2vXYBO2LB9J21h86yn7qtxnKlyqpgwP144\nStq7z7Au6rhDXyCglRRiX1K9qac/OVN7SjCud50EmfjnSBkpoxXRcepchjVZc3Oa\nf1lmbBFh6y1fnA7bVug4V+PBOh1SqgRfAcDLICiRd2D8EXd2KYM9Unr7nTRn8UtG\n0b0v1mB0AtfTyZCZSTm5J8vC8Vfe+BZJDILjmHkQ+ORfoz0FYG4/HpQjgaHuXqWu\n5PW15y7ej7d3eCjSMRKyUskCAwEAAQ==\n-----END PUBLIC KEY-----\n",
+                    "summary": "PEM encoded public key.",
+                    "description": "The PEM encoded payload can be used directly as a public key."
+                  },
+                  "example2": {
+                    "value": "-----BEGIN CERTIFICATE-----\nMIIFZjCCA04CCQCftJIS98uvnDANBgkqhkiG9w0BAQsFADB1MQswCQYDVQQGEwJV\nUzESMBAGA1UECAwJTG91aXNpYW5hMQ8wDQYDVQQHDAZNb25yb2UxFDASBgNVBAoM\nC0NlbnR1cnlMaW5rMRkwFwYDVQQLDBBQb3J0YWwgRnJhbWV3b3JrMRAwDgYDVQQD\nDAdiYXN0aW9uMB4XDTE5MTAyNDA5MTU1OFoXDTIzMTAyMzA5MTU1OFowdTELMAkG\nA1UEBhMCVVMxEjAQBgNVBAgMCUxvdWlzaWFuYTEPMA0GA1UEBwwGTW9ucm9lMRQw\nEgYDVQQKDAtDZW50dXJ5TGluazEZMBcGA1UECwwQUG9ydGFsIEZyYW1ld29yazEQ\nMA4GA1UEAwwHYmFzdGlvbjCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIB\nAOhLv/n4eDX1a/hvCkB01YCB+J+E4DWl638KUN4fE9ICcHxMApHLm2+5yMuCzUbh\n5xPbs2KL4/ZBSa8hDRs9hSn7i/SykSAMJ9mAvVw22lf3orntfMC41gSiuqxUrBlJ\nxeR8TE4fK1d+RGx6Q+nH3/f7isfx3aDLwJZ9qSWy3igh5tEdADCiUfCGubEhAubs\ne1Rxn6UQ3k0GUQDLx9UUuyRjWJJUuXmhk/fl32YqwOthbx09MXvom6uxpv83QOHl\nBzxC0002dmm4VNqgfuzAt62NtJo/Io5HXHnpyAmm2gxsWBRQtffunPTHErseQLA1\nIyv+anAQELX9RN8aWphKO8nZ5SSMrUrxYrH7cgkwgu/g0e+YUHDEM3/vg4Z6yho8\ndD6UupMDB/1FRR31axb3m/XW+HqpFwBtdAUdwoFzze5N3W/XN40uuBsRBBXl2wra\ngW151AAcYuSV+VY2vwhFVNZAYwfpmyPjgvhCLkjFe+ySeSQ7uvn5wgAO/ct1MKK4\nFQY3n0l5ttSg/GJ5urr1LSUNFF+ytL+jUPG0NIyHeZbBrju/mzPGuS6/eT1taz2m\nEwA9+Z0IiEjituIWGzpf5e2igK5IIM/B2o4FhHepGuAXMY6ifQtsItE208YNPAcQ\nrGzrcnERCg5Vw+QymfJWAc3jFmM2YIwGtWkuM+18cbFzAgMBAAEwDQYJKoZIhvcN\nAQELBQADggIBAKuS4hDRPhhaHTT75mhHtMCGNvwhOW7MJtM4PD5IPusv0aPHWefM\ncCTZUUgf5FgjlftIgK/vv+YYhVAc2Yp/s3yRBG1Gzb7TGg9OuJZH0/1507a1/50r\nszevC1NLLOas3EL+UgVDfrZ5S/GqvDleRDBo3ZJuzNi74gRe1BjVczs6bVK/xWs5\n14WYD76w1KR98yWXFK5D8y06NOryYVv3swGUkbdwBcGE2JANG+IliW5UyPtRlbSj\n679TuuxqaHO/hqH1tbsTE+7Jsq+P8ro12WqyHapDBYqOwh4QrHZqBj8AqA1RFiyP\nIYLPBTHkMwkMfO5wsi314+O8Ke4PeQ3+n3ce7yS7PITwWy0ixh9NQysjqo6DrE8W\nAgh1hc8Co1E3BGbozg4a+ZRw7Fm2txXll8qI82f62W8ZCzVrHjjqAIQ0oTKymXFL\nMryYgsqXp1Dsk3zZ5nXok4FsVOxC4vdwreJx1gQtwbB4RITYzdU0Cyfut/YP5jO7\nxIwKYvygROA2I4RaJrLDV2bBW4VwiTJKlaA01tpru0pydhrZKDumkS1pFox9RJ2m\nkEYPcgD7dphEMZhyevF9PyZISIYUYezEELPbE0lQWM1ZL+vMzNb4VeRYV9fUzSB5\n77YBAFFG6SBZO7R37CyOybb54NRmWrmNJP1MWiqG+kaXmoY7foPqFVr6\n-----END CERTIFICATE-----\n",
+                    "summary": "PEM encoded certificate.",
+                    "description": "The PEM encoded payload is a certificate that contains the public key."
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/jwt_keys/{key_id}": {
+      "get": {
+        "summary": "Retrieve the current JWT public signing key.",
+        "description": "Retrieve a PEM-formatted public key that can be used to verify Portal Framework JWTs. Unexpired tokens may have been signed with other, still valid key (for instance, right after a key rotation). The `Accept` header sets the return format: `application/json` returns a JSON document with the key ID and a serialized public key with `\n` instead of new lines, while `text/plain` or `application/x-x509-ca-cert` returns the public key as plain text with valid new line characters.",
+        "operationId": "getJwtKeyById",
+        "tags": [
+          "Signing keys"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "description": "ID of the requested key. This corresponds to the `kid` in the header of a JWT.",
+            "schema": {
+              "type": "string",
+              "example": "5f603df3-e406-41d8-b8cd-dfad7f820c1e"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-key-response"
+                }
+              },
+              "application/x-x509-ca-cert": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "example1": {
+                    "value": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAvpPXNkFbmnNc4wSB21Tb\np9hdCf1rq+urFaXr2BvWQ3kvJG3FBYs43kUHxif8+rqJ+o3ATMWcnmZUPpqxbJFZ\nPknpSO/dJPZnzBCFz6dG5PA5GlLEByw0/39GtDAZMtt/UYNNNc03LGKWrxsvXnjQ\nGnNrtOYgzTVk66GAFbfEg6OuobQVriPdGqPjCM41M9aE9PcwkBYTdcSBn3fBv9o+\n55yBE3lq6o4wcz2Q43eUTUqTRWRZm9Nu2fDOuAzTcA/Ehk+Eqg7ftaFAAZClVKKw\nUsWaR55mGvbdTabMBS2EbuOz4kflJI14HOVBL4bnkURSyxfp9tOehpcsDnKqaYPp\nLaZfCeJGf8pWFwVFXTttbRaCRk65zcEATrgDPCki/OjuVCdWAfqISxcufhKaQvsM\nOstKjgpFcMSG9+r965t7xwl7dngT4n2vXYBO2LB9J21h86yn7qtxnKlyqpgwP144\nStq7z7Au6rhDXyCglRRiX1K9qac/OVN7SjCud50EmfjnSBkpoxXRcepchjVZc3Oa\nf1lmbBFh6y1fnA7bVug4V+PBOh1SqgRfAcDLICiRd2D8EXd2KYM9Unr7nTRn8UtG\n0b0v1mB0AtfTyZCZSTm5J8vC8Vfe+BZJDILjmHkQ+ORfoz0FYG4/HpQjgaHuXqWu\n5PW15y7ej7d3eCjSMRKyUskCAwEAAQ==\n-----END PUBLIC KEY-----\n",
+                    "summary": "PEM encoded public key.",
+                    "description": "The PEM encoded payload can be used directly as a public key."
+                  },
+                  "example2": {
+                    "value": "-----BEGIN CERTIFICATE-----\nMIIFZjCCA04CCQCftJIS98uvnDANBgkqhkiG9w0BAQsFADB1MQswCQYDVQQGEwJV\nUzESMBAGA1UECAwJTG91aXNpYW5hMQ8wDQYDVQQHDAZNb25yb2UxFDASBgNVBAoM\nC0NlbnR1cnlMaW5rMRkwFwYDVQQLDBBQb3J0YWwgRnJhbWV3b3JrMRAwDgYDVQQD\nDAdiYXN0aW9uMB4XDTE5MTAyNDA5MTU1OFoXDTIzMTAyMzA5MTU1OFowdTELMAkG\nA1UEBhMCVVMxEjAQBgNVBAgMCUxvdWlzaWFuYTEPMA0GA1UEBwwGTW9ucm9lMRQw\nEgYDVQQKDAtDZW50dXJ5TGluazEZMBcGA1UECwwQUG9ydGFsIEZyYW1ld29yazEQ\nMA4GA1UEAwwHYmFzdGlvbjCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIB\nAOhLv/n4eDX1a/hvCkB01YCB+J+E4DWl638KUN4fE9ICcHxMApHLm2+5yMuCzUbh\n5xPbs2KL4/ZBSa8hDRs9hSn7i/SykSAMJ9mAvVw22lf3orntfMC41gSiuqxUrBlJ\nxeR8TE4fK1d+RGx6Q+nH3/f7isfx3aDLwJZ9qSWy3igh5tEdADCiUfCGubEhAubs\ne1Rxn6UQ3k0GUQDLx9UUuyRjWJJUuXmhk/fl32YqwOthbx09MXvom6uxpv83QOHl\nBzxC0002dmm4VNqgfuzAt62NtJo/Io5HXHnpyAmm2gxsWBRQtffunPTHErseQLA1\nIyv+anAQELX9RN8aWphKO8nZ5SSMrUrxYrH7cgkwgu/g0e+YUHDEM3/vg4Z6yho8\ndD6UupMDB/1FRR31axb3m/XW+HqpFwBtdAUdwoFzze5N3W/XN40uuBsRBBXl2wra\ngW151AAcYuSV+VY2vwhFVNZAYwfpmyPjgvhCLkjFe+ySeSQ7uvn5wgAO/ct1MKK4\nFQY3n0l5ttSg/GJ5urr1LSUNFF+ytL+jUPG0NIyHeZbBrju/mzPGuS6/eT1taz2m\nEwA9+Z0IiEjituIWGzpf5e2igK5IIM/B2o4FhHepGuAXMY6ifQtsItE208YNPAcQ\nrGzrcnERCg5Vw+QymfJWAc3jFmM2YIwGtWkuM+18cbFzAgMBAAEwDQYJKoZIhvcN\nAQELBQADggIBAKuS4hDRPhhaHTT75mhHtMCGNvwhOW7MJtM4PD5IPusv0aPHWefM\ncCTZUUgf5FgjlftIgK/vv+YYhVAc2Yp/s3yRBG1Gzb7TGg9OuJZH0/1507a1/50r\nszevC1NLLOas3EL+UgVDfrZ5S/GqvDleRDBo3ZJuzNi74gRe1BjVczs6bVK/xWs5\n14WYD76w1KR98yWXFK5D8y06NOryYVv3swGUkbdwBcGE2JANG+IliW5UyPtRlbSj\n679TuuxqaHO/hqH1tbsTE+7Jsq+P8ro12WqyHapDBYqOwh4QrHZqBj8AqA1RFiyP\nIYLPBTHkMwkMfO5wsi314+O8Ke4PeQ3+n3ce7yS7PITwWy0ixh9NQysjqo6DrE8W\nAgh1hc8Co1E3BGbozg4a+ZRw7Fm2txXll8qI82f62W8ZCzVrHjjqAIQ0oTKymXFL\nMryYgsqXp1Dsk3zZ5nXok4FsVOxC4vdwreJx1gQtwbB4RITYzdU0Cyfut/YP5jO7\nxIwKYvygROA2I4RaJrLDV2bBW4VwiTJKlaA01tpru0pydhrZKDumkS1pFox9RJ2m\nkEYPcgD7dphEMZhyevF9PyZISIYUYezEELPbE0lQWM1ZL+vMzNb4VeRYV9fUzSB5\n77YBAFFG6SBZO7R37CyOybb54NRmWrmNJP1MWiqG+kaXmoY7foPqFVr6\n-----END CERTIFICATE-----\n",
+                    "summary": "PEM encoded certificate.",
+                    "description": "The PEM encoded payload is a certificate that contains the public key."
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "example1": {
+                    "value": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAvpPXNkFbmnNc4wSB21Tb\np9hdCf1rq+urFaXr2BvWQ3kvJG3FBYs43kUHxif8+rqJ+o3ATMWcnmZUPpqxbJFZ\nPknpSO/dJPZnzBCFz6dG5PA5GlLEByw0/39GtDAZMtt/UYNNNc03LGKWrxsvXnjQ\nGnNrtOYgzTVk66GAFbfEg6OuobQVriPdGqPjCM41M9aE9PcwkBYTdcSBn3fBv9o+\n55yBE3lq6o4wcz2Q43eUTUqTRWRZm9Nu2fDOuAzTcA/Ehk+Eqg7ftaFAAZClVKKw\nUsWaR55mGvbdTabMBS2EbuOz4kflJI14HOVBL4bnkURSyxfp9tOehpcsDnKqaYPp\nLaZfCeJGf8pWFwVFXTttbRaCRk65zcEATrgDPCki/OjuVCdWAfqISxcufhKaQvsM\nOstKjgpFcMSG9+r965t7xwl7dngT4n2vXYBO2LB9J21h86yn7qtxnKlyqpgwP144\nStq7z7Au6rhDXyCglRRiX1K9qac/OVN7SjCud50EmfjnSBkpoxXRcepchjVZc3Oa\nf1lmbBFh6y1fnA7bVug4V+PBOh1SqgRfAcDLICiRd2D8EXd2KYM9Unr7nTRn8UtG\n0b0v1mB0AtfTyZCZSTm5J8vC8Vfe+BZJDILjmHkQ+ORfoz0FYG4/HpQjgaHuXqWu\n5PW15y7ej7d3eCjSMRKyUskCAwEAAQ==\n-----END PUBLIC KEY-----\n",
+                    "summary": "PEM encoded public key.",
+                    "description": "The PEM encoded payload can be used directly as a public key."
+                  },
+                  "example2": {
+                    "value": "-----BEGIN CERTIFICATE-----\nMIIFZjCCA04CCQCftJIS98uvnDANBgkqhkiG9w0BAQsFADB1MQswCQYDVQQGEwJV\nUzESMBAGA1UECAwJTG91aXNpYW5hMQ8wDQYDVQQHDAZNb25yb2UxFDASBgNVBAoM\nC0NlbnR1cnlMaW5rMRkwFwYDVQQLDBBQb3J0YWwgRnJhbWV3b3JrMRAwDgYDVQQD\nDAdiYXN0aW9uMB4XDTE5MTAyNDA5MTU1OFoXDTIzMTAyMzA5MTU1OFowdTELMAkG\nA1UEBhMCVVMxEjAQBgNVBAgMCUxvdWlzaWFuYTEPMA0GA1UEBwwGTW9ucm9lMRQw\nEgYDVQQKDAtDZW50dXJ5TGluazEZMBcGA1UECwwQUG9ydGFsIEZyYW1ld29yazEQ\nMA4GA1UEAwwHYmFzdGlvbjCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIB\nAOhLv/n4eDX1a/hvCkB01YCB+J+E4DWl638KUN4fE9ICcHxMApHLm2+5yMuCzUbh\n5xPbs2KL4/ZBSa8hDRs9hSn7i/SykSAMJ9mAvVw22lf3orntfMC41gSiuqxUrBlJ\nxeR8TE4fK1d+RGx6Q+nH3/f7isfx3aDLwJZ9qSWy3igh5tEdADCiUfCGubEhAubs\ne1Rxn6UQ3k0GUQDLx9UUuyRjWJJUuXmhk/fl32YqwOthbx09MXvom6uxpv83QOHl\nBzxC0002dmm4VNqgfuzAt62NtJo/Io5HXHnpyAmm2gxsWBRQtffunPTHErseQLA1\nIyv+anAQELX9RN8aWphKO8nZ5SSMrUrxYrH7cgkwgu/g0e+YUHDEM3/vg4Z6yho8\ndD6UupMDB/1FRR31axb3m/XW+HqpFwBtdAUdwoFzze5N3W/XN40uuBsRBBXl2wra\ngW151AAcYuSV+VY2vwhFVNZAYwfpmyPjgvhCLkjFe+ySeSQ7uvn5wgAO/ct1MKK4\nFQY3n0l5ttSg/GJ5urr1LSUNFF+ytL+jUPG0NIyHeZbBrju/mzPGuS6/eT1taz2m\nEwA9+Z0IiEjituIWGzpf5e2igK5IIM/B2o4FhHepGuAXMY6ifQtsItE208YNPAcQ\nrGzrcnERCg5Vw+QymfJWAc3jFmM2YIwGtWkuM+18cbFzAgMBAAEwDQYJKoZIhvcN\nAQELBQADggIBAKuS4hDRPhhaHTT75mhHtMCGNvwhOW7MJtM4PD5IPusv0aPHWefM\ncCTZUUgf5FgjlftIgK/vv+YYhVAc2Yp/s3yRBG1Gzb7TGg9OuJZH0/1507a1/50r\nszevC1NLLOas3EL+UgVDfrZ5S/GqvDleRDBo3ZJuzNi74gRe1BjVczs6bVK/xWs5\n14WYD76w1KR98yWXFK5D8y06NOryYVv3swGUkbdwBcGE2JANG+IliW5UyPtRlbSj\n679TuuxqaHO/hqH1tbsTE+7Jsq+P8ro12WqyHapDBYqOwh4QrHZqBj8AqA1RFiyP\nIYLPBTHkMwkMfO5wsi314+O8Ke4PeQ3+n3ce7yS7PITwWy0ixh9NQysjqo6DrE8W\nAgh1hc8Co1E3BGbozg4a+ZRw7Fm2txXll8qI82f62W8ZCzVrHjjqAIQ0oTKymXFL\nMryYgsqXp1Dsk3zZ5nXok4FsVOxC4vdwreJx1gQtwbB4RITYzdU0Cyfut/YP5jO7\nxIwKYvygROA2I4RaJrLDV2bBW4VwiTJKlaA01tpru0pydhrZKDumkS1pFox9RJ2m\nkEYPcgD7dphEMZhyevF9PyZISIYUYezEELPbE0lQWM1ZL+vMzNb4VeRYV9fUzSB5\n77YBAFFG6SBZO7R37CyOybb54NRmWrmNJP1MWiqG+kaXmoY7foPqFVr6\n-----END CERTIFICATE-----\n",
+                    "summary": "PEM encoded certificate.",
+                    "description": "The PEM encoded payload is a certificate that contains the public key."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Key not found"
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/jwt_keys": {
+      "get": {
+        "summary": "Retrieve all JWT public signing keys that are valid.",
+        "description": "Retrieve all PEM-formatted public keys that are valid that can be used to verify Portal Framework JWTs. Unexpired tokens may have been signed with any of these keys. The `Accept` header sets the return format: `application/json` returns an array of JSON documents with the key ID and a serialized public key with `\n` instead of new lines, while `text/plain` or `application/x-x509-ca-cert` returns a contcatenated list of public keys as plain text with valid new line characters.",
+        "operationId": "getJwtKey",
+        "tags": [
+          "Signing keys"
+        ],
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "description": "List of valid keys.",
+                  "items": {
+                    "$ref": "#/components/schemas/public-key-response"
+                  }
+                }
+              },
+              "application/x-x509-ca-cert": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "example1": {
+                    "value": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAvpPXNkFbmnNc4wSB21Tb\np9hdCf1rq+urFaXr2BvWQ3kvJG3FBYs43kUHxif8+rqJ+o3ATMWcnmZUPpqxbJFZ\nPknpSO/dJPZnzBCFz6dG5PA5GlLEByw0/39GtDAZMtt/UYNNNc03LGKWrxsvXnjQ\nGnNrtOYgzTVk66GAFbfEg6OuobQVriPdGqPjCM41M9aE9PcwkBYTdcSBn3fBv9o+\n55yBE3lq6o4wcz2Q43eUTUqTRWRZm9Nu2fDOuAzTcA/Ehk+Eqg7ftaFAAZClVKKw\nUsWaR55mGvbdTabMBS2EbuOz4kflJI14HOVBL4bnkURSyxfp9tOehpcsDnKqaYPp\nLaZfCeJGf8pWFwVFXTttbRaCRk65zcEATrgDPCki/OjuVCdWAfqISxcufhKaQvsM\nOstKjgpFcMSG9+r965t7xwl7dngT4n2vXYBO2LB9J21h86yn7qtxnKlyqpgwP144\nStq7z7Au6rhDXyCglRRiX1K9qac/OVN7SjCud50EmfjnSBkpoxXRcepchjVZc3Oa\nf1lmbBFh6y1fnA7bVug4V+PBOh1SqgRfAcDLICiRd2D8EXd2KYM9Unr7nTRn8UtG\n0b0v1mB0AtfTyZCZSTm5J8vC8Vfe+BZJDILjmHkQ+ORfoz0FYG4/HpQjgaHuXqWu\n5PW15y7ej7d3eCjSMRKyUskCAwEAAQ==\n-----END PUBLIC KEY-----\n-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA1dG2zyU7LMZqs0H/90c0\n3mhSzzvQXoBWJhME4aa1wl0N/h1Z7dgIN3YWDKLtyo0+VO9HJ6RunnPpAu/ncfVO\neN/kjxXZXoRiwlCVztsXZuCdFfm5aYWmUEteO2iBolG9wxGi+3biejpvvgWEr+AM\nMMYAb2nKqmtgMhkmOcsBLvfb1VL1U2i7yg8VwSRnmSkmwRRimQRVpAb+7gCrAh7P\n+SyEcLuv38pJfFxLbZTv/NyvYLgmagrtmd/Mk9WeDMqiNpKXR1SBXiFNfUS/eBXy\n2dwFKNAbIIJYwGKAo3P+Et/j/E8mpSfGn8zeHHSSxwPO64Ergxb/vVweSAeobTMs\nxoHzK3198jz2n29JHaWV7fbM9vzoUuv8aEuIeMICtROR0/mKM2C/DFgfooPiykbU\nA9bxoFRFKUvUexGwuND8DVGBp2oSr6ngVZ3Isi/jFhGpoXUdeU4IxR4MpeInC7OO\nwLqIKgvXZAKtULOHmvY6WemERgsGWJYOQB7nlTr7NMva+gL7FApNtJRWnjeAMAQN\nW0NqaJd8dzp+Nkr2s/oIMwOi8rEeQgsKloU+JOM8P7yVXktgfFWEgw/FJqrHvSG2\nwXXdGC+maxPvATpmG0u+E7GO5Vw5clGBuShlTXTiJ6UjMgOADoZG6SA2lCJX7VCU\nkS59oiFSG9sWuX02mvLnCmECAwEAAQ==\n-----END PUBLIC KEY-----\n",
+                    "summary": "PEM encoded public key.",
+                    "description": "The PEM encoded payload can be used directly as a public key."
+                  },
+                  "example2": {
+                    "value": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAvpPXNkFbmnNc4wSB21Tb\np9hdCf1rq+urFaXr2BvWQ3kvJG3FBYs43kUHxif8+rqJ+o3ATMWcnmZUPpqxbJFZ\nPknpSO/dJPZnzBCFz6dG5PA5GlLEByw0/39GtDAZMtt/UYNNNc03LGKWrxsvXnjQ\nGnNrtOYgzTVk66GAFbfEg6OuobQVriPdGqPjCM41M9aE9PcwkBYTdcSBn3fBv9o+\n55yBE3lq6o4wcz2Q43eUTUqTRWRZm9Nu2fDOuAzTcA/Ehk+Eqg7ftaFAAZClVKKw\nUsWaR55mGvbdTabMBS2EbuOz4kflJI14HOVBL4bnkURSyxfp9tOehpcsDnKqaYPp\nLaZfCeJGf8pWFwVFXTttbRaCRk65zcEATrgDPCki/OjuVCdWAfqISxcufhKaQvsM\nOstKjgpFcMSG9+r965t7xwl7dngT4n2vXYBO2LB9J21h86yn7qtxnKlyqpgwP144\nStq7z7Au6rhDXyCglRRiX1K9qac/OVN7SjCud50EmfjnSBkpoxXRcepchjVZc3Oa\nf1lmbBFh6y1fnA7bVug4V+PBOh1SqgRfAcDLICiRd2D8EXd2KYM9Unr7nTRn8UtG\n0b0v1mB0AtfTyZCZSTm5J8vC8Vfe+BZJDILjmHkQ+ORfoz0FYG4/HpQjgaHuXqWu\n5PW15y7ej7d3eCjSMRKyUskCAwEAAQ==\n-----END PUBLIC KEY-----\n-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA1dG2zyU7LMZqs0H/90c0\n3mhSzzvQXoBWJhME4aa1wl0N/h1Z7dgIN3YWDKLtyo0+VO9HJ6RunnPpAu/ncfVO\neN/kjxXZXoRiwlCVztsXZuCdFfm5aYWmUEteO2iBolG9wxGi+3biejpvvgWEr+AM\nMMYAb2nKqmtgMhkmOcsBLvfb1VL1U2i7yg8VwSRnmSkmwRRimQRVpAb+7gCrAh7P\n+SyEcLuv38pJfFxLbZTv/NyvYLgmagrtmd/Mk9WeDMqiNpKXR1SBXiFNfUS/eBXy\n2dwFKNAbIIJYwGKAo3P+Et/j/E8mpSfGn8zeHHSSxwPO64Ergxb/vVweSAeobTMs\nxoHzK3198jz2n29JHaWV7fbM9vzoUuv8aEuIeMICtROR0/mKM2C/DFgfooPiykbU\nA9bxoFRFKUvUexGwuND8DVGBp2oSr6ngVZ3Isi/jFhGpoXUdeU4IxR4MpeInC7OO\nwLqIKgvXZAKtULOHmvY6WemERgsGWJYOQB7nlTr7NMva+gL7FApNtJRWnjeAMAQN\nW0NqaJd8dzp+Nkr2s/oIMwOi8rEeQgsKloU+JOM8P7yVXktgfFWEgw/FJqrHvSG2\nwXXdGC+maxPvATpmG0u+E7GO5Vw5clGBuShlTXTiJ6UjMgOADoZG6SA2lCJX7VCU\nkS59oiFSG9sWuX02mvLnCmECAwEAAQ==\n-----END PUBLIC KEY-----\n",
+                    "summary": "PEM encoded certificate.",
+                    "description": "The PEM encoded payload is a certificate that contains the public key."
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "example1": {
+                    "value": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAvpPXNkFbmnNc4wSB21Tb\np9hdCf1rq+urFaXr2BvWQ3kvJG3FBYs43kUHxif8+rqJ+o3ATMWcnmZUPpqxbJFZ\nPknpSO/dJPZnzBCFz6dG5PA5GlLEByw0/39GtDAZMtt/UYNNNc03LGKWrxsvXnjQ\nGnNrtOYgzTVk66GAFbfEg6OuobQVriPdGqPjCM41M9aE9PcwkBYTdcSBn3fBv9o+\n55yBE3lq6o4wcz2Q43eUTUqTRWRZm9Nu2fDOuAzTcA/Ehk+Eqg7ftaFAAZClVKKw\nUsWaR55mGvbdTabMBS2EbuOz4kflJI14HOVBL4bnkURSyxfp9tOehpcsDnKqaYPp\nLaZfCeJGf8pWFwVFXTttbRaCRk65zcEATrgDPCki/OjuVCdWAfqISxcufhKaQvsM\nOstKjgpFcMSG9+r965t7xwl7dngT4n2vXYBO2LB9J21h86yn7qtxnKlyqpgwP144\nStq7z7Au6rhDXyCglRRiX1K9qac/OVN7SjCud50EmfjnSBkpoxXRcepchjVZc3Oa\nf1lmbBFh6y1fnA7bVug4V+PBOh1SqgRfAcDLICiRd2D8EXd2KYM9Unr7nTRn8UtG\n0b0v1mB0AtfTyZCZSTm5J8vC8Vfe+BZJDILjmHkQ+ORfoz0FYG4/HpQjgaHuXqWu\n5PW15y7ej7d3eCjSMRKyUskCAwEAAQ==\n-----END PUBLIC KEY-----\n-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA1dG2zyU7LMZqs0H/90c0\n3mhSzzvQXoBWJhME4aa1wl0N/h1Z7dgIN3YWDKLtyo0+VO9HJ6RunnPpAu/ncfVO\neN/kjxXZXoRiwlCVztsXZuCdFfm5aYWmUEteO2iBolG9wxGi+3biejpvvgWEr+AM\nMMYAb2nKqmtgMhkmOcsBLvfb1VL1U2i7yg8VwSRnmSkmwRRimQRVpAb+7gCrAh7P\n+SyEcLuv38pJfFxLbZTv/NyvYLgmagrtmd/Mk9WeDMqiNpKXR1SBXiFNfUS/eBXy\n2dwFKNAbIIJYwGKAo3P+Et/j/E8mpSfGn8zeHHSSxwPO64Ergxb/vVweSAeobTMs\nxoHzK3198jz2n29JHaWV7fbM9vzoUuv8aEuIeMICtROR0/mKM2C/DFgfooPiykbU\nA9bxoFRFKUvUexGwuND8DVGBp2oSr6ngVZ3Isi/jFhGpoXUdeU4IxR4MpeInC7OO\nwLqIKgvXZAKtULOHmvY6WemERgsGWJYOQB7nlTr7NMva+gL7FApNtJRWnjeAMAQN\nW0NqaJd8dzp+Nkr2s/oIMwOi8rEeQgsKloU+JOM8P7yVXktgfFWEgw/FJqrHvSG2\nwXXdGC+maxPvATpmG0u+E7GO5Vw5clGBuShlTXTiJ6UjMgOADoZG6SA2lCJX7VCU\nkS59oiFSG9sWuX02mvLnCmECAwEAAQ==\n-----END PUBLIC KEY-----\n",
+                    "summary": "PEM encoded public key.",
+                    "description": "The PEM encoded payload can be used directly as a public key."
+                  },
+                  "example2": {
+                    "value": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAvpPXNkFbmnNc4wSB21Tb\np9hdCf1rq+urFaXr2BvWQ3kvJG3FBYs43kUHxif8+rqJ+o3ATMWcnmZUPpqxbJFZ\nPknpSO/dJPZnzBCFz6dG5PA5GlLEByw0/39GtDAZMtt/UYNNNc03LGKWrxsvXnjQ\nGnNrtOYgzTVk66GAFbfEg6OuobQVriPdGqPjCM41M9aE9PcwkBYTdcSBn3fBv9o+\n55yBE3lq6o4wcz2Q43eUTUqTRWRZm9Nu2fDOuAzTcA/Ehk+Eqg7ftaFAAZClVKKw\nUsWaR55mGvbdTabMBS2EbuOz4kflJI14HOVBL4bnkURSyxfp9tOehpcsDnKqaYPp\nLaZfCeJGf8pWFwVFXTttbRaCRk65zcEATrgDPCki/OjuVCdWAfqISxcufhKaQvsM\nOstKjgpFcMSG9+r965t7xwl7dngT4n2vXYBO2LB9J21h86yn7qtxnKlyqpgwP144\nStq7z7Au6rhDXyCglRRiX1K9qac/OVN7SjCud50EmfjnSBkpoxXRcepchjVZc3Oa\nf1lmbBFh6y1fnA7bVug4V+PBOh1SqgRfAcDLICiRd2D8EXd2KYM9Unr7nTRn8UtG\n0b0v1mB0AtfTyZCZSTm5J8vC8Vfe+BZJDILjmHkQ+ORfoz0FYG4/HpQjgaHuXqWu\n5PW15y7ej7d3eCjSMRKyUskCAwEAAQ==\n-----END PUBLIC KEY-----\n-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA1dG2zyU7LMZqs0H/90c0\n3mhSzzvQXoBWJhME4aa1wl0N/h1Z7dgIN3YWDKLtyo0+VO9HJ6RunnPpAu/ncfVO\neN/kjxXZXoRiwlCVztsXZuCdFfm5aYWmUEteO2iBolG9wxGi+3biejpvvgWEr+AM\nMMYAb2nKqmtgMhkmOcsBLvfb1VL1U2i7yg8VwSRnmSkmwRRimQRVpAb+7gCrAh7P\n+SyEcLuv38pJfFxLbZTv/NyvYLgmagrtmd/Mk9WeDMqiNpKXR1SBXiFNfUS/eBXy\n2dwFKNAbIIJYwGKAo3P+Et/j/E8mpSfGn8zeHHSSxwPO64Ergxb/vVweSAeobTMs\nxoHzK3198jz2n29JHaWV7fbM9vzoUuv8aEuIeMICtROR0/mKM2C/DFgfooPiykbU\nA9bxoFRFKUvUexGwuND8DVGBp2oSr6ngVZ3Isi/jFhGpoXUdeU4IxR4MpeInC7OO\nwLqIKgvXZAKtULOHmvY6WemERgsGWJYOQB7nlTr7NMva+gL7FApNtJRWnjeAMAQN\nW0NqaJd8dzp+Nkr2s/oIMwOi8rEeQgsKloU+JOM8P7yVXktgfFWEgw/FJqrHvSG2\nwXXdGC+maxPvATpmG0u+E7GO5Vw5clGBuShlTXTiJ6UjMgOADoZG6SA2lCJX7VCU\nkS59oiFSG9sWuX02mvLnCmECAwEAAQ==\n-----END PUBLIC KEY-----\n",
+                    "summary": "PEM encoded certificate.",
+                    "description": "The PEM encoded payload is a certificate that contains the public key."
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "OIDCBasic": {
+        "type": "http",
+        "scheme": "basic"
+      }
+    },
+    "headers": {
+      "SetCookieToken": {
+        "schema": {
+          "type": "string"
+        },
+        "description": "JWT for authentication of API calls."
+      }
+    },
+    "schemas": {
+      "token": "http://elasticbox.net/schemas/token",
+      "access-token-request": "http://elasticbox.net/schemas/access-token-request",
+      "access-token-response": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "access_token"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "JWT for authentication on product API endpoints.",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5c..."
+          },
+          "access_expires_in": {
+            "type": "integer",
+            "description": "Duration of the access token from the moment it is requested, in seconds.",
+            "example": 300
+          }
+        }
+      },
+      "refresh-access-token-response": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "access_token"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "JWT for authentication on product API endpoints.",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5c..."
+          },
+          "access_expires_in": {
+            "type": "integer",
+            "description": "Duration of the access token from the moment it is requested, in seconds.",
+            "example": 300
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "JWT for authentication on auth API endpoints (i.e. to obtain further access tokens).",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5c..."
+          },
+          "refresh_expires_in": {
+            "type": "integer",
+            "description": "Duration of the refresh token from the moment it is requested, in seconds.",
+            "example": 3600
+          }
+        }
+      },
+      "token_response": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "Access token in JWT format.",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5c..."
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Token type. Only `Bearer` is used.",
+            "enum": [
+              "Bearer"
+            ],
+            "example": "Bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Expiration time in seconds.",
+            "example": 3600
+          }
+        }
+      },
+      "oauth_token_response": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "refresh_token",
+          "refresh_expires_in",
+          "access_token",
+          "access_expires_in",
+          "token_type"
+        ],
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "description": "Refresh token in JWT format.",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5c..."
+          },
+          "refresh_expires_in": {
+            "type": "integer",
+            "description": "Refresh token expiration time in seconds.",
+            "example": 300
+          },
+          "access_token": {
+            "type": "string",
+            "description": "Access token in JWT format.",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5c..."
+          },
+          "access_expires_in": {
+            "type": "integer",
+            "description": "Access token expiration time in seconds.",
+            "example": 300
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Token type. Only `Bearer` is used.",
+            "enum": [
+              "Bearer"
+            ],
+            "example": "Bearer"
+          }
+        }
+      },
+      "user_details": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in"
+        ],
+        "properties": {
+          "userName": {
+            "type": "string",
+            "description": "Username.",
+            "example": "user@centurylink.com"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "First name.",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Last name.",
+            "example": "Doe"
+          },
+          "emailAddress": {
+            "type": "string",
+            "description": "Email address",
+            "example": "user@centurylink.com"
+          },
+          "multifactorRequired": {
+            "type": "boolean",
+            "description": "Whether multifactor is required for login."
+          },
+          "idpIdentifier": {
+            "type": "string",
+            "description": "Identity service provider user ID",
+            "example": "user1"
+          }
+        }
+      },
+      "jwks": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keys"
+        ],
+        "properties": {
+          "keys": {
+            "type": "array",
+            "description": "list of available keys.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "e": {
+                  "type": "string"
+                },
+                "kty": {
+                  "type": "string",
+                  "example": "RSA"
+                },
+                "n": {
+                  "type": "string",
+                  "description": "Key",
+                  "example": "vfXAptp4XtBpI..."
+                }
+              }
+            }
+          }
+        }
+      },
+      "openid-configuration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in"
+        ],
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "description": "Identity provider.",
+            "example": "https://auth.centurylink.com"
+          },
+          "authorization_endpoint": {
+            "type": "string",
+            "description": "Authorization endpoint.",
+            "example": "https://auth.centurylink.com/services/security/oidc/authorize"
+          },
+          "token_endpoint": {
+            "type": "string",
+            "description": "Token endpoint.",
+            "example": "https://auth.centurylink.com/services/security/oidc/token"
+          },
+          "userinfo_endpoint": {
+            "type": "string",
+            "description": "User information endpoint",
+            "example": "https://auth.centurylink.com/services/security/oidc/userinfo"
+          },
+          "jwks_uri": {
+            "type": "string",
+            "description": "OIDC JSON Web Keys endpoint.",
+            "example": "https://auth.centurylink.com/services/security/oidc/jwks"
+          },
+          "scopes_supported": {
+            "type": "array",
+            "description": "List of supported scopes",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "openid"
+            ]
+          },
+          "response_types_supported": {
+            "type": "array",
+            "description": "List of supported response types",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "code"
+            ]
+          },
+          "grant_types_supported": {
+            "type": "array",
+            "description": "List of supported grant types",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "authorization_code"
+            ]
+          },
+          "subject_types_supported": {
+            "type": "array",
+            "description": "List of supported subject types",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "public",
+              "pairwise"
+            ]
+          },
+          "id_token_signing_alg_values_supported": {
+            "type": "array",
+            "description": "List of supported token signing algorithms",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "RS256"
+            ]
+          },
+          "claims_supported": {
+            "type": "array",
+            "description": "List of supported claims",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "email"
+            ]
+          }
+        }
+      },
+      "public-key-response": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key_id",
+          "public_key"
+        ],
+        "properties": {
+          "key_id": {
+            "type": "string",
+            "description": "ID of the signing key. This corresponds to the `kid` field of the header in JWTs.",
+            "example": "5f603df3-e406-41d8-b8cd-dfad7f820c1e"
+          },
+          "public_key": {
+            "type": "string",
+            "description": "PEM-encoded public key with new lines encoded as `\n`. The public key may be enclosed in a certificate.",
+            "example": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA+4JWLMc7TWUPDICh7vW7\nC/KXRyhUFKQpZmfpmqZyo1Mcr4XwPtf1c8fgkcggwBgE+uVTQ/dGDt9wnFA3M6gA\n/zckSQnR1JTt45l9wp6bITYn7t94CCYKH4S06NROZHt49G4PIrffmAT9UB/F/rBC\n1K3KAwYBVkO6SXzcGS9gTai2Xas2OycN/H/hpfLfdVBDYDcZwC4dzCDtLd0zK1/k\nZ88ifZTmk60qP8fcI589ENdMXjVkrmqhv09svJ4PoBeT9h2LoDJlkT78h/SUMMdW\n3GidhiubkfuA18YqXourQbuNdq8OzGPGcjPZ5+toew8NEL5v2+WRFA5Zv2e3oMbw\n41STSpS5hg5za4q52IZo0pkZtiPSPz2W8/AIgOHlpnbsTM9B2tNAlAAJ4kWnhEl8\nq/xhgMMO6ANtVUKC7HbsucfAaDx+p6qCZzbuL0LuhceZioWkVkup2hwAQueJxGks\n2eTV7bC8f5SnZo5yADCic936bEetnMd+OfiTvVFROkqfGTPJhTMWwk3Uqvl+rh7o\nqz0iTPotCm//A6PzDGWt2PSCOu7AQIhl7xRNAiljP/VAyi7Rs80IzX7xrnc8PbOc\ngMxTkl6cveFRDVWvhaMCi7v9xi7CyXnIuyaxwynTc6j67r0JmkKZByo1GGmbkxA1\nPKDntq4yi8rRL59+Xivj3tcCAwEAAQ==\n-----END PUBLIC KEY-----\n"
+          }
+        }
+      },
+      "auth_methods": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ldap_url": {
+            "type": "string",
+            "description": "Endpoint to post the credentials to for LDAP authentication."
+          },
+          "password_url": {
+            "type": "string",
+            "description": "Endpoint to post the credentials to for user+password authentication"
+          },
+          "organization": {
+            "type": "string",
+            "description": "Organization name for which the authentication methods are reported."
+          },
+          "icon": {
+            "type": "string",
+            "description": "Path to the organization icon"
+          },
+          "onboard_checklist": {
+            "type": "string",
+            "description": "Whether the organization onboarding has been completed."
+          },
+          "email": {
+            "type": "string",
+            "description": "User email for which the authentication methods are reported."
+          }
+        }
+      },
+      "saml_metadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "organization": {
+            "type": "object",
+            "description": "Organization details",
+            "properties": {
+              "en-US": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "example": "http://cam.ctl.io"
+                  },
+                  "displayname": {
+                    "type": "string",
+                    "example": "ElasticBox SAML Service Provider"
+                  },
+                  "name": {
+                    "type": "string",
+                    "example": "ElasticBox"
+                  }
+                }
+              }
+            }
+          },
+          "security": {
+            "type": "object",
+            "properties": {
+              "wantAssertionsSigned": {
+                "type": "boolean"
+              },
+              "wantNameId": {
+                "type": "boolean"
+              },
+              "requestedAuthnContext": {
+                "type": "boolean"
+              },
+              "authnRequestsSigned": {
+                "type": "boolean"
+              }
+            }
+          },
+          "sp": {
+            "type": "object",
+            "properties": {
+              "assertionConsumerService": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "example": "https://cam.ctl.com/services/security/saml?organization=public"
+                  },
+                  "binding": {
+                    "type": "string",
+                    "example": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                  }
+                }
+              },
+              "x509cert": {
+                "type": "string",
+                "example": "-----BEGIN CERTIFICATE-----\nMI..."
+              },
+              "NameIDFormat": {
+                "type": "string",
+                "example": "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified"
+              },
+              "privateKey": {
+                "type": "string",
+                "example": "-----BEGIN RSA PRIVATE KEY-----\nMI..."
+              },
+              "entityId": {
+                "type": "string",
+                "example": "cam.ctl.com"
+              }
+            }
+          },
+          "idp": {
+            "type": "object",
+            "properties": {
+              "x509cert": {
+                "type": "string",
+                "example": "MII..."
+              },
+              "entityId": {
+                "type": "string",
+                "example": "https://fnst.centurylink.com/oam/fed"
+              },
+              "singleSignOnService": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "example": "https://fnst.centurylink.com/oamfed/idp/samlv20"
+                  },
+                  "binding": {
+                    "type": "string",
+                    "example": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                  }
+                }
+              }
+            }
+          },
+          "contactPerson": {
+            "type": "object",
+            "properties": {
+              "support": {
+                "type": "object",
+                "properties": {
+                  "givenName": {
+                    "type": "string",
+                    "example": "CAM support"
+                  },
+                  "emailAddress": {
+                    "type": "string",
+                    "example": "support@centurylink.com"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
