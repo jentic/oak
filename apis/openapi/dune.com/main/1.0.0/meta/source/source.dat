@@ -1,0 +1,1551 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Dune Analytics API",
+    "description": "Dune Analytics API provides programmatic access to execute on-chain analytics queries, manage data, upload custom datasets, and retrieve results. Supports SQL-based blockchain data queries across multiple chains.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Dune Analytics",
+      "url": "https://docs.dune.com"
+    },
+    "x-jentic-source-url": "https://docs.dune.com/api-reference",
+    "x-provenance": "jentic-generated"
+  },
+  "servers": [
+    {
+      "url": "https://api.dune.com/api",
+      "description": "Dune Analytics API Production"
+    }
+  ],
+  "security": [
+    {
+      "apiKeyHeader": []
+    }
+  ],
+  "paths": {
+    "/v1/query/{query_id}/execute": {
+      "post": {
+        "operationId": "executeQuery",
+        "summary": "Execute a saved query",
+        "description": "Triggers execution of a saved query by its ID. Returns an execution ID that can be used to poll for status and retrieve results.",
+        "tags": ["Executions"],
+        "parameters": [
+          {
+            "name": "query_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Unique identifier of the saved query"
+          },
+          {
+            "name": "performance",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["medium", "large"],
+              "default": "medium"
+            },
+            "description": "Engine tier for execution. Credits consumed based on actual compute resources."
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query_parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Key-value pairs of SQL parameters to pass to the query"
+                  },
+                  "performance": {
+                    "type": "string",
+                    "enum": ["medium", "large"],
+                    "description": "Engine tier for execution"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Query execution initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - invalid request format"
+          },
+          "401": {
+            "description": "Unauthorized - invalid API key"
+          },
+          "402": {
+            "description": "Payment Required - credit/billing limit exceeded"
+          },
+          "403": {
+            "description": "Forbidden - query is archived, unsaved, or insufficient permissions"
+          },
+          "404": {
+            "description": "Not Found - query does not exist"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/sql/execute": {
+      "post": {
+        "operationId": "executeSql",
+        "summary": "Execute raw SQL",
+        "description": "Executes a raw SQL query without saving it. Returns an execution ID for polling results. The query_id in results will be 0 since execution is not persisted.",
+        "tags": ["Executions"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["sql"],
+                "properties": {
+                  "sql": {
+                    "type": "string",
+                    "description": "The SQL query to execute"
+                  },
+                  "performance": {
+                    "type": "string",
+                    "enum": ["medium", "large"],
+                    "description": "Engine tier for execution"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SQL execution initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized - invalid API key"
+          },
+          "402": {
+            "description": "Payment Required - billing limits exceeded"
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/execution/{execution_id}/status": {
+      "get": {
+        "operationId": "getExecutionStatus",
+        "summary": "Get execution status",
+        "description": "Checks the current status of an execution request. Includes detailed error information when a query fails.",
+        "tags": ["Executions"],
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier for the execution"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Execution status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Execution not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/execution/{execution_id}/results": {
+      "get": {
+        "operationId": "getExecutionResults",
+        "summary": "Get execution results",
+        "description": "Retrieves results of a completed execution by execution ID.",
+        "tags": ["Executions"],
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier for the execution"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Maximum number of rows per page"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Starting row position for pagination"
+          },
+          {
+            "name": "columns",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated column names to return"
+          },
+          {
+            "name": "filters",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "SQL WHERE-like expression to filter rows"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "SQL ORDER BY-like sorting expression"
+          },
+          {
+            "name": "sample_count",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Uniform random sample size (incompatible with limit/offset/filters)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Execution results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Execution not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/execution/{execution_id}/results/csv": {
+      "get": {
+        "operationId": "getExecutionResultsCsv",
+        "summary": "Get execution results as CSV",
+        "description": "Retrieves results of a completed execution in CSV format.",
+        "tags": ["Executions"],
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier for the execution"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Maximum rows to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Starting row position"
+          },
+          {
+            "name": "columns",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated column names"
+          },
+          {
+            "name": "filters",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "SQL WHERE-like filter expression"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "SQL ORDER BY-like expression"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV results",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Execution not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/execution/{execution_id}/cancel": {
+      "post": {
+        "operationId": "cancelExecution",
+        "summary": "Cancel an execution",
+        "description": "Cancels a running execution request.",
+        "tags": ["Executions"],
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique identifier of the execution to cancel"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Whether the cancellation succeeded"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Execution not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/query/{query_id}/results": {
+      "get": {
+        "operationId": "getLatestQueryResult",
+        "summary": "Get latest query result",
+        "description": "Retrieves the most recent results for a saved query. Does NOT trigger a new execution but may consume credits based on result size.",
+        "tags": ["Results"],
+        "parameters": [
+          {
+            "name": "query_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The query ID"
+          },
+          {
+            "name": "allow_partial_results",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Enable retrieval of truncated results exceeding 32GB"
+          },
+          {
+            "name": "columns",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated column names to filter"
+          },
+          {
+            "name": "filters",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "SQL WHERE-like expression for row filtering"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Maximum rows per page"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Starting row position"
+          },
+          {
+            "name": "sample_count",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Uniform random sample size"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "SQL ORDER BY-like expression"
+          },
+          {
+            "name": "ignore_max_credits_per_request",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Bypass credit limits"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest query results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "404": {
+            "description": "Query not found or no access"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/query/{query_id}/results/csv": {
+      "get": {
+        "operationId": "getLatestQueryResultCsv",
+        "summary": "Get latest query result as CSV",
+        "description": "Retrieves the most recent results for a saved query in CSV format. Does NOT trigger a new execution but consumes credits based on result size.",
+        "tags": ["Results"],
+        "parameters": [
+          {
+            "name": "query_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The query ID"
+          },
+          {
+            "name": "allow_partial_results",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Enable partial results retrieval"
+          },
+          {
+            "name": "columns",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated column names"
+          },
+          {
+            "name": "filters",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "SQL WHERE-like filter"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Maximum rows"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Starting row"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "SQL ORDER BY-like expression"
+          },
+          {
+            "name": "sample_count",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Random sample size"
+          },
+          {
+            "name": "ignore_max_credits_per_request",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Bypass credit limits"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV results",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "404": {
+            "description": "Query not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/query": {
+      "post": {
+        "operationId": "createQuery",
+        "summary": "Create a new saved query",
+        "description": "Creates a new saved query with SQL text, parameters, name, and tags.",
+        "tags": ["Queries"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "query_sql"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the query"
+                  },
+                  "query_sql": {
+                    "type": "string",
+                    "description": "SQL text of the query"
+                  },
+                  "query_parameters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": ["text", "number", "date", "enum"]
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "Query parameters with defaults"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Query description"
+                  },
+                  "is_private": {
+                    "type": "boolean",
+                    "description": "Whether the query is private"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Tags for the query"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Query created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Query"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/query/{query_id}": {
+      "get": {
+        "operationId": "getQuery",
+        "summary": "Read a saved query",
+        "description": "Retrieves the SQL text, parameters, name, tags, and state of a saved query.",
+        "tags": ["Queries"],
+        "parameters": [
+          {
+            "name": "query_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The query ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Query details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Query"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Query not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateQuery",
+        "summary": "Update a saved query",
+        "description": "Modifies the SQL text, parameters, name, tags, or state of a saved query.",
+        "tags": ["Queries"],
+        "parameters": [
+          {
+            "name": "query_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The query ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "query_sql": {
+                    "type": "string"
+                  },
+                  "query_parameters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Query updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Query"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Query not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/query/{query_id}/archive": {
+      "post": {
+        "operationId": "archiveQuery",
+        "summary": "Archive a query",
+        "description": "Marks a query as archived, making it uneditable and unexecutable.",
+        "tags": ["Queries"],
+        "parameters": [
+          {
+            "name": "query_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The query ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Query archived successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Query not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/query/{query_id}/unarchive": {
+      "post": {
+        "operationId": "unarchiveQuery",
+        "summary": "Unarchive a query",
+        "description": "Restores an archived query to active state.",
+        "tags": ["Queries"],
+        "parameters": [
+          {
+            "name": "query_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The query ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Query unarchived successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Query not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/query/{query_id}/private": {
+      "post": {
+        "operationId": "makeQueryPrivate",
+        "summary": "Make query private",
+        "description": "Restricts access to a query, making it private.",
+        "tags": ["Queries"],
+        "parameters": [
+          {
+            "name": "query_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The query ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Query made private"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Query not found"
+          }
+        }
+      }
+    },
+    "/v1/query/{query_id}/unprivate": {
+      "post": {
+        "operationId": "makeQueryPublic",
+        "summary": "Make query public",
+        "description": "Removes access restrictions from a private query.",
+        "tags": ["Queries"],
+        "parameters": [
+          {
+            "name": "query_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The query ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Query made public"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Query not found"
+          }
+        }
+      }
+    },
+    "/v1/table/create": {
+      "post": {
+        "operationId": "createTable",
+        "summary": "Create an uploaded table",
+        "description": "Initializes an empty table for data uploads. Costs 10 credits.",
+        "tags": ["Tables"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["namespace", "table_name", "schema"],
+                "properties": {
+                  "namespace": {
+                    "type": "string",
+                    "description": "Your Dune namespace/team name"
+                  },
+                  "table_name": {
+                    "type": "string",
+                    "description": "Name for the table"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Table description"
+                  },
+                  "schema": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "description": "Column type (varchar, integer, double, boolean, timestamp)"
+                        }
+                      }
+                    },
+                    "description": "Column definitions"
+                  },
+                  "is_private": {
+                    "type": "boolean",
+                    "description": "Whether the table is private"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Table created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "namespace": {
+                      "type": "string"
+                    },
+                    "table_name": {
+                      "type": "string"
+                    },
+                    "full_name": {
+                      "type": "string"
+                    },
+                    "example_query": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/table/{namespace}/{table_name}/insert": {
+      "post": {
+        "operationId": "insertData",
+        "summary": "Insert data into a table",
+        "description": "Adds rows to an existing uploaded table. Accepts CSV or NDJSON format.",
+        "tags": ["Tables"],
+        "parameters": [
+          {
+            "name": "namespace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Table namespace"
+          },
+          {
+            "name": "table_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Table name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "string",
+                "description": "CSV data with headers"
+              }
+            },
+            "application/x-ndjson": {
+              "schema": {
+                "type": "string",
+                "description": "Newline-delimited JSON"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Data inserted successfully"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Table not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/table/{namespace}/{table_name}/clear": {
+      "post": {
+        "operationId": "clearTableData",
+        "summary": "Clear table data",
+        "description": "Removes all table contents while preserving the schema.",
+        "tags": ["Tables"],
+        "parameters": [
+          {
+            "name": "namespace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Table namespace"
+          },
+          {
+            "name": "table_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Table name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Table data cleared"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Table not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/table/{namespace}/{table_name}": {
+      "delete": {
+        "operationId": "deleteTable",
+        "summary": "Delete a table",
+        "description": "Permanently removes the table and all its data.",
+        "tags": ["Tables"],
+        "parameters": [
+          {
+            "name": "namespace",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Table namespace"
+          },
+          {
+            "name": "table_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Table name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Table deleted"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Table not found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/table/upload/csv": {
+      "post": {
+        "operationId": "uploadCsv",
+        "summary": "Upload CSV to create or replace table",
+        "description": "Batch upload a CSV file (up to 500MB) with auto schema inference to create or replace a table.",
+        "tags": ["Tables"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "string",
+                "description": "CSV data with headers (max 500MB)"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CSV uploaded successfully"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/v1/billing/usage": {
+      "get": {
+        "operationId": "getUsage",
+        "summary": "Get API usage",
+        "description": "Retrieves billing period usage data including credits consumed.",
+        "tags": ["Usage"],
+        "responses": {
+          "200": {
+            "description": "Usage data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credits_used": {
+                      "type": "number"
+                    },
+                    "credits_limit": {
+                      "type": "number"
+                    },
+                    "period_start": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "period_end": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Dune-Api-Key",
+        "description": "Dune API key. Auto-generated for new teams. Manage in account settings."
+      }
+    },
+    "schemas": {
+      "ExecutionResponse": {
+        "type": "object",
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "description": "Unique execution identifier",
+            "example": "01HKZJ2683PHF9Q9PHHQ8FW4Q1"
+          },
+          "state": {
+            "type": "string",
+            "description": "Current execution state",
+            "example": "QUERY_STATE_PENDING"
+          }
+        }
+      },
+      "ExecutionStatus": {
+        "type": "object",
+        "properties": {
+          "execution_id": {
+            "type": "string"
+          },
+          "query_id": {
+            "type": "integer"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUERY_STATE_PENDING",
+              "QUERY_STATE_EXECUTING",
+              "QUERY_STATE_COMPLETED",
+              "QUERY_STATE_FAILED",
+              "QUERY_STATE_CANCELLED",
+              "QUERY_STATE_EXPIRED"
+            ]
+          },
+          "is_execution_finished": {
+            "type": "boolean",
+            "description": "Whether the state is terminal"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "execution_started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "execution_ended_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "execution_cost_credits": {
+            "type": "number"
+          },
+          "result_metadata": {
+            "$ref": "#/components/schemas/ResultMetadata"
+          },
+          "error": {
+            "type": "object",
+            "description": "Present only when state is QUERY_STATE_FAILED",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "line": {
+                    "type": "integer"
+                  },
+                  "column": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "queue_position": {
+            "type": "integer"
+          },
+          "cancelled_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ResultMetadata": {
+        "type": "object",
+        "properties": {
+          "column_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "column_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "row_count": {
+            "type": "integer"
+          },
+          "total_row_count": {
+            "type": "integer"
+          },
+          "execution_time_millis": {
+            "type": "integer"
+          },
+          "datapoint_count": {
+            "type": "integer"
+          },
+          "result_set_bytes": {
+            "type": "integer"
+          }
+        }
+      },
+      "QueryResults": {
+        "type": "object",
+        "properties": {
+          "query_id": {
+            "type": "integer"
+          },
+          "execution_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "is_execution_finished": {
+            "type": "boolean"
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "metadata": {
+                "$ref": "#/components/schemas/ResultMetadata"
+              }
+            }
+          },
+          "next_offset": {
+            "type": "integer",
+            "description": "Offset for next page of results"
+          },
+          "next_uri": {
+            "type": "string",
+            "description": "Direct URI for next page of results"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Query": {
+        "type": "object",
+        "properties": {
+          "query_id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "query_sql": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "is_private": {
+            "type": "boolean"
+          },
+          "is_archived": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "query_parameters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "owner": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Executions",
+      "description": "Execute queries and manage execution lifecycle"
+    },
+    {
+      "name": "Results",
+      "description": "Retrieve query results without triggering new executions"
+    },
+    {
+      "name": "Queries",
+      "description": "Create, read, update, and manage saved queries"
+    },
+    {
+      "name": "Tables",
+      "description": "Upload and manage custom data tables"
+    },
+    {
+      "name": "Usage",
+      "description": "Monitor API usage and billing"
+    }
+  ]
+}
