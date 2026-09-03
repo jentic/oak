@@ -1,6 +1,6 @@
 # APIs — B
 
-Browsing 202 APIs starting with **B**.
+Browsing 203 APIs starting with **B**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · **B** · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · [I](../I) · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -148,6 +148,7 @@ Browsing 202 APIs starting with **B**.
 | [bpaygroup.com.au](../../../../apis/openapi/bpaygroup.com.au) | [main](../../../../apis/openapi/bpaygroup.com.au/main) |
 | [brainshop.ai](../../../../apis/openapi/brainshop.ai) | [main](../../../../apis/openapi/brainshop.ai/main) |
 | [braintreepayments.com](../../../../apis/openapi/braintreepayments.com) | [main](../../../../apis/openapi/braintreepayments.com/main) |
+| [braintrust.dev](../../../../apis/openapi/braintrust.dev) | [main](../../../../apis/openapi/braintrust.dev/main) |
 | [brandfolder.com](../../../../apis/openapi/brandfolder.com) | [main](../../../../apis/openapi/brandfolder.com/main) |
 | [brandlovers.com](../../../../apis/openapi/brandlovers.com) | [main](../../../../apis/openapi/brandlovers.com/main) |
 | [brave.com](../../../../apis/openapi/brave.com) | [main](../../../../apis/openapi/brave.com/main) |
