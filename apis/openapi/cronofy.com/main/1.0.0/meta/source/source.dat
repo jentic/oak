@@ -1,0 +1,902 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Cronofy Calendar API",
+    "description": "Calendar API aggregation service. Provides unified access to multiple calendar providers (Google, Apple, Exchange, Outlook) with scheduling, availability, and event management capabilities.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Cronofy",
+      "url": "https://www.cronofy.com"
+    },
+    "x-jentic-source-url": "https://docs.cronofy.com/developers/api/",
+    "x-provenance": "jentic-generated"
+  },
+  "servers": [
+    {
+      "url": "https://api.cronofy.com",
+      "description": "Cronofy US API"
+    },
+    {
+      "url": "https://api-uk.cronofy.com",
+      "description": "Cronofy UK API"
+    },
+    {
+      "url": "https://api-au.cronofy.com",
+      "description": "Cronofy Australia API"
+    },
+    {
+      "url": "https://api-ca.cronofy.com",
+      "description": "Cronofy Canada API"
+    },
+    {
+      "url": "https://api-de.cronofy.com",
+      "description": "Cronofy Germany API"
+    },
+    {
+      "url": "https://api-sg.cronofy.com",
+      "description": "Cronofy Singapore API"
+    }
+  ],
+  "security": [
+    {
+      "oauth2": []
+    },
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v1/calendars": {
+      "get": {
+        "operationId": "listCalendars",
+        "summary": "List calendars",
+        "description": "Returns a list of all the authenticated user's calendars across all connected calendar profiles.",
+        "tags": ["Calendars"],
+        "responses": {
+          "200": {
+            "description": "List of calendars",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sub": {
+                      "type": "string",
+                      "description": "Internal Cronofy account ID"
+                    },
+                    "calendars": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Calendar"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid credentials"
+          }
+        }
+      }
+    },
+    "/v1/events": {
+      "get": {
+        "operationId": "readEvents",
+        "summary": "Read events",
+        "description": "Returns a list of events from all connected calendars within the specified time range.",
+        "tags": ["Events"],
+        "parameters": [
+          {
+            "name": "tzid",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "IANA Time Zone Database identifier (e.g., Etc/UTC)"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" },
+            "description": "Start date (max 42 days in the past, defaults to 42 days ago)"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" },
+            "description": "End date (max 201 days in the future, defaults to 201 days ahead)"
+          },
+          {
+            "name": "include_deleted",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Include deleted events"
+          },
+          {
+            "name": "include_managed",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Include events managed via the API"
+          },
+          {
+            "name": "only_managed",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Return only managed events"
+          },
+          {
+            "name": "calendar_ids[]",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "description": "Filter by specific calendar IDs"
+          },
+          {
+            "name": "last_modified",
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Return events modified on or after this timestamp"
+          },
+          {
+            "name": "localized_times",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Include timezone localization data"
+          },
+          {
+            "name": "include_geo",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Include latitude/longitude when available"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pages": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Event"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - missing read_events or read_free_busy scope"
+          },
+          "422": {
+            "description": "Unprocessable - invalid parameters"
+          }
+        }
+      }
+    },
+    "/v1/calendars/{calendar_id}/events": {
+      "post": {
+        "operationId": "upsertEvent",
+        "summary": "Create or update an event",
+        "description": "Creates a new event or updates an existing one in the specified calendar. The event_id is used to determine if this is a create or update operation.",
+        "tags": ["Events"],
+        "parameters": [
+          {
+            "name": "calendar_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Calendar identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["event_id", "summary", "start", "end"],
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "description": "Unique string identifier for the event"
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 1024,
+                    "description": "Event title"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Event description"
+                  },
+                  "start": {
+                    "type": "string",
+                    "description": "Start time (ISO 8601) or date"
+                  },
+                  "end": {
+                    "type": "string",
+                    "description": "End time (ISO 8601) or date, must be after start"
+                  },
+                  "tzid": {
+                    "type": "string",
+                    "description": "IANA timezone identifier"
+                  },
+                  "location": {
+                    "type": "object",
+                    "properties": {
+                      "description": { "type": "string" },
+                      "lat": { "type": "string" },
+                      "long": { "type": "string" }
+                    }
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "transparency": {
+                    "type": "string",
+                    "enum": ["opaque", "transparent"]
+                  },
+                  "color": {
+                    "type": "string"
+                  },
+                  "attendees": {
+                    "type": "object",
+                    "properties": {
+                      "invite": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "email": { "type": "string" },
+                            "display_name": { "type": "string" }
+                          },
+                          "required": ["email"]
+                        }
+                      },
+                      "remove": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "email": { "type": "string" }
+                          },
+                          "required": ["email"]
+                        }
+                      }
+                    }
+                  },
+                  "reminders": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "minutes": { "type": "integer" }
+                      }
+                    }
+                  },
+                  "event_private": {
+                    "type": "boolean"
+                  },
+                  "conferencing": {
+                    "type": "object",
+                    "properties": {
+                      "profile_id": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Event accepted for processing"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - missing create_event scope"
+          },
+          "404": {
+            "description": "Calendar not found"
+          },
+          "422": {
+            "description": "Unprocessable - invalid parameters"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteEvent",
+        "summary": "Delete an event",
+        "description": "Deletes an event from the specified calendar.",
+        "tags": ["Events"],
+        "parameters": [
+          {
+            "name": "calendar_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Calendar identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["event_id"],
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "description": "Unique identifier of the event to delete"
+                  },
+                  "include_userinfo": {
+                    "type": "boolean",
+                    "description": "Embed userinfo in response"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Event deletion accepted"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - missing delete_event scope"
+          },
+          "422": {
+            "description": "Unprocessable - invalid parameters"
+          }
+        }
+      }
+    },
+    "/v1/free_busy": {
+      "get": {
+        "operationId": "getFreeBusy",
+        "summary": "Get free/busy information",
+        "description": "Returns free/busy status for the authenticated user's calendars within the specified time range.",
+        "tags": ["Events"],
+        "parameters": [
+          {
+            "name": "tzid",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "IANA timezone identifier"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" },
+            "description": "Start date (defaults to 42 days ago)"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" },
+            "description": "End date (defaults to 201 days ahead)"
+          },
+          {
+            "name": "include_managed",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Include managed events"
+          },
+          {
+            "name": "calendar_ids[]",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "description": "Filter by calendar IDs"
+          },
+          {
+            "name": "localized_times",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Include timezone-localized times"
+          },
+          {
+            "name": "include_ids",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Include event identifiers"
+          },
+          {
+            "name": "include_free",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Include free-status events"
+          },
+          {
+            "name": "include_deleted",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Include deleted events"
+          },
+          {
+            "name": "last_modified",
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Return entries modified after this timestamp"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Free/busy information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pages": {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    "free_busy": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FreeBusy"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - missing read_free_busy scope"
+          }
+        }
+      }
+    },
+    "/v1/availability": {
+      "post": {
+        "operationId": "queryAvailability",
+        "summary": "Query availability",
+        "description": "Finds available time slots across multiple participants' calendars based on required duration and time constraints.",
+        "tags": ["Availability"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["participants", "required_duration"],
+                "properties": {
+                  "participants": {
+                    "type": "array",
+                    "description": "Groups of participants",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "members": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "sub": { "type": "string" },
+                              "calendar_ids": {
+                                "type": "array",
+                                "items": { "type": "string" }
+                              },
+                              "managed_availability": { "type": "boolean" }
+                            },
+                            "required": ["sub"]
+                          }
+                        },
+                        "required": {
+                          "oneOf": [
+                            { "type": "string", "enum": ["all"] },
+                            { "type": "integer" }
+                          ],
+                          "description": "Number of required participants or 'all'"
+                        }
+                      },
+                      "required": ["members", "required"]
+                    }
+                  },
+                  "required_duration": {
+                    "type": "object",
+                    "properties": {
+                      "minutes": { "type": "integer" }
+                    },
+                    "required": ["minutes"],
+                    "description": "Minimum period length"
+                  },
+                  "query_periods": {
+                    "type": "array",
+                    "description": "Time windows to search within",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "start": { "type": "string", "format": "date-time" },
+                        "end": { "type": "string", "format": "date-time" }
+                      },
+                      "required": ["start", "end"]
+                    }
+                  },
+                  "response_format": {
+                    "type": "string",
+                    "enum": ["periods", "slots", "overlapping_slots"],
+                    "default": "periods"
+                  },
+                  "buffer": {
+                    "type": "object",
+                    "properties": {
+                      "before": {
+                        "type": "object",
+                        "properties": { "minutes": { "type": "integer" } }
+                      },
+                      "after": {
+                        "type": "object",
+                        "properties": { "minutes": { "type": "integer" } }
+                      }
+                    }
+                  },
+                  "start_interval": {
+                    "type": "object",
+                    "properties": {
+                      "minutes": {
+                        "type": "integer",
+                        "enum": [5, 10, 15, 20, 30, 60]
+                      }
+                    }
+                  },
+                  "max_results": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 512,
+                    "default": 20
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Available time slots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available_periods": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "start": { "type": "string", "format": "date-time" },
+                          "end": { "type": "string", "format": "date-time" },
+                          "participants": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "sub": { "type": "string" }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "402": {
+            "description": "Payment required"
+          },
+          "422": {
+            "description": "Unprocessable - invalid parameters"
+          }
+        }
+      }
+    },
+    "/v1/userinfo": {
+      "get": {
+        "operationId": "getUserInfo",
+        "summary": "Get user information",
+        "description": "Returns identifying information for the authenticated account as per OpenID spec.",
+        "tags": ["Identity"],
+        "responses": {
+          "200": {
+            "description": "User information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sub": {
+                      "type": "string",
+                      "description": "Cronofy account ID (28 characters)"
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "Primary email or username"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Account name"
+                    },
+                    "zoneinfo": {
+                      "type": "string",
+                      "description": "IANA time zone identifier"
+                    },
+                    "cronofy.type": {
+                      "type": "string",
+                      "description": "Account type identifier"
+                    },
+                    "cronofy.data": {
+                      "type": "object",
+                      "properties": {
+                        "authorization": {
+                          "type": "object",
+                          "properties": {
+                            "scope": { "type": "string" },
+                            "status": {
+                              "type": "string",
+                              "enum": ["active", "hibernated"]
+                            }
+                          }
+                        },
+                        "profiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "provider_name": { "type": "string" },
+                              "profile_id": { "type": "string" },
+                              "profile_name": { "type": "string" },
+                              "profile_connected": { "type": "boolean" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/channels": {
+      "post": {
+        "operationId": "createNotificationChannel",
+        "summary": "Create a push notification channel",
+        "description": "Creates a new notification channel to receive push notifications when calendar events change.",
+        "tags": ["Push Notifications"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["callback_url"],
+                "properties": {
+                  "callback_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL to receive push notifications"
+                  },
+                  "filters": {
+                    "type": "object",
+                    "properties": {
+                      "calendar_ids": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Restrict notifications to specific calendars"
+                      },
+                      "only_managed": {
+                        "type": "boolean",
+                        "description": "Only trigger for managed events"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Channel created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "channel": {
+                      "type": "object",
+                      "properties": {
+                        "channel_id": { "type": "string" },
+                        "callback_url": { "type": "string" },
+                        "filters": {
+                          "type": "object",
+                          "properties": {
+                            "calendar_ids": {
+                              "type": "array",
+                              "items": { "type": "string" }
+                            },
+                            "only_managed": { "type": "boolean" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Unprocessable - invalid parameters"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "oauth2": {
+        "type": "oauth2",
+        "description": "OAuth 2.0 Authorization Code flow for user calendar access",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://app.cronofy.com/oauth/authorize",
+            "tokenUrl": "https://api.cronofy.com/oauth/token",
+            "scopes": {
+              "read_events": "Read calendar events",
+              "create_event": "Create and update events",
+              "delete_event": "Delete events",
+              "read_free_busy": "Read free/busy information",
+              "change_participation_status": "Change event participation status"
+            }
+          }
+        }
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Bearer token obtained via OAuth 2.0 or API key (client_secret) for application-level endpoints like availability"
+      }
+    },
+    "schemas": {
+      "Calendar": {
+        "type": "object",
+        "properties": {
+          "provider_name": {
+            "type": "string",
+            "enum": ["apple", "cronofy", "exchange", "google", "live_connect"]
+          },
+          "profile_id": { "type": "string" },
+          "profile_name": { "type": "string" },
+          "calendar_id": { "type": "string" },
+          "calendar_name": { "type": "string" },
+          "calendar_readonly": { "type": "boolean" },
+          "calendar_deleted": { "type": "boolean" },
+          "calendar_primary": { "type": "boolean" },
+          "calendar_integrated_conferencing_available": { "type": "boolean" },
+          "calendar_attachments_available": { "type": "boolean" },
+          "permission_level": {
+            "type": "string",
+            "enum": ["sandbox", "unrestricted"]
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "calendar_id": { "type": "string" },
+          "event_uid": { "type": "string" },
+          "summary": { "type": "string" },
+          "description": { "type": "string" },
+          "start": { "type": "string" },
+          "end": { "type": "string" },
+          "deleted": { "type": "boolean" },
+          "created": { "type": "string", "format": "date-time" },
+          "updated": { "type": "string", "format": "date-time" },
+          "participation_status": {
+            "type": "string",
+            "enum": ["needs_action", "accepted", "declined", "tentative", "unknown"]
+          },
+          "attendees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": { "type": "string" },
+                "display_name": { "type": "string" },
+                "status": { "type": "string" }
+              }
+            }
+          },
+          "organizer": {
+            "type": "object",
+            "properties": {
+              "email": { "type": "string" },
+              "display_name": { "type": "string" }
+            }
+          },
+          "transparency": {
+            "type": "string",
+            "enum": ["opaque", "transparent", "unknown"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["confirmed", "tentative", "cancelled", "unknown"]
+          },
+          "recurring": { "type": "boolean" },
+          "options": {
+            "type": "object",
+            "properties": {
+              "delete": { "type": "boolean" },
+              "update": { "type": "boolean" },
+              "change_participation_status": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "FreeBusy": {
+        "type": "object",
+        "properties": {
+          "calendar_id": { "type": "string" },
+          "start": { "type": "string" },
+          "end": { "type": "string" },
+          "free_busy_status": {
+            "type": "string",
+            "enum": ["busy", "tentative", "free", "unknown"]
+          },
+          "event_uid": { "type": "string" },
+          "event_id": { "type": "string" },
+          "deleted": { "type": "boolean" }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "current": { "type": "integer" },
+          "total": { "type": "integer" },
+          "next_page": { "type": "string", "format": "uri" }
+        }
+      }
+    }
+  }
+}
