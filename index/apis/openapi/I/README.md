@@ -1,6 +1,6 @@
 # APIs — I
 
-Browsing 93 APIs starting with **I**.
+Browsing 94 APIs starting with **I**.
 
 [0](../0) · [1](../1) · [2](../2) · [3](../3) · [4](../4) · [5](../5) · [6](../6) · [7](../7) · [8](../8) · [9](../9) · [A](../A) · [B](../B) · [C](../C) · [D](../D) · [E](../E) · [F](../F) · [G](../G) · [H](../H) · **I** · [J](../J) · [K](../K) · [L](../L) · [M](../M) · [N](../N) · [O](../O) · [P](../P) · [Q](../Q) · [R](../R) · [S](../S) · [T](../T) · [U](../U) · [V](../V) · [W](../W) · [X](../X) · [Y](../Y) · [Z](../Z) · [~rest](../~rest)
 
@@ -42,6 +42,7 @@ Browsing 93 APIs starting with **I**.
 | [industrial.api.ubidots.com](../../../../apis/openapi/industrial.api.ubidots.com) | [main](../../../../apis/openapi/industrial.api.ubidots.com/main) |
 | [infermedica.com](../../../../apis/openapi/infermedica.com) | [infermedica-api](../../../../apis/openapi/infermedica.com/infermedica-api) |
 | [infinispan.org](../../../../apis/openapi/infinispan.org) | [main](../../../../apis/openapi/infinispan.org/main) |
+| [inflection.ai](../../../../apis/openapi/inflection.ai) | [main](../../../../apis/openapi/inflection.ai/main) |
 | [inly.com](../../../../apis/openapi/inly.com) | [main](../../../../apis/openapi/inly.com/main) |
 | [inmobile.com](../../../../apis/openapi/inmobile.com) | [main](../../../../apis/openapi/inmobile.com/main) |
 | [inmotionnow.com](../../../../apis/openapi/inmotionnow.com) | [main](../../../../apis/openapi/inmotionnow.com/main) |
