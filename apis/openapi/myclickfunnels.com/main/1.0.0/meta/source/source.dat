@@ -1,0 +1,825 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ClickFunnels Email Broadcast CRUD API",
+    "description": "CRUD endpoints for email broadcasts in ClickFunnels API V2.\n\n**Feature Gates:**\n- `email-sending-api` - Required for all endpoints\n- `can-see-analytics-in-broadcasts-payloads` - Required for progress/performance/revenue attributes\n\n**URL Structure:**\n- Collection endpoints use workspace scope: `/workspaces/:id/emails/broadcasts`\n- Individual resource endpoints use broadcast ID only: `/emails/broadcasts/:id`\n",
+    "version": "1.0.0",
+    "contact": {
+      "name": "ClickFunnels Engineering",
+      "url": "https://developers.myclickfunnels.com"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/richstoneio/clickfunnels-email-broadcast-crud-api/1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.myclickfunnels.com/api/v2",
+      "description": "Production API"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Broadcasts",
+      "description": "Email broadcast CRUD operations"
+    }
+  ],
+  "paths": {
+    "/workspaces/{workspace_id}/emails/broadcasts": {
+      "get": {
+        "tags": [
+          "Broadcasts"
+        ],
+        "summary": "List broadcasts",
+        "description": "Returns a paginated list of email broadcasts for the workspace.",
+        "operationId": "listBroadcasts",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          },
+          {
+            "$ref": "#/components/parameters/After"
+          },
+          {
+            "$ref": "#/components/parameters/SortOrder"
+          },
+          {
+            "name": "filter[status]",
+            "in": "query",
+            "description": "Filter by broadcast status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "scheduled",
+                "sending",
+                "paused",
+                "unhealthy",
+                "complete",
+                "canceled"
+              ]
+            }
+          },
+          {
+            "name": "filter[created_at][gte]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "filter[created_at][lte]",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of broadcasts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "broadcasts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Broadcast"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Pagination-Next": {
+                "description": "Cursor value for next page",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Broadcasts"
+        ],
+        "summary": "Create a broadcast",
+        "description": "Creates a new email broadcast with raw HTML/text content.\n\n**Important:** Broadcasts created via API use raw HTML content and are not\neditable in the visual email editor. They are marked as `api_generated: true`.\n\n**Sending Behavior:**\n- `send_immediately: true` - Broadcast is queued for immediate sending\n- `send_at: <datetime>` - Broadcast is scheduled for specified time\n- Neither specified - Broadcast is created as a draft\n",
+        "operationId": "createBroadcast",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WorkspaceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BroadcastCreateRequest"
+              },
+              "examples": {
+                "immediate_send": {
+                  "summary": "Send immediately",
+                  "value": {
+                    "broadcast": {
+                      "name": "Welcome Newsletter",
+                      "subject": "Welcome to our newsletter!",
+                      "preheadline": "You're going to love this...",
+                      "from_email": "newsletter@example.com",
+                      "html_body": "<html><body><h1>Welcome!</h1></body></html>",
+                      "text_body": "Welcome!",
+                      "filter_id": "gjDMvQ",
+                      "topic_ids": [
+                        "abCdEf"
+                      ],
+                      "send_immediately": true,
+                      "external_id": "my_external_ref_123"
+                    }
+                  }
+                },
+                "draft": {
+                  "summary": "Create as draft",
+                  "value": {
+                    "broadcast": {
+                      "name": "Weekly Digest - Draft",
+                      "subject": "Your Weekly Digest",
+                      "from_email": "digest@example.com",
+                      "html_body": "<html><body><p>Weekly content here...</p></body></html>"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Broadcast created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "broadcast": {
+                      "$ref": "#/components/schemas/Broadcast"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      }
+    },
+    "/emails/broadcasts/{broadcast_id}": {
+      "get": {
+        "tags": [
+          "Broadcasts"
+        ],
+        "summary": "Get a broadcast",
+        "description": "Returns detailed information about a specific broadcast.\n\n**Analytics Data (requires `can-see-analytics-in-broadcasts-payloads` FG):**\n- `progress` - Real-time sending progress\n- `performance` - Engagement metrics\n- `revenue` - Attributed revenue stats\n",
+        "operationId": "getBroadcast",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BroadcastId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Broadcast details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "broadcast": {
+                      "$ref": "#/components/schemas/Broadcast"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Broadcasts"
+        ],
+        "summary": "Update a broadcast",
+        "description": "Updates a broadcast. Only broadcasts in `draft` status can be fully edited.\nBroadcasts in other statuses have limited editable fields.\n",
+        "operationId": "updateBroadcast",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BroadcastId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BroadcastUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Broadcast updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "broadcast": {
+                      "$ref": "#/components/schemas/Broadcast"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Broadcasts"
+        ],
+        "summary": "Delete a broadcast",
+        "description": "Deletes a broadcast. Only draft broadcasts can be deleted.\nUse cancel action for scheduled/sending broadcasts.\n",
+        "operationId": "deleteBroadcast",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BroadcastId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Broadcast deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "description": "Cannot delete broadcast in current status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key authentication via Bearer token"
+      }
+    },
+    "parameters": {
+      "WorkspaceId": {
+        "name": "workspace_id",
+        "in": "path",
+        "required": true,
+        "description": "Workspace ID (numeric or public ID string)",
+        "schema": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "BroadcastId": {
+        "name": "broadcast_id",
+        "in": "path",
+        "required": true,
+        "description": "Broadcast ID (numeric or public ID string)",
+        "schema": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "After": {
+        "name": "after",
+        "in": "query",
+        "description": "Cursor for pagination",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "SortOrder": {
+        "name": "sort_order",
+        "in": "query",
+        "description": "Sort direction",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "default": "desc"
+        }
+      }
+    },
+    "schemas": {
+      "BroadcastCreateRequest": {
+        "type": "object",
+        "required": [
+          "broadcast"
+        ],
+        "properties": {
+          "broadcast": {
+            "type": "object",
+            "required": [
+              "name",
+              "subject",
+              "from_email"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Internal name for the broadcast",
+                "maxLength": 255
+              },
+              "subject": {
+                "type": "string",
+                "description": "Email subject line",
+                "maxLength": 255
+              },
+              "preheadline": {
+                "type": "string",
+                "description": "Preview text shown in email clients",
+                "maxLength": 150
+              },
+              "from_email": {
+                "type": "string",
+                "format": "email",
+                "description": "Sender email address (must be verified in workspace)"
+              },
+              "reply_to_email": {
+                "type": "string",
+                "format": "email",
+                "description": "Reply-to email address"
+              },
+              "html_body": {
+                "type": "string",
+                "description": "HTML content of the email"
+              },
+              "text_body": {
+                "type": "string",
+                "description": "Plain text fallback content"
+              },
+              "filter_id": {
+                "type": "string",
+                "description": "Contact filter ID for recipient selection"
+              },
+              "topic_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Email topic IDs (recipients must be subscribed)"
+              },
+              "send_immediately": {
+                "type": "boolean",
+                "description": "If true, send immediately; if false/omitted, create as draft",
+                "default": false
+              },
+              "send_at": {
+                "type": "string",
+                "format": "date",
+                "description": "Schedule send date (YYYY-MM-DD)"
+              },
+              "send_at_local_time": {
+                "type": "string",
+                "description": "Local time to send (HH:MM:SS)"
+              },
+              "time_zone": {
+                "type": "string",
+                "description": "\"workspace\", \"contact\", or IANA timezone name",
+                "default": "workspace"
+              },
+              "external_id": {
+                "type": "string",
+                "description": "Your external reference ID for correlation",
+                "maxLength": 255
+              }
+            }
+          }
+        }
+      },
+      "BroadcastUpdateRequest": {
+        "type": "object",
+        "required": [
+          "broadcast"
+        ],
+        "properties": {
+          "broadcast": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 255
+              },
+              "subject": {
+                "type": "string",
+                "maxLength": 255
+              },
+              "preheadline": {
+                "type": "string",
+                "maxLength": 150
+              },
+              "from_email": {
+                "type": "string",
+                "format": "email"
+              },
+              "reply_to_email": {
+                "type": "string",
+                "format": "email"
+              },
+              "html_body": {
+                "type": "string"
+              },
+              "text_body": {
+                "type": "string"
+              },
+              "filter_id": {
+                "type": "string"
+              },
+              "topic_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "send_at": {
+                "type": "string",
+                "format": "date"
+              },
+              "send_at_local_time": {
+                "type": "string"
+              },
+              "time_zone": {
+                "type": "string"
+              },
+              "external_id": {
+                "type": "string",
+                "maxLength": 255
+              }
+            }
+          }
+        }
+      },
+      "Broadcast": {
+        "type": "object",
+        "description": "Email broadcast resource",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Numeric broadcast ID"
+          },
+          "public_id": {
+            "type": "string",
+            "description": "Public obfuscated broadcast ID"
+          },
+          "workspace_id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "preheadline": {
+            "type": "string",
+            "nullable": true
+          },
+          "from_email": {
+            "type": "string",
+            "description": "Resolved from from_address_id"
+          },
+          "from_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Resolved from from_address_id"
+          },
+          "reply_to_email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Resolved from reply_to_address_id"
+          },
+          "html_body": {
+            "type": "string",
+            "nullable": true,
+            "description": "HTML content (from template)"
+          },
+          "text_body": {
+            "type": "string",
+            "nullable": true,
+            "description": "Plain text content (from template)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "scheduled",
+              "sending",
+              "paused",
+              "unhealthy",
+              "complete",
+              "canceled"
+            ]
+          },
+          "api_generated": {
+            "type": "boolean",
+            "description": "True if broadcast was created via API"
+          },
+          "external_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Your external reference ID"
+          },
+          "filter_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "topic_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "send_at": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Scheduled send date"
+          },
+          "send_at_local_time": {
+            "type": "string",
+            "nullable": true,
+            "description": "Scheduled send time (HH:MM:SS)"
+          },
+          "send_immediately": {
+            "type": "boolean",
+            "description": "Maps to send_instantly column"
+          },
+          "time_zone": {
+            "type": "string"
+          },
+          "sending_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When sending actually started"
+          },
+          "complete_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When sending completed"
+          },
+          "progress": {
+            "type": "object",
+            "nullable": true,
+            "description": "Real-time progress during sending.\n**Requires `can-see-analytics-in-broadcasts-payloads` feature gate.**\n",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total recipients to process"
+              },
+              "queued": {
+                "type": "integer",
+                "description": "Recipients waiting to be processed"
+              },
+              "processing": {
+                "type": "integer",
+                "description": "Recipients currently being processed"
+              },
+              "sent": {
+                "type": "integer",
+                "description": "Recipients where send was attempted"
+              },
+              "failed": {
+                "type": "integer",
+                "description": "Recipients that failed to send"
+              }
+            }
+          },
+          "performance": {
+            "type": "object",
+            "nullable": true,
+            "description": "Engagement and delivery metrics.\n**Requires `can-see-analytics-in-broadcasts-payloads` feature gate.**\n",
+            "properties": {
+              "delivered": {
+                "type": "integer"
+              },
+              "bounced": {
+                "type": "integer"
+              },
+              "opened": {
+                "type": "integer",
+                "description": "Total opens (including repeats)"
+              },
+              "unique_opens": {
+                "type": "integer"
+              },
+              "clicked": {
+                "type": "integer",
+                "description": "Total clicks"
+              },
+              "unique_clicks": {
+                "type": "integer"
+              },
+              "unsubscribed": {
+                "type": "integer"
+              },
+              "spam_complaints": {
+                "type": "integer"
+              },
+              "open_rate": {
+                "type": "number",
+                "format": "float"
+              },
+              "click_rate": {
+                "type": "number",
+                "format": "float"
+              },
+              "click_to_open_rate": {
+                "type": "number",
+                "format": "float"
+              },
+              "bounce_rate": {
+                "type": "number",
+                "format": "float"
+              },
+              "unsubscribe_rate": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "revenue": {
+            "type": "object",
+            "nullable": true,
+            "description": "Revenue attributed to this broadcast.\n**Requires `can-see-analytics-in-broadcasts-payloads` feature gate.**\n",
+            "properties": {
+              "total": {
+                "type": "number",
+                "format": "float"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "orders_count": {
+                "type": "integer"
+              },
+              "per_recipient": {
+                "type": "number",
+                "format": "float"
+              },
+              "per_unique_open": {
+                "type": "number",
+                "format": "float"
+              },
+              "per_unique_click": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request - invalid parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized - invalid or missing authentication",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "UnprocessableEntity": {
+        "description": "Unprocessable entity - validation errors",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}
