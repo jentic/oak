@@ -1,0 +1,596 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Marqo Cloud API",
+    "description": "Marqo is a tensor search engine that provides end-to-end vector search with built-in embedding generation. The Cloud API enables creating indexes, adding documents with automatic vectorization, and performing tensor/lexical/hybrid search over your data.",
+    "version": "2.0.0",
+    "x-jentic-source-url": "https://docs.marqo.ai/reference",
+    "x-provenance": "jentic-generated"
+  },
+  "servers": [
+    {
+      "url": "https://api.marqo.ai/api/v2",
+      "description": "Marqo Cloud API"
+    }
+  ],
+  "security": [
+    {
+      "apiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/indexes/{indexName}": {
+      "post": {
+        "operationId": "createIndex",
+        "summary": "Create a new index",
+        "description": "Create a new index for storing and searching documents. Supports configuration of embedding models, index types, inference nodes, and storage classes.",
+        "parameters": [
+          {
+            "name": "indexName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the index to create"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "default": "hf/e5-base-v2",
+                    "description": "The embedding model to use"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": ["unstructured", "structured"],
+                    "default": "unstructured",
+                    "description": "Index type"
+                  },
+                  "treatUrlsAndPointersAsImages": {
+                    "type": "boolean",
+                    "description": "Process URLs/pointers as images"
+                  },
+                  "normalizeEmbeddings": {
+                    "type": "boolean",
+                    "description": "Normalize embeddings to unit length"
+                  },
+                  "inferenceType": {
+                    "type": "string",
+                    "enum": ["marqo.CPU.large", "marqo.GPU"],
+                    "description": "Inference node type"
+                  },
+                  "storageClass": {
+                    "type": "string",
+                    "enum": ["marqo.basic", "marqo.balanced", "marqo.performance"],
+                    "description": "Storage type"
+                  },
+                  "numberOfShards": {
+                    "type": "integer",
+                    "description": "Number of shards"
+                  },
+                  "numberOfReplicas": {
+                    "type": "integer",
+                    "description": "Number of replicas"
+                  },
+                  "numberOfInferences": {
+                    "type": "integer",
+                    "description": "Number of inference nodes"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Index created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "acknowledged": {
+                      "type": "boolean"
+                    },
+                    "index": {
+                      "type": "string"
+                    },
+                    "shards_acknowledged": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "409": {
+            "description": "Index already exists"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteIndex",
+        "summary": "Delete an index",
+        "description": "Permanently delete an index and all its documents. This operation cannot be undone.",
+        "parameters": [
+          {
+            "name": "indexName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the index to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Index deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "acknowledged": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Index not found"
+          }
+        }
+      }
+    },
+    "/indexes": {
+      "get": {
+        "operationId": "listIndexes",
+        "summary": "List all indexes",
+        "description": "Retrieve a list of all indexes in the Marqo instance.",
+        "responses": {
+          "200": {
+            "description": "List of indexes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "indexName": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/indexes/{indexName}/documents": {
+      "post": {
+        "operationId": "addDocuments",
+        "summary": "Add or replace documents in an index",
+        "description": "Add or replace documents in an index. Documents are automatically vectorized based on the index's tensor fields configuration. Supports batch operations up to 128 documents.",
+        "parameters": [
+          {
+            "name": "indexName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the target index"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["documents"],
+                "properties": {
+                  "documents": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "properties": {
+                        "_id": {
+                          "type": "string",
+                          "description": "Document ID. Auto-generated if not provided."
+                        }
+                      }
+                    },
+                    "description": "Array of documents to add"
+                  },
+                  "tensorFields": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Fields to vectorize for semantic search"
+                  },
+                  "useExistingTensors": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Reuse vectors for unchanged fields"
+                  },
+                  "mappings": {
+                    "type": "object",
+                    "description": "Defines multimodal, custom vector, and text field configurations"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Documents added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "errors": {
+                      "type": "boolean"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "_id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "integer"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "processingTimeMs": {
+                      "type": "number"
+                    },
+                    "index_name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "Index not found"
+          }
+        }
+      }
+    },
+    "/indexes/{indexName}/search": {
+      "post": {
+        "operationId": "searchIndex",
+        "summary": "Search an index",
+        "description": "Search an index using tensor (semantic), lexical, or hybrid search. Supports filtering, pagination, reranking, and score modifiers.",
+        "parameters": [
+          {
+            "name": "indexName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the index to search"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "q": {
+                    "type": "string",
+                    "description": "Query string or weighted query object"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "default": 10,
+                    "maximum": 1000,
+                    "description": "Maximum documents to return"
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "default": 0,
+                    "description": "Number of documents to skip"
+                  },
+                  "searchMethod": {
+                    "type": "string",
+                    "enum": ["TENSOR", "LEXICAL", "HYBRID"],
+                    "default": "TENSOR",
+                    "description": "Search method to use"
+                  },
+                  "filter": {
+                    "type": "string",
+                    "description": "Filter expression using Marqo DSL"
+                  },
+                  "attributesToRetrieve": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Specific fields to return"
+                  },
+                  "reRanker": {
+                    "type": "string",
+                    "description": "Reranker model to use"
+                  },
+                  "searchableAttributes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Attributes to search over"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hits": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "_id": {
+                            "type": "string"
+                          },
+                          "_score": {
+                            "type": "number"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    },
+                    "processingTimeMs": {
+                      "type": "number"
+                    },
+                    "query": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "Index not found"
+          }
+        }
+      }
+    },
+    "/indexes/{indexName}/documents/{documentId}": {
+      "get": {
+        "operationId": "getDocument",
+        "summary": "Get a document by ID",
+        "description": "Retrieve a specific document from an index by its ID.",
+        "parameters": [
+          {
+            "name": "indexName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the index"
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the document to retrieve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "_id": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteDocument",
+        "summary": "Delete a document by ID",
+        "description": "Delete a specific document from an index by its ID.",
+        "parameters": [
+          {
+            "name": "indexName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the index"
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the document to delete"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "acknowledged": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found"
+          }
+        }
+      }
+    },
+    "/indexes/{indexName}/recommend": {
+      "post": {
+        "operationId": "recommend",
+        "summary": "Get recommendations based on documents",
+        "description": "Get document recommendations based on one or more reference documents in the index.",
+        "parameters": [
+          {
+            "name": "indexName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name of the index"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["documents"],
+                "properties": {
+                  "documents": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Document IDs to base recommendations on"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "default": 10,
+                    "description": "Maximum recommendations to return"
+                  },
+                  "filter": {
+                    "type": "string",
+                    "description": "Filter expression"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recommendations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hits": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    },
+                    "processingTimeMs": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Index not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Marqo Cloud API key"
+      }
+    }
+  }
+}
