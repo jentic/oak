@@ -1,0 +1,442 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "description": "The API to configure accounts & devices in Ai-RGUS. Requires the use of an encryption key provided to you by your Ai-RGUS representative.",
+    "version": "1.0.0",
+    "title": "Ai-RGUS Configuration API",
+    "contact": {
+      "email": "support@ai-rgus.com"
+    },
+    "license": {
+      "name": "Proprietary",
+      "url": "https://app.ai-rgus.com/terms-of-service"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/DANIELR_3/ai-rgus_config/1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://app.ai-rgus.com/eapi/v1/config"
+    },
+    {
+      "description": "SwaggerHub API Auto Mocking",
+      "url": "https://virtserver.swaggerhub.com/DANIELR_3/ai-rgus_config/1.0.0"
+    }
+  ],
+  "paths": {
+    "/createClientAccount": {
+      "post": {
+        "tags": [
+          "Config"
+        ],
+        "description": "Create a new account under your main account",
+        "operationId": "createAccount",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "AccountName": {
+                    "type": "string",
+                    "example": "My Headquarters"
+                  },
+                  "ConnectionType": {
+                    "type": "string",
+                    "enum": [
+                      "cloud",
+                      "hybrid"
+                    ],
+                    "example": "cloud"
+                  },
+                  "TimeZone": {
+                    "type": "string",
+                    "description": "IANA timezone",
+                    "example": "America/New_York"
+                  }
+                },
+                "required": [
+                  "AccountName",
+                  "ConnectionType",
+                  "TimeZone"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "integer",
+                      "example": 0
+                    },
+                    "AccountID": {
+                      "type": "string",
+                      "example": "dc336154b249f90243c9c830"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          }
+        }
+      }
+    },
+    "/getAccountsList": {
+      "get": {
+        "tags": [
+          "Config"
+        ],
+        "description": "Returns the list of subaccounts along with their `AccountID` which is a required parameter in other configuration functions.",
+        "operationId": "getAccountsList",
+        "responses": {
+          "200": {
+            "description": "List of accounts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "integer",
+                      "example": 0
+                    },
+                    "AccountInfo": {
+                      "type": "array",
+                      "description": "list of [name, ID] pairs",
+                      "items": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "example": [
+                        [
+                          "name1",
+                          "ID1"
+                        ],
+                        [
+                          "name2",
+                          "ID2"
+                        ]
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          }
+        }
+      }
+    },
+    "/addDevice": {
+      "post": {
+        "tags": [
+          "Config"
+        ],
+        "description": "Add device such as camera, NVR, VMS to an account",
+        "operationId": "addDevice",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "AccountID": {
+                    "type": "string",
+                    "example": "dc336154b249f90243c9c830",
+                    "description": "Retrieve AccountID value from the /getAccountsList endpoint"
+                  },
+                  "ProductName": {
+                    "type": "string",
+                    "example": "Axis Camera",
+                    "description": "One of the supported product types listed in the Ai-RGUS System Manager. This string must be an exact match or the device will not be added."
+                  },
+                  "DeviceName": {
+                    "type": "string",
+                    "description": "The name you would like to give this device",
+                    "example": "Exterior Camera 1"
+                  },
+                  "DeviceProto": {
+                    "type": "string",
+                    "enum": [
+                      "HTTP://",
+                      "HTTPS://"
+                    ],
+                    "example": "HTTP://",
+                    "description": "The connection protocol for this camera when you load its webpage in the browser"
+                  },
+                  "DeviceIP": {
+                    "type": "string",
+                    "example": "192.168.1.213",
+                    "description": "The IP address for this camera when you load its webpage in the browser"
+                  },
+                  "DevicePort": {
+                    "type": "integer",
+                    "example": 80,
+                    "description": "The port for this camera when you load its webpage in the browser"
+                  },
+                  "CredentialsBlob": {
+                    "type": "string",
+                    "description": "Encrypted credentials. JSON encode an array in the format {\"u\":\"username\", \"p\": \"password\"} where you change thevalues for \"user\" and \"password\" with the actual credentials for this device. Base64 decode your provided encryption key, and encrypt the the encoded credentials array using the DecodeKey (the IV) using aes-256-cbc symmetric encryption. In Python this would be\n```import os, json, base64\nfrom Crypto.Cipher import AES\nfrom Crypto.Util.Padding import pad\ncreds = {'u':'myuser', 'p': 'S3cretPassw0rd'}\nkey =  base64.b64decode('Ai-RGUSEncryptionKey')\niv = os.urandom(16)\npt = json.dumps(creds)\nplaintext = pt.encode('utf-8')\ncipher = AES.new(key, AES.MODE_CBC)\nciphertext = cipher.encrypt(pad(plaintext, AES.block_size))\n```\n"
+                  },
+                  "DecodeKey": {
+                    "type": "string",
+                    "description": "Base64 encoded, randomly generated IV value of 16 bytes for aes-256-cbc symmetric encryption. In python this can be created using os.urandom(16) as shown in the code example in CredentialsBlob."
+                  }
+                },
+                "required": [
+                  "AccountID",
+                  "ProductName",
+                  "DeviceProto",
+                  "DeviceIP",
+                  "DevicePort",
+                  "CredentialsBlob",
+                  "DecodeKey"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device Added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "integer",
+                      "example": 0
+                    },
+                    "DevID": {
+                      "type": "string",
+                      "example": "0dc336154b249f90243c9c830"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          },
+          "404": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/remDevice": {
+      "post": {
+        "tags": [
+          "Config"
+        ],
+        "description": "Remove device from an account",
+        "operationId": "remDevice",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "AccountID": {
+                    "type": "string",
+                    "example": "dc336154b249f90243c9c830",
+                    "description": "Retrieve AccountID value from the /getAccountsList endpoint"
+                  },
+                  "DevID": {
+                    "type": "string",
+                    "example": "0dc336154b249f90243c9c830",
+                    "description": "The ID of the device from the /getDevices endpoint"
+                  }
+                },
+                "required": [
+                  "AccountID",
+                  "DevID"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device removed"
+          },
+          "401": {
+            "description": "Authentication error"
+          },
+          "404": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/remAccount": {
+      "post": {
+        "tags": [
+          "Config"
+        ],
+        "description": "Deactivate an account in the accounts list",
+        "operationId": "remAccount",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "AccountID": {
+                    "type": "string",
+                    "example": "dc336154b249f90243c9c830",
+                    "description": "Retrieve AccountID value from the /getAccountsList endpoint"
+                  }
+                },
+                "required": [
+                  "AccountID"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account removed"
+          },
+          "401": {
+            "description": "Authentication error"
+          },
+          "404": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/getDevices": {
+      "get": {
+        "tags": [
+          "Config"
+        ],
+        "description": "Get list of devices",
+        "operationId": "getDevices",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "AccountID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Limit the set of devices returned to that of a specific account. If omitted, this will return all devices across all accounts"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of devices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "integer",
+                      "example": 0
+                    },
+                    "DeviceList": {
+                      "type": "array",
+                      "description": "Array of device objects.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "AccountID": {
+                            "type": "string",
+                            "example": "ACCT001"
+                          },
+                          "DevID": {
+                            "type": "string",
+                            "example": "DEV42"
+                          },
+                          "ProductName": {
+                            "type": "string",
+                            "example": "Axis P3245"
+                          },
+                          "DevName": {
+                            "type": "string",
+                            "example": "FrontGate"
+                          },
+                          "DevIP": {
+                            "type": "string",
+                            "format": "ipv4",
+                            "example": "192.168.1.50"
+                          },
+                          "DevPort": {
+                            "type": "integer",
+                            "example": 80
+                          },
+                          "NumCams": {
+                            "type": "integer",
+                            "example": 8
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic"
+      }
+    },
+    "schemas": {
+      "Schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "basicAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Config",
+      "description": "Configuration endpoints"
+    }
+  ]
+}
