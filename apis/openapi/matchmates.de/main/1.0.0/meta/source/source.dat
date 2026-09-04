@@ -1,0 +1,1501 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MatchMates External API",
+    "description": "API for external integrations to create candidate profiles in MatchMates.\n\n## Authentication\n\nAll API requests require an API key to be passed in the `X-API-Key` header. API keys can be created in the MatchMates dashboard under Company Settings > API-Schl\u00fcssel.\n\n## Rate Limiting\n\nCurrently there are no rate limits, but this may change in the future.\n\n## Credits\n\nAPI calls may consume credits from your organization's wallet if the `create_candidate` action is configured.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "MatchMates Support",
+      "url": "https://matchmates.de"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/matchmates/MatchMatesAPI/1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://app.matchmates.de/api/v1",
+      "description": "Production server"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/candidates/search": {
+      "post": {
+        "summary": "Search candidates",
+        "description": "Search for candidates using a human-readable query. The query is processed by AI to extract relevant search criteria (roles, skills, location, salary, etc.), which are then fuzzy-matched against the database.\n\n**Response includes:**\n- `extractedData`: Raw data extracted from your query by AI\n- `normalizedData`: Data after fuzzy-matching against database values (e.g., education levels, shifts)\n- `unmatchedFields`: Fields that couldn't be matched to database values\n- `candidates`: Matching candidate profiles with relevance scores",
+        "operationId": "searchCandidates",
+        "tags": [
+          "Candidates"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchCandidateRequest"
+              },
+              "examples": {
+                "simple": {
+                  "summary": "Simple role-based search",
+                  "value": {
+                    "query": "Looking for a React developer in Berlin"
+                  }
+                },
+                "detailed": {
+                  "summary": "Detailed search with multiple criteria",
+                  "value": {
+                    "query": "Software Engineer with 5 years experience, TypeScript and Node.js skills, salary around 70000 EUR, German B2 level, in Munich area"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchCandidateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "validation_error": {
+                    "summary": "Validation error",
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Invalid request body",
+                        "details": {
+                          "issues": [
+                            {
+                              "path": "query",
+                              "message": "Query must not be empty"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required - Insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/candidates": {
+      "post": {
+        "summary": "Create a candidate",
+        "description": "Creates a new candidate profile in MatchMates. All fields are optional to allow flexible candidate creation.\n\n**User Assignment:**\n- By default, the candidate is assigned to the user who created the API key\n- Use `userEmail` to assign the candidate to a different user in your organization\n\n**Auto-Activation:**\n- If all required fields are provided (city, searchRadiusKm > 0, salary range, at least 1 role, at least 1 skill), the candidate is automatically activated\n- Otherwise, the candidate is created as inactive and can be completed later",
+        "operationId": "createCandidate",
+        "tags": [
+          "Candidates"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCandidateRequest"
+              },
+              "examples": {
+                "minimal": {
+                  "summary": "Minimal - just API reference",
+                  "description": "Create an inactive candidate with just an external reference. Can be updated later.",
+                  "value": {
+                    "apiRef": "external-system-id-123"
+                  }
+                },
+                "complete": {
+                  "summary": "Complete - auto-activated",
+                  "description": "Candidate with all required fields will be auto-activated",
+                  "value": {
+                    "apiRef": "external-system-id-123",
+                    "city": "Berlin",
+                    "searchRadiusKm": 50,
+                    "minSalaryExpectationEur": 50000,
+                    "maxSalaryExpectationEur": 70000,
+                    "roles": [
+                      {
+                        "label": "Software Engineer"
+                      }
+                    ],
+                    "skills": [
+                      {
+                        "label": "TypeScript",
+                        "kind": "PRIMARY"
+                      }
+                    ]
+                  }
+                },
+                "with_user_assignment": {
+                  "summary": "Assign to specific user",
+                  "description": "Assign the candidate to a different user in your organization",
+                  "value": {
+                    "userEmail": "recruiter@company.com",
+                    "apiRef": "ATS-12345",
+                    "city": "Berlin",
+                    "searchRadiusKm": 50,
+                    "minSalaryExpectationEur": 50000,
+                    "maxSalaryExpectationEur": 70000,
+                    "roles": [
+                      {
+                        "label": "Software Engineer"
+                      }
+                    ],
+                    "skills": [
+                      {
+                        "label": "TypeScript",
+                        "kind": "PRIMARY"
+                      }
+                    ]
+                  }
+                },
+                "full": {
+                  "summary": "Full example with all fields",
+                  "value": {
+                    "userEmail": "recruiter@company.com",
+                    "apiRef": "ATS-12345",
+                    "city": "Berlin",
+                    "zipCode": "10115",
+                    "searchRadiusKm": 50,
+                    "minSalaryExpectationEur": 50000,
+                    "maxSalaryExpectationEur": 70000,
+                    "roles": [
+                      {
+                        "label": "Software Engineer"
+                      },
+                      {
+                        "label": "Full Stack Developer"
+                      }
+                    ],
+                    "skills": [
+                      {
+                        "label": "TypeScript",
+                        "kind": "PRIMARY"
+                      },
+                      {
+                        "label": "React",
+                        "kind": "PRIMARY"
+                      },
+                      {
+                        "label": "Node.js",
+                        "kind": "ADDITIONAL"
+                      },
+                      {
+                        "label": "PostgreSQL",
+                        "kind": "ADDITIONAL"
+                      }
+                    ],
+                    "itSkills": [
+                      {
+                        "label": "Git"
+                      },
+                      {
+                        "label": "Docker"
+                      }
+                    ],
+                    "internalReferences": "REF-12345",
+                    "noticePeriod": "3 Monate",
+                    "minWeeklyHours": 35,
+                    "maxWeeklyHours": 40,
+                    "experienceYears": 5,
+                    "description": "Experienced full-stack developer with focus on TypeScript and React.",
+                    "wishes": "Remote work preferred"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Candidate created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateCandidateResponse"
+                },
+                "examples": {
+                  "activated": {
+                    "summary": "Candidate auto-activated (all required fields provided)",
+                    "value": {
+                      "candidateId": "clxyz123abc456def789",
+                      "isActive": true
+                    }
+                  },
+                  "inactive": {
+                    "summary": "Candidate created but inactive (incomplete data)",
+                    "value": {
+                      "candidateId": "clxyz123abc456def789",
+                      "isActive": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "validation_error": {
+                    "summary": "Validation error",
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Invalid request body",
+                        "details": {
+                          "issues": [
+                            {
+                              "path": "city",
+                              "message": "City must be at least 2 characters"
+                            },
+                            {
+                              "path": "skills",
+                              "message": "At least one skill is required"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "invalid_json": {
+                    "summary": "Invalid JSON",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_JSON",
+                        "message": "Request body must be valid JSON"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing_key": {
+                    "summary": "Missing API key",
+                    "value": {
+                      "error": {
+                        "code": "MISSING_API_KEY",
+                        "message": "Missing X-API-Key header"
+                      }
+                    }
+                  },
+                  "invalid_key": {
+                    "summary": "Invalid API key",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_API_KEY",
+                        "message": "Invalid API key"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment Required - Insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "INSUFFICIENT_CREDITS",
+                    "message": "Not enough credits to perform this action",
+                    "details": {
+                      "required": 10,
+                      "available": 5
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - API key revoked/expired or user not in organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "revoked": {
+                    "summary": "API key revoked",
+                    "value": {
+                      "error": {
+                        "code": "API_KEY_REVOKED",
+                        "message": "API key has been revoked"
+                      }
+                    }
+                  },
+                  "expired": {
+                    "summary": "API key expired",
+                    "value": {
+                      "error": {
+                        "code": "API_KEY_EXPIRED",
+                        "message": "API key has expired"
+                      }
+                    }
+                  },
+                  "user_not_in_org": {
+                    "summary": "User not in organization",
+                    "value": {
+                      "error": {
+                        "code": "USER_NOT_IN_ORGANIZATION",
+                        "message": "User with email recruiter@company.com does not belong to this organization"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - User email not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "USER_NOT_FOUND",
+                    "message": "No user found with email: recruiter@company.com"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected error occurred"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/candidates/{candidateId}": {
+      "put": {
+        "summary": "Update a candidate (Full Replace)",
+        "description": "Updates a candidate by ID using **FULL REPLACE** semantics.\n\n## \u26a0\ufe0f IMPORTANT: Full Replace Behavior\n\nThis endpoint uses **full replace** semantics for all array fields:\n- `roles`, `skills`, `itSkills`, `languages`, `shifts`, `degrees`, `driverLicenses`\n\n**What this means:**\n- All provided array fields will **ENTIRELY REPLACE** the existing values\n- If you omit an array field, it will be **CLEARED** (set to empty)\n- To keep existing values, you **MUST include them** in the request\n\n## Example\n\nIf a candidate has skills `[\"TypeScript\", \"React\"]` and you send:\n```json\n{ \"skills\": [{ \"label\": \"Python\", \"kind\": \"PRIMARY\" }] }\n```\nThe candidate will now have **only** `[\"Python\"]` - the previous skills are removed.\n\nTo add Python while keeping existing skills, send:\n```json\n{ \"skills\": [\n  { \"label\": \"TypeScript\", \"kind\": \"PRIMARY\" },\n  { \"label\": \"React\", \"kind\": \"PRIMARY\" },\n  { \"label\": \"Python\", \"kind\": \"PRIMARY\" }\n] }\n```\n\n## Matching Strategy\n\nSkills and roles are matched by **normalized label**:\n1. Exact match against existing entries\n2. Fuzzy match against ESCO standard (if no externalId)\n3. Create new custom entry if no match found",
+        "operationId": "updateCandidate",
+        "tags": [
+          "Candidates"
+        ],
+        "parameters": [
+          {
+            "name": "candidateId",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the candidate to update",
+            "schema": {
+              "type": "string"
+            },
+            "example": "clxyz123abc456def789"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCandidateRequest"
+              },
+              "examples": {
+                "update_location": {
+                  "summary": "Update location only",
+                  "description": "Update city and search radius. Note: skills/roles will be cleared if not provided!",
+                  "value": {
+                    "city": "Munich",
+                    "searchRadiusKm": 30,
+                    "skills": [
+                      {
+                        "label": "TypeScript",
+                        "kind": "PRIMARY"
+                      }
+                    ],
+                    "roles": [
+                      {
+                        "label": "Software Engineer"
+                      }
+                    ]
+                  }
+                },
+                "update_skills": {
+                  "summary": "Replace all skills",
+                  "description": "Completely replace the candidate's skills",
+                  "value": {
+                    "skills": [
+                      {
+                        "label": "Python",
+                        "kind": "PRIMARY"
+                      },
+                      {
+                        "label": "Django",
+                        "kind": "PRIMARY"
+                      },
+                      {
+                        "label": "PostgreSQL",
+                        "kind": "ADDITIONAL"
+                      }
+                    ],
+                    "roles": [
+                      {
+                        "label": "Backend Developer"
+                      }
+                    ]
+                  }
+                },
+                "activate_candidate": {
+                  "summary": "Activate a candidate",
+                  "description": "Set isActive to true to make the candidate visible",
+                  "value": {
+                    "isActive": true,
+                    "city": "Berlin",
+                    "searchRadiusKm": 50,
+                    "minSalaryExpectationEur": 60000,
+                    "maxSalaryExpectationEur": 80000,
+                    "skills": [
+                      {
+                        "label": "TypeScript",
+                        "kind": "PRIMARY"
+                      }
+                    ],
+                    "roles": [
+                      {
+                        "label": "Software Engineer"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Candidate updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateCandidateResponse"
+                },
+                "example": {
+                  "candidateId": "clxyz123abc456def789",
+                  "message": "Candidate updated successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "validation_error": {
+                    "summary": "Validation error",
+                    "value": {
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Invalid request body",
+                        "details": {
+                          "issues": [
+                            {
+                              "path": "minSalaryExpectationEur",
+                              "message": "Min salary must be less than or equal to max salary"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Candidate does not exist or belongs to another organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "CANDIDATE_NOT_FOUND",
+                    "message": "Candidate with ID clxyz123abc456def789 not found"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a candidate",
+        "description": "Deletes a candidate by ID. The candidate must belong to your organization.",
+        "operationId": "deleteCandidate",
+        "tags": [
+          "Candidates"
+        ],
+        "parameters": [
+          {
+            "name": "candidateId",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the candidate to delete (returned from create endpoint)",
+            "schema": {
+              "type": "string"
+            },
+            "example": "clxyz123abc456def789"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Candidate deleted successfully (no content returned)"
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing_key": {
+                    "summary": "Missing API key",
+                    "value": {
+                      "error": {
+                        "code": "MISSING_API_KEY",
+                        "message": "Missing X-API-Key header"
+                      }
+                    }
+                  },
+                  "invalid_key": {
+                    "summary": "Invalid API key",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_API_KEY",
+                        "message": "Invalid API key"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - API key revoked or expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "revoked": {
+                    "summary": "API key revoked",
+                    "value": {
+                      "error": {
+                        "code": "API_KEY_REVOKED",
+                        "message": "API key has been revoked"
+                      }
+                    }
+                  },
+                  "expired": {
+                    "summary": "API key expired",
+                    "value": {
+                      "error": {
+                        "code": "API_KEY_EXPIRED",
+                        "message": "API key has expired"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found - Candidate does not exist or belongs to another organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "CANDIDATE_NOT_FOUND",
+                    "message": "Candidate with ID clxyz123abc456def789 not found"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected error occurred"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key obtained from MatchMates dashboard (Company Settings > API-Schl\u00fcssel)"
+      }
+    },
+    "schemas": {
+      "SearchCandidateRequest": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "Human-readable search query. The AI will extract relevant criteria like roles, skills, location, salary expectations, languages, and experience.",
+            "example": "Looking for a React developer in Berlin with 5 years experience"
+          }
+        }
+      },
+      "SearchCandidateResponse": {
+        "type": "object",
+        "required": [
+          "extractedData",
+          "normalizedData",
+          "unmatchedFields",
+          "candidates",
+          "totalResults"
+        ],
+        "properties": {
+          "extractedData": {
+            "$ref": "#/components/schemas/ExtractedSearchData"
+          },
+          "normalizedData": {
+            "$ref": "#/components/schemas/ExtractedSearchData"
+          },
+          "unmatchedFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Fields that were extracted but couldn't be fuzzy-matched to database values",
+            "example": [
+              "educationSchool"
+            ]
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CandidateSearchResult"
+            },
+            "description": "Matching candidates sorted by relevance"
+          },
+          "totalResults": {
+            "type": "integer",
+            "description": "Total number of matching candidates",
+            "example": 42
+          }
+        }
+      },
+      "ExtractedSearchData": {
+        "type": "object",
+        "description": "Search criteria extracted from the query",
+        "properties": {
+          "region": {
+            "type": "string",
+            "description": "Region name (e.g., Bavaria, NRW)",
+            "example": "Bayern"
+          },
+          "city": {
+            "type": "string",
+            "description": "City name",
+            "example": "Berlin"
+          },
+          "zipCode": {
+            "type": "string",
+            "description": "Postal code",
+            "example": "10115"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Job roles/positions",
+            "example": [
+              "Software Engineer",
+              "React Developer"
+            ]
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Technical skills",
+            "example": [
+              "TypeScript",
+              "React"
+            ]
+          },
+          "itSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "IT tools and technologies",
+            "example": [
+              "Git",
+              "Docker"
+            ]
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguagePreference"
+            },
+            "description": "Language requirements"
+          },
+          "experienceYears": {
+            "type": "integer",
+            "description": "Years of experience required",
+            "example": 5
+          },
+          "salary": {
+            "type": "integer",
+            "description": "Expected salary in EUR (annual)",
+            "example": 60000
+          },
+          "shiftAvailability": {
+            "type": "string",
+            "description": "Shift availability preference",
+            "example": "Tagschicht"
+          },
+          "educationSchool": {
+            "type": "string",
+            "description": "Education level (e.g., Hochschulabschluss)",
+            "example": "Bachelor"
+          },
+          "educationDegree": {
+            "type": "string",
+            "description": "Specific degree type",
+            "example": "Informatik"
+          }
+        }
+      },
+      "LanguagePreference": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Language code or name",
+            "example": "de"
+          },
+          "level": {
+            "type": "string",
+            "description": "Proficiency level (e.g., A1, B2, C1, Native)",
+            "example": "B2"
+          },
+          "name": {
+            "type": "string",
+            "description": "Language name",
+            "example": "German"
+          }
+        }
+      },
+      "CandidateSearchResult": {
+        "type": "object",
+        "required": [
+          "id",
+          "roles",
+          "skills",
+          "itSkills",
+          "languages",
+          "city",
+          "zipCode",
+          "minSalaryExpectationEur",
+          "maxSalaryExpectationEur",
+          "score"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique candidate identifier",
+            "example": "clxyz123abc456def789"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Candidate's job roles",
+            "example": [
+              "Software Engineer",
+              "Full Stack Developer"
+            ]
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Candidate's skills",
+            "example": [
+              "TypeScript",
+              "React",
+              "Node.js"
+            ]
+          },
+          "itSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Candidate's IT tools/technologies",
+            "example": [
+              "Git",
+              "Docker",
+              "AWS"
+            ]
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CandidateLanguage"
+            },
+            "description": "Languages the candidate speaks"
+          },
+          "city": {
+            "type": "string",
+            "description": "Candidate's city",
+            "example": "Berlin"
+          },
+          "zipCode": {
+            "type": "string",
+            "description": "Candidate's postal code",
+            "example": "10115"
+          },
+          "minSalaryExpectationEur": {
+            "type": "integer",
+            "description": "Minimum salary expectation (EUR/year)",
+            "example": 55000
+          },
+          "maxSalaryExpectationEur": {
+            "type": "integer",
+            "description": "Maximum salary expectation (EUR/year)",
+            "example": 70000
+          },
+          "score": {
+            "type": "number",
+            "description": "Relevance score (0-100)",
+            "example": 85
+          },
+          "distance": {
+            "type": "number",
+            "description": "Distance from search location in km (if location was specified)",
+            "example": 5.2
+          }
+        }
+      },
+      "CandidateLanguage": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Language code",
+            "example": "de"
+          },
+          "name": {
+            "type": "string",
+            "description": "Language name",
+            "example": "German"
+          },
+          "level": {
+            "type": "string",
+            "description": "Proficiency level",
+            "example": "Native"
+          }
+        }
+      },
+      "CreateCandidateRequest": {
+        "type": "object",
+        "description": "All fields are optional. If all required fields (city, searchRadiusKm > 0, salary range, roles, skills) are provided, the candidate is auto-activated.",
+        "properties": {
+          "userEmail": {
+            "type": "string",
+            "format": "email",
+            "description": "Email of the user to assign this candidate to. Must be a user in your organization. If not provided, the candidate is assigned to the API key owner.",
+            "example": "recruiter@company.com"
+          },
+          "apiRef": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "External reference ID from your system (e.g., ATS candidate ID). Use this to track candidates created via API.",
+            "example": "ATS-12345"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 2,
+            "description": "City where the candidate is located",
+            "example": "Berlin"
+          },
+          "zipCode": {
+            "type": "string",
+            "maxLength": 5,
+            "description": "Postal code (German format)",
+            "example": "10115"
+          },
+          "locationId": {
+            "type": "string",
+            "description": "Internal location ID (optional, will be auto-resolved from city/zipCode if not provided)"
+          },
+          "searchRadiusKm": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Search radius in kilometers from the candidate's location",
+            "example": 50
+          },
+          "minSalaryExpectationEur": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Minimum salary expectation in EUR (annual)",
+            "example": 50000
+          },
+          "maxSalaryExpectationEur": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum salary expectation in EUR (annual)",
+            "example": 70000
+          },
+          "roles": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Job roles/positions the candidate is interested in",
+            "items": {
+              "$ref": "#/components/schemas/RoleRef"
+            }
+          },
+          "skills": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Skills the candidate possesses",
+            "items": {
+              "$ref": "#/components/schemas/SkillRef"
+            }
+          },
+          "itSkills": {
+            "type": "array",
+            "description": "IT-specific skills (tools, technologies)",
+            "items": {
+              "$ref": "#/components/schemas/ItSkillRef"
+            }
+          },
+          "languages": {
+            "type": "array",
+            "description": "Languages the candidate speaks",
+            "items": {
+              "$ref": "#/components/schemas/LanguageRef"
+            }
+          },
+          "internalReferences": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Internal reference ID from your system (e.g., applicant ID)",
+            "example": "REF-12345"
+          },
+          "noticePeriod": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Notice period before the candidate can start",
+            "example": "3 Monate"
+          },
+          "minWeeklyHours": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum weekly working hours",
+            "example": 35
+          },
+          "maxWeeklyHours": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum weekly working hours",
+            "example": 40
+          },
+          "experienceYears": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Years of professional experience",
+            "example": 5
+          },
+          "vocationalTraining": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Vocational training/apprenticeship"
+          },
+          "additionalQualifications": {
+            "type": "string",
+            "description": "Additional qualifications and certifications"
+          },
+          "wishes": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Candidate's wishes and preferences",
+            "example": "Remote work preferred"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Free-text description of the candidate",
+            "example": "Experienced full-stack developer with focus on TypeScript and React."
+          },
+          "highestEducationLevelId": {
+            "type": "string",
+            "description": "ID of the highest education level"
+          },
+          "shifts": {
+            "type": "array",
+            "description": "Shift IDs the candidate is available for",
+            "items": {
+              "type": "string"
+            }
+          },
+          "degrees": {
+            "type": "array",
+            "description": "Degree IDs the candidate holds",
+            "items": {
+              "type": "string"
+            }
+          },
+          "driverLicenses": {
+            "type": "array",
+            "description": "Driver license IDs the candidate has",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RoleRef": {
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the role/position",
+            "example": "Software Engineer"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "External ID (e.g., ESCO occupation code)"
+          }
+        }
+      },
+      "SkillRef": {
+        "type": "object",
+        "required": [
+          "label",
+          "kind"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the skill",
+            "example": "TypeScript"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PRIMARY",
+              "ADDITIONAL"
+            ],
+            "description": "PRIMARY = main/core skill, ADDITIONAL = secondary skill",
+            "example": "PRIMARY"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "External ID (e.g., ESCO skill code)"
+          }
+        }
+      },
+      "ItSkillRef": {
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the IT skill/tool",
+            "example": "Docker"
+          },
+          "externalId": {
+            "type": "string",
+            "description": "External ID"
+          }
+        }
+      },
+      "LanguageRef": {
+        "type": "object",
+        "required": [
+          "languageId",
+          "levelId"
+        ],
+        "properties": {
+          "languageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Internal language ID"
+          },
+          "levelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Internal language level ID"
+          }
+        }
+      },
+      "CreateCandidateResponse": {
+        "type": "object",
+        "required": [
+          "candidateId",
+          "isActive"
+        ],
+        "properties": {
+          "candidateId": {
+            "type": "string",
+            "description": "Unique identifier of the created candidate",
+            "example": "clxyz123abc456def789"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether the candidate is active. True if all required fields were provided, false otherwise.",
+            "example": true
+          }
+        }
+      },
+      "UpdateCandidateRequest": {
+        "type": "object",
+        "description": "Update request using FULL REPLACE semantics. All array fields (roles, skills, etc.) will completely replace existing values. Omitted arrays will be cleared.",
+        "properties": {
+          "city": {
+            "type": "string",
+            "minLength": 2,
+            "description": "City where the candidate is located"
+          },
+          "zipCode": {
+            "type": "string",
+            "maxLength": 5,
+            "nullable": true,
+            "description": "Postal code (German format)"
+          },
+          "locationId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Internal location ID"
+          },
+          "searchRadiusKm": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Search radius in kilometers"
+          },
+          "minSalaryExpectationEur": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum salary expectation in EUR (annual)"
+          },
+          "maxSalaryExpectationEur": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum salary expectation in EUR (annual)"
+          },
+          "roles": {
+            "type": "array",
+            "description": "\u26a0\ufe0f FULL REPLACE: Completely replaces all existing roles",
+            "items": {
+              "$ref": "#/components/schemas/RoleRef"
+            }
+          },
+          "skills": {
+            "type": "array",
+            "description": "\u26a0\ufe0f FULL REPLACE: Completely replaces all existing skills",
+            "items": {
+              "$ref": "#/components/schemas/SkillRef"
+            }
+          },
+          "itSkills": {
+            "type": "array",
+            "description": "\u26a0\ufe0f FULL REPLACE: Completely replaces all existing IT skills",
+            "items": {
+              "$ref": "#/components/schemas/ItSkillRef"
+            }
+          },
+          "languages": {
+            "type": "array",
+            "description": "\u26a0\ufe0f FULL REPLACE: Completely replaces all existing languages",
+            "items": {
+              "$ref": "#/components/schemas/LanguageRef"
+            }
+          },
+          "shifts": {
+            "type": "array",
+            "description": "\u26a0\ufe0f FULL REPLACE: Completely replaces all existing shifts",
+            "items": {
+              "type": "string"
+            }
+          },
+          "degrees": {
+            "type": "array",
+            "description": "\u26a0\ufe0f FULL REPLACE: Completely replaces all existing degrees",
+            "items": {
+              "type": "string"
+            }
+          },
+          "driverLicenses": {
+            "type": "array",
+            "description": "\u26a0\ufe0f FULL REPLACE: Completely replaces all existing driver licenses",
+            "items": {
+              "type": "string"
+            }
+          },
+          "noticePeriod": {
+            "type": "string",
+            "maxLength": 100,
+            "nullable": true
+          },
+          "minWeeklyHours": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          },
+          "maxWeeklyHours": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          },
+          "experienceYears": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          },
+          "vocationalTraining": {
+            "type": "string",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "additionalQualifications": {
+            "type": "string",
+            "nullable": true
+          },
+          "wishes": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "internalReferences": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "highestEducationLevelId": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Set to true to activate the candidate, false to deactivate. If omitted, current value is preserved."
+          }
+        }
+      },
+      "UpdateCandidateResponse": {
+        "type": "object",
+        "required": [
+          "candidateId",
+          "message"
+        ],
+        "properties": {
+          "candidateId": {
+            "type": "string",
+            "description": "Unique identifier of the updated candidate"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code for programmatic handling",
+                "enum": [
+                  "INVALID_JSON",
+                  "VALIDATION_ERROR",
+                  "MISSING_API_KEY",
+                  "INVALID_API_KEY",
+                  "API_KEY_REVOKED",
+                  "API_KEY_EXPIRED",
+                  "INSUFFICIENT_CREDITS",
+                  "USER_NOT_FOUND",
+                  "USER_NOT_IN_ORGANIZATION",
+                  "CANDIDATE_NOT_FOUND",
+                  "CREATION_FAILED",
+                  "UPDATE_FAILED",
+                  "SEARCH_FAILED",
+                  "INTERNAL_ERROR"
+                ]
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error message"
+              },
+              "details": {
+                "type": "object",
+                "description": "Additional error details (varies by error type)",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Candidates",
+      "description": "Operations for managing candidate profiles"
+    }
+  ]
+}
