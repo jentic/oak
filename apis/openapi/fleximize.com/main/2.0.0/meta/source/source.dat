@@ -1,0 +1,992 @@
+{
+  "openapi": "3.1.0",
+  "servers": [
+    {
+      "description": "Fleximize Production",
+      "url": "https://api.fleximize.com/api/v2"
+    }
+  ],
+  "info": {
+    "description": "Welcome to the Fleximize API!\n\n\n**Important Notice:**\n\n\nBy submitting application, you confirm that you have obtained the consent of\nall individuals associated with it (directors, personal guarantors,\nmortgagors and shareholders etc). The personal information we have collected\nfrom you will be shared with fraud prevention agencies. This is to prevent\nfraud and money laundering and to verify the identity of all individuals\nsupplied and associated with this application. If fraud is detected, you and\nthese individuals could be refused certain services, finance and employment.\nFurther details on the processing of information and the individual\u2019s data\nprocessing rights can be found [here](https://www.cifas.org.uk/fpn).  \n\n\n\n### Integration notes:  \n\n\n* When onboarding, please ensure you set the \u201c***is_test***\u201d flag to \u201c***true***\u201d and only set it to \u201c***false***\u201d when you are ready to send live leads. Setting the flag to true will send applications to Fleximize's production database, but automatically mark the application as a test, and prevent credit checks from being run on it.\n* Please note that the test flag is designed for onboarding only, and should not be used for any other purpose.\n* Please also note that API calls are rate-limited to ***60 calls per minute***.\n\n\n### How to Use This Documentation:\n\n\n  * Expand an endpoint by clicking the arrow on the right-hand side.\n\n    * When expanded, you will see:\n\n      * **Example Value** \u2013 A sample request body showing how the payload should\n        be structured.\n\n      * **Schema** \u2013 Detailed information about each field, including:\n\n        * The data type (string, integer, boolean, array, etc.)\n\n        * Whether the field is required or optional\n\n        * Any validation rules or constraints\n\n        * Whether the field expects one of a predefined list of values\n\n\n  * Some fields require values from a predefined list. For example, in\n      **POST /application**, the `title_id` field must contain one of the\n      supported values displayed in the Schema section. You may use any of the\n      allowed values shown there when calling the endpoint.\n\n\n### Retrieving Supported Values:\n\n\n  Some endpoints return lists of supported values that must be used in other\n    API calls.\n\n\n  * **GET /application/document-types**\n\n    Returns a list of all supported document types and their corresponding IDs.\n\n    When this endpoint is called, it returns:\n\n    * The supported document types\n\n    * The unique ID associated with each document type\n\n\n  * This information should then be used when calling:\n\n      **POST /application/{application_id}/upload** to upload an application-related document.\n\n    In the request body of this endpoint, the `document_type` parameter must\n    match one of the IDs returned by the\n    **GET /application/document-types** endpoint.\n\n\n\n### Supported File Formats:\n  Generally supported file formats include:\n\n    bmp, doc, docx, gif, jpeg, jpg, pdf, png, xls, xlsx, xlx, heic, csv, msg, txt, eml\n\n\n\n\n### Technical Support  \n\nThe Fleximize API is a self-service application, and all of the information you require to onboard should be collated below, however if you encouter any problems or have any questions and inquiries, please contact the development team using the link below. For all other non-technical enquiries, please contact your BDM.\n",
+    "version": "2.0.0",
+    "title": "Fleximize Applications API",
+    "contact": {
+      "email": "development@fleximize.com"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/Fleximize/Application_API/2.0.0"
+  },
+  "paths": {
+    "/get_token": {
+      "post": {
+        "summary": "Gets authentication token",
+        "description": "Gets authentication token using credentials.\n\n  Token is valid for **7 days**. After that new token should be obtained using the same endpoint\n",
+        "operationId": "getToken",
+        "security": [],
+        "tags": [
+          "authorisation"
+        ],
+        "requestBody": {
+          "description": "Fleximize uses API tokens to allow access to the API called JWT.\n\nAll other Fleximize endpoints require authorization using the API token, which is expected to be included in all API requests to the server in an Auth Bearer token header. \n\nTo get your token, call this endpoint first with your broker account login details.\n",
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/loginCredentials"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/loginCredentials"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/authToken"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unautheticated"
+          }
+        }
+      }
+    },
+    "/application": {
+      "post": {
+        "summary": "Submits loan application",
+        "description": "Submits loan application",
+        "operationId": "postApplication",
+        "tags": [
+          "application"
+        ],
+        "requestBody": {
+          "description": "New loan application can be submitted through this endpoint\n",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/application"
+              },
+              "encoding": {
+                "company": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/appSubmitted"
+          },
+          "400": {
+            "$ref": "#/components/responses/error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unautheticated"
+          },
+          "422": {
+            "description": "This response indicates that the application has been blocked by our systems and cannot be accepted by Fleximize. This is for operational reasons rather than technical ones. If you see this response, please do not try to resubmit the application. If you require further information on the individual application, please contact Fleximize.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "examples": [
+                        "This application cannot be accepted and details have not been saved."
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/application/{application_id}": {
+      "get": {
+        "summary": "Get current application status by `application_id`",
+        "description": "Get current application status by `application_id`",
+        "operationId": "getApplicationStatus",
+        "tags": [
+          "application"
+        ],
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "description": "application_id value returned in in the `/application` response",
+            "schema": {
+              "type": "string",
+              "examples": [
+                "flex1abcd2efg34hij"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response from the server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "application_status": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/app_status"
+                        },
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "description": "Current application status"
+                        },
+                        {
+                          "examples": [
+                            "Approved"
+                          ]
+                        }
+                      ]
+                    },
+                    "failed_cancelled_reason": {
+                      "type": "string",
+                      "description": "This is optional field describing reason for loan being failed or cancelled."
+                    },
+                    "internal_score_status": {
+                      "type": "string",
+                      "enum": [
+                        "PASSED",
+                        "FAILED",
+                        "REFERRED"
+                      ],
+                      "description": "String describing if application passed, failed or have been referred for manual review",
+                      "examples": [
+                        "PASSED"
+                      ]
+                    },
+                    "internal_id": {
+                      "type": "string",
+                      "description": "Client internall ID"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Link customer open banking data.",
+        "description": "Provide AccountScore customer reference token.\n\nThis can be found on AccountScore portal or through their API and it should provided as UIID (not internal reference)\n",
+        "operationId": "linkAccountScore",
+        "tags": [
+          "application"
+        ],
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "description": "application_id value returned in in the `/application` response",
+            "schema": {
+              "type": "string",
+              "examples": [
+                "flex1abcd2efg34hij"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minimum": 36,
+                    "maximum": 36,
+                    "description": "AccountScore Customer Reference",
+                    "examples": [
+                      "12345678-1111-2222-94e6-c0eaf2e052ef"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response from the server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "boolean",
+                      "examples": [
+                        true
+                      ],
+                      "description": "Returns 'true' if application have been linked correctly and 'false' on failure."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "If aplication is not found or user is not set with us to provide AccountScore data, error response is returned.\n\nIf you want to be set up to share AccountScore with Fleximize then please contact us.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "boolean",
+                      "examples": [
+                        false
+                      ],
+                      "description": "Returns 'true' if application have been linked correctly and 'false' on failure."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/application/document-types": {
+      "get": {
+        "summary": "Gets list of allowed document types to upload",
+        "description": "Gets list of allowed document types to upload. Each of ID returned is used as \"document_type\" paremeter in \"upload\" endpoint\n",
+        "operationId": "getAllowedDocTypes",
+        "tags": [
+          "application",
+          "documents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Response with list of all alowed document types ID and description",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Document ID",
+                        "examples": [
+                          1
+                        ]
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "Document type description",
+                        "examples": [
+                          "Bank Statement"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "links": {
+              "document_type": {
+                "description": "The `id` value returned in the response can be used as the `document_type` parameter in `POST /application/{application_id}/upload`.\n",
+                "operationId": "postApplicationDocuments",
+                "requestBody": "$response.body#/0/id",
+                "parameters": {
+                  "document_type": "$response.body#/0/id"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unautheticated"
+          }
+        }
+      }
+    },
+    "/application/{application_id}/upload": {
+      "post": {
+        "summary": "Post application related document",
+        "description": "Post document related to application",
+        "operationId": "postApplicationDocuments",
+        "tags": [
+          "application",
+          "documents"
+        ],
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "description": "application_id value returned in in the `/application` response",
+            "schema": {
+              "type": "string",
+              "examples": [
+                "flex1abcd2efg34hij"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "New loan application documents can be uploaded through this endpoint\n",
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "document_type",
+                  "file"
+                ],
+                "properties": {
+                  "document_type": {
+                    "type": "integer",
+                    "format": "int32",
+                    "description": "One of `id` values returned by `/application/document-types` response",
+                    "examples": [
+                      1
+                    ]
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Document file being uploaded"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ok"
+          },
+          "400": {
+            "$ref": "#/components/responses/error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unautheticated"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "loginCredentials": {
+        "title": "Get token by credentials",
+        "description": "Login credentials object",
+        "type": "object",
+        "required": [
+          "user_name",
+          "password"
+        ],
+        "properties": {
+          "user_name": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "email",
+            "description": "Account username. Usually email address",
+            "examples": [
+              "example@example.com"
+            ]
+          },
+          "password": {
+            "description": "Account password",
+            "type": "string",
+            "format": "password",
+            "examples": [
+              "somepassword"
+            ]
+          }
+        }
+      },
+      "app_status": {
+        "type": "string",
+        "enum": [
+          "Approved",
+          "Approved (Offer Expired)",
+          "Cancelled",
+          "Deposited",
+          "Failed",
+          "Under Review",
+          "Test"
+        ]
+      },
+      "application": {
+        "title": "Application object",
+        "description": "Application object",
+        "type": "object",
+        "required": [
+          "business_type_id",
+          "company_name",
+          "title_id",
+          "first_name",
+          "last_name",
+          "phone",
+          "email",
+          "loan_amount",
+          "term",
+          "funding_urgency",
+          "loan_purpose_id",
+          "other_purpose",
+          "privacy_policy_consent",
+          "cra_checks_consent",
+          "refer_consent",
+          "company"
+        ],
+        "properties": {
+          "is_test": {
+            "type": "boolean",
+            "description": "When set to true, the application will be automatically moved to test status, and will not reviewed or processed by the business. While test applications passed through the API are sent to our live systems, marking them as test will prevent credit searches from being run on the company and individuals supplied. As the application data from your test will be stored in our live database, we do recommend using dummy data where possible."
+          },
+          "business_type_id": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "description": "Business Type:\n  * `1` - Sole Trader\n  * `2` - Non-Limited Partnership\n  * `3` - Limited Company\n  * `4` - Limited Partnership (LLP)\n    \n"
+          },
+          "company_name": {
+            "type": "string",
+            "maxLength": 75,
+            "description": "Company Name",
+            "examples": [
+              "Example Company Name"
+            ]
+          },
+          "registration_number": {
+            "type": "string",
+            "maxLength": 8,
+            "nullable": true,
+            "description": "Company Registration Number",
+            "examples": [
+              12345678
+            ]
+          },
+          "title_id": {
+            "$ref": "#/components/schemas/title_id"
+          },
+          "first_name": {
+            "$ref": "#/components/schemas/first_name"
+          },
+          "last_name": {
+            "$ref": "#/components/schemas/last_name"
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 80,
+            "pattern": "^(0|\\+)\\d+$",
+            "description": "Applicant phone number",
+            "examples": [
+              "0123456789"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "email",
+            "pattern": "^(([^<>()\\[\\]\\\\.,;:\\s@\"]+(\\.[^<>()\\[\\]\\\\.,;:\\s@\"]+)*)|(\".+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$",
+            "description": "Applicant email address",
+            "examples": [
+              "example@example.com"
+            ]
+          },
+          "loan_amount": {
+            "type": "number",
+            "format": "double",
+            "minimum": 5000,
+            "maximum": 500000,
+            "description": "Loan amount",
+            "examples": [
+              30000
+            ]
+          },
+          "term": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 60,
+            "description": "Loan term",
+            "examples": [
+              24
+            ]
+          },
+          "funding_urgency": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "description": "How quick funds are required:\n  * `1` - As soon as possible\n  * `2` - Within a few weeks\n  * `3` - I just want to see what's available\n    \n"
+          },
+          "loan_purpose_id": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16
+            ],
+            "description": "Loan purpose:\n  * `1` - Hire staff\n  * `2` - Management buyout\n  * `3` - Marketing\n  * `4` - Moving premises\n  * `5` - Fulfil an order or contract\n  * `6` - Pay a due bill\n  * `7` - Pay HMRC\n  * `8` - Pay staff\n  * `9` - Purchase stock\n  * `10` - Purchase equipment\n  * `11` - Refinance debt\n  * `12` - Refurbish premises\n  * `13` - Upgrade website\n  * `14` - Business expansion\n  * `15` - Working capital / cash flow\n  * `16` - Other (please specify)\n"
+          },
+          "other_purpose": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 1000,
+            "description": "Detailed purpose description is required in this field when loan_purpose_id field is 14, 15 or 16"
+          },
+          "internal_id": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Your internal ID",
+            "examples": [
+              "AB123456"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Notes"
+          },
+          "privacy_policy_consent": {
+            "type": "boolean",
+            "description": "When set to true, you are confirming that your client has consented to Fleximize and its group of companies using their personal information in the ways described in the [Privacy Policy](https://fleximize.com/terms-of-use/privacy-policy) and [Terms of Website Use](https://fleximize.com/terms-of-use/privacy-policy).\n\n**Fleximize won't be able to process an application without _privacy_policy_consent_ set to true**"
+          },
+          "cra_checks_consent": {
+            "type": "boolean",
+            "description": "When set to true you are confirming that your client authorises Fleximize to perform credit reference agency (CRA) searches on the business, directors, any individuals supplied as part of the application, and their financial associates. A record of this search will be recorded against all applicants and may be seen by other companies if they carry out a credit enquiry. Before submitting this application, please confirm that you have obtained the consent of all individuals concerned and provided them a copy of our [Privacy Policy](https://fleximize.com/terms-of-use/privacy-policy). For more information on how we and the CRAs use your information, please refer to our [Privacy Policy](https://fleximize.com/terms-of-use/privacy-policy).\n\n**Fleximize won't be able to process an application without _cra_checks_consent_ set to true**"
+          },
+          "refer_consent": {
+            "type": "boolean",
+            "description": "If Fleximize are unable to provide the finance requested, this consent allows us to refer the credit application and personal details to our carefully selected panel of brokers and lenders to assist in obtaining credit."
+          },
+          "company": {
+            "$ref": "#/components/schemas/company"
+          }
+        }
+      },
+      "company": {
+        "type": "object",
+        "description": "Object holding company data",
+        "required": [
+          "monthly_sales",
+          "trading_date",
+          "same_address",
+          "registered_address",
+          "directors"
+        ],
+        "properties": {
+          "vat_no": {
+            "type": "string",
+            "maxLength": 15,
+            "description": "Company Vat Number",
+            "examples": [
+              "GB999999973"
+            ]
+          },
+          "monthly_sales": {
+            "type": "number",
+            "format": "double",
+            "description": "Company monthly sales value",
+            "examples": [
+              50000
+            ]
+          },
+          "date_of_creation": {
+            "type": "string",
+            "format": "date",
+            "description": "Company incorporation date. Format: YYYY-MM-DD",
+            "examples": [
+              "2012-12-12"
+            ]
+          },
+          "trading_date": {
+            "type": "string",
+            "format": "date",
+            "description": "When company have started to trade",
+            "examples": [
+              "2012-12-12"
+            ]
+          },
+          "same_address": {
+            "type": "boolean",
+            "description": "If is set to true, trading address is not required"
+          },
+          "registered_address": {
+            "$ref": "#/components/schemas/address"
+          },
+          "trading_address": {
+            "$ref": "#/components/schemas/address"
+          },
+          "directors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/person"
+            }
+          },
+          "shareholders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/person"
+            }
+          }
+        }
+      },
+      "address": {
+        "type": "object",
+        "required": [
+          "abode_name_no",
+          "street",
+          "town",
+          "postcode"
+        ],
+        "properties": {
+          "abode_name_no": {
+            "type": "string",
+            "maxLength": 250,
+            "description": "Building Name or Number   \n**Required for first director*\n",
+            "examples": [
+              51
+            ]
+          },
+          "street": {
+            "type": "string",
+            "maxLength": 250,
+            "description": "Street name   \n**Required for first director*\n",
+            "examples": [
+              "John Street"
+            ]
+          },
+          "street2": {
+            "type": "string",
+            "maxLength": 250,
+            "description": "Address second line   \n**Required for first director*\n",
+            "examples": [
+              "John Street"
+            ]
+          },
+          "town": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Town name   \n**Required for first director*\n",
+            "examples": [
+              "Ipswich"
+            ]
+          },
+          "county": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "County name   \n**Required for first director*\n",
+            "examples": [
+              "Suffolk"
+            ]
+          },
+          "postcode": {
+            "type": "string",
+            "maxLength": 20,
+            "description": "Postocode   \n**Required for first director*\n",
+            "examples": [
+              "IP3 0AH"
+            ]
+          }
+        }
+      },
+      "person": {
+        "allOf": [
+          {
+            "type": "object",
+            "description": "Person object",
+            "required": [
+              "first_name",
+              "last_name",
+              "date_of_birth",
+              "residential_type_id"
+            ],
+            "properties": {
+              "title_id": {
+                "$ref": "#/components/schemas/title_id"
+              },
+              "first_name": {
+                "$ref": "#/components/schemas/first_name"
+              },
+              "last_name": {
+                "$ref": "#/components/schemas/last_name"
+              },
+              "date_of_birth": {
+                "type": "string",
+                "format": "date",
+                "description": "Person date of birth. Format: YYYY-MM-DD",
+                "examples": [
+                  "1980-12-12"
+                ]
+              },
+              "major_shareholder": {
+                "type": "boolean",
+                "default": false,
+                "description": "Set to true if person holds 25% or more shares"
+              },
+              "residential_type_id": {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "description": "Person Title:\n  * `1` - Homeowner\n  * `2` - Living with Partner\n  * `3` - Tenant\n  * `4` - Other\n"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/address"
+          },
+          {
+            "type": "object",
+            "required": [
+              "move_in_date"
+            ],
+            "properties": {
+              "move_in_date": {
+                "$ref": "#/components/schemas/move_in_date"
+              },
+              "previous_addresses": {
+                "type": "array",
+                "items": {
+                  "allOf": [
+                    {
+                      "type": "object",
+                      "description": "Person previous addresses.\n\n*Required if move_in_date is not over 3 years ago*"
+                    },
+                    {
+                      "$ref": "#/components/schemas/address"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "move_in_date"
+                      ],
+                      "properties": {
+                        "move_in_date": {
+                          "$ref": "#/components/schemas/move_in_date"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "title_id": {
+        "type": "integer",
+        "enum": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          null
+        ],
+        "nullable": true,
+        "description": "Person Title:\n  * `1` - Mr\n  * `2` - Mrs\n  * `3` - Miss\n  * `4` - Ms\n  * `5` - Dr\n  * `null` - Unknown\n  \n"
+      },
+      "first_name": {
+        "type": "string",
+        "maxLength": 80,
+        "description": "Person first name",
+        "examples": [
+          "John"
+        ]
+      },
+      "last_name": {
+        "type": "string",
+        "maxLength": 80,
+        "description": "Person last name",
+        "examples": [
+          "Doe"
+        ]
+      },
+      "move_in_date": {
+        "type": "string",
+        "format": "date",
+        "description": "Approximate move-in date. Format: YYYY-MM-DD\n      \n**Required for first director*\n",
+        "examples": [
+          "1980-12-12"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Access token is missing or invalid"
+      },
+      "Unautheticated": {
+        "description": "Invalid credentials",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string",
+                  "examples": [
+                    "Invalid credentials"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "authToken": {
+        "description": "Returned authorisation token to use for all requests",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "token": {
+                  "type": "string",
+                  "description": "Bearer token",
+                  "examples": [
+                    "d290f1ee6c544b0190e6d701748f0851"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "appSubmitted": {
+        "description": "Returns application ID and status",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "application_id": {
+                  "type": "string",
+                  "description": "Unique application ID",
+                  "examples": [
+                    "d290f1ee6c544b0190e6d701748f0851"
+                  ]
+                },
+                "internal_score_status": {
+                  "type": "string",
+                  "enum": [
+                    "PASSED",
+                    "FAILED",
+                    "REFERRED"
+                  ],
+                  "description": "Internal checks status",
+                  "examples": [
+                    "PASSED"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "links": {
+          "application_id": {
+            "$ref": "#/components/links/applicationId"
+          },
+          "path.application_id": {
+            "description": "The `application_id` value returned in the response can be used as the `application_id` parameter in various application related requests.\n",
+            "operationId": "getApplicationStatus",
+            "parameters": {
+              "application_id": "$response.body#/application_id"
+            }
+          }
+        }
+      },
+      "error": {
+        "description": "Error response from server",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ok": {
+        "description": "OK response from server",
+        "content": {
+          "text/plain": {
+            "schema": {
+              "type": "string",
+              "examples": [
+                "File uploaded"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "links": {
+      "applicationId": {
+        "description": "The `application_id` value returned in the response can be used as the `application_id` parameter in various application related requests.\n",
+        "operationId": "postApplicationDocuments",
+        "parameters": {
+          "application_id": "$response.body#/application_id"
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}
