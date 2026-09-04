@@ -1,0 +1,2147 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Jaggaer Advanced Sourcing Optimizer (ASO) API",
+    "description": "The Jaggaer ASO API provides programmatic access to the Advanced Sourcing Optimizer platform for procurement and strategic sourcing. It encompasses three services: Customer Host Entity Service (CHES) for managing customers, users, events, and templates; Event Entity Service (EES) for interacting with event attributes, bids, awards, and suppliers; and Quay Service for submitting and managing optimization jobs.",
+    "version": "26.0.0.4",
+    "x-jentic-source-url": "https://asodocs.jaggaer.com/"
+  },
+  "servers": [
+    {
+      "url": "https://ches.aso-api.jaggaer.com",
+      "description": "Customer Host Entity Service (CHES)"
+    },
+    {
+      "url": "https://ees.aso-api.jaggaer.com",
+      "description": "Event Entity Service (EES)"
+    },
+    {
+      "url": "https://quay.aso-api.jaggaer.com",
+      "description": "Quay Optimization Job Service"
+    },
+    {
+      "url": "https://auth.aso-api.jaggaer.com",
+      "description": "OAuth 2.0 Authentication Service"
+    }
+  ],
+  "security": [
+    {
+      "oauth2": [],
+      "apiKey": []
+    }
+  ],
+  "paths": {
+    "/oauth2/token": {
+      "post": {
+        "operationId": "generateAccessToken",
+        "summary": "Generate OAuth 2.0 access token",
+        "description": "Retrieves a system-to-system bearer access token using the OAuth 2.0 Client Credentials Grant.",
+        "tags": ["Authentication"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "grant_type",
+            "in": "query",
+            "required": true,
+            "description": "OAuth 2.0 grant type",
+            "schema": {
+              "type": "string",
+              "enum": ["client_credentials"]
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "description": "Admin clients require valid customer host ID or SHA512-hashed session value; non-admin clients omit this.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["grant_type"],
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "enum": ["client_credentials"]
+                  },
+                  "scope": {
+                    "type": "string",
+                    "description": "Required for admin clients"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Access token generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthToken"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, unknown client, invalid scope, or unsupported grant type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid client credentials"
+          }
+        }
+      }
+    },
+    "/asyncStatus/{encodedAsyncPid}": {
+      "get": {
+        "operationId": "getAsyncStatus",
+        "summary": "Get asynchronous process status",
+        "description": "Retrieves the status of an asynchronous file processing operation using an encoded process ID.",
+        "tags": ["Async Operations"],
+        "parameters": [
+          {
+            "name": "encodedAsyncPid",
+            "in": "path",
+            "required": true,
+            "description": "Encoded async process ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Async process status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid encoded async process ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Request expired or unauthorized async process ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chost/{customerHostId}/fqdn": {
+      "get": {
+        "operationId": "getCustomerHostFqdn",
+        "summary": "Get customer host FQDN",
+        "description": "Retrieves the fully qualified domain name for an ASO customer host.",
+        "tags": ["Customer Host"],
+        "parameters": [
+          {
+            "name": "customerHostId",
+            "in": "path",
+            "required": true,
+            "description": "ASO customer host identifier",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer host FQDN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fqdn": {
+                      "type": "string",
+                      "description": "Fully qualified domain name",
+                      "example": "qa.qa-asap-web-04.combinenet.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized customer host ID"
+          },
+          "404": {
+            "description": "Customer host FQDN not found"
+          }
+        }
+      }
+    },
+    "/chost/{customerHostId}/user/{userId}/template/{templateId}/apiEvent": {
+      "post": {
+        "operationId": "createEventFromTemplate",
+        "summary": "Create event from template",
+        "description": "Creates an ASO event synchronously from a template for a specified user.",
+        "tags": ["Events"],
+        "parameters": [
+          {
+            "name": "customerHostId",
+            "in": "path",
+            "required": true,
+            "description": "Customer host identifier",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "description": "User identifier",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "description": "Template identifier",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/vnd.sciquest.com.ches+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event created successfully",
+            "content": {
+              "application/vnd.sciquest.com.ches+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateEventResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error (NULL_PAYLOAD, USER_NOT_FOUND, TEMPLATE_EVENT_NOT_FOUND, INSUFFICIENT_PERMISSIONS, MISSING_REQUIRED_FIELD, ALREADY_EXISTS, EXCEEDED_CHARACTER_LIMIT, INVALID_TEMPLATE_TYPE, INVALID_SUBCATEGORY_1_VALUE, INVALID_SUBCATEGORY_2_VALUE, INVALID_USER_GROUP_NAME, REQUIRES_COPY_SUPPLIERS_AND_COPY_ITEMS, REQUIRES_COPY_SUPPLIERS)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized customer host ID"
+          }
+        }
+      }
+    },
+    "/chost/{customerHostId}/user/{userId}/template/{templateId}/apiEvent/async": {
+      "post": {
+        "operationId": "createEventFromTemplateAsync",
+        "summary": "Create event from template asynchronously",
+        "description": "Initiates asynchronous event creation from a template, returning a status URL for polling.",
+        "tags": ["Events"],
+        "parameters": [
+          {
+            "name": "customerHostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "templateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/vnd.sciquest.com.ches+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Async event creation initiated",
+            "content": {
+              "application/vnd.sciquest.com.ches+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized customer host ID"
+          }
+        }
+      }
+    },
+    "/chost/{customerHostId}/user/{userId}/apiEvents": {
+      "get": {
+        "operationId": "listEventsByUser",
+        "summary": "List events by user",
+        "description": "Retrieves ASO event data visible to a specified user with optional filtering.",
+        "tags": ["Events"],
+        "parameters": [
+          {
+            "name": "customerHostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "query",
+            "description": "Filter to single event",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "name_in",
+            "in": "query",
+            "description": "Filter events by name substring",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "description_in",
+            "in": "query",
+            "description": "Filter events by description substring",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdOn_to",
+            "in": "query",
+            "description": "Filter events created on or before date (13-digit epoch ms)",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "createdOn_from",
+            "in": "query",
+            "description": "Filter events created on or after date (13-digit epoch ms)",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "createdBy",
+            "in": "query",
+            "description": "Filter events by creator user ID",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of events",
+            "content": {
+              "application/vnd.sciquest.com.ches+json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Event"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized customer host ID"
+          }
+        }
+      }
+    },
+    "/chost/{customerHostId}/apiLocationNames": {
+      "get": {
+        "operationId": "listRateLocationNames",
+        "summary": "List rate location names",
+        "description": "Retrieves ASO rate structure location names with filtering, sorting, and pagination.",
+        "tags": ["Customer Host"],
+        "parameters": [
+          {
+            "name": "customerHostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "locationName",
+            "in": "query",
+            "description": "Filter by name (supports * wildcard for startsWith, endsWith, contains)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort_field",
+            "in": "query",
+            "description": "Field to sort by",
+            "schema": {
+              "type": "string",
+              "enum": ["locationName"]
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "description": "Sort direction",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "asc"
+            }
+          },
+          {
+            "name": "page_number",
+            "in": "query",
+            "description": "Pagination offset",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Results per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of location names",
+            "content": {
+              "application/vnd.sciquest.com.ches+json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized customer host ID"
+          }
+        }
+      }
+    },
+    "/chost/{customerHostId}/templateType/{templateTypeId}/apiSubcategories": {
+      "get": {
+        "operationId": "listSubcategoriesByTemplateType",
+        "summary": "List subcategories by template type",
+        "description": "Retrieves subcategory names for a specified template type.",
+        "tags": ["Templates"],
+        "parameters": [
+          {
+            "name": "customerHostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "templateTypeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subcategories for the template type",
+            "content": {
+              "application/vnd.sciquest.com.ches+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subcategories"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized customer host ID"
+          }
+        }
+      }
+    },
+    "/chost/{customerHostId}/user/{userId}/apiTemplates": {
+      "get": {
+        "operationId": "listTemplatesByUser",
+        "summary": "List templates by user",
+        "description": "Retrieves ASO event templates visible to a specified user with optional filtering.",
+        "tags": ["Templates"],
+        "parameters": [
+          {
+            "name": "customerHostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "query",
+            "description": "Filter to single template",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "name_in",
+            "in": "query",
+            "description": "Filter templates by name substring",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "description_in",
+            "in": "query",
+            "description": "Filter templates by description substring",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdOn_to",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "createdOn_from",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "createdBy",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of templates",
+            "content": {
+              "application/vnd.sciquest.com.ches+json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Template"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized customer host ID"
+          }
+        }
+      }
+    },
+    "/chost/{customerHostId}/apiTemplateTypes": {
+      "get": {
+        "operationId": "listTemplateTypes",
+        "summary": "List template types",
+        "description": "Retrieves all available ASO template types for a customer host.",
+        "tags": ["Templates"],
+        "parameters": [
+          {
+            "name": "customerHostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of template types",
+            "content": {
+              "application/vnd.sciquest.com.ches+json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateType"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized customer host ID"
+          }
+        }
+      }
+    },
+    "/chost/{customerHostId}/apiUser/{userId}": {
+      "get": {
+        "operationId": "getUser",
+        "summary": "Get a single user",
+        "description": "Retrieves a single ASO user by user ID.",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "customerHostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User details",
+            "content": {
+              "application/vnd.sciquest.com.ches+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized customer host ID"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/chost/{customerHostId}/apiUsers": {
+      "get": {
+        "operationId": "listUsers",
+        "summary": "List all users",
+        "description": "Retrieves all ASO users for a specified customer host.",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "customerHostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of users",
+            "content": {
+              "application/vnd.sciquest.com.ches+json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized customer host ID"
+          }
+        }
+      }
+    },
+    "/event/{eventId}/apiAttribute/{attributeId}": {
+      "get": {
+        "operationId": "getAttribute",
+        "summary": "Get a single attribute",
+        "description": "Retrieves a single attribute by ID within an event.",
+        "tags": ["Attributes"],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "attributeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attribute details",
+            "content": {
+              "application/vnd.sciquest.com.ees+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attribute"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Attribute not found"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateAttribute",
+        "summary": "Update an attribute",
+        "description": "Updates an existing attribute's writable fields.",
+        "tags": ["Attributes"],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "attributeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/vnd.sciquest.com.ees+json": {
+              "schema": {
+                "$ref": "#/components/schemas/Attribute"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Attribute updated successfully",
+            "content": {
+              "application/vnd.sciquest.com.ees+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Attribute not found"
+          },
+          "409": {
+            "description": "Conflict - attribute cannot be updated"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAttribute",
+        "summary": "Delete an attribute",
+        "description": "Deletes an attribute by ID (bid/item/supplier types only).",
+        "tags": ["Attributes"],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "attributeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Attribute deleted successfully"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Attribute not found"
+          },
+          "409": {
+            "description": "Conflict - attribute cannot be deleted"
+          }
+        }
+      }
+    },
+    "/event/{eventId}/apiAttributes": {
+      "get": {
+        "operationId": "listAttributes",
+        "summary": "List all attributes",
+        "description": "Retrieves all attributes within an event.",
+        "tags": ["Attributes"],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of attributes",
+            "content": {
+              "application/vnd.sciquest.com.ees+json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Attribute"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Event not found"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAttributes",
+        "summary": "Create attributes",
+        "description": "Creates one or more attributes within an event.",
+        "tags": ["Attributes"],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/vnd.sciquest.com.ees+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Attribute"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "207": {
+            "description": "Multi-status response with per-attribute success/failure",
+            "content": {
+              "application/vnd.sciquest.com.ees+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Event not found"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateAttributes",
+        "summary": "Update multiple attributes",
+        "description": "Updates multiple existing attributes (attributeId required in each).",
+        "tags": ["Attributes"],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/vnd.sciquest.com.ees+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Attribute"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "207": {
+            "description": "Multi-status response",
+            "content": {
+              "application/vnd.sciquest.com.ees+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Event not found"
+          }
+        }
+      }
+    },
+    "/event/{eventId}/attributeType/{attributeType}/apiAttributes": {
+      "get": {
+        "operationId": "listAttributesByType",
+        "summary": "List attributes by type",
+        "description": "Retrieves attributes filtered by type within an event.",
+        "tags": ["Attributes"],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "attributeType",
+            "in": "path",
+            "required": true,
+            "description": "Attribute type filter",
+            "schema": {
+              "type": "string",
+              "enum": ["bid", "item", "supplier", "supplier_contact"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered list of attributes",
+            "content": {
+              "application/vnd.sciquest.com.ees+json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Attribute"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Event not found"
+          }
+        }
+      }
+    },
+    "/event/{eventId}/scenario/preferred/apiAwards/async": {
+      "get": {
+        "operationId": "getAwardsByPreferredScenarioAsync",
+        "summary": "Get awards by preferred scenario (async)",
+        "description": "Initiates asynchronous retrieval of awards for the preferred scenario.",
+        "tags": ["Awards"],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Async process initiated",
+            "content": {
+              "application/vnd.sciquest.com.ees+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Event not found"
+          }
+        }
+      }
+    },
+    "/event/{eventId}/scenario/{scenarioId}/apiAwards/async": {
+      "get": {
+        "operationId": "getAwardsByScenarioAsync",
+        "summary": "Get awards by scenario (async)",
+        "description": "Initiates asynchronous retrieval of awards for a specific scenario.",
+        "tags": ["Awards"],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "scenarioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Async process initiated",
+            "content": {
+              "application/vnd.sciquest.com.ees+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Event or scenario not found"
+          }
+        }
+      }
+    },
+    "/event/{eventId}/apiBids/async": {
+      "get": {
+        "operationId": "getBidsAsync",
+        "summary": "Get bids (async)",
+        "description": "Initiates asynchronous retrieval of all bids for an event.",
+        "tags": ["Bids"],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Async process initiated",
+            "content": {
+              "application/vnd.sciquest.com.ees+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AsyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Event not found"
+          }
+        }
+      }
+    },
+    "/submitJob": {
+      "post": {
+        "operationId": "submitOptimizationJob",
+        "summary": "Submit optimization job",
+        "description": "Submits a job for queuing and optimization processing.",
+        "tags": ["Optimization Jobs"],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/vnd.sciquest.com.quay+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job submitted successfully",
+            "content": {
+              "application/vnd.sciquest.com.quay+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized - missing or invalid API key"
+          },
+          "422": {
+            "description": "Validation error (INVALID_ENUM_VALUE, MISSING_REQUIRED_FIELD, EXCEEDED_CHARACTER_LIMIT, FILE_NOT_FOUND)"
+          },
+          "429": {
+            "description": "Job submission exceeded customer's configured limit"
+          }
+        }
+      }
+    },
+    "/cancelJob/{jobId}": {
+      "post": {
+        "operationId": "cancelOptimizationJob",
+        "summary": "Cancel optimization job",
+        "description": "Cancels an in-process optimization job.",
+        "tags": ["Optimization Jobs"],
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "Quay job identifier",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Job cancelled successfully"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Job not found"
+          },
+          "422": {
+            "description": "Job could not be cancelled"
+          }
+        }
+      }
+    },
+    "/jobStatus/{jobId}": {
+      "get": {
+        "operationId": "getJobStatus",
+        "summary": "Get job status",
+        "description": "Retrieves current job status by job identifier.",
+        "tags": ["Optimization Jobs"],
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "Quay job identifier",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status",
+            "content": {
+              "application/vnd.sciquest.com.quay+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/job/{jobId}": {
+      "get": {
+        "operationId": "getJobDetails",
+        "summary": "Get job details",
+        "description": "Retrieves comprehensive job information including submission, execution, and timing data.",
+        "tags": ["Optimization Jobs"],
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "Quay job identifier",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job details",
+            "content": {
+              "application/vnd.sciquest.com.quay+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing or invalid authentication"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "oauth2": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://auth.aso-api.jaggaer.com/oauth2/token",
+            "scopes": {}
+          }
+        }
+      },
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key for client identification"
+      }
+    },
+    "schemas": {
+      "OAuthToken": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Bearer access token"
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Token type (bearer)"
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Token expiration time in seconds"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Token scope"
+          }
+        }
+      },
+      "OAuthError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error code"
+          },
+          "error_description": {
+            "type": "string",
+            "description": "Detailed error explanation"
+          }
+        }
+      },
+      "AsyncStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["initialized", "processing", "cancelled", "failed", "completed"],
+            "description": "Current process status"
+          },
+          "resultUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "Pre-signed download URL (visible only when completed)"
+          },
+          "resultUrlExpiresInSeconds": {
+            "type": "integer",
+            "description": "Seconds until result URL expiration"
+          }
+        }
+      },
+      "AsyncResponse": {
+        "type": "object",
+        "properties": {
+          "statusUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL for polling async status"
+          },
+          "statusUrlExpiresInSeconds": {
+            "type": "integer",
+            "description": "Seconds until status URL expiration"
+          }
+        }
+      },
+      "CreateEventRequest": {
+        "type": "object",
+        "required": ["name", "description", "isTestEvent", "templateTypeName", "subcategory1", "copySuppliers", "copyItems", "copyHistorics", "copyRfiAnswers"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Event name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Event description"
+          },
+          "isTestEvent": {
+            "type": "boolean",
+            "description": "Whether this is a test event"
+          },
+          "templateTypeName": {
+            "type": "string",
+            "enum": ["Transportation", "Packaging", "Indirect Materials", "RFxpress", "Direct Materials", "Services", "SD Auction", "Multi-Stage", "Facilities Management & Services", "Routing Network"],
+            "description": "Template type name"
+          },
+          "subcategory1": {
+            "type": "string",
+            "description": "Required subcategory value"
+          },
+          "subcategory2": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional subcategory value"
+          },
+          "copySuppliers": {
+            "type": "boolean",
+            "description": "Include template suppliers"
+          },
+          "copyItems": {
+            "type": "boolean",
+            "description": "Include template items"
+          },
+          "copyHistorics": {
+            "type": "boolean",
+            "description": "Include item historic pricing (requires copySuppliers and copyItems)"
+          },
+          "copyRfiAnswers": {
+            "type": "boolean",
+            "description": "Include RFI answers (requires copySuppliers)"
+          },
+          "userGroupName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional user group name"
+          }
+        }
+      },
+      "CreateEventResponse": {
+        "type": "object",
+        "properties": {
+          "statuses": {
+            "type": "object",
+            "properties": {
+              "SUCCESS": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "eventId": {
+                      "type": "integer"
+                    },
+                    "eventName": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "integer",
+            "description": "Event identifier"
+          },
+          "customerHostId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "uriName": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "isTestEvent": {
+            "type": "boolean"
+          },
+          "isTemplate": {
+            "type": "boolean"
+          },
+          "archivalState": {
+            "type": "string",
+            "enum": ["archiving", "archived", "restoring", "not_archived"]
+          },
+          "eventOwner": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "eventOwnerEmail": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "publicOrPrivate": {
+            "type": "string",
+            "enum": ["public", "private"]
+          },
+          "templateTypeName": {
+            "type": "string"
+          },
+          "eventTypeName": {
+            "type": "string"
+          },
+          "eventTypeCategory": {
+            "type": "string",
+            "enum": ["RFX", "eAuction"]
+          },
+          "subcategory1": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "subcategory2": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 64
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdOn": {
+            "type": "integer",
+            "format": "int64",
+            "description": "13-digit epoch timestamp"
+          },
+          "projectStartDate": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "biddingOpen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "biddingClose": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastModified": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Template": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "integer"
+          },
+          "customerHostId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "uriName": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isTestEvent": {
+            "type": "boolean"
+          },
+          "isTemplate": {
+            "type": "boolean"
+          },
+          "archivalState": {
+            "type": "string",
+            "enum": ["archiving", "archived", "restoring", "not_archived"]
+          },
+          "eventOwner": {
+            "type": "string"
+          },
+          "eventOwnerEmail": {
+            "type": "string"
+          },
+          "publicOrPrivate": {
+            "type": "string",
+            "enum": ["public", "private"]
+          },
+          "templateTypeName": {
+            "type": "string"
+          },
+          "eventTypeName": {
+            "type": "string",
+            "enum": ["Sealed Bid", "Reverse Auction", "Dutch Reverse Auction", "Japanese Reverse Auction", "SD Auction", "Supply Chain", "Routing Network"]
+          },
+          "eventTypeCategory": {
+            "type": "string",
+            "enum": ["RFX", "eAuction", "Advanced Sourcing"]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdOn": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastModified": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "TemplateType": {
+        "type": "object",
+        "properties": {
+          "templateTypeId": {
+            "type": "integer",
+            "description": "Template type identifier"
+          },
+          "name": {
+            "type": "string",
+            "enum": ["Transportation", "Packaging", "Indirect Materials", "RFxpress", "Direct Materials", "Services", "SD Auction", "Multi-Stage", "Facilities Management & Services", "Routing Network"]
+          }
+        }
+      },
+      "Subcategories": {
+        "type": "object",
+        "properties": {
+          "subcategory1": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Available subcategory 1 names"
+          },
+          "subcategory2": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Available subcategory 2 names"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "User identifier"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true,
+            "description": "User email/username"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "User full name"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["locked", "single_use", "unlocked", "bad_password", "expired"],
+            "description": "User account status"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "User active status"
+          }
+        }
+      },
+      "Attribute": {
+        "type": "object",
+        "properties": {
+          "attributeId": {
+            "type": "integer"
+          },
+          "attributeCode": {
+            "type": "string",
+            "description": "Attribute code (required for creation)"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "attributeType": {
+            "type": "string",
+            "enum": ["bid", "item", "supplier", "supplier_contact"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["string", "memo", "currency", "integer", "number", "money", "percent", "date", "time", "date-time", "yes-no", "select-one"]
+          },
+          "apiField": {
+            "type": "string"
+          },
+          "isNormalized": {
+            "type": "boolean"
+          },
+          "selectOneValues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "normalizedValues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fractionalPrecision": {
+            "type": "integer"
+          },
+          "isRequired": {
+            "type": "boolean"
+          },
+          "lowValue": {
+            "type": "number"
+          },
+          "highValue": {
+            "type": "number"
+          },
+          "visibleToBidder": {
+            "type": "boolean"
+          },
+          "visibleInManagement": {
+            "type": "boolean"
+          },
+          "isHistoric": {
+            "type": "boolean"
+          },
+          "isLocked": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SubmitJobRequest": {
+        "type": "object",
+        "required": ["consumer", "customerId", "customerName", "eventId", "inputFilename"],
+        "properties": {
+          "consumer": {
+            "type": "string",
+            "enum": ["ASO", "JCS", "USDA"],
+            "description": "Consumer system"
+          },
+          "customerId": {
+            "type": "integer",
+            "description": "Customer identifier"
+          },
+          "customerName": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Customer name"
+          },
+          "eventId": {
+            "type": "integer",
+            "description": "Event identifier"
+          },
+          "inputFilename": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Input filename for optimization"
+          },
+          "notificationHostname": {
+            "type": "string",
+            "maxLength": 250,
+            "description": "Notification callback hostname"
+          },
+          "notificationPort": {
+            "type": "integer",
+            "description": "Notification callback port"
+          }
+        }
+      },
+      "SubmitJobResponse": {
+        "type": "object",
+        "properties": {
+          "statuses": {
+            "type": "object",
+            "properties": {
+              "SUCCESS": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "integer",
+                      "description": "Assigned job identifier"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "JobStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["Received", "Queued", "Requeued", "Optimizing", "Completed", "Failed", "Cancelled", "Cancelling", "Expired", "Limited"],
+            "description": "Current job status"
+          }
+        }
+      },
+      "JobDetails": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "integer"
+          },
+          "consumer": {
+            "type": "string",
+            "enum": ["ASO", "JCS", "USDA"]
+          },
+          "customerId": {
+            "type": "integer"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "integer"
+          },
+          "inputFilename": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["Received", "Queued", "Requeued", "Optimizing", "Completed", "Failed", "Cancelled", "Cancelling", "Expired", "Limited"]
+          },
+          "jobType": {
+            "type": "string"
+          },
+          "optSetType": {
+            "type": "string"
+          },
+          "submitTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "inprocAtSubmit": {
+            "type": "integer"
+          },
+          "runClient": {
+            "type": "string"
+          },
+          "workingDirectory": {
+            "type": "string"
+          },
+          "processStartTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "processStopTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cpuTime": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "StatusResponse": {
+        "type": "object",
+        "properties": {
+          "statuses": {
+            "type": "object",
+            "properties": {
+              "SUCCESS": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "attributeId": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "MultiStatusResponse": {
+        "type": "object",
+        "properties": {
+          "statuses": {
+            "type": "object",
+            "properties": {
+              "SUCCESS": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "attributeId": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "FAILURE": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "attributeCode": {
+                      "type": "string"
+                    },
+                    "errorCode": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "errorCode": {
+            "type": "string",
+            "description": "Machine-readable error code"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message"
+          }
+        }
+      }
+    }
+  }
+}
