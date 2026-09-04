@@ -1,0 +1,1293 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Knock API",
+    "description": "Knock is a notification system that provides APIs for triggering workflows, managing users, sending messages across channels, and handling notification preferences. Supports cursor-based pagination and idempotent requests.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Knock",
+      "url": "https://knock.app"
+    },
+    "x-jentic-source-url": "https://docs.knock.app/reference",
+    "x-jentic-provenance": "jentic-generated"
+  },
+  "servers": [
+    {
+      "url": "https://api.knock.app/v1",
+      "description": "Knock API v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/workflows/{key}/trigger": {
+      "post": {
+        "operationId": "triggerWorkflow",
+        "summary": "Trigger a workflow",
+        "description": "Triggers a workflow run for one or more recipients.",
+        "tags": ["Workflows"],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The workflow key"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["recipients"],
+                "properties": {
+                  "recipients": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "List of recipient user IDs"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Data payload for the workflow"
+                  },
+                  "actor": {
+                    "type": "string",
+                    "description": "The user ID of the actor triggering the workflow"
+                  },
+                  "cancellation_key": {
+                    "type": "string",
+                    "description": "Key used to cancel this workflow run later"
+                  },
+                  "tenant": {
+                    "type": "string",
+                    "description": "Tenant ID for multi-tenant workflows"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Workflow triggered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workflow_run_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "422": { "description": "Validation error" }
+        }
+      }
+    },
+    "/workflows/{key}/cancel": {
+      "post": {
+        "operationId": "cancelWorkflow",
+        "summary": "Cancel a workflow",
+        "description": "Cancels an in-progress workflow run using the cancellation key.",
+        "tags": ["Workflows"],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The workflow key"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["recipients", "cancellation_key"],
+                "properties": {
+                  "recipients": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "cancellation_key": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Workflow cancelled successfully" },
+          "422": { "description": "Validation error" }
+        }
+      }
+    },
+    "/messages": {
+      "get": {
+        "operationId": "listMessages",
+        "summary": "List messages",
+        "description": "Returns a paginated list of messages with optional filtering.",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": { "type": "integer", "default": 50 },
+            "description": "Number of items per page"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Cursor for forward pagination"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Cursor for backward pagination"
+          },
+          {
+            "name": "channel_id",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by channel ID"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["queued", "sent", "delivered", "undelivered", "not_sent"] },
+            "description": "Filter by message status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of messages",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageList" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/{message_id}": {
+      "get": {
+        "operationId": "getMessage",
+        "summary": "Get a message",
+        "description": "Retrieves a specific message by ID.",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Message" }
+              }
+            }
+          },
+          "404": { "description": "Message not found" }
+        }
+      }
+    },
+    "/messages/{message_id}/content": {
+      "get": {
+        "operationId": "getMessageContent",
+        "summary": "Get rendered message content",
+        "description": "Returns the rendered content of a specific message.",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rendered message content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Message not found" }
+        }
+      }
+    },
+    "/messages/{message_id}/events": {
+      "get": {
+        "operationId": "listMessageEvents",
+        "summary": "List message events",
+        "description": "Returns events for a specific message.",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of message events",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/{message_id}/activities": {
+      "get": {
+        "operationId": "listMessageActivities",
+        "summary": "List message activities",
+        "description": "Returns activities associated with a message.",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "List of activities" }
+        }
+      }
+    },
+    "/messages/{message_id}/seen": {
+      "put": {
+        "operationId": "markMessageSeen",
+        "summary": "Mark message as seen",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Message marked as seen" }
+        }
+      },
+      "delete": {
+        "operationId": "markMessageUnseen",
+        "summary": "Mark message as unseen",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Message marked as unseen" }
+        }
+      }
+    },
+    "/messages/{message_id}/read": {
+      "put": {
+        "operationId": "markMessageRead",
+        "summary": "Mark message as read",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Message marked as read" }
+        }
+      },
+      "delete": {
+        "operationId": "markMessageUnread",
+        "summary": "Mark message as unread",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Message marked as unread" }
+        }
+      }
+    },
+    "/messages/{message_id}/interacted": {
+      "put": {
+        "operationId": "markMessageInteracted",
+        "summary": "Mark message as interacted",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Message marked as interacted" }
+        }
+      }
+    },
+    "/messages/{message_id}/archived": {
+      "put": {
+        "operationId": "archiveMessage",
+        "summary": "Archive a message",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Message archived" }
+        }
+      },
+      "delete": {
+        "operationId": "unarchiveMessage",
+        "summary": "Unarchive a message",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Message unarchived" }
+        }
+      }
+    },
+    "/messages/batch/seen": {
+      "post": {
+        "operationId": "batchMarkSeen",
+        "summary": "Batch mark messages as seen",
+        "tags": ["Messages"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_ids": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Messages marked as seen" }
+        }
+      }
+    },
+    "/messages/batch/read": {
+      "post": {
+        "operationId": "batchMarkRead",
+        "summary": "Batch mark messages as read",
+        "tags": ["Messages"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_ids": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Messages marked as read" }
+        }
+      }
+    },
+    "/messages/batch/archived": {
+      "post": {
+        "operationId": "batchArchive",
+        "summary": "Batch archive messages",
+        "tags": ["Messages"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_ids": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Messages archived" }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "operationId": "listUsers",
+        "summary": "List users",
+        "description": "Returns a paginated list of users.",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of users",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedList" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_id}": {
+      "get": {
+        "operationId": "getUser",
+        "summary": "Get a user",
+        "description": "Retrieves a specific user by ID.",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "404": { "description": "User not found" }
+        }
+      },
+      "put": {
+        "operationId": "identifyUser",
+        "summary": "Identify or create a user",
+        "description": "Creates or updates a user with the given ID and properties.",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string", "format": "email" },
+                  "phone_number": { "type": "string" },
+                  "avatar": { "type": "string", "format": "uri" },
+                  "timezone": { "type": "string" }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User created or updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteUser",
+        "summary": "Delete a user",
+        "description": "Permanently deletes a user and all associated data.",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "User deleted" },
+          "404": { "description": "User not found" }
+        }
+      }
+    },
+    "/users/{user_id}/merge": {
+      "post": {
+        "operationId": "mergeUsers",
+        "summary": "Merge two users",
+        "description": "Merges the specified user into the target user.",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The user ID to merge into"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["from_user_id"],
+                "properties": {
+                  "from_user_id": { "type": "string", "description": "The user ID being merged" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Users merged successfully" }
+        }
+      }
+    },
+    "/users/{user_id}/messages": {
+      "get": {
+        "operationId": "listUserMessages",
+        "summary": "List user messages",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Paginated list of user messages" }
+        }
+      }
+    },
+    "/users/{user_id}/schedules": {
+      "get": {
+        "operationId": "listUserSchedules",
+        "summary": "List user schedules",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "List of user schedules" }
+        }
+      }
+    },
+    "/users/{user_id}/subscriptions": {
+      "get": {
+        "operationId": "listUserSubscriptions",
+        "summary": "List user subscriptions",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "List of user subscriptions" }
+        }
+      }
+    },
+    "/users/{user_id}/preferences": {
+      "get": {
+        "operationId": "listUserPreferences",
+        "summary": "List user preference sets",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "List of preference sets" }
+        }
+      }
+    },
+    "/users/{user_id}/preferences/{preference_id}": {
+      "get": {
+        "operationId": "getUserPreference",
+        "summary": "Get a user preference set",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "preference_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Preference set details" }
+        }
+      },
+      "put": {
+        "operationId": "updateUserPreference",
+        "summary": "Update a user preference set",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "preference_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "additionalProperties": true }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Preference set updated" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteUserPreference",
+        "summary": "Delete a user preference set",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "preference_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Preference set deleted" }
+        }
+      }
+    },
+    "/users/{user_id}/channel_data/{channel_id}": {
+      "get": {
+        "operationId": "getUserChannelData",
+        "summary": "Get user channel data",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "User channel data" }
+        }
+      },
+      "put": {
+        "operationId": "setUserChannelData",
+        "summary": "Set user channel data",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "additionalProperties": true }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Channel data set" }
+        }
+      },
+      "delete": {
+        "operationId": "unsetUserChannelData",
+        "summary": "Unset user channel data",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Channel data removed" }
+        }
+      }
+    },
+    "/users/{user_id}/feeds/{feed_id}": {
+      "get": {
+        "operationId": "listUserFeedItems",
+        "summary": "List user feed items",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "feed_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Feed items" }
+        }
+      }
+    },
+    "/users/bulk/identify": {
+      "post": {
+        "operationId": "bulkIdentifyUsers",
+        "summary": "Bulk identify users",
+        "description": "Creates or updates multiple users in a single request.",
+        "tags": ["Users"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "users": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["id"],
+                      "properties": {
+                        "id": { "type": "string" },
+                        "name": { "type": "string" },
+                        "email": { "type": "string" }
+                      },
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk operation started",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BulkOperation" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/bulk/delete": {
+      "post": {
+        "operationId": "bulkDeleteUsers",
+        "summary": "Bulk delete users",
+        "tags": ["Users"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_ids": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk delete operation started",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BulkOperation" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/objects/{collection}": {
+      "get": {
+        "operationId": "listObjects",
+        "summary": "List objects in a collection",
+        "tags": ["Objects"],
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Paginated list of objects" }
+        }
+      }
+    },
+    "/objects/{collection}/{object_id}": {
+      "get": {
+        "operationId": "getObject",
+        "summary": "Get an object",
+        "tags": ["Objects"],
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Object details" },
+          "404": { "description": "Object not found" }
+        }
+      },
+      "put": {
+        "operationId": "setObject",
+        "summary": "Set an object",
+        "description": "Creates or updates an object in a collection.",
+        "tags": ["Objects"],
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "additionalProperties": true }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Object set" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteObject",
+        "summary": "Delete an object",
+        "tags": ["Objects"],
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Object deleted" }
+        }
+      }
+    },
+    "/objects/{collection}/{object_id}/subscriptions": {
+      "get": {
+        "operationId": "listObjectSubscriptions",
+        "summary": "List object subscriptions",
+        "tags": ["Objects"],
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "List of subscriptions" }
+        }
+      },
+      "post": {
+        "operationId": "addObjectSubscriptions",
+        "summary": "Add subscriptions to an object",
+        "tags": ["Objects"],
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipients": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Subscriptions added" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteObjectSubscriptions",
+        "summary": "Delete subscriptions from an object",
+        "tags": ["Objects"],
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipients": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Subscriptions deleted" }
+        }
+      }
+    },
+    "/channels/{channel_id}/messages/bulk/{action}": {
+      "post": {
+        "operationId": "bulkUpdateChannelMessages",
+        "summary": "Bulk update message statuses in a channel",
+        "description": "Performs a bulk status update on messages in a specific channel.",
+        "tags": ["Channels"],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["seen", "unseen", "read", "unread", "archived", "unarchived", "interacted"]
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Bulk update completed" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API secret key (sk_*) for server-side requests or public key (pk_*) for client-side requests"
+      }
+    },
+    "schemas": {
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "channel_id": { "type": "string" },
+          "recipient": { "type": "object" },
+          "workflow": { "type": "string" },
+          "tenant": { "type": "string", "nullable": true },
+          "status": { "type": "string" },
+          "read_at": { "type": "string", "format": "date-time", "nullable": true },
+          "seen_at": { "type": "string", "format": "date-time", "nullable": true },
+          "archived_at": { "type": "string", "format": "date-time", "nullable": true },
+          "inserted_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "MessageList": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Message" }
+          },
+          "page_info": { "$ref": "#/components/schemas/PageInfo" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string", "nullable": true },
+          "email": { "type": "string", "nullable": true },
+          "phone_number": { "type": "string", "nullable": true },
+          "avatar": { "type": "string", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PageInfo": {
+        "type": "object",
+        "properties": {
+          "after": { "type": "string", "nullable": true },
+          "before": { "type": "string", "nullable": true },
+          "page_size": { "type": "integer" },
+          "total_count": { "type": "integer" }
+        }
+      },
+      "PaginatedList": {
+        "type": "object",
+        "properties": {
+          "entries": { "type": "array", "items": { "type": "object" } },
+          "page_info": { "$ref": "#/components/schemas/PageInfo" }
+        }
+      },
+      "BulkOperation": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "processing", "completed", "failed"] },
+          "estimated_total_rows": { "type": "integer" },
+          "processed_rows": { "type": "integer" }
+        }
+      }
+    }
+  }
+}
