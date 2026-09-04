@@ -1,0 +1,436 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payment Gateway Client API",
+    "description": "API p\u00fablica para la integraci\u00f3n de clientes. \nPermite generar Links de Pago y gestionar Reembolsos a trav\u00e9s de EzPays.\n",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Soporte de Integraciones",
+      "email": "gonzalo@ezpays.io"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/ezpays-fdb/payment-gateway-client-api/1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.ezpays.io/v1",
+      "description": "Servidor de Producci\u00f3n"
+    },
+    {
+      "url": "https://sandbox-api.ezpays.io/v1",
+      "description": "Servidor de Pruebas (Sandbox)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API_KEY",
+        "description": "Tu clave secreta de cliente"
+      }
+    },
+    "schemas": {
+      "CreatePaymentLinkRequest": {
+        "type": "object",
+        "required": [
+          "amount",
+          "currency",
+          "reference_id"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "double",
+            "description": "Monto total a cobrar.",
+            "example": 150.5
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "C\u00f3digo ISO 4217 de la moneda.",
+            "example": "EUR"
+          },
+          "reference_id": {
+            "type": "string",
+            "description": "ID \u00fanico de tu sistema (ej. n\u00famero de pedido). \u00datil para conciliaci\u00f3n.",
+            "example": "ORD-2024-001"
+          },
+          "description": {
+            "type": "string",
+            "description": "Texto que aparecer\u00e1 en el concepto del banco del usuario.",
+            "example": "Compra en Mi Tienda - Zapatillas"
+          },
+          "return_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL donde redirigiremos al usuario tras completar (o fallar) el pago.",
+            "example": "https://mitienda.com/checkout/complete?order=ORD-2024-001"
+          },
+          "customer": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "name": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string",
+                "description": "C\u00f3digo ISO de 2 letras (ej. ES, BR).",
+                "example": "ES"
+              }
+            }
+          },
+          "products": {
+            "type": "array",
+            "description": "Lista de items (opcional, para mostrar en el TPV).",
+            "items": {
+              "$ref": "#/components/schemas/ProductItem"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Datos clave-valor arbitrarios que te devolveremos en los Webhooks.",
+            "example": {
+              "campaign": "black_friday",
+              "internal_id": "99"
+            }
+          }
+        }
+      },
+      "ProductItem": {
+        "type": "object",
+        "required": [
+          "name",
+          "price",
+          "quantity"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Suscripci\u00f3n Premium"
+          },
+          "quantity": {
+            "type": "integer",
+            "example": 1
+          },
+          "price": {
+            "type": "number",
+            "description": "Precio unitario",
+            "example": 150.5
+          }
+        }
+      },
+      "CreateRefundRequest": {
+        "type": "object",
+        "required": [
+          "transaction_id"
+        ],
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID de la transacci\u00f3n exitosa que deseas reembolsar."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Monto a devolver. Si se omite, se realiza un reembolso TOTAL.",
+            "example": 50.0
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "requested_by_customer",
+              "fraudulent",
+              "duplicate",
+              "other"
+            ]
+          }
+        }
+      },
+      "PaymentLinkResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID \u00fanico del Link de Pago."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PAID",
+              "EXPIRED"
+            ]
+          },
+          "payment_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL del TPV alojado (redirige a tu usuario aqu\u00ed).",
+            "example": "https://pay.ezpays.io/checkout/a1b2c3d4-..."
+          },
+          "qr_code_image": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL directa a la imagen del c\u00f3digo QR listo para imprimir/mostrar."
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fecha de caducidad del link."
+          }
+        }
+      },
+      "TransactionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID interno de la transacci\u00f3n."
+          },
+          "reference_id": {
+            "type": "string",
+            "description": "Tu ID de pedido original."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "AUTHORIZED",
+              "COMPLETED",
+              "FAILED",
+              "REFUNDED",
+              "PARTIALLY_REFUNDED"
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "payment_method": {
+            "type": "string",
+            "example": "credit_card",
+            "description": "M\u00e9todo utilizado finalmente (ej. tarjeta, bizum, mbway)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RefundResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID del reembolso."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUCCEEDED",
+              "PENDING",
+              "FAILED"
+            ]
+          },
+          "amount_refunded": {
+            "type": "number"
+          },
+          "original_transaction_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "validation_error"
+          },
+          "message": {
+            "type": "string",
+            "example": "El monto no puede ser negativo."
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/payment-links": {
+      "post": {
+        "summary": "Crear Link de Pago",
+        "description": "Genera una sesi\u00f3n de pago y devuelve una URL para redirigir al usuario.",
+        "operationId": "createPaymentLink",
+        "tags": [
+          "Pagos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Link generado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentLinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error de validaci\u00f3n en los datos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API Key inv\u00e1lida"
+          }
+        }
+      }
+    },
+    "/payment-links/{id}": {
+      "get": {
+        "summary": "Consultar Link",
+        "description": "Obtiene el estado actual de un link (ej. saber si ya fue pagado).",
+        "operationId": "getPaymentLink",
+        "tags": [
+          "Pagos"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalles del link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentLinkResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Link no encontrado"
+          }
+        }
+      }
+    },
+    "/refunds": {
+      "post": {
+        "summary": "Emitir Reembolso",
+        "description": "Solicita la devoluci\u00f3n (total o parcial) de una transacci\u00f3n completada.",
+        "operationId": "createRefund",
+        "tags": [
+          "Reembolsos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRefundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reembolso procesado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error de negocio (ej. la transacci\u00f3n ya estaba reembolsada o el monto excede el total).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/{id}": {
+      "get": {
+        "summary": "Consultar Transacci\u00f3n",
+        "description": "Obtiene los detalles t\u00e9cnicos de un cobro espec\u00edfico.",
+        "operationId": "getTransaction",
+        "tags": [
+          "Pagos"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalles de la transacci\u00f3n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
