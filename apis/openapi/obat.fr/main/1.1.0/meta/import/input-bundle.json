@@ -1,0 +1,924 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Projet - Client Import API",
+    "description": "API pour la gestion et l'import de clients depuis un fichier CSV pour les artisans.\n\n## Endpoints disponibles\n- `GET /client/list` : Récupérer la liste des clients existants\n- `POST /client/import` : Analyser un fichier CSV pour import\n- `POST /client/send` : Confirmer l'import des clients sélectionnés\n\n## Flux d'import\n1. Appeler `GET /client/list` pour voir les clients existants (optionnel)\n2. Appeler `POST /client/import` avec un fichier CSV pour analyser les données\n3. L'API retourne une analyse avec le statut de chaque ligne (new, duplicate, invalid)\n4. L'utilisateur sélectionne les lignes à importer\n5. Appeler `POST /client/send` avec l'import_id et les indices des lignes sélectionnées\n6. Les clients sont créés dans Obat Sales\n",
+    "version": "1.1.0",
+    "contact": {
+      "name": "Obat Team"
+    },
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/MAXIMED/projet-client-import-api/1.1.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.obat.fr/projet-client-import",
+      "description": "Production"
+    },
+    {
+      "url": "https://api-qa.obat.fr/projet-client-import",
+      "description": "QA/Staging"
+    }
+  ],
+  "paths": {
+    "/client/list": {
+      "get": {
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Récupérer la liste des clients",
+        "description": "Retourne la liste complète des clients de l'entreprise connectée.\nLes clients sont récupérés depuis l'API Obat Sales.\n",
+        "operationId": "listClients",
+        "responses": {
+          "200": {
+            "description": "Liste des clients récupérée avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientListResponse"
+                },
+                "example": {
+                  "company_uuid": "abc-123-company-uuid",
+                  "total_clients": 2,
+                  "clients": [
+                    {
+                      "uuid": "client-uuid-1",
+                      "civility": "M",
+                      "firstname": "Jean",
+                      "lastname": "Dupont",
+                      "is_pro": false,
+                      "company_name": null,
+                      "emails": [
+                        {
+                          "label": "Principal",
+                          "email": "jean@email.com",
+                          "default": true,
+                          "activated": true
+                        }
+                      ],
+                      "phones": [
+                        {
+                          "label": "Principal",
+                          "country": "FR",
+                          "number": "0612345678",
+                          "activated": true,
+                          "main": true
+                        }
+                      ],
+                      "addresses": [
+                        {
+                          "address": "1 rue de la Paix",
+                          "city": "Paris",
+                          "zip_code": "75001",
+                          "country": "fr",
+                          "is_main": true
+                        }
+                      ]
+                    },
+                    {
+                      "uuid": "client-uuid-2",
+                      "civility": "Mme",
+                      "firstname": "Marie",
+                      "lastname": "Martin",
+                      "is_pro": true,
+                      "company_name": "Martin SARL",
+                      "emails": [
+                        {
+                          "label": "Principal",
+                          "email": "marie@pro.com",
+                          "default": true,
+                          "activated": true
+                        }
+                      ],
+                      "phones": [
+                        {
+                          "label": "Principal",
+                          "country": "FR",
+                          "number": "0698765432",
+                          "activated": true,
+                          "main": true
+                        }
+                      ],
+                      "addresses": [
+                        {
+                          "address": "5 avenue des Champs",
+                          "city": "Lyon",
+                          "zip_code": "69001",
+                          "country": "fr",
+                          "is_main": true
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Authentification requise",
+                  "status": 401
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/import": {
+      "post": {
+        "tags": [
+          "Import"
+        ],
+        "summary": "Analyser un fichier CSV de clients",
+        "description": "Analyse un fichier CSV contenant des clients et retourne une analyse détaillée avec :\n- Détection des doublons (par email OU téléphone)\n- Validation des données (lastname requis, company_name requis si is_pro=true)\n- Statut de chaque ligne (new, duplicate, invalid)\n\n**Format CSV attendu :**\n```\ncivility,firstname,lastname,email,phone,address,city,zipcode,is_pro,company_name\n```\n\nVoir le fichier `sample_import.csv` pour un exemple.\n",
+        "operationId": "importClients",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "company_uuid",
+                  "file"
+                ],
+                "properties": {
+                  "company_uuid": {
+                    "type": "string",
+                    "description": "UUID de l'entreprise pour laquelle importer les clients",
+                    "example": "abc-123-company-uuid"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Fichier CSV contenant les clients à importer"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "text/csv"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Analyse du CSV réussie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportAnalysisResponse"
+                },
+                "example": {
+                  "import_id": 123,
+                  "total_rows": 3,
+                  "duplicates_count": 1,
+                  "errors_count": 1,
+                  "analysis": [
+                    {
+                      "row_index": 1,
+                      "data": {
+                        "civility": "M",
+                        "firstname": "Jean",
+                        "lastname": "Dupont",
+                        "email": "jean@email.com",
+                        "phone": "0612345678",
+                        "address": "1 rue de la Paix",
+                        "city": "Paris",
+                        "zipcode": "75001",
+                        "is_pro": false,
+                        "company_name": ""
+                      },
+                      "status": "new",
+                      "validation_errors": []
+                    },
+                    {
+                      "row_index": 2,
+                      "data": {
+                        "civility": "Mme",
+                        "firstname": "Marie",
+                        "lastname": "Martin",
+                        "email": "marie@existing.com",
+                        "phone": "0698765432",
+                        "address": "5 avenue des Champs",
+                        "city": "Lyon",
+                        "zipcode": "69001",
+                        "is_pro": true,
+                        "company_name": "Martin SARL"
+                      },
+                      "status": "duplicate",
+                      "validation_errors": [],
+                      "duplicate_match": {
+                        "field": "email",
+                        "existing_client_id": "abc-123-uuid"
+                      }
+                    },
+                    {
+                      "row_index": 3,
+                      "data": {
+                        "civility": "",
+                        "firstname": "Pierre",
+                        "lastname": "",
+                        "email": "pierre@test.com",
+                        "phone": "0687654321",
+                        "address": "",
+                        "city": "",
+                        "zipcode": "",
+                        "is_pro": true,
+                        "company_name": ""
+                      },
+                      "status": "invalid",
+                      "validation_errors": [
+                        "Le nom de famille est obligatoire",
+                        "Le nom de l'entreprise est obligatoire pour un professionnel"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Fichier CSV invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Authentification requise",
+                  "status": 401
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/send": {
+      "post": {
+        "tags": [
+          "Import"
+        ],
+        "summary": "Confirmer l'import des clients sélectionnés",
+        "description": "Confirme l'import des clients sélectionnés par l'utilisateur.\n\nPour chaque ligne sélectionnée, un client est créé via l'API Obat Sales.\nLes lignes invalides sont ignorées et retournées dans la liste des erreurs.\n",
+        "operationId": "sendClientImport",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendRequest"
+              },
+              "example": {
+                "company_uuid": "abc-123-company-uuid",
+                "import_id": 123,
+                "rows_to_import": [
+                  1,
+                  2
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import terminé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendResponse"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Import réussi",
+                    "value": {
+                      "import_id": 123,
+                      "status": "completed",
+                      "imported_count": 2,
+                      "errors_count": 0,
+                      "errors": []
+                    }
+                  },
+                  "partial": {
+                    "summary": "Import partiel avec erreurs",
+                    "value": {
+                      "import_id": 123,
+                      "status": "completed",
+                      "imported_count": 1,
+                      "errors_count": 1,
+                      "errors": [
+                        {
+                          "row_index": 2,
+                          "error": "Erreur lors de la création du client"
+                        }
+                      ]
+                    }
+                  },
+                  "failed": {
+                    "summary": "Import échoué",
+                    "value": {
+                      "import_id": 123,
+                      "status": "failed",
+                      "imported_count": 0,
+                      "errors_count": 2,
+                      "errors": [
+                        {
+                          "row_index": 1,
+                          "error": "Ligne invalide: Le nom de famille est obligatoire"
+                        },
+                        {
+                          "row_index": 2,
+                          "error": "Erreur lors de la création du client"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Import non trouvé ou déjà traité",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Import non trouvé",
+                    "value": {
+                      "error": "Import non trouvé"
+                    }
+                  },
+                  "already_processed": {
+                    "summary": "Import déjà traité",
+                    "value": {
+                      "error": "Cet import a déjà été traité"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Non autorisé (import appartient à une autre entreprise)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Vous n'êtes pas autorisé à accéder à cet import"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "jwt_payload",
+        "description": "JWT Obat stocké dans les cookies"
+      }
+    },
+    "schemas": {
+      "ClientListResponse": {
+        "type": "object",
+        "required": [
+          "company_uuid",
+          "total_clients",
+          "clients"
+        ],
+        "properties": {
+          "company_uuid": {
+            "type": "string",
+            "description": "UUID de l'entreprise",
+            "example": "abc-123-company-uuid"
+          },
+          "total_clients": {
+            "type": "integer",
+            "description": "Nombre total de clients",
+            "example": 25
+          },
+          "clients": {
+            "type": "array",
+            "description": "Liste des clients",
+            "items": {
+              "$ref": "#/components/schemas/Client"
+            }
+          }
+        }
+      },
+      "Client": {
+        "type": "object",
+        "description": "Client complet retourné par l'API Obat Sales",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "UUID unique du client",
+            "example": "client-uuid-123"
+          },
+          "civility": {
+            "type": "string",
+            "description": "Civilité",
+            "enum": [
+              "M",
+              "Mme",
+              "Messieurs",
+              "Mesdames",
+              "Docteur",
+              "Docteurs",
+              "Maître",
+              "Maîtres",
+              "Professeur",
+              "Président",
+              "Frère",
+              "Soeur",
+              "Révérend",
+              "Inconnu"
+            ],
+            "example": "M"
+          },
+          "firstname": {
+            "type": "string",
+            "description": "Prénom",
+            "example": "Jean"
+          },
+          "lastname": {
+            "type": "string",
+            "description": "Nom de famille",
+            "example": "Dupont"
+          },
+          "is_pro": {
+            "type": "boolean",
+            "description": "Client professionnel",
+            "example": false
+          },
+          "company_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nom de l'entreprise (si is_pro=true)",
+            "example": null
+          },
+          "emails": {
+            "type": "array",
+            "description": "Liste des emails du client",
+            "items": {
+              "$ref": "#/components/schemas/ClientEmail"
+            }
+          },
+          "phones": {
+            "type": "array",
+            "description": "Liste des téléphones du client",
+            "items": {
+              "$ref": "#/components/schemas/ClientPhone"
+            }
+          },
+          "addresses": {
+            "type": "array",
+            "description": "Liste des adresses du client",
+            "items": {
+              "$ref": "#/components/schemas/ClientAddress"
+            }
+          },
+          "siren": {
+            "type": "string",
+            "nullable": true,
+            "description": "Numéro SIREN (si professionnel)",
+            "example": "852612520"
+          },
+          "vat": {
+            "type": "string",
+            "nullable": true,
+            "description": "Numéro de TVA intracommunautaire",
+            "example": "FR40123456824"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "description": "Notes sur le client",
+            "example": "Client fidèle"
+          },
+          "client_accounting_code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Code comptable auxiliaire",
+            "example": "1234568"
+          },
+          "source": {
+            "type": "string",
+            "description": "Source de création du client",
+            "enum": [
+              "obat",
+              "marketplace",
+              "e-reputation"
+            ],
+            "example": "marketplace"
+          }
+        }
+      },
+      "ClientEmail": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Libellé de l'email",
+            "example": "Principal"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Adresse email",
+            "example": "jean@email.com"
+          },
+          "default": {
+            "type": "boolean",
+            "description": "Email par défaut",
+            "example": true
+          },
+          "activated": {
+            "type": "boolean",
+            "description": "Email actif",
+            "example": true
+          }
+        }
+      },
+      "ClientPhone": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Libellé du téléphone",
+            "example": "Principal"
+          },
+          "country": {
+            "type": "string",
+            "description": "Code pays ISO2",
+            "example": "FR"
+          },
+          "number": {
+            "type": "string",
+            "description": "Numéro de téléphone",
+            "example": "0612345678"
+          },
+          "activated": {
+            "type": "boolean",
+            "description": "Téléphone actif",
+            "example": true
+          },
+          "main": {
+            "type": "boolean",
+            "description": "Téléphone principal",
+            "example": true
+          }
+        }
+      },
+      "ClientAddress": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Adresse",
+            "example": "1 rue de la Paix"
+          },
+          "address_complement": {
+            "type": "string",
+            "nullable": true,
+            "description": "Complément d'adresse",
+            "example": "3e étage"
+          },
+          "zip_code": {
+            "type": "string",
+            "description": "Code postal",
+            "example": "75001"
+          },
+          "city": {
+            "type": "string",
+            "description": "Ville",
+            "example": "Paris"
+          },
+          "country": {
+            "type": "string",
+            "description": "Pays",
+            "example": "fr"
+          },
+          "is_main": {
+            "type": "boolean",
+            "description": "Adresse principale",
+            "example": true
+          }
+        }
+      },
+      "ImportAnalysisResponse": {
+        "type": "object",
+        "required": [
+          "import_id",
+          "total_rows",
+          "duplicates_count",
+          "errors_count",
+          "analysis"
+        ],
+        "properties": {
+          "import_id": {
+            "type": "integer",
+            "description": "ID de l'import créé (à utiliser pour /client/send)",
+            "example": 123
+          },
+          "total_rows": {
+            "type": "integer",
+            "description": "Nombre total de lignes dans le CSV",
+            "example": 50
+          },
+          "duplicates_count": {
+            "type": "integer",
+            "description": "Nombre de doublons détectés",
+            "example": 5
+          },
+          "errors_count": {
+            "type": "integer",
+            "description": "Nombre de lignes invalides",
+            "example": 2
+          },
+          "analysis": {
+            "type": "array",
+            "description": "Analyse détaillée de chaque ligne",
+            "items": {
+              "$ref": "#/components/schemas/RowAnalysis"
+            }
+          }
+        }
+      },
+      "RowAnalysis": {
+        "type": "object",
+        "required": [
+          "row_index",
+          "data",
+          "status",
+          "validation_errors"
+        ],
+        "properties": {
+          "row_index": {
+            "type": "integer",
+            "description": "Index de la ligne (commence à 1)",
+            "example": 1
+          },
+          "data": {
+            "$ref": "#/components/schemas/ClientData"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "duplicate",
+              "invalid"
+            ],
+            "description": "Statut de la ligne :\n- `new` : Nouveau client, prêt à être importé\n- `duplicate` : Doublon détecté (email ou téléphone existe déjà)\n- `invalid` : Données invalides (erreurs de validation)\n",
+            "example": "new"
+          },
+          "validation_errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Liste des erreurs de validation",
+            "example": []
+          },
+          "duplicate_match": {
+            "$ref": "#/components/schemas/DuplicateMatch"
+          }
+        }
+      },
+      "ClientData": {
+        "type": "object",
+        "description": "Données du client extraites du CSV",
+        "properties": {
+          "civility": {
+            "type": "string",
+            "description": "Civilité (M, Mme, etc.)",
+            "example": "M"
+          },
+          "firstname": {
+            "type": "string",
+            "description": "Prénom",
+            "example": "Jean"
+          },
+          "lastname": {
+            "type": "string",
+            "description": "Nom de famille (obligatoire)",
+            "example": "Dupont"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email",
+            "example": "jean@email.com"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Téléphone",
+            "example": "0612345678"
+          },
+          "address": {
+            "type": "string",
+            "description": "Adresse",
+            "example": "1 rue de la Paix"
+          },
+          "city": {
+            "type": "string",
+            "description": "Ville",
+            "example": "Paris"
+          },
+          "zipcode": {
+            "type": "string",
+            "description": "Code postal",
+            "example": "75001"
+          },
+          "is_pro": {
+            "type": "boolean",
+            "description": "Client professionnel",
+            "example": false
+          },
+          "company_name": {
+            "type": "string",
+            "description": "Nom de l'entreprise (obligatoire si is_pro=true)",
+            "example": ""
+          }
+        }
+      },
+      "DuplicateMatch": {
+        "type": "object",
+        "description": "Informations sur le doublon détecté",
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "email",
+              "phone"
+            ],
+            "description": "Champ ayant déclenché la détection de doublon",
+            "example": "email"
+          },
+          "existing_client_id": {
+            "type": "string",
+            "description": "UUID du client existant",
+            "example": "abc-123-uuid"
+          }
+        }
+      },
+      "SendRequest": {
+        "type": "object",
+        "required": [
+          "company_uuid",
+          "import_id",
+          "rows_to_import"
+        ],
+        "properties": {
+          "company_uuid": {
+            "type": "string",
+            "description": "UUID de l'entreprise",
+            "example": "abc-123-company-uuid"
+          },
+          "import_id": {
+            "type": "integer",
+            "description": "ID de l'import (retourné par /client/import)",
+            "example": 123
+          },
+          "rows_to_import": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Indices des lignes à importer (choix de l'utilisateur)",
+            "example": [
+              1,
+              2,
+              4,
+              5
+            ]
+          }
+        }
+      },
+      "SendResponse": {
+        "type": "object",
+        "required": [
+          "import_id",
+          "status",
+          "imported_count",
+          "errors_count",
+          "errors"
+        ],
+        "properties": {
+          "import_id": {
+            "type": "integer",
+            "description": "ID de l'import",
+            "example": 123
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "failed"
+            ],
+            "description": "Statut final de l'import :\n- `completed` : Au moins un client importé avec succès\n- `failed` : Aucun client importé (toutes les lignes en erreur)\n",
+            "example": "completed"
+          },
+          "imported_count": {
+            "type": "integer",
+            "description": "Nombre de clients importés avec succès",
+            "example": 45
+          },
+          "errors_count": {
+            "type": "integer",
+            "description": "Nombre d'erreurs",
+            "example": 3
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportError"
+            },
+            "description": "Liste des erreurs rencontrées"
+          }
+        }
+      },
+      "ImportError": {
+        "type": "object",
+        "properties": {
+          "row_index": {
+            "type": "integer",
+            "description": "Index de la ligne en erreur",
+            "example": 12
+          },
+          "error": {
+            "type": "string",
+            "description": "Message d'erreur",
+            "example": "Erreur lors de la création du client"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Message d'erreur"
+          },
+          "status": {
+            "type": "integer",
+            "description": "Code HTTP"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "cookieAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Clients",
+      "description": "Gestion des clients"
+    },
+    {
+      "name": "Import",
+      "description": "Import de clients depuis CSV"
+    }
+  ]
+}
