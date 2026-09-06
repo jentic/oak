@@ -1,0 +1,434 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Oxylabs Web Scraper API",
+    "description": "Oxylabs Web Scraper API provides web scraping capabilities with built-in proxy rotation, JavaScript rendering, and structured data parsing. Supports synchronous (realtime) and asynchronous (push-pull) integration methods.",
+    "version": "1.0.0",
+    "x-jentic-source-url": "https://developers.oxylabs.io/scraper-apis/getting-started",
+    "x-provenance": "jentic-generated"
+  },
+  "servers": [
+    {
+      "url": "https://realtime.oxylabs.io",
+      "description": "Realtime (synchronous) endpoint"
+    },
+    {
+      "url": "https://data.oxylabs.io",
+      "description": "Push-Pull (asynchronous) endpoint"
+    }
+  ],
+  "security": [
+    {
+      "basicAuth": []
+    }
+  ],
+  "paths": {
+    "/v1/queries": {
+      "post": {
+        "operationId": "submitScrapeJob",
+        "summary": "Submit a web scraping job",
+        "description": "Submit a scraping request. When using the realtime server, the response is returned synchronously. When using the data server (push-pull), a job ID is returned for async retrieval. Supports multiple source types including universal, amazon_product, google_search, and more.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["source"],
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "description": "Scraper type. Examples: universal, amazon_product, amazon_search, google_search, google_shopping, etc."
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Target URL to scrape. Required for url-based sources."
+                  },
+                  "query": {
+                    "type": "string",
+                    "description": "Search query or product identifier. Required for query-based sources."
+                  },
+                  "geo_location": {
+                    "type": "string",
+                    "description": "Geographic location for the request. Can be country, state, city, or postal code."
+                  },
+                  "user_agent_type": {
+                    "type": "string",
+                    "enum": ["desktop", "desktop_chrome", "desktop_firefox", "mobile", "mobile_android", "mobile_ios"],
+                    "description": "Browser user agent type"
+                  },
+                  "parse": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable structured data parsing"
+                  },
+                  "render": {
+                    "type": "string",
+                    "enum": ["html", "png"],
+                    "description": "Enable JavaScript rendering. html for rendered HTML, png for screenshot."
+                  },
+                  "callback_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Webhook URL for async job completion notification (push-pull only)"
+                  },
+                  "storage_type": {
+                    "type": "string",
+                    "enum": ["s3"],
+                    "description": "Cloud storage type for results (push-pull only)"
+                  },
+                  "storage_url": {
+                    "type": "string",
+                    "description": "Cloud storage URL for results (push-pull only)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scraping result (realtime) or job created (push-pull)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "content": {
+                            "type": "string",
+                            "description": "Scraped content (HTML, JSON, or base64 PNG)"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updated_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "job_id": {
+                            "type": "string"
+                          },
+                          "status_code": {
+                            "type": "integer"
+                          },
+                          "page": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Job ID (push-pull mode)"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Job status (push-pull mode)"
+                    },
+                    "_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "rel": {
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string"
+                          },
+                          "method": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/queries/batch": {
+      "post": {
+        "operationId": "submitBatchScrapeJob",
+        "summary": "Submit a batch scraping job",
+        "description": "Submit multiple scraping requests in a single batch. Accepts arrays of up to 5,000 query or url values with shared parameters. Push-pull (async) only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["source"],
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "description": "Scraper type"
+                  },
+                  "url": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5000,
+                    "description": "Array of URLs to scrape"
+                  },
+                  "query": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5000,
+                    "description": "Array of queries"
+                  },
+                  "geo_location": {
+                    "type": "string",
+                    "description": "Geographic location"
+                  },
+                  "parse": {
+                    "type": "boolean",
+                    "description": "Enable structured data parsing"
+                  },
+                  "render": {
+                    "type": "string",
+                    "enum": ["html", "png"],
+                    "description": "Enable JavaScript rendering"
+                  },
+                  "callback_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Webhook URL for completion notification"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch job created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "queries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "_links": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/queries/{jobId}": {
+      "get": {
+        "operationId": "getJobStatus",
+        "summary": "Get scraping job status",
+        "description": "Check the status of an asynchronous scraping job. Push-pull mode only.",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The job ID returned from the submit endpoint"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["pending", "done", "faulted"],
+                      "description": "Current job status"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "rel": {
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string"
+                          },
+                          "method": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/v1/queries/{jobId}/results": {
+      "get": {
+        "operationId": "getJobResults",
+        "summary": "Get scraping job results",
+        "description": "Retrieve the results of a completed asynchronous scraping job. Supports multiple output formats.",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The job ID"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["raw", "parsed", "png", "xhr", "markdown"]
+            },
+            "description": "Output format type. Multiple types can be comma-separated."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "content": {
+                            "type": "string"
+                          },
+                          "status_code": {
+                            "type": "integer"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/v1/info/callbacker_ips": {
+      "get": {
+        "operationId": "getCallbackIps",
+        "summary": "Get callback IP addresses",
+        "description": "Returns the list of IP addresses used by Oxylabs to send callback notifications for push-pull jobs.",
+        "responses": {
+          "200": {
+            "description": "List of callback IPs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "HTTP Basic Authentication using Oxylabs dashboard credentials (username and password)"
+      }
+    }
+  }
+}
