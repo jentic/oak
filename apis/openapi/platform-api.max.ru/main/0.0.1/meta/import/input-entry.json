@@ -1,0 +1,4660 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "0.0.1",
+    "title": "Max Bot API",
+    "license": {
+      "name": "Apache 2.0"
+    },
+    "description": "# About\nBot API allows bots to interact with Max. Methods are called by sending HTTPS requests to [platform-api.max.ru](https://platform-api.max.ru) domain.\nBots are third-party applications that use Max features. A bot can legitimately take part in a conversation. It can be achieved through HTTP requests to the Max Bot API.\n\n## Features\nMax bots of the current version are able to:\n- Communicate with users and respond to requests\n- Recommend users complete actions via programmed buttons\n- Request personal data from users (name, short reference, phone number)\nWe'll keep working on expanding bot capabilities in the future.\n\n## Examples\nBots can be used for the following purposes:\n- Providing support, answering frequently asked questions\n- Sending typical information\n- Voting\n- Likes/dislikes\n- Following external links\n- Forwarding a user to a chat/channel\n\n## HTTP verbs\n`GET` &mdash; getting resources, parameters are transmitted via URL\n\n`POST` &mdash; creation of resources (for example, sending new messages)\n\n`PUT` &mdash; editing resources\n\n`DELETE` &mdash; deleting resources\n\n`PATCH` &mdash; patching resources\n\n## HTTP response codes\n`200` &mdash; successful operation\n\n`400` &mdash; invalid request\n\n`401` &mdash; authentication error\n\n`404` &mdash; resource not found\n\n`405` &mdash; method is not allowed\n\n`429` &mdash; the number of requests is exceeded\n\n`503` &mdash; service unavailable\n\n## Resources format\nFor content requests (PUT and POST) and responses, the API uses the JSON format.\nAll strings are UTF-8 encoded.\nDate/time fields are represented as the number of milliseconds that have elapsed since 00:00 January 1, 1970 in the long format. To get it, you can simply multiply the UNIX timestamp by 1000. All date/time fields have a UTC timezone.\n## Error responses\nIn case of an error, the API returns a response with the corresponding HTTP code and JSON with the following fields:\n\n`code` - the string with the error key\n\n`message` - a string describing the error </br>\n\nFor example:\n```bash\n> http https://platform-api.max.ru/chats?access_token={EXAMPLE_TOKEN}\nHTTP / 1.1 403 Forbidden\nCache-Control: no-cache\nConnection: Keep-Alive\nContent-Length: 57\nContent-Type: application / json; charset = utf-8\nSet-Cookie: web_ui_lang = ru; Path = /; Domain = .max.ru; Expires = 2019-03-24T11: 45: 36.500Z\n{\n   \"code\": \"verify.token\",\n   \"message\": \"Invalid access_token\"\n}\n```\n## Receiving notifications\nMax Bot API supports 2 options of receiving notifications on new events for bots:\n- Push notifications via WebHook. To receive data via WebHook, you'll have to [add subscription](https://dev.max.ru/docs-api/methods/POST/subscriptions);\n- Notifications upon request via [long polling](/docs-api/methods/GET/updates) API. All data can be received via long polling **by default** after creating the bot.\n\nBoth methods **cannot** be used simultaneously.\nRefer to the response schema of [GET:/updates](https://dev.max.ru/docs-api/methods/GET/updates) method to check all available types of updates.\n\n### Webhook\nThere is some notes about how we handle webhook subscription:\n1. Sometimes webhook notification cannot be delivered in case when bot server or network is down.\n\n  In such case we well retry delivery in a short period of time (from 30 to 60 seconds) and will do this until get\n  `200 OK` status code from your server, but not longer than **8 hours** (*may change over time*) since update happened.\n\n  We also consider any non `200`-response from server as failed delivery.\n\n2. To protect your bot from unexpected high load we send **no more than 100** notifications per second by default.\n  If you want increase this limit, contact us at [@support](https://max.ru/support).\n\n\nIt should be from one of the following subnets:\n```\n185.16.150.0/30\n185.16.150.84/30\n185.16.150.152/30\n185.16.150.192/30\n```\n\n\n## Message buttons\nYou can program buttons for users answering a bot.\nMax supports the following types of buttons:\n\n`callback` &mdash; sends a notification with payload to a bot (via WebHook or long polling)\n\n`link` &mdash; makes a user to follow a link\n\n`request_contact` &mdash; requests the user permission to access contact information (phone number, short link, email)\n\n`request_geo_location` &mdash; asks user to provide current geo location\n\n`chat` &mdash; creates chat associated with message\n\nTo start create buttons [send message](/docs-api/methods/POST/messages) with `InlineKeyboardAttachment`:\n```json\n{\n  \"text\": \"It is message with inline keyboard\",\n  \"attachments\": [\n    {\n      \"type\": \"inline_keyboard\",\n      \"payload\": {\n        \"buttons\": [\n          [\n            {\n              \"type\": \"callback\",\n              \"text\": \"Press me!\",\n              \"payload\": \"button1 pressed\"\n            }\n          ],\n          [\n            {\n              \"type\": \"chat\",\n              \"text\": \"Discuss\",\n              \"chat_title\": \"Message discussion\"\n            }\n          ]\n        ]\n      }\n    }\n  ]\n}\n```\n### Chat button\nChat button is a button that starts chat assosiated with the current message. It will be **private** chat with a link, bot will be added as administrator by default.\n\nChat will be created as soon as the first user taps on button. Bot will receive `message_chat_created` update.\n\nBot can set title and description of new chat by setting `chat_title` and `chat_description` properties.\n\nWhereas keyboard can contain several `chat`-buttons there is `uuid` property to distinct them between each other.\nIn case you do not pass `uuid` we will generate it. If you edit message, pass `uuid` so we know that this button starts the same chat as before.\n\nChat button also can contain `start_payload` that will be sent to bot as part of `message_chat_created` update.\n\n## Deep linking\nMax supports deep linking mechanism for bots. It allows passing additional payload to the bot on startup.\nDeep link can contain any data encoded into string up to **512** characters long. Longer strings will be omitted and **not** passed to the bot.\n\nEach bot has start link that looks like:\n```\nhttps://max.ru/<botName>?start=<payload>\n```\nAs soon as user clicks on such link we open dialog with bot and send this payload to bot as part of `bot_started` update:\n```json\n{\n    \"update_type\": \"bot_started\",\n    \"timestamp\": 1573226679188,\n    \"chat_id\": 1234567890,\n    \"user\": {\n        \"user_id\": 1234567890,\n        \"name\": \"Boris\",\n        \"username\": \"borisd84\"\n    },\n    \"payload\": \"any data meaningful to bot\"\n}\n```\n\nDeep linking mechanism is supported for iOS version 2.7.0 and Android 2.9.0 and higher.\n\n## Text formatting\n\nMessage text can be improved with basic formatting such as: **strong**, *emphasis*, ~strikethough~, \n<ins>underline</ins>, `code` or link. You can use either markdown-like or HTML formatting.\n\nTo enable text formatting set the `format` property of [NewMessageBody](#tag/new_message_model).\n\n### Max flavored Markdown\nTo enable [Markdown](https://spec.commonmark.org/0.29/) parsing, set the `format` property of [NewMessageBody](#tag/new_message_model) to `markdown`.\n\nWe currently support only the following syntax:\n\n`*empasized*` or `_empasized_` for *italic* text\n\n`**strong**` or `__strong__` for __bold__ text\n\n`~~strikethough~~`  for ~strikethough~ text\n\n`++underline++`  for <ins>underlined</ins> text\n\n``` `code` ``` or ` ```code``` ` for `monospaced` text\n\n`^^important^^` for highlighted text (colored in red, by default)\n\n`[Inline URL](https://dev.max.ru/)` for inline URLs\n\n`[User mention](max://user/%user_id%)` for user mentions without username\n\n`# Header` for header\n\n### HTML support\n\nTo enable HTML parsing, set the `format` property of [NewMessageBody](#tag/new_message_model) to `html`.\n \nOnly the following HTML tags are supported. All others will be stripped:\n\nEmphasized: `<i>` or `<em>`\n\nStrong: `<b>` or `<strong>`\n\nStrikethrough: `<del>` or `<s>`\n\nUnderlined: `<ins>` or `<u>`\n\nLink: `<a href=\"https://dev.max.ru\">Docs</a>`\n\nMonospaced text: `<pre>` or `<code>`\n\nHighlighted text: `<mark>`\n\nHeader: `<h1>`\n\nText formatting is supported for iOS since version 3.1 and Android since 2.20.0.\n\n# Versioning\nAPI models and interface may change over time. To make sure your bot will get the right info, we strongly recommend adding API version number to each request. You can add it as `v` parameter to each HTTP-request. For instance, `v=0.1.2`.\nTo specify the data model version you are getting through WebHook subscription, use the `version` property in the request body of the [subscribe](https://dev.max.ru/docs-api/methods/POST/subscriptions) request.\n\n# Libraries\nWe have developed the official [Java client](https://github.com/tamtam-chat/tamtam-bot-api) and [SDK](https://github.com/tamtam-chat/tamtam-bot-sdk).\n\n# Changelog\nTo see changelog for older versions visit our [GitHub](https://github.com/tamtam-chat/tamtam-bot-api-schema/releases).",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/pari-71c/max-bot-api/0.0.1"
+  },
+  "servers": [
+    {
+      "url": "https://platform-api.max.ru"
+    }
+  ],
+  "paths": {
+    "/me": {
+      "get": {
+        "tags": [
+          "bots"
+        ],
+        "summary": "Получение информации о текущем боте",
+        "operationId": "getMyInfo",
+        "description": "Возвращает информацию о текущем боте, который идентифицируется с помощью токена доступа. Метод возвращает ID бота, его имя и аватар (если есть).",
+        "responses": {
+          "200": {
+            "description": "Информация о боте",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BotInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/chats": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "getChats",
+        "description": "Возвращает информацию о чатах, в которых участвовал бот. Результат включает список чатов и маркер для перехода к следующей странице.",
+        "summary": "Получение списка всех чатов",
+        "parameters": [
+          {
+            "description": "Количество запрашиваемых чатов",
+            "name": "count",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "description": "Указатель на следующую страницу данных. Для первой страницы передайте `null`",
+            "name": "marker",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/bigint"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "В ответе с пагинацией возвращаются чаты",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/chats/{chatLink}": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "x-opGroup": "chat",
+        "operationId": "getChatByLink",
+        "description": "Возвращает информацию о чате по его публичной ссылке, либо информацию о диалоге с пользователем по его `username`.",
+        "summary": "Получение чата по ссылке",
+        "parameters": [
+          {
+            "name": "chatLink",
+            "description": "Публичная ссылка на чат или username пользователя. Должна соответствовать регулярному выражению",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "pattern": "@?[a-zA-Z]+[a-zA-Z0-9-_]*"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Информация о чате",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chat"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/chats/{chatId}": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "x-opGroup": "chat",
+        "operationId": "getChat",
+        "description": "Возвращает информацию о чате по его ID.",
+        "summary": "Получение информации о чате",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID запрашиваемого чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Информация о чате",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chat"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "chats"
+        ],
+        "x-opGroup": "chat",
+        "operationId": "editChat",
+        "description": "Позволяет редактировать информацию о чате, включая название, иконку и закреплённое сообщение.",
+        "summary": "Изменение информации о чате",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "If success, returns updated chat object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chat"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chats"
+        ],
+        "x-opGroup": "chat",
+        "operationId": "deleteChat",
+        "description": "Удаляет чат для всех участников",
+        "summary": "Удалить чат",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/chats/{chatId}/actions": {
+      "post": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "sendAction",
+        "description": "Позволяет отправлять действия бота в чат, такие как «набор текста» или «отправка фото».",
+        "summary": "Отправка действия в чат",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/chats/{chatId}/pin": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "getPinnedMessage",
+        "description": "Возвращает закрепленное сообщение в чате.",
+        "summary": "Получение закрепленного сообщения",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Закрепленное сообщение",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetPinnedMessageResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "pinMessage",
+        "description": "Закрепляет сообщение в чате.",
+        "summary": "Закрепление сообщения",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата, где должно быть закреплено сообщение",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinMessageBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "unpinMessage",
+        "description": "Удаляет закрепленное сообщение в чате.",
+        "summary": "Удаление закрепленного сообщения",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата, из которого нужно удалить закрепленное сообщение",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/chats/{chatId}/members/me": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "x-opGroup": "myMembership",
+        "operationId": "getMembership",
+        "summary": "Получение информации о членстве в чате",
+        "description": "Возвращает информацию о членстве текущего бота в чате.",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Текущаяя информация о членстве бота",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMember"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "leaveChat",
+        "x-opGroup": "myMembership",
+        "summary": "Удаление бота из чата",
+        "description": "Удаляет бота из участников чата.",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/chats/{chatId}/members/admins": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "getAdmins",
+        "summary": "Получение списка администраторов чата",
+        "description": "Возвращает всех администраторов чата. Бот должен быть администратором в запрашиваемом чате.",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Список администраторов",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMembersList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "setAdmins",
+        "description": "Возвращает значение true, если добавлены все администраторы",
+        "summary": "Назначить администратора чата",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatAdminsList"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/chats/{chatId}/members/admins/{userId}": {
+      "delete": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "deleteAdmin",
+        "description": "Отменяет права администратора у пользователя в чате, лишая его административных привилегий",
+        "summary": "Отменить права администратора",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          },
+          {
+            "name": "userId",
+            "description": "Идентификатор пользователя",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/chats/{chatId}/members": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "getMembers",
+        "summary": "Получение участников чата",
+        "description": "Возвращает пользователей, участвующих в чате.",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          },
+          {
+            "name": "user_ids",
+            "description": "Список ID пользователей, чье членство нужно получить. Когда этот параметр передан, параметры `count` и `marker` игнорируются",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "nullable": true
+            },
+            "style": "simple"
+          },
+          {
+            "name": "marker",
+            "description": "Указатель на следующую страницу данных",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "count",
+            "description": "Количество участников, которых нужно вернуть",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": "20"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Возвращает список участников и указатель на следующую страницу данных.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMembersList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "addMembers",
+        "description": "Добавляет участников в чат. Для этого могут потребоваться дополнительные права.",
+        "summary": "Добавление участников в чат",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserIdsList"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chats"
+        ],
+        "operationId": "removeMember",
+        "description": "Удаляет участника из чата. Для этого могут потребоваться дополнительные права.",
+        "summary": "Удаление участника из чата",
+        "parameters": [
+          {
+            "name": "chatId",
+            "description": "ID чата",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "pattern": "\\-?\\d+"
+            }
+          },
+          {
+            "name": "user_id",
+            "description": " ID пользователя, которого нужно удалить из чата",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "block",
+            "description": "Если установлено в `true`, пользователь будет заблокирован в чате. Применяется только для чатов с публичной или приватной ссылкой. Игнорируется в остальных случаях",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/subscriptions": {
+      "get": {
+        "tags": [
+          "subscriptions"
+        ],
+        "operationId": "getSubscriptions",
+        "description": "Если ваш бот получает данные через WebHook, этот метод возвращает список всех подписок.\n\n>Обратите внимание: для отправки вебхуков поддерживается только протокол HTTPS, включая самоподписанные сертификаты. HTTP не поддерживается",
+        "summary": "Получение подписок",
+        "responses": {
+          "200": {
+            "description": "Ожидаемый результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetSubscriptionsResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "subscriptions"
+        ],
+        "operationId": "subscribe",
+        "description": "Подписывает бота на получение обновлений через WebHook. После вызова этого метода бот будет получать уведомления о новых событиях в чатах на указанный URL.\nВаш сервер **должен** прослушивать один из следующих портов: `80`, `8080`, `443`, `8443`, `16384`-`32383`.\n",
+        "summary": "Подписка на обновления",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "subscriptions"
+        ],
+        "operationId": "unsubscribe",
+        "description": "Отписывает бота от получения обновлений через WebHook. После вызова этого метода бот перестает получать уведомления о новых событиях, и доступна доставка уведомлений через API с длительным опросом.",
+        "summary": "Отписка от обновлений",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "description": "URL, который нужно удалить из подписок на WebHook",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/uploads": {
+      "post": {
+        "tags": [
+          "upload"
+        ],
+        "operationId": "getUploadUrl",
+        "description": "Возвращает URL для последующей загрузки файла.\n\nПоддерживаются два типа загрузки:\n1. **Multipart upload** — более простой, но менее надежный способ. В этом случае используется заголовок `Content-Type: multipart/form-data`. Этот способ имеет ограничения:\n    - Максимальный размер файла: 4 ГБ\n    - Можно загружать только один файл за раз\n    - Невозможно перезапустить загрузку, если она была остановлена\n\n    \n2. **Resumable upload** — более надежный способ, если заголовок `Content-Type` не равен `multipart/form-data`. Этот способ позволяет загружать файл частями и возобновить загрузку с последней успешно загруженной части в случае ошибок.\n\nПример использования cURL для загрузки файла:\n\n```shell\ncurl -i -X POST \\\n  -H \"Content-Type: multipart/form-data\" \\\n  -F \"data=@movie.pdf\" \"%UPLOAD_URL%\"\n```\n\nГде %UPLOAD_URL% - это URL из результата метода в примере cURL запроса\n\n**Для загрузки видео и аудио:**\n\n1. Когда получаем ссылку на загрузку видео или аудио (`POST /uploads` с `type` = `video` или `type` = `audio`), вместе с `url` в ответе приходит `token`, который нужно использовать в сообщении (когда формируете `body` с `attachments`) в `POST /messages`.\n\n2. После загрузки видео или аудио (по `url` из шага выше) сервер возвращает `retval`\n\n3. C этого момента можно использовать `token`, чтобы прикреплять вложение в сообщение бота\n\nМеханика отличается от `type` = `image` | `file`, где `token` возвращается в ответе на загрузку изображения или файла\n\n",
+        "summary": "Получение URL для загрузки файла",
+        "parameters": [
+          {
+            "description": "Тип загружаемого файла. Возможные значения: `\"image\"`, `\"video\"`, `\"audio\"`, `\"file\"`",
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/UploadType"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Возвращает URL для загрузки вложения.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadEndpoint"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/messages": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "getMessages",
+        "description": "Возвращает сообщения в чате: страницу с результатами и маркер, указывающий на следующую страницу. Сообщения возвращаются в обратном порядке, то есть последние сообщения в чате будут первыми в массиве. Поэтому, если вы используете параметры `from` и `to`, то `to` должно быть **меньше**, чем `from`.",
+        "summary": "Получение сообщений",
+        "parameters": [
+          {
+            "description": " ID чата, чтобы получить сообщения из определённого чата",
+            "name": "chat_id",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/bigint"
+            }
+          },
+          {
+            "description": "Список ID сообщений, которые нужно получить (через запятую)",
+            "name": "message_ids",
+            "in": "query",
+            "style": "simple",
+            "schema": {
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              },
+              "nullable": true
+            }
+          },
+          {
+            "name": "from",
+            "description": "Время начала для запрашиваемых сообщений (в формате Unix timestamp)",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/bigint"
+            }
+          },
+          {
+            "name": "to",
+            "description": "Время окончания для запрашиваемых сообщений (в формате Unix timestamp)",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/bigint"
+            }
+          },
+          {
+            "name": "count",
+            "description": "Максимальное количество сообщений в ответе",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Возвращает список сообщений",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Это исключение возникает, когда пользователь приостановил бота или у него нет доступа к чату",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "sendMessage",
+        "description": "Отправляет сообщение в чат\n\n## Прикрепление медиа\nМедиафайлы прикрепляются к сообщениям поэтапно:\n\n1. Получите URL для загрузки медиафайлов\n2. Загрузите бинарные данные соответствующего формата по полученному URL\n3. После успешной загрузки получите JSON-объект в ответе. Используйте этот объект для создания вложения. Структура вложения:\n    - `type`: тип медиа (например, `\"video\"`)\n    - `payload`: JSON-объект, который вы получили\n\nПример для видео:\n1. Получите URL для загрузки\n```bash\ncurl -X POST 'https://botapi.max.ru/uploads?access_token=%access_token%&type=video'\n```\n\nОтвет:\n```json\n{\n    \"url\": \"https://vu.mycdn.me/upload.do…\"\n}\n```\n\n2. Загрузите видео по URL\n\n```bash\ncurl -i -X POST -H \"Content-Type: multipart/form-data\" -F \"data=@movie.mp4\" \"https://vu.mycdn.me/upload.do…\"\n```\n\nОтвет:\n```json\n{\n    \"token\": \"_3Rarhcf1PtlMXy8jpgie8Ai_KARnVFYNQTtmIRWNh4\"\n}\n```\n\n3. Отправьте сообщение с вложением\n\n```json\n{\n    \"text\": \"Message with video\",\n    \"attachments\": [\n        {\n            \"type\": \"video\",\n            \"payload\": {\n                \"token\": \"_3Rarhcf1PtlMXy8jpgie8Ai_KARnVFYNQTtmIRWNh4\"\n            }\n        }\n    ]\n}\n```",
+        "summary": "Отправить сообщение",
+        "parameters": [
+          {
+            "name": "user_id",
+            "description": "Если вы хотите отправить сообщение пользователю, укажите его ID",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "chat_id",
+            "description": "Если сообщение отправляется в чат, укажите его ID",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "in": "query",
+            "required": false
+          },
+          {
+            "name": "disable_link_preview",
+            "description": " Если `false`, сервер не будет генерировать превью для ссылок в тексте сообщения",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMessageBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Возвращает информацию о созданном сообщении",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendMessageResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "editMessage",
+        "description": "Редактирует сообщение в чате. Если поле `attachments` равно `null`, вложения текущего сообщения не изменяются. Если в этом поле передан пустой список, все вложения будут удалены.",
+        "summary": "Редактировать сообщение",
+        "parameters": [
+          {
+            "name": "message_id",
+            "description": "ID редактируемого сообщения",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMessageBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "deleteMessage",
+        "summary": "Удалить сообщение",
+        "description": "Удаляет сообщение в диалоге или чате, если бот имеет разрешение на удаление сообщений.",
+        "parameters": [
+          {
+            "name": "message_id",
+            "description": "ID удаляемого сообщения",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/messages/{messageId}": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "getMessageById",
+        "description": "Возвращает одно сообщение по его ID.",
+        "summary": "Получить сообщение",
+        "parameters": [
+          {
+            "description": "ID сообщения (`mid`), чтобы получить одно сообщение в чате",
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "[a-zA-Z0-9_\\-]+"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Возвращает одно сообщение",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "В случае, если сообщение не найдено или бот не имеет доступа к нему",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/videos/{videoToken}": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "getVideoAttachmentDetails",
+        "description": "Возвращает подробную информацию о приклеплённом видео. URL-адреса воспроизведения и дополнительные метаданные",
+        "summary": "Получить информацио о видео",
+        "parameters": [
+          {
+            "description": "Токен видео-вложения",
+            "in": "path",
+            "name": "videoToken",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "[a-zA-Z0-9_\\-]+"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detailed video attachment info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoAttachmentDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "В случае, если сообщение не найдено или бот не имеет доступа к нему",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/answers": {
+      "post": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "answerOnCallback",
+        "description": "Этот метод используется для отправки ответа после того, как пользователь нажал на кнопку. Ответом может быть обновленное сообщение и/или одноразовое уведомление для пользователя.",
+        "summary": "Ответ на callback",
+        "parameters": [
+          {
+            "name": "callback_id",
+            "description": "Идентификатор кнопки, по которой пользователь кликнул. Бот получает идентификатор как часть [Update](/docs-api/objects/Update) с типом`message_callback`.\n\nМожно получить из [GET:/updates](/docs-api/methods/GET/updates) через поле `updates[i].callback.callback_id`",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!\\s*$).+"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallbackAnswer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/NotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/updates": {
+      "get": {
+        "operationId": "getUpdates",
+        "tags": [
+          "subscriptions"
+        ],
+        "description": "Этот метод можно использовать для получения обновлений, если ваш бот не подписан на WebHook. Метод использует долгий опрос (long polling).\n\nКаждое обновление имеет свой номер последовательности. Свойство `marker` в ответе указывает на следующее ожидаемое обновление.\n\nВсе предыдущие обновления считаются завершенными после прохождения параметра `marker`. Если параметр `marker` **не передан**, бот получит все обновления, произошедшие после последнего подтверждения.",
+        "summary": "Получение обновлений",
+        "parameters": [
+          {
+            "name": "limit",
+            "description": "Максимальное количество обновлений для получения",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            }
+          },
+          {
+            "name": "timeout",
+            "description": "Тайм-аут в секундах для долгого опроса",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 90,
+              "default": 30
+            }
+          },
+          {
+            "name": "marker",
+            "description": "Если передан, бот получит обновления, которые еще не были получены. Если не передан, получит все новые обновления",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "types",
+            "description": "Список типов обновлений, которые бот хочет получить (например, `message_created`, `message_callback`)",
+            "in": "query",
+            "example": "types=message_created,message_callback",
+            "schema": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              },
+              "nullable": true
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Список обновлений",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/NotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "access_token": {
+        "type": "apiKey",
+        "name": "access_token",
+        "description": "A token is given to you by [MasterBot](https://tt.me/MasterBot) after you have created a bot.\nIn all subsequent requests to the Bot API, you **must** pass the received token as an `access_token` parameter to the HTTP request.\n\n\nIf [Terms and Conditions of Max usage](https://team.max.ru/en/terms/) have been violated, the Max administration may withdraw tokens by aborting user sessions.\nIf your token has been compromised, you can request a new one by sending a `/revoke` command to **[MasterBot](https://tt.me/MasterBot)**.",
+        "in": "query"
+      }
+    },
+    "responses": {
+      "SuccessResponse": {
+        "description": "Успешный или неуспешный результат",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SimpleQueryResult"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Внутренняя ошибка сервера",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Ошибка авторизации. Не предоставлен `access_token` или токен недействителен",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Ошибка доступа. У вас нет прав на доступ к этому ресурсу",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Запрашиваемый ресурс не найден",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotAllowed": {
+        "description": "Метод не разрешен",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "bigint": {
+        "type": "integer",
+        "format": "int64"
+      },
+      "User": {
+        "description": "Объект, описывающий пользователя. Имеет несколько вариаций (наследований):\n\n- [`User`](/docs-api/objects/User)\n- [`UserWithPhoto`](/docs-api/objects/UserWithPhoto)\n- [`BotInfo`](/docs-api/objects/BotInfo)\n- [`ChatMember`](/docs-api/objects/ChatMember)",
+        "properties": {
+          "user_id": {
+            "description": "ID пользователя",
+            "type": "integer",
+            "format": "int64"
+          },
+          "first_name": {
+            "description": "Отображаемое имя пользователя",
+            "type": "string"
+          },
+          "last_name": {
+            "description": "Отображаемая фамилия пользователя",
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "description": "_Устаревшее поле, скоро будет удалено_",
+            "type": "string",
+            "readOnly": false,
+            "nullable": true
+          },
+          "username": {
+            "description": "Уникальное публичное имя пользователя. Может быть `null`, если пользователь недоступен или имя не задано",
+            "type": "string",
+            "nullable": true
+          },
+          "is_bot": {
+            "description": "`true`,  если пользователь является ботом",
+            "type": "boolean"
+          },
+          "last_activity_time": {
+            "description": "Время последней активности пользователя в MAX (Unix-время в миллисекундах). Может быть неактуальным, если пользователь отключил статус \"онлайн\" в настройках.",
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "user_id",
+          "first_name",
+          "last_name",
+          "username",
+          "is_bot",
+          "last_activity_time"
+        ]
+      },
+      "UserWithPhoto": {
+        "description": "Объект пользователя с фотографией",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/User"
+          },
+          {
+            "properties": {
+              "description": {
+                "description": "Описание пользователя. Может быть `null`, если пользователь его не заполнил",
+                "maxLength": 16000,
+                "type": "string",
+                "nullable": true,
+                "readOnly": false
+              },
+              "avatar_url": {
+                "description": "URL аватара",
+                "type": "string",
+                "readOnly": false
+              },
+              "full_avatar_url": {
+                "description": "URL аватара большего размера",
+                "type": "string",
+                "readOnly": false
+              }
+            }
+          }
+        ]
+      },
+      "BotInfo": {
+        "description": "Объект, описывающий информацию о боте",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UserWithPhoto"
+          },
+          {
+            "properties": {
+              "commands": {
+                "description": "Команды, поддерживаемые ботом",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/BotCommand"
+                },
+                "maxItems": 32,
+                "readOnly": false,
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "BotPatch": {
+        "properties": {
+          "first_name": {
+            "description": "Отображаемое имя бота",
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "readOnly": false,
+            "nullable": true
+          },
+          "last_name": {
+            "description": "Отображаемое второе имя бота",
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "readOnly": false,
+            "nullable": true
+          },
+          "name": {
+            "description": "_Поле устарело, скоро будет удалено. Используйте_ `first_name`",
+            "type": "string",
+            "readOnly": false,
+            "nullable": true
+          },
+          "description": {
+            "description": "Описание бота",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000,
+            "readOnly": false,
+            "nullable": true
+          },
+          "commands": {
+            "description": "Команды, поддерживаемые ботом. Чтобы удалить все команды, передайте пустой список",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BotCommand"
+            },
+            "maxItems": 32,
+            "readOnly": false,
+            "nullable": true
+          },
+          "photo": {
+            "description": "Запрос на установку фото бота",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PhotoAttachmentRequestPayload"
+              }
+            ],
+            "readOnly": false,
+            "nullable": true
+          }
+        }
+      },
+      "BotCommand": {
+        "description": "до 32 элементов<br/>Комманды, поддерживаемые ботом",
+        "properties": {
+          "name": {
+            "description": "Название команды",
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "description": {
+            "description": "Описание команды (по желанию)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "readOnly": false,
+            "nullable": true
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "Chat": {
+        "properties": {
+          "chat_id": {
+            "description": "ID чата",
+            "type": "integer",
+            "format": "int64"
+          },
+          "type": {
+            "description": "Тип чата:\n - `\"chat\"` — Групповой чат.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatType"
+              }
+            ]
+          },
+          "status": {
+            "description": "Статус чата:\n- `\"active\"` — Бот является активным участником чата.\n- `\"removed\"` — Бот был удалён из чата.\n- `\"left\"` — Бот покинул чат.\n- `\"closed\"` — Чат был закрыт.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatStatus"
+              }
+            ]
+          },
+          "title": {
+            "description": "Отображаемое название чата. Может быть `null` для диалогов",
+            "type": "string",
+            "nullable": true
+          },
+          "icon": {
+            "description": "Иконка чата",
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Image"
+              }
+            ]
+          },
+          "last_event_time": {
+            "description": "Время последнего события в чате",
+            "type": "integer",
+            "format": "int64"
+          },
+          "participants_count": {
+            "description": "Количество участников чата. Для диалогов всегда `2`",
+            "type": "integer",
+            "format": "int32"
+          },
+          "owner_id": {
+            "description": "ID владельца чата",
+            "nullable": true,
+            "type": "integer",
+            "format": "int64",
+            "readOnly": false
+          },
+          "participants": {
+            "description": "Участники чата с временем последней активности. Может быть `null`, если запрашивается список чатов",
+            "nullable": true,
+            "readOnly": false,
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "is_public": {
+            "description": "Доступен ли чат публично (для диалогов всегда `false`)",
+            "type": "boolean"
+          },
+          "link": {
+            "description": "Ссылка на чат",
+            "type": "string",
+            "readOnly": false,
+            "nullable": true
+          },
+          "description": {
+            "description": "Описание чата",
+            "type": "string",
+            "nullable": true
+          },
+          "dialog_with_user": {
+            "description": "Данные о пользователе в диалоге (только для чатов типа `\"dialog\"`)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserWithPhoto"
+              }
+            ],
+            "nullable": true,
+            "readOnly": false
+          },
+          "chat_message_id": {
+            "description": "ID сообщения, содержащего кнопку, через которую был инициирован чат",
+            "nullable": true,
+            "readOnly": false,
+            "type": "string"
+          },
+          "pinned_message": {
+            "description": "Закреплённое сообщение в чате (возвращается только при запросе конкретного чата)",
+            "nullable": true,
+            "readOnly": false,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Message"
+              }
+            ]
+          }
+        },
+        "required": [
+          "chat_id",
+          "type",
+          "status",
+          "title",
+          "last_event_time",
+          "participants_count",
+          "icon",
+          "is_public",
+          "description"
+        ]
+      },
+      "ChatType": {
+        "description": "Тип чата: диалог, чат",
+        "enum": [
+          "chat"
+        ]
+      },
+      "ChatStatus": {
+        "description": "Статус чата для текущего бота",
+        "enum": [
+          "active",
+          "removed",
+          "left",
+          "closed"
+        ]
+      },
+      "ChatList": {
+        "properties": {
+          "chats": {
+            "description": "Список запрашиваемых чатов",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Chat"
+            }
+          },
+          "marker": {
+            "description": "Указатель на следующую страницу запрашиваемых чатов",
+            "nullable": true,
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "chats",
+          "marker"
+        ]
+      },
+      "ChatPatch": {
+        "properties": {
+          "icon": {
+            "readOnly": false,
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PhotoAttachmentRequestPayload"
+              }
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "readOnly": false,
+            "nullable": true
+          },
+          "pin": {
+            "description": "ID сообщения для закрепления в чате. Чтобы удалить закреплённое сообщение, используйте метод [unpin](/docs-api/methods/DELETE/chats/%7BchatId%7D/pin)",
+            "type": "string",
+            "readOnly": false,
+            "nullable": true
+          },
+          "notify": {
+            "description": "Если `true`, участники получат системное уведомление об изменении",
+            "type": "boolean",
+            "default": true,
+            "readOnly": false,
+            "nullable": true
+          }
+        }
+      },
+      "ChatMember": {
+        "description": "Объект, описывающий участника чата",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UserWithPhoto"
+          },
+          {
+            "properties": {
+              "last_access_time": {
+                "description": "Время последней активности пользователя в чате. Может быть устаревшим для суперчатов (равно времени вступления)",
+                "type": "integer",
+                "format": "int64"
+              },
+              "is_owner": {
+                "type": "boolean",
+                "description": "Является ли пользователь владельцем чата"
+              },
+              "is_admin": {
+                "type": "boolean",
+                "description": "Является ли пользователь администратором чата"
+              },
+              "join_time": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Дата присоединения к чату в формате Unix time"
+              },
+              "permissions": {
+                "description": "Перечень прав пользователя. Возможные значения:\n- `\"read_all_messages\"` — Читать все сообщения.\n- `\"add_remove_members\"` — Добавлять/удалять участников.\n- `\"add_admins\"` — Добавлять администраторов.\n- `\"change_chat_info\"` — Изменять информацию о чате.\n- `\"pin_message\"` — Закреплять сообщения.\n- `\"write\"` — Писать сообщения.\n- `\"edit_link\"` — Изменять ссылку на чат.\n",
+                "type": "array",
+                "uniqueItems": true,
+                "nullable": true,
+                "items": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ChatAdminPermission"
+                    }
+                  ]
+                }
+              },
+              "alias": {
+                "description": "Заголовок, который будет показан на клиенте\n\nЕсли пользователь администратор или владелец и ему не установлено это название, то поле не передается, клиенты на своей стороне подменят на \"владелец\" или \"админ\"",
+                "type": "string"
+              }
+            },
+            "required": [
+              "last_access_time",
+              "is_owner",
+              "is_admin",
+              "permissions",
+              "join_time"
+            ]
+          }
+        ]
+      },
+      "ChatAdmin": {
+        "properties": {
+          "user_id": {
+            "description": "Идентификатор администратора с правами доступа",
+            "type": "integer",
+            "format": "int64"
+          },
+          "permissions": {
+            "description": "Перечень прав пользователя. Возможные значения:\n- `\"read_all_messages\"` — Читать все сообщения.\n- `\"add_remove_members\"` — Добавлять/удалять участников.\n- `\"add_admins\"` — Добавлять администраторов.\n- `\"change_chat_info\"` — Изменять информацию о чате.\n- `\"pin_message\"` — Закреплять сообщения.\n- `\"write\"` — Писать сообщения.\n",
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ChatAdminPermission"
+                }
+              ]
+            }
+          },
+          "alias": {
+            "description": "Заголовок, который будет показан на клиенте\n\nЕсли пользователь администратор или владелец и ему не установлено это название, то поле не передается, клиенты на своей стороне подменят на \"владелец\" или \"админ\"",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "permissions"
+        ]
+      },
+      "ChatAdminPermission": {
+        "description": "Права администратора чата",
+        "type": "string",
+        "enum": [
+          "read_all_messages",
+          "add_remove_members",
+          "add_admins",
+          "change_chat_info",
+          "pin_message",
+          "write",
+          "edit_link"
+        ]
+      },
+      "ChatMembersList": {
+        "properties": {
+          "members": {
+            "description": "Список участников чата с информацией о времени последней активности",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMember"
+            }
+          },
+          "marker": {
+            "description": "Указатель на следующую страницу данных",
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "readOnly": false
+          }
+        },
+        "required": [
+          "members"
+        ]
+      },
+      "ChatAdminsList": {
+        "properties": {
+          "admins": {
+            "description": "Массив администраторов чата",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatAdmin"
+            }
+          },
+          "marker": {
+            "description": "Указатель на следующую страницу данных",
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "readOnly": false
+          }
+        },
+        "required": [
+          "admins"
+        ]
+      },
+      "Image": {
+        "description": "Общая схема, описывающая объект изображения",
+        "properties": {
+          "url": {
+            "description": "URL изображения",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "Subscription": {
+        "description": "Схема для описания подписки на WebHook",
+        "properties": {
+          "url": {
+            "description": "URL вебхука",
+            "type": "string"
+          },
+          "time": {
+            "description": "Unix-время, когда была создана подписка",
+            "type": "integer",
+            "format": "int64"
+          },
+          "update_types": {
+            "description": "Типы обновлений, на которые подписан бот",
+            "example": "[\"message_created\", \"bot_started\"]",
+            "type": "array",
+            "nullable": true,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "url",
+          "time",
+          "update_types",
+          "version"
+        ]
+      },
+      "Recipient": {
+        "description": "Новый получатель сообщения. Может быть пользователем или чатом",
+        "properties": {
+          "chat_id": {
+            "description": "ID чата",
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "chat_type": {
+            "description": "Тип чата",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatType"
+              }
+            ]
+          },
+          "user_id": {
+            "description": "ID пользователя, если сообщение было отправлено пользователю",
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "required": [
+          "chat_id",
+          "chat_type",
+          "user_id"
+        ]
+      },
+      "Message": {
+        "description": "Сообщение в чате",
+        "properties": {
+          "sender": {
+            "description": "Пользователь, отправивший сообщение",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              }
+            ],
+            "readOnly": false
+          },
+          "recipient": {
+            "description": "Получатель сообщения. Может быть пользователем или чатом",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Recipient"
+              }
+            ]
+          },
+          "timestamp": {
+            "description": "Время создания сообщения в формате Unix-time",
+            "type": "integer",
+            "format": "int64"
+          },
+          "link": {
+            "description": "Пересланное или ответное сообщение",
+            "nullable": true,
+            "readOnly": false,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LinkedMessage"
+              }
+            ]
+          },
+          "body": {
+            "description": "Содержимое сообщения. Текст + вложения. Может быть `null`, если сообщение содержит только пересланное сообщение",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MessageBody"
+              }
+            ]
+          },
+          "stat": {
+            "description": "Статистика сообщения.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MessageStat"
+              }
+            ],
+            "nullable": true,
+            "readOnly": false
+          },
+          "url": {
+            "description": "Публичная ссылка на сообщение. Может быть null для диалогов или не публичных чатов",
+            "type": "string",
+            "nullable": true,
+            "readOnly": false
+          }
+        },
+        "required": [
+          "recipient",
+          "body",
+          "timestamp"
+        ]
+      },
+      "MessageStat": {
+        "description": "Статистика сообщения",
+        "properties": {
+          "views": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "views"
+        ]
+      },
+      "MessageBody": {
+        "description": "Схема, представляющая тело сообщения",
+        "type": "object",
+        "properties": {
+          "mid": {
+            "description": "Уникальный ID сообщения",
+            "type": "string"
+          },
+          "seq": {
+            "description": "ID последовательности сообщения в чате",
+            "type": "integer",
+            "format": "int64"
+          },
+          "text": {
+            "description": "Новый текст сообщения",
+            "type": "string",
+            "nullable": true
+          },
+          "attachments": {
+            "description": "Вложения сообщения. Могут быть одним из типов `Attachment`. Смотрите описание схемы",
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            }
+          },
+          "markup": {
+            "description": "Разметка текста сообщения. Для подробной информации загляните в раздел [Форматирование](/docs-api#Форматирование%20текста)",
+            "type": "array",
+            "nullable": true,
+            "readOnly": false,
+            "items": {
+              "$ref": "#/components/schemas/MarkupElement"
+            }
+          }
+        },
+        "required": [
+          "mid",
+          "seq",
+          "text",
+          "attachments",
+          "link"
+        ]
+      },
+      "MessageList": {
+        "description": "Пагинированный список сообщений",
+        "properties": {
+          "messages": {
+            "description": "Массив сообщений",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          }
+        },
+        "required": [
+          "messages"
+        ]
+      },
+      "TextFormat": {
+        "description": "Формат текста сообщения",
+        "type": "string",
+        "enum": [
+          "markdown",
+          "html"
+        ]
+      },
+      "NewMessageBody": {
+        "properties": {
+          "text": {
+            "description": "Новый текст сообщения",
+            "type": "string",
+            "maxLength": 4000,
+            "nullable": true
+          },
+          "attachments": {
+            "description": "Вложения сообщения. Если пусто, все вложения будут удалены",
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/AttachmentRequest"
+            }
+          },
+          "link": {
+            "description": "Ссылка на сообщение",
+            "type": "object",
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NewMessageLink"
+              }
+            ]
+          },
+          "notify": {
+            "description": "Если false, участники чата не будут уведомлены (по умолчанию `true`)",
+            "type": "boolean",
+            "default": true,
+            "readOnly": false
+          },
+          "format": {
+            "description": "Если установлен, текст сообщения будет форматирован данным способом. Для подробной информации загляните в раздел [Форматирование](/docs-api#Форматирование%20текста)",
+            "readOnly": false,
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TextFormat"
+              }
+            ]
+          }
+        },
+        "required": [
+          "text",
+          "attachments",
+          "link"
+        ]
+      },
+      "NewMessageLink": {
+        "properties": {
+          "type": {
+            "description": "Тип ссылки сообщения",
+            "nullable": false,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MessageLinkType"
+              }
+            ]
+          },
+          "mid": {
+            "description": "ID сообщения исходного сообщения",
+            "type": "string",
+            "nullable": false
+          }
+        },
+        "required": [
+          "type",
+          "mid"
+        ]
+      },
+      "LinkedMessage": {
+        "properties": {
+          "type": {
+            "description": "Тип связанного сообщения",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MessageLinkType"
+              }
+            ]
+          },
+          "sender": {
+            "description": "Пользователь, отправивший сообщение.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              }
+            ],
+            "readOnly": false
+          },
+          "chat_id": {
+            "description": "Чат, в котором сообщение было изначально опубликовано. Только для пересланных сообщений",
+            "type": "integer",
+            "format": "int64",
+            "readOnly": false
+          },
+          "message": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MessageBody"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ]
+      },
+      "SendMessageResult": {
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/Message"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "Attachment": {
+        "description": "Общая схема, представляющая вложение сообщения",
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "image": "#/components/schemas/PhotoAttachment",
+            "video": "#/components/schemas/VideoAttachment",
+            "audio": "#/components/schemas/AudioAttachment",
+            "file": "#/components/schemas/FileAttachment",
+            "sticker": "#/components/schemas/StickerAttachment",
+            "contact": "#/components/schemas/ContactAttachment",
+            "inline_keyboard": "#/components/schemas/InlineKeyboardAttachment",
+            "share": "#/components/schemas/ShareAttachment",
+            "location": "#/components/schemas/LocationAttachment"
+          }
+        },
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "PhotoAttachment": {
+        "description": "Вложение изображения",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PhotoAttachmentPayload"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "PhotoAttachmentPayload": {
+        "properties": {
+          "photo_id": {
+            "description": "Уникальный ID этого изображения",
+            "type": "integer",
+            "format": "int64"
+          },
+          "token": {
+            "description": "",
+            "type": "string"
+          },
+          "url": {
+            "description": "URL изображения",
+            "type": "string"
+          }
+        },
+        "required": [
+          "photo_id",
+          "url",
+          "token"
+        ]
+      },
+      "VideoAttachment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/MediaAttachmentPayload"
+                  }
+                ]
+              },
+              "thumbnail": {
+                "description": "Миниатюра видео",
+                "type": "string",
+                "nullable": true,
+                "readOnly": false,
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/VideoThumbnail"
+                  }
+                ]
+              },
+              "width": {
+                "description": "Ширина видео",
+                "type": "integer",
+                "nullable": true,
+                "readOnly": false
+              },
+              "height": {
+                "description": "Высота видео",
+                "type": "integer",
+                "nullable": true,
+                "readOnly": false
+              },
+              "duration": {
+                "description": "Длина видео в секундах",
+                "type": "integer",
+                "nullable": true,
+                "readOnly": false
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "VideoThumbnail": {
+        "properties": {
+          "url": {
+            "description": "URL изображения",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "VideoUrls": {
+        "properties": {
+          "mp4_1080": {
+            "description": "URL видео в разрешении 1080p, если доступно",
+            "type": "string",
+            "nullable": true,
+            "readOnly": false
+          },
+          "mp4_720": {
+            "description": "URL видео в разрешении 720p, если доступно",
+            "type": "string",
+            "nullable": true,
+            "readOnly": false
+          },
+          "mp4_480": {
+            "description": "URL видео в разрешении 480p, если доступно",
+            "type": "string",
+            "nullable": true,
+            "readOnly": false
+          },
+          "mp4_360": {
+            "description": "URL видео в разрешении 360p, если доступно",
+            "type": "string",
+            "nullable": true,
+            "readOnly": false
+          },
+          "mp4_240": {
+            "description": "URL видео в разрешении 240p, если доступно",
+            "type": "string",
+            "nullable": true,
+            "readOnly": false
+          },
+          "mp4_144": {
+            "description": "URL видео в разрешении 144p, если доступно",
+            "type": "string",
+            "nullable": true,
+            "readOnly": false
+          },
+          "hls": {
+            "description": "URL трансляции, если доступна",
+            "type": "string",
+            "nullable": true,
+            "readOnly": false
+          }
+        }
+      },
+      "VideoAttachmentDetails": {
+        "properties": {
+          "token": {
+            "description": "Токен видео-вложения",
+            "type": "string"
+          },
+          "urls": {
+            "description": "URL-ы для скачивания или воспроизведения видео. Может быть null, если видео недоступно",
+            "nullable": true,
+            "readOnly": false,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VideoUrls"
+              }
+            ]
+          },
+          "thumbnail": {
+            "description": "Миниатюра видео",
+            "nullable": true,
+            "readOnly": false,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PhotoAttachmentPayload"
+              }
+            ]
+          },
+          "width": {
+            "description": "Ширина видео",
+            "type": "integer"
+          },
+          "height": {
+            "description": "Высота видео",
+            "type": "integer"
+          },
+          "duration": {
+            "description": "Длина видео в секундах",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "width",
+          "height",
+          "duration",
+          "token"
+        ]
+      },
+      "AudioAttachment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/MediaAttachmentPayload"
+                  }
+                ]
+              },
+              "transcription": {
+                "description": "Аудио транскрипция",
+                "type": "string",
+                "nullable": true,
+                "readOnly": false
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "FileAttachment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FileAttachmentPayload"
+                  }
+                ]
+              },
+              "filename": {
+                "description": "Имя загруженного файла",
+                "type": "string"
+              },
+              "size": {
+                "description": "Размер файла в байтах",
+                "type": "integer",
+                "format": "int64"
+              }
+            },
+            "required": [
+              "payload",
+              "filename",
+              "size"
+            ]
+          }
+        ]
+      },
+      "AttachmentPayload": {
+        "properties": {
+          "url": {
+            "description": "URL медиа-вложения.\nДля видео-вложения используйте метод [getVideoAttachmentDetails](/docs-api/methods/GET/videos/%7BvideoToken%7D), чтобы получить прямые ссылки.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "MediaAttachmentPayload": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentPayload"
+          },
+          {
+            "properties": {
+              "token": {
+                "description": "Используйте `token`, если вы пытаетесь повторно использовать одно и то же вложение в другом сообщении.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "token"
+            ]
+          }
+        ]
+      },
+      "FileAttachmentPayload": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentPayload"
+          },
+          {
+            "properties": {
+              "token": {
+                "description": "Используйте `token`, если вы пытаетесь повторно использовать одно и то же вложение в другом сообщении.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "token"
+            ]
+          }
+        ]
+      },
+      "ContactAttachment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ContactAttachmentPayload"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "ContactAttachmentPayload": {
+        "properties": {
+          "vcf_info": {
+            "description": "Информация о пользователе в формате VCF.",
+            "nullable": true,
+            "readOnly": false,
+            "type": "string"
+          },
+          "max_info": {
+            "description": "Информация о пользователе",
+            "nullable": true,
+            "readOnly": false,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              }
+            ]
+          }
+        }
+      },
+      "StickerAttachmentPayload": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentPayload"
+          },
+          {
+            "properties": {
+              "code": {
+                "description": "ID стикера",
+                "type": "string"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "StickerAttachment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/StickerAttachmentPayload"
+                  }
+                ]
+              },
+              "width": {
+                "description": "Ширина стикера",
+                "type": "integer"
+              },
+              "height": {
+                "description": "Высота стикера",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "payload",
+              "width",
+              "height"
+            ]
+          }
+        ]
+      },
+      "ShareAttachmentPayload": {
+        "description": "Полезная нагрузка запроса ShareAttachmentRequest",
+        "properties": {
+          "url": {
+            "description": "URL, прикрепленный к сообщению в качестве предпросмотра медиа",
+            "minLength": 1,
+            "type": "string",
+            "nullable": true,
+            "readOnly": false
+          },
+          "token": {
+            "description": "Токен вложения",
+            "type": "string",
+            "nullable": true,
+            "readOnly": false
+          }
+        }
+      },
+      "ShareAttachment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ShareAttachmentPayload"
+                  }
+                ]
+              },
+              "title": {
+                "description": "Заголовок предпросмотра ссылки.",
+                "type": "string",
+                "readOnly": false,
+                "nullable": true
+              },
+              "description": {
+                "description": "Описание предпросмотра ссылки",
+                "type": "string",
+                "readOnly": false,
+                "nullable": true
+              },
+              "image_url": {
+                "description": "Изображение предпросмотра ссылки",
+                "type": "string",
+                "nullable": true,
+                "readOnly": false
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "LocationAttachment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "latitude": {
+                "type": "number",
+                "format": "double",
+                "description": "Широта"
+              },
+              "longitude": {
+                "type": "number",
+                "format": "double",
+                "description": "Долгота"
+              }
+            },
+            "required": [
+              "latitude",
+              "longitude"
+            ]
+          }
+        ]
+      },
+      "InlineKeyboardAttachment": {
+        "description": "Кнопки в сообщении",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Keyboard"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "ReplyKeyboardAttachment": {
+        "description": "Custom reply keyboard in message",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "buttons": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReplyButton"
+                  }
+                }
+              }
+            },
+            "required": [
+              "buttons"
+            ]
+          }
+        ]
+      },
+      "DataAttachment": {
+        "description": "Attachment contains payload sent through `SendMessageButton`",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Attachment"
+          },
+          {
+            "properties": {
+              "data": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "data"
+            ]
+          }
+        ]
+      },
+      "Keyboard": {
+        "description": "Клавиатура - это двумерный массив кнопок",
+        "properties": {
+          "buttons": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/Button"
+              }
+            }
+          }
+        },
+        "required": [
+          "buttons"
+        ]
+      },
+      "Button": {
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "text": {
+            "description": "Видимый текст кнопки",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "callback": "#/components/schemas/CallbackButton",
+            "link": "#/components/schemas/LinkButton",
+            "request_geo_location": "#/components/schemas/RequestGeoLocationButton",
+            "request_contact": "#/components/schemas/RequestContactButton",
+            "open_app": "#/components/schemas/OpenAppButton",
+            "message": "#/components/schemas/MessageButton"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ]
+      },
+      "CallbackButton": {
+        "description": "После нажатия на такую кнопку клиент отправляет на сервер полезную нагрузку, которая содержит",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Button"
+          },
+          {
+            "properties": {
+              "payload": {
+                "description": "Токен кнопки",
+                "type": "string",
+                "maxLength": 1024
+              },
+              "intent": {
+                "description": "Намерение кнопки. Влияет на отображение клиентом.",
+                "readOnly": false,
+                "default": "default",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Intent"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "LinkButton": {
+        "description": "После нажатия на такую кнопку пользователь переходит по ссылке, которую она содержит",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Button"
+          },
+          {
+            "properties": {
+              "url": {
+                "type": "string",
+                "maxLength": 2048
+              }
+            },
+            "required": [
+              "url"
+            ]
+          }
+        ]
+      },
+      "RequestContactButton": {
+        "description": "AПосле нажатия на такую кнопку клиент отправляет новое сообщение с вложением текущего контакта пользователя",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Button"
+          }
+        ]
+      },
+      "RequestGeoLocationButton": {
+        "description": "После нажатия на такую кнопку клиент отправляет новое сообщение с вложением текущего географического положения пользователя",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Button"
+          },
+          {
+            "properties": {
+              "quick": {
+                "description": "Если *true*, отправляет местоположение без запроса подтверждения пользователя",
+                "readOnly": false,
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
+        ]
+      },
+      "ChatButton": {
+        "description": "Кнопка, которая создает новый чат, как только первый пользователь на нее нажмет.\nBБот будет добавлен в участники чата как администратор.\nMАвтор сообщения станет владельцем чата.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Button"
+          },
+          {
+            "properties": {
+              "chat_title": {
+                "description": "Название чата, который будет создан",
+                "type": "string",
+                "maxLength": 200
+              },
+              "chat_description": {
+                "description": "Описание чата",
+                "readOnly": false,
+                "nullable": true,
+                "type": "string",
+                "maxLength": 400
+              },
+              "start_payload": {
+                "description": "Стартовая полезная нагрузка будет отправлена боту, как только чат будет создан",
+                "readOnly": false,
+                "nullable": true,
+                "type": "string",
+                "maxLength": 512
+              },
+              "uuid": {
+                "description": "Уникальный ID кнопки среди всех кнопок чата на клавиатуре.\nЕсли `uuid` изменен, новый чат будет создан при следующем нажатии.\nСервер сгенерирует его в момент, когда кнопка будет впервые размещена.\nИспользуйте его при редактировании сообщения.'",
+                "readOnly": false,
+                "nullable": true,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "chat_title"
+            ]
+          }
+        ]
+      },
+      "OpenAppButton": {
+        "description": "Кнопка для запуска мини-приложения",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Button"
+          },
+          {
+            "properties": {
+              "web_app": {
+                "description": "Публичное имя (username) бота или ссылка на него, чьё мини-приложение надо запустить",
+                "readOnly": false,
+                "type": "string"
+              },
+              "contact_id": {
+                "description": "Идентификатор бота, чьё мини-приложение надо запустить",
+                "readOnly": false,
+                "type": "integer",
+                "format": "int64"
+              },
+              "payload": {
+                "description": "Параметр запуска, который будет передан в [initData](/docs/webapps/bridge#WebAppData) мини-приложения",
+                "readOnly": false,
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "MessageButton": {
+        "description": "Кнопка для запуска мини-приложения",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Button"
+          },
+          {
+            "properties": {
+              "text": {
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Текст кнопки, который будет отправлен в чат от лица пользователя",
+                "readOnly": false,
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "Intent": {
+        "description": "Намерение кнопки",
+        "type": "string",
+        "enum": [
+          "positive",
+          "negative",
+          "default"
+        ]
+      },
+      "ReplyButton": {
+        "description": "After pressing this type of button client will send a message on behalf of user with given payload",
+        "properties": {
+          "text": {
+            "description": "Видимый текст кнопки",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "payload": {
+            "description": "Токен кнопки",
+            "type": "string",
+            "maxLength": 1024,
+            "readOnly": false,
+            "nullable": true
+          }
+        },
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "message": "#/components/schemas/SendMessageButton",
+            "user_geo_location": "#/components/schemas/SendGeoLocationButton",
+            "user_contact": "#/components/schemas/SendContactButton"
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "SendMessageButton": {
+        "description": "After pressing this type of button client will send a message on behalf of user with given payload",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ReplyButton"
+          },
+          {
+            "properties": {
+              "intent": {
+                "description": "Намерение кнопки. Влияет на отображение клиентом.",
+                "readOnly": false,
+                "default": "default",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Intent"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "SendGeoLocationButton": {
+        "description": "После нажатия на такую кнопку клиент отправляет новое сообщение с вложением текущего географического положения пользователя",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ReplyButton"
+          },
+          {
+            "properties": {
+              "quick": {
+                "description": "Если *true*, отправляет местоположение без запроса подтверждения пользователя",
+                "readOnly": false,
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
+        ]
+      },
+      "SendContactButton": {
+        "description": "AПосле нажатия на такую кнопку клиент отправляет новое сообщение с вложением текущего контакта пользователя",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ReplyButton"
+          }
+        ]
+      },
+      "MessageLinkType": {
+        "description": "Тип связанного сообщения",
+        "type": "string",
+        "enum": [
+          "forward",
+          "reply"
+        ]
+      },
+      "AttachmentRequest": {
+        "description": "Запрос на прикрепление данных к сообщению",
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "image": "#/components/schemas/PhotoAttachmentRequest",
+            "video": "#/components/schemas/VideoAttachmentRequest",
+            "audio": "#/components/schemas/AudioAttachmentRequest",
+            "file": "#/components/schemas/FileAttachmentRequest",
+            "sticker": "#/components/schemas/StickerAttachmentRequest",
+            "contact": "#/components/schemas/ContactAttachmentRequest",
+            "inline_keyboard": "#/components/schemas/InlineKeyboardAttachmentRequest",
+            "location": "#/components/schemas/LocationAttachmentRequest",
+            "share": "#/components/schemas/ShareAttachmentRequest"
+          }
+        },
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "PhotoAttachmentRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentRequest"
+          },
+          {
+            "properties": {
+              "payload": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PhotoAttachmentRequestPayload"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "PhotoAttachmentRequestPayload": {
+        "description": "Запрос на прикрепление изображения (все поля являются взаимоисключающими)",
+        "properties": {
+          "url": {
+            "description": "Любой внешний URL изображения, которое вы хотите прикрепить",
+            "minLength": 1,
+            "nullable": true,
+            "readOnly": false,
+            "type": "string"
+          },
+          "token": {
+            "description": "Токен существующего вложения",
+            "nullable": true,
+            "readOnly": false,
+            "type": "string"
+          },
+          "photos": {
+            "description": "Токены, полученные после загрузки изображений",
+            "nullable": true,
+            "readOnly": false,
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PhotoToken"
+            }
+          }
+        }
+      },
+      "PhotoToken": {
+        "properties": {
+          "token": {
+            "description": "Закодированная информация загруженного изображения",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "PhotoTokens": {
+        "description": "Это информация, которую вы получите, как только изображение будет загружено",
+        "properties": {
+          "photos": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PhotoToken"
+            }
+          }
+        },
+        "required": [
+          "photos"
+        ]
+      },
+      "VideoAttachmentRequest": {
+        "description": "Запрос на прикрепление видео к сообщению",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentRequest"
+          },
+          {
+            "properties": {
+              "payload": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UploadedInfo"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "AudioAttachmentRequest": {
+        "description": "Запрос на прикрепление аудио к сообщению. ДОЛЖЕН быть единственным вложением в сообщении",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentRequest"
+          },
+          {
+            "properties": {
+              "payload": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UploadedInfo"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "UploadedInfo": {
+        "description": "Это информация, которую вы получите, как только аудио/видео будет загружено",
+        "properties": {
+          "token": {
+            "description": "Токен — уникальный ID загруженного медиафайла",
+            "type": "string",
+            "readOnly": false
+          }
+        }
+      },
+      "FileAttachmentRequest": {
+        "description": "Запрос на прикрепление файла к сообщению. ДОЛЖЕН быть единственным вложением в сообщении",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentRequest"
+          },
+          {
+            "properties": {
+              "payload": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UploadedInfo"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "UploadType": {
+        "description": "Тип загружаемого файла",
+        "enum": [
+          "image",
+          "video",
+          "audio",
+          "file"
+        ]
+      },
+      "ContactAttachmentRequest": {
+        "description": "Запрос на прикрепление карточки контакта к сообщению. MДОЛЖЕН быть единственным вложением в сообщении",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentRequest"
+          },
+          {
+            "properties": {
+              "payload": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ContactAttachmentRequestPayload"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "ContactAttachmentRequestPayload": {
+        "properties": {
+          "name": {
+            "description": "Имя контакта",
+            "nullable": true,
+            "type": "string"
+          },
+          "contact_id": {
+            "description": "ID контакта, если он зарегистирован в MAX",
+            "nullable": true,
+            "readOnly": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          "vcf_info": {
+            "description": "Полная информация о контакте в формате VCF",
+            "nullable": true,
+            "readOnly": false,
+            "type": "string"
+          },
+          "vcf_phone": {
+            "description": "Телефон контакта в формате VCF",
+            "readOnly": false,
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "StickerAttachmentRequest": {
+        "description": "Запрос на прикрепление стикера. ДОЛЖЕН быть единственным вложением в сообщении",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentRequest"
+          },
+          {
+            "properties": {
+              "payload": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/StickerAttachmentRequestPayload"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "StickerAttachmentRequestPayload": {
+        "properties": {
+          "code": {
+            "description": "Код стикера",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "InlineKeyboardAttachmentRequest": {
+        "description": "Запрос на прикрепление клавиатуры к сообщению",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentRequest"
+          },
+          {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/InlineKeyboardAttachmentRequestPayload"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "InlineKeyboardAttachmentRequestPayload": {
+        "properties": {
+          "buttons": {
+            "description": "Двумерный массив кнопок",
+            "type": "array",
+            "minLength": 1,
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/Button"
+              }
+            }
+          }
+        },
+        "required": [
+          "buttons"
+        ]
+      },
+      "ReplyKeyboardAttachmentRequest": {
+        "description": "Request to attach reply keyboard to message",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentRequest"
+          },
+          {
+            "properties": {
+              "direct": {
+                "description": "Applicable only for chats. If `true` keyboard will be shown only for user bot mentioned or replied",
+                "type": "boolean",
+                "default": false,
+                "readOnly": false
+              },
+              "direct_user_id": {
+                "description": "If set to `true`, reply keyboard will only be shown to this participant in chat",
+                "type": "integer",
+                "format": "int64",
+                "nullable": true,
+                "readOnly": false
+              },
+              "buttons": {
+                "description": "Двумерный массив кнопок",
+                "type": "array",
+                "minLength": 1,
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReplyButton"
+                  }
+                }
+              }
+            },
+            "required": [
+              "buttons"
+            ]
+          }
+        ]
+      },
+      "LocationAttachmentRequest": {
+        "description": "Запрос на прикрепление клавиатуры к сообщению",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentRequest"
+          },
+          {
+            "properties": {
+              "latitude": {
+                "type": "number",
+                "format": "double",
+                "description": "Широта"
+              },
+              "longitude": {
+                "type": "number",
+                "format": "double",
+                "description": "Долгота"
+              }
+            },
+            "required": [
+              "latitude",
+              "longitude"
+            ]
+          }
+        ]
+      },
+      "ShareAttachmentRequest": {
+        "description": "Запрос на прикрепление предпросмотра медиафайла по внешнему URL",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AttachmentRequest"
+          },
+          {
+            "properties": {
+              "payload": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ShareAttachmentPayload"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "payload"
+            ]
+          }
+        ]
+      },
+      "MarkupElement": {
+        "properties": {
+          "type": {
+            "description": "Тип элемента разметки. Может быть **жирный**,  *курсив*, ~зачеркнутый~, <ins>подчеркнутый</ins>, `моноширинный`, ссылка или упоминание пользователя",
+            "type": "string"
+          },
+          "from": {
+            "description": "Индекс начала элемента разметки в тексте. Нумерация с нуля",
+            "type": "integer",
+            "format": "int32"
+          },
+          "length": {
+            "description": "Длина элемента разметки",
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "strong": "#/components/schemas/StrongMarkup",
+            "emphasized": "#/components/schemas/EmphasizedMarkup",
+            "monospaced": "#/components/schemas/MonospacedMarkup",
+            "link": "#/components/schemas/LinkMarkup",
+            "strikethrough": "#/components/schemas/StrikethroughMarkup",
+            "underline": "#/components/schemas/UnderlineMarkup",
+            "user_mention": "#/components/schemas/UserMentionMarkup"
+          }
+        },
+        "required": [
+          "type",
+          "from",
+          "length"
+        ]
+      },
+      "StrongMarkup": {
+        "description": "Представляет **жирный** текст",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MarkupElement"
+          }
+        ]
+      },
+      "EmphasizedMarkup": {
+        "description": "Представляет *курсив*",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MarkupElement"
+          }
+        ]
+      },
+      "MonospacedMarkup": {
+        "description": "Представляет `моноширинный` или блок ```код``` в тексте",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MarkupElement"
+          }
+        ]
+      },
+      "LinkMarkup": {
+        "description": "Представляет ссылку в тексте",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MarkupElement"
+          },
+          {
+            "properties": {
+              "url": {
+                "description": "URL ссылки",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              }
+            },
+            "required": [
+              "url"
+            ]
+          }
+        ]
+      },
+      "StrikethroughMarkup": {
+        "description": "Представляет ~зачекрнутый~ текст",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MarkupElement"
+          }
+        ]
+      },
+      "UnderlineMarkup": {
+        "description": "Представляет <ins>подчеркнутый</ins> текст",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MarkupElement"
+          }
+        ]
+      },
+      "HeadingMarkup": {
+        "description": "Представляет заголовок текста",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MarkupElement"
+          }
+        ]
+      },
+      "UserMentionMarkup": {
+        "description": "Представляет упоминание пользователя в тексте. Упоминание может быть как по имени пользователя, так и по ID, если у пользователя нет имени",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MarkupElement"
+          },
+          {
+            "properties": {
+              "user_link": {
+                "description": "`@username` упомянутого пользователя",
+                "type": "string",
+                "nullable": true,
+                "readOnly": false
+              },
+              "user_id": {
+                "description": "ID упомянутого пользователя без имени",
+                "type": "integer",
+                "format": "int64",
+                "nullable": true,
+                "readOnly": false
+              }
+            }
+          }
+        ]
+      },
+      "HighlightedMarkup": {
+        "description": "Представляет выделенную часть текста",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MarkupElement"
+          }
+        ]
+      },
+      "SubscriptionRequestBody": {
+        "description": "Запрос на настройку подписки WebHook",
+        "properties": {
+          "url": {
+            "description": "URL HTTP(S)-эндпойнта вашего бота. Должен начинаться с `http(s)://`",
+            "type": "string"
+          },
+          "update_types": {
+            "description": "Список типов обновлений, которые ваш бот хочет получать. Для полного списка типов см. объект [Update](/docs-api/objects/Update)",
+            "example": "[\"message_created\", \"bot_started\"]",
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            },
+            "readOnly": false
+          },
+          "secret": {
+            "description": "Cекрет, который должен быть отправлен в заголовке `X-Max-Bot-Api-Secret` в каждом запросе Webhook. Разрешены только символы `A-Z`, `a-z`, `0-9`, и дефис. Заголовок рекомендован, чтобы запрос поступал из установленного веб-узла",
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 256,
+            "pattern": "^[a-zA-Z0-9_-]{5,256}$"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "GetSubscriptionsResult": {
+        "description": "Список всех WebHook подписок",
+        "properties": {
+          "subscriptions": {
+            "description": "Список текущих подписок",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Subscription"
+            }
+          }
+        },
+        "required": [
+          "subscriptions"
+        ]
+      },
+      "SimpleQueryResult": {
+        "description": "Простой ответ на запрос",
+        "properties": {
+          "success": {
+            "description": "`true`, если запрос был успешным, `false` в противном случае",
+            "type": "boolean"
+          },
+          "message": {
+            "description": "Объяснительное сообщение, если результат не был успешным",
+            "type": "string",
+            "readOnly": false
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "PinMessageBody": {
+        "properties": {
+          "message_id": {
+            "description": "ID сообщения, которое нужно закрепить. Соответствует полю `Message.body.mid`",
+            "type": "string"
+          },
+          "notify": {
+            "description": "Если `true`, участники получат уведомление с системным сообщением о закреплении",
+            "type": "boolean",
+            "default": true,
+            "readOnly": false,
+            "nullable": true
+          }
+        },
+        "required": [
+          "message_id"
+        ]
+      },
+      "GetPinnedMessageResult": {
+        "properties": {
+          "message": {
+            "description": "Закрепленное сообщение. Может быть `null`, если в чате нет закрепленного сообщения",
+            "readOnly": false,
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Message"
+              }
+            ]
+          }
+        }
+      },
+      "Callback": {
+        "description": "Объект, отправленный боту, когда пользователь нажимает кнопку",
+        "properties": {
+          "timestamp": {
+            "description": "Unix-время, когда пользователь нажал кнопку",
+            "type": "integer",
+            "format": "int64"
+          },
+          "callback_id": {
+            "description": "Текущий ID клавиатуры",
+            "type": "string"
+          },
+          "payload": {
+            "description": "Токен кнопки",
+            "type": "string",
+            "readOnly": false
+          },
+          "user": {
+            "description": "Пользователь, нажавший на кнопку",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              }
+            ]
+          }
+        },
+        "required": [
+          "timestamp",
+          "callback_id",
+          "user"
+        ]
+      },
+      "CallbackAnswer": {
+        "description": "Отправьте этот объект, когда ваш бот хочет отреагировать на нажатие кнопки",
+        "properties": {
+          "message": {
+            "description": "Заполните это, если хотите изменить текущее сообщение",
+            "nullable": true,
+            "readOnly": false,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NewMessageBody"
+              }
+            ]
+          },
+          "notification": {
+            "description": "Заполните это, если хотите просто отправить одноразовое уведомление пользователю",
+            "nullable": true,
+            "readOnly": false,
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "description": "Сервер возвращает это, если возникло исключение при вашем запросе",
+        "properties": {
+          "error": {
+            "description": "Ошибка",
+            "type": "string"
+          },
+          "code": {
+            "description": "Код ошибки",
+            "type": "string"
+          },
+          "message": {
+            "description": "Читаемое описание ошибки",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "UploadEndpoint": {
+        "description": "Точка доступа, куда следует загружать ваши бинарные файлы",
+        "type": "object",
+        "properties": {
+          "url": {
+            "description": "URL для загрузки файла",
+            "type": "string"
+          },
+          "token": {
+            "description": "Видео- или аудио-токен для отправки сообщения",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "UserIdsList": {
+        "properties": {
+          "user_ids": {
+            "name": "user_ids",
+            "description": "Массив ID пользователей для добавления в чат",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            },
+            "style": "simple"
+          }
+        },
+        "required": [
+          "user_ids"
+        ]
+      },
+      "ActionRequestBody": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/SenderAction"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "SenderAction": {
+        "description": "Действие, отправляемое участникам чата. Возможные значения:\n- `\"typing_on\"` — Бот набирает сообщение.\n- `\"sending_photo\"` — Бот отправляет фото.\n- `\"sending_video\"` — Бот отправляет видео.\n- `\"sending_audio\"` — Бот отправляет аудиофайл.\n-  `\"sending_file\"` — Бот отправляет файл.\n- `\"mark_seen\"` — Бот помечает сообщения как прочитанные.\n",
+        "enum": [
+          "typing_on",
+          "sending_photo",
+          "sending_video",
+          "sending_audio",
+          "sending_file",
+          "mark_seen"
+        ]
+      },
+      "UpdateList": {
+        "description": "Список всех обновлений в чатах, в которых ваш бот участвовал",
+        "properties": {
+          "updates": {
+            "description": "Страница обновлений",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Update"
+            }
+          },
+          "marker": {
+            "description": "Указатель на следующую страницу данных",
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "required": [
+          "updates",
+          "marker"
+        ]
+      },
+      "Update": {
+        "description": "Объект`Update` представляет различные типы событий, произошедших в чате. См. его наследников",
+        "discriminator": {
+          "propertyName": "update_type",
+          "mapping": {
+            "message_created": "#/components/schemas/MessageCreatedUpdate",
+            "message_callback": "#/components/schemas/MessageCallbackUpdate",
+            "message_edited": "#/components/schemas/MessageEditedUpdate",
+            "message_removed": "#/components/schemas/MessageRemovedUpdate",
+            "bot_added": "#/components/schemas/BotAddedToChatUpdate",
+            "bot_removed": "#/components/schemas/BotRemovedFromChatUpdate",
+            "dialog_muted": "#/components/schemas/DialogMutedUpdate",
+            "dialog_unmuted": "#/components/schemas/DialogUnmutedUpdate",
+            "dialog_cleared": "#/components/schemas/DialogClearedUpdate",
+            "dialog_removed": "#/components/schemas/DialogRemovedUpdate",
+            "user_added": "#/components/schemas/UserAddedToChatUpdate",
+            "user_removed": "#/components/schemas/UserRemovedFromChatUpdate",
+            "bot_started": "#/components/schemas/BotStartedUpdate",
+            "bot_stopped": "#/components/schemas/BotStoppedUpdate",
+            "chat_title_changed": "#/components/schemas/ChatTitleChangedUpdate",
+            "message_chat_created": "#/components/schemas/MessageChatCreatedUpdate"
+          }
+        },
+        "properties": {
+          "update_type": {
+            "type": "string"
+          },
+          "timestamp": {
+            "description": "Unix-время, когда произошло событие",
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "update_type",
+          "timestamp"
+        ]
+      },
+      "MessageCallbackUpdate": {
+        "description": "Вы получите этот `update` как только пользователь нажмет кнопку",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "callback": {
+                "description": "",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Callback"
+                  }
+                ]
+              },
+              "message": {
+                "description": "Изначальное сообщение, содержащее встроенную клавиатуру. Может быть `null`, если оно было удалено к моменту, когда бот получил это обновление",
+                "nullable": true,
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                ]
+              },
+              "user_locale": {
+                "description": "Текущий язык пользователя в формате IETF BCP 47",
+                "type": "string",
+                "nullable": true,
+                "readOnly": false
+              }
+            },
+            "required": [
+              "callback",
+              "message"
+            ]
+          }
+        ]
+      },
+      "MessageCreatedUpdate": {
+        "description": "ы получите этот `update`, как только сообщение будет создано",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "message": {
+                "description": "Новое созданное сообщение",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                ]
+              },
+              "user_locale": {
+                "description": "Текущий язык пользователя в формате IETF BCP 47. Доступно только в диалогах",
+                "type": "string",
+                "readOnly": false,
+                "nullable": true
+              }
+            },
+            "required": [
+              "message"
+            ]
+          }
+        ]
+      },
+      "MessageRemovedUpdate": {
+        "description": "Вы получите этот `update`, как только сообщение будет удалено",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "message_id": {
+                "description": "ID удаленного сообщения",
+                "type": "string"
+              },
+              "chat_id": {
+                "description": "ID чата, где сообщение было удалено",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user_id": {
+                "description": "Пользователь, удаливший сообщение",
+                "type": "integer",
+                "format": "int64"
+              }
+            },
+            "required": [
+              "message_id",
+              "chat_id",
+              "user_id"
+            ]
+          }
+        ]
+      },
+      "MessageEditedUpdate": {
+        "description": "Вы получите этот `update`, как только сообщение будет отредактировано",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "message": {
+                "description": "Отредактированное сообщение",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "message"
+            ]
+          }
+        ]
+      },
+      "BotAddedToChatUpdate": {
+        "description": "Вы получите этот update, как только бот будет добавлен в чат",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID чата, куда был добавлен бот",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, добавивший бота в чат",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "is_channel": {
+                "description": "Указывает, был ли бот добавлен в канал или нет",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "chat_id",
+              "user",
+              "is_channel"
+            ]
+          }
+        ]
+      },
+      "BotRemovedFromChatUpdate": {
+        "description": "Вы получите этот update, как только бот будет удален из чата",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID чата, откуда был удален бот",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, удаливший бота из чата",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "is_channel": {
+                "description": "Указывает, был ли бот удален из канала или нет",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "chat_id",
+              "user",
+              "is_channel"
+            ]
+          }
+        ]
+      },
+      "DialogMutedUpdate": {
+        "description": "Вы получите этот update, когда пользователь заглушит диалог с ботом",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID чата, где произошло событие",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, который отключил уведомления",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "muted_until": {
+                "description": "Время в формате Unix, до наступления которого диалог был отключен",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user_locale": {
+                "description": "Текущий язык пользователя в формате IETF BCP 47",
+                "type": "string"
+              }
+            },
+            "required": [
+              "chat_id",
+              "user",
+              "muted_until"
+            ]
+          }
+        ]
+      },
+      "DialogUnmutedUpdate": {
+        "description": "Вы получите этот update, когда пользователь включит уведомления в диалоге с ботом",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID чата, где произошло событие",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, который включил уведомления",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "user_locale": {
+                "description": "Текущий язык пользователя в формате IETF BCP 47",
+                "type": "string"
+              }
+            },
+            "required": [
+              "chat_id",
+              "user"
+            ]
+          }
+        ]
+      },
+      "DialogClearedUpdate": {
+        "description": "Бот получает этот тип обновления сразу после очистки истории диалога.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID чата, где произошло событие",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, который включил уведомления",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "user_locale": {
+                "description": "Текущий язык пользователя в формате IETF BCP 47",
+                "type": "string"
+              }
+            },
+            "required": [
+              "chat_id",
+              "user"
+            ]
+          }
+        ]
+      },
+      "DialogRemovedUpdate": {
+        "description": "Вы получите этот update, когда пользователь удаляет чат",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID чата, где произошло событие",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, который удалил чат",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "user_locale": {
+                "description": "Текущий язык пользователя в формате IETF BCP 47",
+                "type": "string"
+              }
+            },
+            "required": [
+              "chat_id",
+              "user"
+            ]
+          }
+        ]
+      },
+      "UserAddedToChatUpdate": {
+        "description": "Вы получите это обновление, когда пользователь будет добавлен в чат, где бот является администратором",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID чата, где произошло событие",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, добавленный в чат",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "inviter_id": {
+                "description": "Пользователь, который добавил пользователя в чат. Может быть `null`, если пользователь присоединился к чату по ссылке",
+                "type": "integer",
+                "format": "int64",
+                "readOnly": false,
+                "nullable": true
+              },
+              "is_channel": {
+                "description": "Указывает, был ли пользователь добавлен в канал или нет",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "chat_id",
+              "user",
+              "is_channel"
+            ]
+          }
+        ]
+      },
+      "UserRemovedFromChatUpdate": {
+        "description": "Вы получите это обновление, когда пользователь будет удален из чата, где бот является администратором",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID чата, где произошло событие",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, удаленный из чата",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "admin_id": {
+                "description": "Администратор, который удалил пользователя из чата. Может быть `null`, если пользователь покинул чат сам",
+                "type": "integer",
+                "format": "int64",
+                "readOnly": false
+              },
+              "is_channel": {
+                "description": "Указывает, был ли пользователь удален из канала или нет",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "chat_id",
+              "user",
+              "is_channel"
+            ]
+          }
+        ]
+      },
+      "BotStartedUpdate": {
+        "description": "Бот получает этот тип обновления, как только пользователь нажал кнопку `Start`",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID диалога, где произошло событие",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, который нажал кнопку 'Start'",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "payload": {
+                "description": "Дополнительные данные из дип-линков, переданные при запуске бота",
+                "type": "string",
+                "maxLength": 512,
+                "nullable": true,
+                "readOnly": false
+              },
+              "user_locale": {
+                "description": "Текущий язык пользователя в формате IETF BCP 47",
+                "type": "string",
+                "readOnly": false
+              }
+            },
+            "required": [
+              "chat_id",
+              "user"
+            ]
+          }
+        ]
+      },
+      "BotStoppedUpdate": {
+        "description": "Бот получает этот тип обновления, как только пользователь останавливает бота",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID диалога, где произошло событие",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, который остановил чат",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "user_locale": {
+                "description": "Текущий язык пользователя в формате IETF BCP 47",
+                "type": "string",
+                "readOnly": false
+              }
+            },
+            "required": [
+              "chat_id",
+              "user"
+            ]
+          }
+        ]
+      },
+      "ChatTitleChangedUpdate": {
+        "description": "BБот получит это обновление, когда будет изменено название чата",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat_id": {
+                "description": "ID чата, где произошло событие",
+                "type": "integer",
+                "format": "int64"
+              },
+              "user": {
+                "description": "Пользователь, который изменил название",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/User"
+                  }
+                ]
+              },
+              "title": {
+                "description": "Новое название",
+                "type": "string"
+              }
+            },
+            "required": [
+              "chat_id",
+              "user",
+              "title"
+            ]
+          }
+        ]
+      },
+      "MessageChatCreatedUpdate": {
+        "description": "Бот получит это обновление, когда чат будет создан, как только первый пользователь нажмет кнопку чата",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Update"
+          },
+          {
+            "properties": {
+              "chat": {
+                "description": "Созданный чат",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Chat"
+                  }
+                ]
+              },
+              "message_id": {
+                "description": "ID сообщения, где была нажата кнопка",
+                "type": "string"
+              },
+              "start_payload": {
+                "description": "Полезная нагрузка от кнопки чата",
+                "type": "string",
+                "nullable": true,
+                "readOnly": false
+              }
+            },
+            "required": [
+              "message_id",
+              "chat"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "access_token": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "user_model",
+      "x-displayName": "User",
+      "description": "<SchemaDefinition schemaRef=\"#/components/schemas/User\"/>\n"
+    },
+    {
+      "name": "bot_command_model",
+      "x-displayName": "BotCommand",
+      "description": "<SchemaDefinition schemaRef=\"#/components/schemas/BotCommand\"/>\n"
+    },
+    {
+      "name": "chat_model",
+      "x-displayName": "Chat",
+      "description": "<SchemaDefinition schemaRef=\"#/components/schemas/Chat\"/>\n"
+    },
+    {
+      "name": "message_model",
+      "x-displayName": "Message",
+      "description": "<SchemaDefinition schemaRef=\"#/components/schemas/Message\"/>\n"
+    },
+    {
+      "name": "new_message_model",
+      "x-displayName": "NewMessageBody",
+      "description": "<SchemaDefinition schemaRef=\"#/components/schemas/NewMessageBody\"/>\n"
+    },
+    {
+      "name": "update_model",
+      "x-displayName": "Update",
+      "description": "<SchemaDefinition schemaRef=\"#/components/schemas/Update\"/>\n"
+    }
+  ],
+  "x-tagGroups": [
+    {
+      "name": "Methods",
+      "tags": [
+        "bots",
+        "chats",
+        "messages",
+        "subscriptions",
+        "upload"
+      ]
+    },
+    {
+      "name": "Objects",
+      "tags": [
+        "user_model",
+        "chat_model",
+        "message_model",
+        "new_message_model",
+        "update_model"
+      ]
+    }
+  ]
+}
