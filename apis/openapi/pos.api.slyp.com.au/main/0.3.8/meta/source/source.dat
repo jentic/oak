@@ -1,0 +1,2731 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "version": "0.3.8",
+    "title": "Slyp POS API",
+    "description": "# Introduction\n\nThis information is intended as a reference for Point of Sale (POS) providers.\n\nThis API is used to create consumer accounts and submit receipts for a given merchant\nThe following introduces the requests required for a successful integration and provide an overview of how and when these requests should be triggered.\n\nFor any assistance, error reporting or feedback please contact <dev@slyp.com.au>\n\n# Overview\n\nThe following applies to the entire Slyp API, and is considered assumed knowledge throughout the rest of this resource.\n\nThe Slyp API is based on RESTful principles with predictable, resource-oriented URLs and uses HTTP response codes to indicate successful API calls and errors. The API has built-in HTTP features, like HTTP authentication and HTTP verbs, which are understood by off-the-shelf HTTP clients. CORS (cross-origin resource sharing) is not currently supported. JSON is returned by all API responses, including errors.\n\n### Data Requirements and Flexibility\n- Data Type definitions are included throughout this document to accompany request/response formats that use them.\n- Required fields are marked by an asterisk(*).\n- Fields that are not required have to be omitted from the requests - specifically setting them as `null` or empty string is not allowed.\n- Fields that are of `string` type have by default the minimum length of 1 character.\n\n### Custom headers\n- All endpoints should be returning `x-slyp-correlation-id` header with a unique identifier for the response.\n\n### TLS\nSlyp complies with best practice and requires TLS 1.2 for all API endpoints.\n\n### Errors\nSlyp makes use of standard HTTP response codes to indicate the outcome of an API request, as follows:\n\n- `2XX` response codes indicate success.\n- `3XX` response codes indicate a previous success.\n- `401` response codes indicate an authorization error.\n- `429` response codes indicates that too many requests has been sent in a given amount of time.\n- All other `4XX` response codes indicate a failure, with additional information provided to elaborate on the reason for the failure. Failures should be flagged for investigation and should be able to be manually retried to ensure no receipts are lost.\n- `5XX` response codes indicate an error with Slyp. Retry these requests with exponential back off, triggering investigation if not successful after a maximum of 24h.\n- Connectivity/Network and 'other' errors that result in the request never reaching Slyp should be accounted for wherever possible and retried with exponential back off to ensure customers never go without their receipt.\n\n# Authentication\nThe Slyp API securely manages authentication using a system generated `API key`, an `Account ID` (typically the Merchant ID) and `JSON Web Tokens` (JWT). To use the API first authenticate against the `/authenticate` endpoint with an API Key and Account ID. Slyp will provision a set of credentials for testing on request.\n\nEvery request to other API endpoints must include an `Authorization` header key with a Bearer token in the format of `\"Authorization\": \"Bearer \"`.\n\n## Access Token Length\nExpect that the length of all access token types will change over time as Slyp makes changes to what is stored in them and how they are encoded. You can expect that they will grow and shrink over time. Please use a variable length data type without a specific maximum size to store access tokens.\n\n## Expired Tokens\nIntegrators should be aware that a token can expire after a specific amount of time (typically 25 hours). Your authentication process should handle the possibility of an unexpected expired token as best practice and, at a minimum, should refresh the token at the same time once per day.\n\n## Unauthorized Responses\nWhen authenticating, the calling application will receive a `401 - Unauthorized` exception if the API Key is invalid or is not permitted to acquire the requested role. Once authenticated, requests made using the JSON Web Token (JWT) will also receive a `401` error if the token is invalid, has expired or is not authorized to make the request.\n\n# Flow of the purchase\n\n## Pre-tender flow\n\nThe following presents the general flow of the purchase when the integration with Slyp happens pre-tender, i.e. synchronously before the consumer makes the payment.\nThe flow allows for retrieval of the consumer's account information, applying discounts and performing points redemption.\n\n1. Consumer scans the loyalty card. POS receives back loyalty details (available credit, name, surname etc.) from Slyp API. Alternatively Consumer hands over their phone number and the POS searches for the loyalty card in Slyp API.\n2. Once all basket items have been scanned, POS sends the `Transaction Open` request with the basket items and receives back the discounted prices and points to be earned.\n3. If the consumer adds more items or removes any, POS will need to send the `Transaction Update` request to retrieve the new assessment.\n4. If the consumer scans a different loyalty card, POS will need to send the `Transaction Cancel` request and then Transaction Open request with the new loyalty id.\n5. Once the Consumer is ready to pay, they decide how many $ in points they want to use towards the purchase. POS sends the `Payment` request with the $ amount.\n6. Consumer pays the total discounted price less $ in points redeemed.\n7. POS sends `Transaction Finalise` request using the discounted prices and specifying the number of points redeemed (in `loyalty`) and their $ value (in `other payment`).\n\n## Post-tender flow\n\nThe following presents the general flow of the purchase when the integration with Slyp happens post-tender, i.e. asynchronously after the consumer makes the payment.\n\n1. (Optional) consumer scans the loyalty card. POS verifies the card by itself or assumes it is correct. No account details are retrieved from Slyp.\n2. Consumer scans the basket items.\n3. Consumer pays the total price.\n4. POS sends the `Receipt` request.\n",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/TranslatorHQ/slyp-pos-api/0.3.8"
+  },
+  "servers": [
+    {
+      "url": "https://pos.api.slyp.com.au/v1",
+      "description": "POS API - Production environment"
+    },
+    {
+      "url": "https://pos.api.sandbox-slyp.com.au/v1",
+      "description": "POS API - Sandbox environment"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Account",
+      "description": "Endpoints used to retrieve the consumer's account details and sign up the consumer to the program."
+    },
+    {
+      "name": "Transaction",
+      "description": "Endpoints handling the pre-tender purchase flow."
+    },
+    {
+      "name": "Payment",
+      "description": "Endpoints to be used to handle payments with points in the pre-tender purchase flow."
+    },
+    {
+      "name": "Receipt",
+      "description": "Endpoints handling the post-tender purchase flow."
+    },
+    {
+      "name": "Adjustments",
+      "description": "Endpoints to be used to adjust the receipt post finalisation or submission for both pre- and post-tender flows."
+    }
+  ],
+  "paths": {
+    "/authenticate": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Retrieve a JWT used for querying all other endpoints.",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/PostAuthRequest"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PostAuthResponse"
+          },
+          "401": {
+            "description": "Unauthorized. Please check the API key."
+          },
+          "422": {
+            "description": "Unprocessable Entity. Please check the request body."
+          },
+          "500": {
+            "description": "Internal Server Error. Please try again."
+          }
+        }
+      }
+    },
+    "/account": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Retrieve the account details of the consumer.",
+        "description": "Only one query parameter should be used:\n- `phone_number`: To be used when the consumer does not have the card with them\n- `loyalty_id`: To be used when the consumer taps the card during the purchase\n- `oauth_code`: To be used when the consumer completes the oauth flow to verify their account\n\nThe returned `available_credit` should be used to offer the consumer points redemption and to calculate the number of points to be burned (`points burned` = `$ credit used` * `points_per_dollar`).\n",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "phone_number",
+            "description": "Phone number of the consumer starting with +614, no spaces or dashes",
+            "example": "+61400000000",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "loyalty_id",
+            "description": "Loyalty id of the consumer",
+            "example": "1234567890",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "oauth_code",
+            "description": "OAuth account linking token provided in the redirect back from https://oauth.gorewards.com.au",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account successfully retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "404": {
+            "description": "No account matching the params found."
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "Sign up the consumer to the loyalty program",
+        "description": "Sign up the consumer to the loyalty program and retrieve their account details.\n",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account successfully created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "409": {
+            "description": "Conflict. Consumer already signed up to the program."
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/transaction/open": {
+      "post": {
+        "tags": [
+          "Transaction"
+        ],
+        "summary": "Open a transaction",
+        "description": "Open the transaction to retrieve the assessment of the basket items, e.g. how many points will be earned and the adjusted prices post loyalty related discounts.\n\nAt this stage the purchase has not been finalised yet and the consumer may still add / remove items.\nThis and subsequent endpoints should be called during the pre-tender flow when the consumer's loyalty id is known.\nIf the consumer changes the items in the basket, the POST `/transaction/{transaction_id}/update` endpoint should be called.\nOpening the transaction locks the consumer's account.\n\nThis and `/transaction/{transaction_id}/update` endpoint require a subset of the receipt properties required by `/transaction/{transaction_id}/finalise` endpoint.\n",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenedTransaction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction successfully opened.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionOpenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequestsError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/transaction/{transaction_id}/update": {
+      "post": {
+        "tags": [
+          "Transaction"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "description": "Id of the transaction received from POST /transaction/open endpoint",
+            "example": "12345678-1234-1234-1234-123456789012",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "summary": "Update a transaction",
+        "description": "Adjust the transaction if the consumer scans additional products or removes any from the basket.\n\nAt this stage the purchase has not been finalised yet and the consumer may still add / remove items.\nThis endpoint should be used if the consumer changes the items in the basket after the initial POST `/transaction/open` call.\n\nIf the `loyalty_id` is to change (e.g. a different loyalty card is scanned), the transaction should be cancelled first and a new transaction should be opened.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenedTransaction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction successfully updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionOpenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "404": {
+            "description": "Transaction not found"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequestsError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/transaction/{transaction_id}/finalise": {
+      "post": {
+        "tags": [
+          "Transaction"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "description": "Id of the transaction received from POST /transaction/open endpoint",
+            "example": "12345678-1234-1234-1234-123456789012",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "summary": "Finalise the transaction",
+        "description": "Finalise the transaction to complete the purchase.\nThis should be performed as the last step once the consumer has paid for the purchase.\n\n`other_payments` should include the `payment_xref` if applicable.\n\nThe prices of the basket items should incorporate the latest adjusted prices received from the latest POST `/transaction/open` or `/transaction/{transaction_id}/update` requests. The `loyalty` array items should include the points redeemed.\n\nFinalising the transaction will attribute points from the purchase and decrease the points by points redeemed.\nAdditionally the consumer's account will be unlocked for future purchases.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalisedTransaction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction successfully finalised.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalReference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "404": {
+            "description": "Transaction not found"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequestsError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/transaction/{transaction_id}/cancel": {
+      "post": {
+        "tags": [
+          "Transaction"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "description": "Id of the transaction received from POST /transaction/open endpoint",
+            "example": "12345678-1234-1234-1234-123456789012",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "summary": "Cancel the transaction",
+        "description": "Cancel the transaction.\nThis should be used when the consumer decides to cancel the purchase or if a different loyalty card is scanned.\nCancelling the transaction unlocks the consumer's account for future purchases.\n",
+        "responses": {
+          "204": {
+            "description": "Transaction successfully cancelled."
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "404": {
+            "description": "Transaction not found"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequestsError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/transaction/{transaction_id}/payment": {
+      "post": {
+        "tags": [
+          "Payment"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "description": "Id of the transaction received from POST /transaction/open endpoint",
+            "example": "12345678-1234-1234-1234-123456789012",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "summary": "Record a payment",
+        "description": "Record a payment for the transaction using the points.\nThis should be used when the consumer pays for the purchase.\nThe payment should be recorded before the transaction is finalised.\n\nThe amount should be based on the `available_credit` received from the GET `/account` endpoint.\n\nThis will lock the consumer's points, which will be debited from the account when the transaction is finalised.\n\nThe returned `payment_xref` should be sent in the `other_payments` array in the POST `/transaction/{transaction_id}/finalise` request.\nIt is considered an error if the payment is not included in `other_payments` if it has not been cancelled using the `/payment/{payment_xref}/cancel` endpoint beforehand.\n\nThe endpoint with return `Bad Request` if the points balance became insufficient in the meantime (e.g. consumer making a concurrent purchase)\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PointsPaymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment successfully recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "payment_xref": {
+                      "type": "string",
+                      "description": "The reference of the payment",
+                      "example": "P-X-1234567890"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequestsError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/transaction/{transaction_id}/payment/{payment_xref}/cancel": {
+      "post": {
+        "tags": [
+          "Payment"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "description": "Id of the transaction received from POST /transaction/open endpoint",
+            "example": "12345678-1234-1234-1234-123456789012",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "payment_xref",
+            "description": "Id of the payment received from POST /transaction/{transaction_id}/payment endpoint",
+            "example": "P-X-1234567890",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "summary": "Cancel a payment",
+        "description": "Cancel the payment. This will unlock the points for the consumer to use in a future purchase.\n",
+        "responses": {
+          "204": {
+            "description": "Payment successfully cancelled."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequestsError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/receipts": {
+      "post": {
+        "tags": [
+          "Receipt"
+        ],
+        "summary": "Submit the receipt.",
+        "description": "Standard flow:\nIf a loyalty card has been scanned, include the `loyalty_id` and `program_id` in the loyalty array.\nThe program_id should be configured as a variable in the POS system.\n\nOffline Flow:\nThis endpoint must also be used when the POS is offline and cannot retrieve member details from Go Rewards in real time.\nCustomers may still scan their loyalty card or provide a valid phone number.\nPoints will be attributed once the receipt is received by Go Rewards.\n\nIf a phone number is provided in offline mode:\nSet `loyalty_id` to `\"phone_number_provided\"`.\nSet the `purchaser` object's `\"phone\"` attribute to the provided phone number.\n\nIf the loyalty program is handled by Go Rewards, the points attribution will be performed downstream with loyalty $ discounts potentially be converted into additional points.\n",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Receipt"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Receipt successfully submitted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalReference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequestsError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/receipts/{receipt_xref}/adjust": {
+      "post": {
+        "tags": [
+          "Adjustments"
+        ],
+        "summary": "Adjust the receipt post finalisation or submission",
+        "description": "Adjust the receipt post finalisation or submission (after the consumer has paid for the purchase).\n\nThe endpoint should be used for refunds, exchanges, adding additional items, application of additional discounts etc. Only the \"delta\" should be sent in the request.\n\nRefunded items should be sent with negative price.\n\nRefund of the payment should be sent with negative amount.\n\nAny additional discounts not related to a specific product should be sent in the \"basket_items\" array as follows `{ \"kind\": \"adjustment\", \"seqno\": \"{seqno}\", \"external_id\": \"{external_id}, \"name\": \"Discount\", \"description\": \"{reason for discount}, \"pricing\": { \"price\": -10.00, \"currency_code\": \"AUD\" } }`.\n\nThe reduction in of points burned should be sent in the \"other_payments\" array as follows `{ \"payment_type\": \"points_adjustment\", \"reference\": \"{program_id}\", \"amount: -10 }`. In this case partial refund is allowed even if the resulting value is between the `increment`s or lower than `minimum` credit spend allowed.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_xref",
+            "description": "Id the of the original receipt received from POST /receipts or POST /transaction/{transaction_id}/finalise endpoints",
+            "example": "R-X-1234567890",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptAdjustment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Receipt adjustment successfully submitted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalReference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequestsError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/receipt": {
+      "get": {
+        "tags": [
+          "Adjustments"
+        ],
+        "summary": "Retrieve the receipt details",
+        "description": "Only one query parameter should be used:\n- `external_id`\n- `transaction_id`\n\nThe returned `xref` can be used to adjust the receipt post finalisation by means of POST `/receipts/{receipt_xref}/adjust` endpoint\n",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "external_id",
+            "description": "External id of the receipt as defined by the POS",
+            "example": "1234-ABCD",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "transaction_id",
+            "description": "Transaction id returned by `transaction/open` endpoint",
+            "example": "393de8c872bd44b686747b1b9699d823",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-client",
+            "description": "The identification of the system sending the request, e.g. \"kosmos-pos-v1\"",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Receipt successfully retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalReference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorisedError"
+          },
+          "404": {
+            "description": "No account matching the params found."
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT retrieved from `https://pos.api.slyp.com.au/v1/authenticate` or `https://pos.api.sandbox-slyp.com.au/v1/authenticate` endpoint.\n"
+      }
+    },
+    "requestBodies": {
+      "PostAuthRequest": {
+        "description": "Merchant ID and secret",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "apiKey": {
+                  "type": "string",
+                  "example": "MAK-1234567890",
+                  "description": "Api key of the merchant."
+                },
+                "merchant": {
+                  "type": "string",
+                  "example": "M-X-12345678",
+                  "description": "The id of merchant access is requested for."
+                }
+              },
+              "required": [
+                "apiKey",
+                "merchant"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "AccountDetails": {
+        "description": "Account details",
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "example": "Vital",
+            "description": "First name of the consumer"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Lacerda",
+            "description": "Last name of the consumer"
+          },
+          "loyalty_id": {
+            "type": "string",
+            "example": 1234567890,
+            "description": "Id of the consumer in the loyalty program"
+          },
+          "program_id": {
+            "type": "string",
+            "example": "kosmos-rewards",
+            "description": "Id of the program the consumer is signed up to"
+          },
+          "available_credit": {
+            "type": "object",
+            "description": "Available $ credit (from points) that the consumer can redeem for the purchase",
+            "properties": {
+              "min": {
+                "type": "number",
+                "example": 10,
+                "description": "Minimum $ amount that can be redeemed for points"
+              },
+              "max": {
+                "type": "number",
+                "example": 30,
+                "description": "Maximum $ amount that can be redeemed for points"
+              },
+              "increment": {
+                "type": "number",
+                "example": 5,
+                "description": "Incremental $ amount that can be redeemed for points"
+              },
+              "currency": {
+                "type": "string",
+                "example": "AUD",
+                "description": "Currency of the available credit"
+              },
+              "points_per_currency": {
+                "type": "integer",
+                "example": 100,
+                "description": "Number of points per dollar. To be used for calculating the redeemed points."
+              }
+            },
+            "required": [
+              "min",
+              "max",
+              "increment",
+              "currency",
+              "points_per_currency"
+            ]
+          },
+          "available_points": {
+            "type": "number",
+            "example": 1520,
+            "description": "Current usable points of the consumer"
+          },
+          "print_paper_receipt": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether to print a paper receipt for the consumer"
+          },
+          "notice": {
+            "type": "string",
+            "example": "You need to verify your account in the Go Rewards App to be able to redeem points",
+            "description": "Notice to be displayed to the consumer"
+          }
+        },
+        "required": [
+          "loyalty_id",
+          "program_id",
+          "available_credit",
+          "available_points"
+        ]
+      },
+      "AccountCreateRequest": {
+        "description": "Request to create an account for the consumer",
+        "type": "object",
+        "properties": {
+          "program_id": {
+            "type": "string",
+            "example": "kosmos-rewards",
+            "description": "Id of the program the consumer is signing up to"
+          },
+          "phone_number": {
+            "type": "string",
+            "example": "+61400000000",
+            "description": "Phone number of the consumer starting with +614, no spaces or dashes"
+          },
+          "first_name": {
+            "type": "string",
+            "example": "Vital",
+            "description": "First name of the consumer"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Lacerda",
+            "description": "Last name of the consumer"
+          },
+          "email": {
+            "type": "string",
+            "example": "test@example.com",
+            "description": "Email of the consumer"
+          }
+        },
+        "required": [
+          "program_id",
+          "phone_number"
+        ]
+      },
+      "PointsPaymentRequest": {
+        "type": "object",
+        "properties": {
+          "currency_value_redeemed": {
+            "type": "number",
+            "example": 10.0,
+            "description": "The value of the points redeemed in the currency of the transaction"
+          }
+        }
+      },
+      "ExternalReference": {
+        "type": "object",
+        "properties": {
+          "xref": {
+            "type": "string",
+            "description": "Slyp's external reference ID for the given receipt. This field cannot be set or edited. Generated by Slyp and can be used for lookups, updates, and deletes.",
+            "readOnly": true,
+            "example": "R-X-1234"
+          }
+        }
+      },
+      "CoreReceipt": {
+        "type": "object",
+        "properties": {
+          "merchant": {
+            "type": "string",
+            "description": "The merchant id of the merchant who issued the receipt.",
+            "example": "M-123456789012345678901234567890",
+            "minLength": 32,
+            "pattern": "^M-"
+          },
+          "store_id": {
+            "type": "string",
+            "description": "The id of the store where the receipt originated from as defined by the merchant.",
+            "example": "STORE_123",
+            "minLength": 1
+          },
+          "basket_items": {
+            "type": "array",
+            "description": "The items purchased in this transaction. Item types are `product`, `service`, `journey`, `adjustment`",
+            "items": {
+              "$ref": "#/components/schemas/BasketItem"
+            }
+          },
+          "total_price": {
+            "type": "number",
+            "description": "The total price for this purchase, including all taxes and discounts.",
+            "example": 146.4
+          },
+          "currency_code": {
+            "type": "string",
+            "description": "The applicable ISO 4217 alphabetic currency code for the purchase amount. Typically `AUD`. May differ from the currency charged to the payment card.",
+            "default": "AUD"
+          },
+          "loyalty": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "loyalty_id": {
+                  "type": "string",
+                  "description": "The loyalty id of the consumer.",
+                  "example": 1234567890
+                },
+                "program_id": {
+                  "type": "string",
+                  "description": "The loyalty program id.",
+                  "example": "kosmos-rewards"
+                }
+              },
+              "required": [
+                "loyalty_id",
+                "program_id"
+              ]
+            }
+          },
+          "datetime_iso_tz": {
+            "type": "string",
+            "description": "Timestamp of the operation in ISO 8601 format with consumer's timezone. In case of the /finalise it is the actual time of the purchase which will be displayed on the tax receipt",
+            "example": "2024-11-01T14:30:51+11:00"
+          }
+        },
+        "required": [
+          "merchant",
+          "store_id",
+          "basket_items",
+          "total_price",
+          "currency_code",
+          "datetime_iso_tz"
+        ]
+      },
+      "OpenedTransaction": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CoreReceipt"
+          },
+          {
+            "required": [
+              "loyalty"
+            ]
+          }
+        ]
+      },
+      "ReceiptAdjustment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Receipt"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "loyalty": {
+                "readOnly": true
+              },
+              "replaced_by": {
+                "readOnly": true
+              },
+              "purchaser": {
+                "readOnly": true
+              }
+            }
+          }
+        ]
+      },
+      "FinalisedTransaction": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Receipt"
+          },
+          {
+            "required": [
+              "loyalty"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "other_payments": {
+                "description": "Information about the cash, gift card, loyalty points payments.",
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PointsPayment"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "PointsPayment": {
+        "type": "object",
+        "description": "Information about the payment with points",
+        "properties": {
+          "payment_type": {
+            "type": "string",
+            "description": "Payment by means of points",
+            "enum": [
+              "points"
+            ]
+          },
+          "payment_xref": {
+            "type": "string",
+            "description": "The reference of the payment received from \"payment\" endpoint",
+            "example": "1234567890"
+          }
+        },
+        "required": [
+          "payment_type",
+          "payment_xref"
+        ]
+      },
+      "Receipt": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CoreReceipt"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "pos_id": {
+                "type": "string",
+                "description": "The id of the POS device that issued this receipt.",
+                "example": "POS_1"
+              },
+              "tid": {
+                "type": "string",
+                "description": "The id of the terminal that the transaction originated from.",
+                "example": "TERMINAL_1"
+              },
+              "external_id": {
+                "type": "string",
+                "description": "A unique id provided by integrator to help prevent duplicates. This will be unique over a time interval (not globally).",
+                "example": "RPT-123"
+              },
+              "replaced_by": {
+                "type": "string",
+                "description": "The receipt xref of the receipt that replaces this receipt (e.g. in the event of a refund or exchange).",
+                "example": "R-X-1236"
+              },
+              "raw_basket_items": {
+                "type": "string",
+                "description": "A text string containing the raw basket items.",
+                "example": "product1, product2"
+              },
+              "payment_data": {
+                "type": "array",
+                "description": "Information about the payment. This is used to reconcile a receipt to a consumer.",
+                "items": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              },
+              "raw_payment_data": {
+                "type": "string",
+                "description": "A text string containing the raw payments.",
+                "example": "$16.34,xxxx1234"
+              },
+              "other_payments": {
+                "description": "Information about the cash and gift card payments.",
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/OtherPayment"
+                    }
+                  ]
+                }
+              },
+              "purchaser": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Purchaser"
+                  },
+                  {
+                    "description": "Purchaser details if supplied at checkout or linked to a specific transaction by the POS."
+                  }
+                ]
+              },
+              "global_more_information": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GlobalMoreInfo"
+                  },
+                  {
+                    "description": "A global more information panel for the receipt"
+                  }
+                ]
+              },
+              "is_tax_invoice": {
+                "type": "boolean",
+                "description": "An indication of whether this receipt serves as a tax invoice."
+              },
+              "total_tax": {
+                "type": "number",
+                "description": "The total tax for this purchase.",
+                "example": 12.34
+              },
+              "total_taxes": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TaxWithCurrency"
+                },
+                "description": "The total taxes split into types and currencies. To be populated if the tax data cannot be split into individual line items."
+              },
+              "total_discount": {
+                "type": "number",
+                "description": "The total discount for this receipt.",
+                "example": 23.99
+              },
+              "barcode": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Barcode"
+                  },
+                  {
+                    "description": "The barcode for the receipt"
+                  }
+                ]
+              },
+              "metadata": {
+                "type": "string",
+                "description": "Arbitrary metadata provided by the integrator.",
+                "example": "homewares,#01234,REF_1234"
+              },
+              "served_by": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Server"
+                  },
+                  {
+                    "description": "Who served the customer today."
+                  }
+                ]
+              },
+              "return_period": {
+                "type": "number",
+                "description": "The return period for all basket items associated with this receipt.",
+                "example": 60
+              },
+              "return_message": {
+                "type": "string",
+                "description": "A returns message inputted into the POS by a staff member.",
+                "example": "The AirJordans were sold as a floor item and aren't eligible for returns."
+              },
+              "indicate_taxable_items": {
+                "description": "An array of tax types that will be used to annotate basket items in the receipt.",
+                "example": [
+                  "AU_GST"
+                ],
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TaxType"
+                }
+              },
+              "sms_message": {
+                "type": "string",
+                "description": "The custom message for the SMS receipt that is specific for this receipt.",
+                "example": "Thanks John for shopping with us"
+              },
+              "item_count": {
+                "type": "number",
+                "description": "The total number of items that the consumer has in their basket.\nFor the following line items:\n1 x shampoo,\n1/2 x script,\n3 x toothpaste,\nthe item count is 4 1/2.\n",
+                "example": 6
+              },
+              "promotions": {
+                "description": "An array of promotions specifying which promotions should be displayed on this receipt as well as barcode and unique code overrides",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Promotion"
+                }
+              }
+            },
+            "required": [
+              "payment_data",
+              "issued_at",
+              "external_id",
+              "total_tax"
+            ]
+          }
+        ]
+      },
+      "BasketItem": {
+        "description": "The basket item where the type is the attribute name `product`, `service`, `journey` or `adjustment`",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Product"
+          },
+          {
+            "$ref": "#/components/schemas/Service"
+          },
+          {
+            "$ref": "#/components/schemas/Journey"
+          },
+          {
+            "$ref": "#/components/schemas/Adjustment"
+          }
+        ]
+      },
+      "Product": {
+        "type": "object",
+        "description": "Product variant of basket item",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The type of the basket item - \"product\"",
+            "enum": [
+              "product"
+            ]
+          },
+          "seqno": {
+            "type": "number",
+            "description": "The sequence number of the item on the receipt.",
+            "example": 1
+          },
+          "external_id": {
+            "type": "string",
+            "description": "The merchant defined id of this item. An example is an SKU or ISBN, etc. If it is not the product's barcode then the barcode should be included in the `barcode` property.",
+            "maxLength": 50,
+            "example": "ABCD-1234"
+          },
+          "name": {
+            "type": "string",
+            "description": "A short title or name for this line item",
+            "example": "Spirit Island Board Game"
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of the item."
+          },
+          "short_description": {
+            "type": "string",
+            "description": "A short description that will be displayed below the product name. This field can be used for a model number or a message such as \"You saved ...\".",
+            "example": "WAT28460GB",
+            "maxLength": 25
+          },
+          "attributes": {
+            "type": "array",
+            "description": "Optional array of product attributes.",
+            "items": {
+              "$ref": "#/components/schemas/ProductAttribute"
+            }
+          },
+          "brand": {
+            "type": "string",
+            "description": "The product brand."
+          },
+          "identifiers": {
+            "type": "array",
+            "description": "Optional array of product identifiers.",
+            "items": {
+              "$ref": "#/components/schemas/ProductIdentifier"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "description": "Optional array of tags used to classify the product.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pricing": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Pricing"
+              },
+              {
+                "description": "Total price for all items post all discounts."
+              }
+            ]
+          },
+          "taxes": {
+            "description": "Optional array of taxes that apply to the product.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tax"
+            }
+          },
+          "quantity_purchased": {
+            "type": "number",
+            "description": "The number of items of this type purchased (or the number of the unit type specified if applicable)"
+          },
+          "quantity_unit_type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProductUnit"
+              },
+              {
+                "description": "The unit of measure for the product for variable quantity types."
+              }
+            ]
+          },
+          "warranty_period": {
+            "type": "number",
+            "description": "The warranty period, in months, for this item. If `0`, warranty information is omitted",
+            "default": 0
+          },
+          "serial_number": {
+            "type": "string",
+            "description": "The product serial number."
+          },
+          "barcode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Barcode"
+              },
+              {
+                "description": "The product barcode."
+              }
+            ]
+          },
+          "image_url": {
+            "type": "string",
+            "description": "The URL for the image for this item."
+          },
+          "external_links": {
+            "type": "array",
+            "description": "External links of type `product`, `manufacturer`, `documentation`, `product_warranty`, `extended_warranty`, `custom`.<br/>Where `custom` takes the form of a NamedLink",
+            "items": {
+              "$ref": "#/components/schemas/ProductLink"
+            }
+          },
+          "categories": {
+            "description": "Categories which apply to this product.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "original_invoice_number": {
+            "description": "The original invoice number.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "seqno",
+          "name",
+          "external_id",
+          "pricing",
+          "quantity_purchased",
+          "quantity_unit_type"
+        ]
+      },
+      "Service": {
+        "type": "object",
+        "description": "Service variant of basket item",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The type of the basket item - \"service\"",
+            "enum": [
+              "service"
+            ]
+          },
+          "seqno": {
+            "type": "number",
+            "description": "The sequence number of the item on the receipt."
+          },
+          "external_id": {
+            "type": "string",
+            "description": "The merchant defined id of this item. An example is an SKU or ISBN, etc.",
+            "maxLength": 50,
+            "example": "ABCD-1234"
+          },
+          "name": {
+            "type": "string",
+            "description": "A short title or name for this line item"
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of the item."
+          },
+          "short_description": {
+            "type": "string",
+            "description": "A short description that will be displayed below the service name. This field can be used for an item number or a message such as \"You saved ...\".",
+            "maxLength": 25
+          },
+          "attributes": {
+            "type": "array",
+            "description": "Optional array of service attributes.",
+            "items": {
+              "$ref": "#/components/schemas/ServiceAttribute"
+            }
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/Pricing"
+          },
+          "taxes": {
+            "description": "Optional array of taxes that apply to the service.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tax"
+            }
+          },
+          "quantity_purchased": {
+            "type": "number",
+            "description": "The number of items purchased."
+          },
+          "warranty_period": {
+            "type": "number",
+            "description": "The warranty period, in months, for this item. If `0`, warranty information is omitted",
+            "default": 0
+          },
+          "image_url": {
+            "type": "string",
+            "description": "The URL for the image for this item."
+          },
+          "external_links": {
+            "type": "array",
+            "description": "External links of type `product`, `manufacturer`, `documentation`, `product_warranty`, `extended_warranty`, `custom`.<br/>Where `custom` takes the form of a NamedLink",
+            "items": {
+              "$ref": "#/components/schemas/ProductLink"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "seqno",
+          "external_id",
+          "name",
+          "pricing",
+          "quantity_purchased"
+        ]
+      },
+      "Journey": {
+        "type": "object",
+        "description": "journey variant of basket item",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The type of the basket item - \"journey\"",
+            "enum": [
+              "journey"
+            ]
+          },
+          "seqno": {
+            "type": "number",
+            "description": "The sequence number of the item on the receipt."
+          },
+          "external_id": {
+            "type": "string",
+            "description": "The merchant defined id of this item. An example is an SKU or ISBN, etc.",
+            "maxLength": 50,
+            "example": "ABCD-1234"
+          },
+          "name": {
+            "type": "string",
+            "description": "A short title or name for this line item"
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of the item."
+          },
+          "short_description": {
+            "type": "string",
+            "description": "A short description that will be displayed below the journey name. This field can be used for a ride type or a message such as \"You saved ...\".",
+            "example": "Express",
+            "maxLength": 25
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/Pricing"
+          },
+          "taxes": {
+            "description": "Optional array of taxes that apply to the service.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tax"
+            }
+          },
+          "pickup": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Location"
+              },
+              {
+                "description": "The pickup location."
+              }
+            ]
+          },
+          "dropoff": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Location"
+              },
+              {
+                "description": "The dropoff location."
+              }
+            ]
+          },
+          "image_url": {
+            "type": "string",
+            "description": "The URL for the image for this item."
+          },
+          "external_links": {
+            "type": "array",
+            "description": "External links of type `product`, `manufacturer`, `documentation`, `product_warranty`, `extended_warranty`, `custom`.<br/>Where `custom` takes the form of a NamedLink",
+            "items": {
+              "$ref": "#/components/schemas/ProductLink"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "seqno",
+          "external_id",
+          "name",
+          "pricing",
+          "pickup",
+          "dropoff"
+        ]
+      },
+      "Adjustment": {
+        "type": "object",
+        "description": "Adjustment variant of basket item",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The type of the basket item - \"adjustment\"",
+            "enum": [
+              "adjustment"
+            ]
+          },
+          "seqno": {
+            "description": "The sequence number of the item on the receipt.",
+            "type": "number"
+          },
+          "external_id": {
+            "type": "string",
+            "description": "The merchant defined id of this item. An example is an SKU or ISBN, etc.",
+            "maxLength": 50,
+            "example": "ABCD-1234"
+          },
+          "name": {
+            "type": "string",
+            "description": "A short title or name for this line item"
+          },
+          "description": {
+            "description": "A description of the item.",
+            "type": "string"
+          },
+          "short_description": {
+            "type": "string",
+            "description": "A short description that will be displayed below the adjustment name. This field can be used for a message such as \"You saved ...\".",
+            "example": "You save $5.99.",
+            "maxLength": 25
+          },
+          "pricing": {
+            "$ref": "#/components/schemas/Pricing"
+          },
+          "claimed_promotion": {
+            "$ref": "#/components/schemas/ClaimedPromotion"
+          }
+        },
+        "required": [
+          "kind",
+          "seqno",
+          "external_id",
+          "name",
+          "pricing"
+        ]
+      },
+      "TransactionOpenResponse": {
+        "description": "Points to be earned on the transaction and adjusted prices post loyalty related discounts",
+        "type": "object",
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "example": "12345678-abcd-efgh-ijkl-1234567890",
+            "description": "Unique id for the current purchase.\nTo be used in the `/transaction/{transaction_id}/...` endpoints.\n"
+          },
+          "total_points_to_earn": {
+            "type": "integer",
+            "example": 90,
+            "description": "Total number of points to be earned on the basket items"
+          },
+          "adjusted_total_price": {
+            "type": "number",
+            "example": 90,
+            "description": "Total price of the basket post discounts"
+          },
+          "receipt_level_discount": {
+            "type": "number",
+            "example": 10,
+            "description": "Total discount applied at the receipt level. \"adjusted_total_price\" = sum of \"adjusted_price\" of basket items - \"receipt_level_discount\".\nReceipt level discount should not be included in the subsequent `/transaction/{transaction_id}/update` request.\nHowever it should be included in the `/transaction/{transaction_id}/finalise` request as an \"adjustment\" with `external_id` = `receipt_level_discount`\n"
+          },
+          "currency": {
+            "type": "string",
+            "example": "AUD",
+            "description": "Currency of the basket"
+          },
+          "basket_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "seqno": {
+                  "type": "number",
+                  "description": "Sequence of the item in the basket as received in the request",
+                  "example": 1
+                },
+                "external_id": {
+                  "type": "string",
+                  "description": "The merchant defined id as received in the request.",
+                  "example": "ABCD-1234"
+                },
+                "adjusted_price": {
+                  "type": "number",
+                  "description": "Total adjusted price of the items",
+                  "example": 100
+                },
+                "quantity_purchased": {
+                  "type": "number",
+                  "description": "The quantity of the item"
+                },
+                "currency": {
+                  "type": "string",
+                  "example": "AUD"
+                },
+                "points_to_earn": {
+                  "type": "integer",
+                  "example": 90,
+                  "description": "(Optional) Number of points to be earned on the item"
+                },
+                "kind": {
+                  "type": "string",
+                  "description": "The type of the basket item",
+                  "enum": [
+                    "product",
+                    "service",
+                    "journey",
+                    "adjustment"
+                  ]
+                }
+              },
+              "required": [
+                "seqno",
+                "external_id",
+                "adjusted_price",
+                "currency",
+                "kind"
+              ]
+            }
+          }
+        },
+        "required": [
+          "transaction_id",
+          "total_points_to_earn",
+          "adjusted_total_price",
+          "receipt_level_discount",
+          "currency",
+          "available_credit",
+          "basket_items"
+        ]
+      },
+      "ClaimedPromotion": {
+        "type": "object",
+        "description": "The summary for a promotion that was claimed in the purchase for the receipt",
+        "properties": {
+          "external_id": {
+            "type": "string",
+            "description": "The merchant's external id for the promotion"
+          },
+          "claim_details": {
+            "$ref": "#/components/schemas/ClaimedDetails"
+          }
+        }
+      },
+      "ClaimedDetails": {
+        "type": "object",
+        "description": "The claims required to accept the promotion",
+        "properties": {
+          "online": {
+            "$ref": "#/components/schemas/OnlineCode"
+          },
+          "barcode": {
+            "$ref": "#/components/schemas/PromotionBarcode"
+          }
+        }
+      },
+      "OnlineCode": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "eJ9hy72F"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "PromotionBarcode": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "example": "9789862410035"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "CustomAttribute": {
+        "type": "object",
+        "description": "Captures a custom attribute associated to a product or service.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ]
+      },
+      "ProductAttribute": {
+        "type": "object",
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "String type attributes",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "size",
+                  "colour",
+                  "condition",
+                  "feature"
+                ]
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "description": "Number type attributes",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "width",
+                  "height",
+                  "length",
+                  "netWeight",
+                  "grossWeight",
+                  "volume"
+                ]
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "description": "Custom attribute",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "custom"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/CustomAttribute"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          }
+        ]
+      },
+      "ServiceAttribute": {
+        "type": "object",
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Number type attributes",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "length",
+                  "setup_time",
+                  "cleanup_time"
+                ]
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "description": "Custom attribute",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "custom"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/CustomAttribute"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          }
+        ]
+      },
+      "ProductIdentifier": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "mpn",
+              "upc",
+              "ean",
+              "isbn",
+              "sku",
+              "slug"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ]
+      },
+      "Promotion": {
+        "type": "object",
+        "description": "A receipt promotion object used to add additional promotion information on a per receipt basis to existing promotions.",
+        "properties": {
+          "external_id": {
+            "type": "string",
+            "description": "The merchant defined promotion id"
+          },
+          "claim_details": {
+            "$ref": "#/components/schemas/ClaimDetails"
+          }
+        },
+        "required": [
+          "external_id"
+        ]
+      },
+      "ClaimDetails": {
+        "type": "object",
+        "description": "This section determines how the customer can claim their promotion. Providing OnlineClaimDetails will override the existing claim details on the promotion. Providing BarcodeClaimDetails will override the existing promotion barcode. Both of these options can be provided to the customer if desired.",
+        "properties": {
+          "online": {
+            "$ref": "#/components/schemas/OnlineClaimDetails"
+          },
+          "barcode": {
+            "$ref": "#/components/schemas/BarcodeClaimDetails"
+          }
+        }
+      },
+      "OnlineClaimDetails": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The promotional code for the online offer for this particular receipt"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "BarcodeClaimDetails": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "$ref": "#/components/schemas/BarcodeFormat"
+          },
+          "value": {
+            "type": "string",
+            "description": "The barcode value for this particular receipt"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "Tax": {
+        "type": "object",
+        "description": "Tax information",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "Total tax paid"
+          },
+          "tax_type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaxType"
+              },
+              {
+                "description": "A tax code"
+              }
+            ]
+          }
+        },
+        "required": [
+          "amount",
+          "tax_type"
+        ]
+      },
+      "TaxWithCurrency": {
+        "type": "object",
+        "properties": {
+          "tax_type": {
+            "type": "string",
+            "description": "Type of the tax",
+            "example": "AU_GST"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/ConsumerPricing"
+          }
+        },
+        "required": [
+          "tax_type",
+          "amount"
+        ]
+      },
+      "TaxType": {
+        "type": "string",
+        "enum": [
+          "AU_GST",
+          "AU-GST",
+          "GST",
+          "AU_WET",
+          "AU-WET",
+          "WET",
+          "TAX_FREE",
+          "NO_TAX",
+          "OTHER"
+        ]
+      },
+      "Pricing": {
+        "type": "object",
+        "description": "Common attributes used to describe a specific product. Custom attributes may also be defined where they are not currently defined in our schema.",
+        "properties": {
+          "price": {
+            "type": "number",
+            "description": "Total final price for all items, including any taxes and after deducting the discounts (including from loyalty), i.e. quantity x discounted unit price"
+          },
+          "discount": {
+            "description": "The discount applied",
+            "type": "number"
+          },
+          "tax": {
+            "type": "number",
+            "description": "The tax paid"
+          },
+          "tax_type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaxType"
+              },
+              {
+                "description": "The tax paid"
+              }
+            ]
+          },
+          "currency_code": {
+            "type": "string",
+            "description": "The applicable ISO 4217 currency code for the purchase amount. eg. Australian Dollars `\"AUD\"`"
+          }
+        },
+        "required": [
+          "price",
+          "currency_code"
+        ]
+      },
+      "ConsumerPricing": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number"
+          },
+          "currency_code": {
+            "type": "string",
+            "description": "The applicable ISO 4217 currency code for the purchase amount. eg. Australian Dollars `\"AUD\"`"
+          }
+        },
+        "required": [
+          "price",
+          "currency_code"
+        ]
+      },
+      "ProductUnit": {
+        "type": "string",
+        "enum": [
+          "g",
+          "kg",
+          "m",
+          "l",
+          "item"
+        ]
+      },
+      "ProductLink": {
+        "type": "object",
+        "description": "Captures a URL along with a canonical name.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "product",
+                  "manufacturer",
+                  "documentation",
+                  "product_warranty",
+                  "extended_warranty",
+                  "image_url"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The URL of the link"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "custom"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/NamedLink"
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ]
+          }
+        ]
+      },
+      "NamedLink": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The named type of the link"
+          },
+          "description": {
+            "type": "string",
+            "description": "The link text to display"
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL of the link"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "url"
+        ]
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Card"
+              },
+              {
+                "description": "The Card itself, with the PAN masked."
+              }
+            ]
+          },
+          "network_merchant_id": {
+            "type": "string",
+            "description": "The merchant ID as sent to the issuer by the acquirer/card network.",
+            "example": "NID_1234"
+          },
+          "card_acceptor_name": {
+            "type": "string",
+            "description": "This is the merchant who is accepting the payment.",
+            "example": "Merchant1"
+          },
+          "trading_name": {
+            "type": "string",
+            "description": "This is the merchant's trading name.",
+            "example": "Merchant2"
+          },
+          "tid": {
+            "type": "string",
+            "description": "The id provided by the terminal.",
+            "example": "34645364"
+          },
+          "rrn": {
+            "type": "string",
+            "description": "The Retrieval Reference Number for the payment.",
+            "example": "ABC123"
+          },
+          "stan": {
+            "type": "string",
+            "description": "The System Trace Audit Number for the payment.",
+            "example": "ABC123"
+          },
+          "auth_code": {
+            "type": "string",
+            "description": "The authorisation code for the payment.",
+            "example": "ABC123"
+          },
+          "transaction_date": {
+            "type": "string",
+            "description": "Payment date and time from the payment terminal in RFC3339 date-time format.",
+            "example": "2020-05-20T10:23:47+10:00"
+          },
+          "purchase_amount": {
+            "type": "number",
+            "description": "The total sum of the items on this receipt.",
+            "example": 100.43
+          },
+          "surcharge": {
+            "type": "number",
+            "description": "Any additional charges from the card provider for this transaction.",
+            "example": 10.04
+          },
+          "cash_out": {
+            "type": "number",
+            "description": "Cash out amount, if applicable for this transaction",
+            "example": 20.0
+          },
+          "tip": {
+            "type": "number",
+            "description": "Any explicit tip captured by the payment terminal",
+            "example": 20.0
+          },
+          "total": {
+            "type": "number",
+            "description": "Total amount charged to the card as will be seen by bank side, including all surcharges, tips, etc.",
+            "example": 140.43
+          },
+          "currency_code": {
+            "example": "AUD",
+            "description": "The currency that this payment made in.",
+            "type": "string",
+            "enum": [
+              "AUD"
+            ]
+          },
+          "address": {
+            "type": "string",
+            "description": "The merchant store address.",
+            "example": "50 York St, Sydney 2000"
+          },
+          "merchant_category_code": {
+            "type": "string",
+            "description": "The category code of the merchant.",
+            "example": "5021"
+          },
+          "acquirer": {
+            "type": "string",
+            "description": "The acquirer name or label.",
+            "example": "BANK_NAME"
+          },
+          "terminal_name": {
+            "type": "string",
+            "description": "The brand name for the terminal.",
+            "example": "BANK TERMINAL"
+          },
+          "purchase_type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PurchaseType"
+              },
+              {
+                "description": "The type of purchase.",
+                "example": "credit"
+              }
+            ]
+          },
+          "transaction_type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionType"
+              },
+              {
+                "description": "The type of transaction.",
+                "example": "purchase"
+              }
+            ]
+          },
+          "pos_ref_no": {
+            "type": "string",
+            "description": "The POS generated transaction reference number.",
+            "example": "123456"
+          },
+          "transaction_reference_number": {
+            "type": "string",
+            "description": "The transaction reference number. This may be the same as the POS generated transaction reference number.",
+            "example": "123456"
+          },
+          "reference_id": {
+            "type": "string",
+            "description": "The reference id for this payment.",
+            "example": "abcd1234"
+          }
+        },
+        "required": [
+          "card",
+          "network_merchant_id",
+          "total",
+          "auth_code",
+          "stan",
+          "rrn",
+          "tid",
+          "transaction_date",
+          "purchase_amount"
+        ]
+      },
+      "Card": {
+        "type": "object",
+        "properties": {
+          "masked_pan": {
+            "type": "string",
+            "description": "The masked PAN for the card. It includes the first 6 and last 3 (but preferably 4) digits, with the middle digits masked with an 'X'.",
+            "example": "123456XXXXXX1234"
+          },
+          "external_id": {
+            "type": "string",
+            "description": "A card identifier.",
+            "example": "123456"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name on the card.",
+            "example": "John Doe"
+          },
+          "expiry": {
+            "type": "string",
+            "description": "The expiry date of the card.",
+            "example": "03/21"
+          },
+          "card_type": {
+            "type": "string",
+            "description": "The card type.",
+            "example": "visa"
+          }
+        },
+        "required": [
+          "masked_pan"
+        ]
+      },
+      "PurchaseType": {
+        "type": "string",
+        "enum": [
+          "debit",
+          "credit",
+          "savings",
+          "cheque"
+        ]
+      },
+      "TransactionType": {
+        "type": "string",
+        "enum": [
+          "purchase",
+          "credit",
+          "refund",
+          "return",
+          "cheque",
+          "void"
+        ]
+      },
+      "OtherPayment": {
+        "type": "object",
+        "description": "Information about the non-card payments, such as cash.",
+        "properties": {
+          "payment_type": {
+            "type": "string",
+            "description": "The payment type, e.g. cash",
+            "example": "cash"
+          },
+          "reference": {
+            "type": "string",
+            "description": "The payment reference",
+            "example": "REF_1234"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount paid via this method in the receipt currency",
+            "example": 263.12
+          },
+          "tip": {
+            "type": "number",
+            "description": "The tip paid in this purchase",
+            "example": 26.31
+          },
+          "surcharge": {
+            "type": "number",
+            "description": "The surcharge paid for this purchase",
+            "example": 13.15
+          }
+        },
+        "required": [
+          "payment_type",
+          "amount"
+        ]
+      },
+      "GlobalMoreInfoContentLink": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NamedLink"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "position": {
+                "type": "string",
+                "description": "A link could either be positioned at the top or bottom",
+                "enum": [
+                  "top",
+                  "bottom"
+                ]
+              }
+            },
+            "required": [
+              "position"
+            ]
+          }
+        ]
+      },
+      "GlobalMoreInfoContentParagraph": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The paragraph title of the global more information panel body"
+          },
+          "body": {
+            "type": "string",
+            "description": "The paragraph text of the global more information panel body"
+          }
+        }
+      },
+      "GlobalMoreInfoContent": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The content title of the global more information panel"
+          },
+          "paragraphs": {
+            "type": "array",
+            "description": "The content body of the global more information panel",
+            "items": {
+              "$ref": "#/components/schemas/GlobalMoreInfoContentParagraph"
+            }
+          },
+          "links": {
+            "type": "array",
+            "description": "A list of the links to be shown in the global more information panel",
+            "items": {
+              "$ref": "#/components/schemas/GlobalMoreInfoContentLink"
+            }
+          }
+        }
+      },
+      "GlobalMoreInfo": {
+        "type": "object",
+        "properties": {
+          "link_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the link that triggers the global more information panel"
+          },
+          "content": {
+            "type": "array",
+            "description": "A list of the global more information content",
+            "items": {
+              "$ref": "#/components/schemas/GlobalMoreInfoContent"
+            }
+          }
+        },
+        "required": [
+          "link_name",
+          "content"
+        ]
+      },
+      "Purchaser": {
+        "type": "object",
+        "description": "Purchaser details if supplied at checkout or linked to a specific transaction by the POS.",
+        "properties": {
+          "external_id": {
+            "type": "string",
+            "description": "A merchant defined id for the purchaser.",
+            "example": "123456"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the purchaser.",
+            "example": "Jane Doe"
+          },
+          "email": {
+            "type": "string",
+            "description": "The email of the purchaser.",
+            "example": "jane@doe.com.au"
+          },
+          "phone": {
+            "type": "string",
+            "description": "The phone number of the purchaser.",
+            "example": "+61426975578"
+          },
+          "abn": {
+            "type": "string",
+            "description": "Purchaser ABN, required for valid tax invoice where sale total exceeds $1000 AUD.",
+            "example": "01 234 567 890"
+          },
+          "notification_method": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationMethod"
+              },
+              {
+                "description": "The method chosen by the purchaser for receipt notifications.",
+                "default": "none",
+                "example": "sms"
+              }
+            ]
+          }
+        }
+      },
+      "NotificationMethod": {
+        "type": "string",
+        "enum": [
+          "sms",
+          "email",
+          "none"
+        ]
+      },
+      "Barcode": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The barcode id",
+                "example": "1A2B3C4D"
+              },
+              "format": {
+                "oneOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BarcodeFormat"
+                  }
+                ],
+                "description": "The encoding format used.",
+                "example": "ean13"
+              }
+            },
+            "required": [
+              "id",
+              "format"
+            ]
+          }
+        ]
+      },
+      "BarcodeFormat": {
+        "type": "string",
+        "enum": [
+          "ean13",
+          "ean8",
+          "ean5",
+          "ean2",
+          "upc",
+          "upcA",
+          "itf14",
+          "itf",
+          "code128",
+          "code128A",
+          "code128B",
+          "code128C",
+          "code39",
+          "unknown"
+        ]
+      },
+      "Location": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A human readable name for the location"
+          },
+          "position": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GpsPosition"
+              },
+              {
+                "description": "The GPS position"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "position"
+        ]
+      },
+      "GpsPosition": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number"
+          },
+          "lng": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "lat",
+          "lng"
+        ]
+      },
+      "Server": {
+        "type": "object",
+        "properties": {
+          "external_id": {
+            "type": "string",
+            "description": "The id of the server as provided by the merchant.",
+            "example": "1A2B3C4D"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the server.",
+            "example": "Jessica"
+          },
+          "position": {
+            "type": "string",
+            "description": "The position of the server within the organisation.",
+            "example": "Manager"
+          },
+          "photo_url": {
+            "type": "string",
+            "description": "The url of an image of the server.",
+            "example": "http://images.org/jessica"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "String error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code"
+          },
+          "details": {
+            "type": "object",
+            "description": "Arbitrary object for including further information or raw error responses"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      }
+    },
+    "responses": {
+      "PostAuthResponse": {
+        "description": "Authentication response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "jwt_token": {
+                  "type": "string",
+                  "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9....",
+                  "description": "The JWT token for the given merchant to be used in interactions with other Slyp Services.\nThe token expiry is 25 hours and should be cached.\n"
+                }
+              },
+              "required": [
+                "jwt_token"
+              ]
+            }
+          }
+        }
+      },
+      "BadRequestError": {
+        "description": "Bad Request. The request was invalid or could not be understood by the server.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "UnauthorisedError": {
+        "description": "Unauthorised. The API key or JWT provided was invalid or not authorised for this resource or action"
+      },
+      "TooManyRequestsError": {
+        "description": "Too Many Requests. We recommend an exponential back-off of your requests."
+      },
+      "InternalServerError": {
+        "description": "Internal server error. Please try again later."
+      }
+    }
+  }
+}
