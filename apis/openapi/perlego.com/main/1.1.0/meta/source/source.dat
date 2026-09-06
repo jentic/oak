@@ -1,0 +1,1048 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Perlego Partner API",
+    "description": "API for managing users and entitlements in Perlego.\n\nAll API calls must be made via HTTPS (TLS 1.3), must include a API key as a header, and must be hashed and signed (HMAC) for security. Keys will be provided to you by your Perlego account manager via a secure message prior.\n\nPlease note that in Staging and Development, this API is limited to a set of pre-agreed IP addresses or ranges. You will need to confirm these with your Perlego account manager prior.\n\nRate limits for the API are specified per path.",
+    "version": "1.1.0",
+    "x-jentic-source-url": "https://api.swaggerhub.com/apis/SCOTTDAFFORN_1/perlego-partner-api/1.1.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.perlego.com/partner/v1",
+      "description": "Production server"
+    },
+    {
+      "url": "https://api-eu-west-2-staging.perlego.com/partner",
+      "description": "Staging server"
+    },
+    {
+      "url": "https://api-eu-west-2-dev.perlego.com/partner",
+      "description": "Development server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "API key for authenticating requests.\nMust be included in the header of all requests. \nWill be provided to you by your Perlego account manager via a secure message."
+      },
+      "HmacAuth": {
+        "type": "http",
+        "scheme": "hmac-sha256",
+        "description": "HMAC SHA-256 authentication for requests.\nMust be included in the header of all requests.\nBody of the request must be hashed and provided as a header with value `authorization: HMAC ${hmac}`, where `${hmac}` is a hash of `${requestBody}${timestamp}`. `${requestBody}` is the JSON body of the request, and `${timestamp}` is the timestamp provided in the `x-timestamp` header.\nHash key will be provided to you by your Perlego account manager via a secure message."
+      }
+    },
+    "parameters": {
+      "timestampHeader": {
+        "in": "header",
+        "name": "x-timestamp",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "description": "The current timestamp in milliseconds since the Unix epoch.\nMust be included in the header of all requests.\nUsed to prevent replay attacks."
+        }
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "description": "A user object that contains user information and entitlements",
+        "required": [
+          "userId",
+          "email",
+          "entitlements"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the user in the Perlego system",
+            "example": "47e61dfd-8bb6-47ea-aafb-6359a7c70012"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "The user's email address",
+            "example": "john@smith.com"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "The user's first name",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "The user's last name",
+            "example": "Smith"
+          },
+          "organisationName": {
+            "type": "string",
+            "description": "The organisation the user belongs to",
+            "example": "University of Washington"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "student",
+              "instructor"
+            ],
+            "description": "The role of the user",
+            "x-enum-descriptions": {
+              "student": "A user who is currently enrolled a course of study",
+              "instructor": "A user who teaches or manages a course of study"
+            }
+          },
+          "discipline": {
+            "type": "string",
+            "description": "The field of study the user is enrolled in",
+            "example": "Mathematics"
+          },
+          "active": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Indicates whether or not the user has any active entitlements"
+          },
+          "entitlements": {
+            "type": "array",
+            "description": "List of entitlements the user has",
+            "items": {
+              "$ref": "#/components/schemas/Entitlement"
+            },
+            "example": [
+              {
+                "entitlementId": "subscription:12",
+                "entitlementType": "subscription"
+              }
+            ]
+          }
+        }
+      },
+      "Entitlement": {
+        "type": "object",
+        "required": [
+          "entitlementId",
+          "entitlementType"
+        ],
+        "properties": {
+          "entitlementId": {
+            "type": "string",
+            "description": "Unique identifier for the entitlement",
+            "example": "subscription:12"
+          },
+          "entitlementType": {
+            "type": "string",
+            "enum": [
+              "subscription"
+            ],
+            "description": "Type of the entitlement, used to determine the actual schema to use"
+          }
+        },
+        "discriminator": {
+          "propertyName": "entitlementType",
+          "mapping": {
+            "subscription": "#/components/schemas/SubscriptionEntitlement"
+          }
+        }
+      },
+      "SubscriptionEntitlement": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Entitlement"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "trialStartDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Date trial subscription starts. Must be before startDate"
+              },
+              "startDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Date billable subscription starts. If not specified, subscription begins immediately"
+              },
+              "endDate": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Date subscription ends. Must be after startDate"
+              },
+              "attributes": {
+                "type": "object",
+                "description": "A freeform object used to declare attributes to be stored against the entitlement with optional reserved attributes that may have extra data validation against them.",
+                "properties": {
+                  "perlegoBookIds": {
+                    "description": "an optional array of Perlego book IDs that can be provided with the attributes object. These will be validated as an array of integers.",
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Error400": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 400,
+            "description": "HTTP status code of the error response"
+          },
+          "message": {
+            "type": "string",
+            "description": "Description of the error, indicating that there was a bad request due to invalid input"
+          }
+        }
+      },
+      "Error401": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 401,
+            "description": "HTTP status code of the error response"
+          },
+          "message": {
+            "type": "string",
+            "description": "Description of the error, indicating that the user is not authorized",
+            "example": "Not Authorized"
+          }
+        }
+      },
+      "Error404": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 404,
+            "description": "HTTP status code of the error response"
+          },
+          "message": {
+            "type": "string",
+            "description": "Description of the error, indicating that the resource was not found",
+            "example": "Not Found"
+          }
+        }
+      },
+      "Error409": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 409,
+            "description": "HTTP status code of the error response"
+          },
+          "message": {
+            "type": "string",
+            "description": "Description of the error, indicating that the request could not be completed due to a conflict",
+            "example": "Conflict"
+          }
+        }
+      },
+      "Error429": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 429,
+            "description": "HTTP status code of the error response"
+          },
+          "message": {
+            "type": "string",
+            "description": "Description of the error, indicating that too many requests have been sent in a given amount of time",
+            "example": "Rate Limit Hit"
+          }
+        }
+      },
+      "JwtResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "format": "jwt",
+            "description": "The JSON Web Token that can be used for authenticated requests",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+          },
+          "expiresIn": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Time in seconds until the token expires",
+            "example": 900
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/users": {
+      "get": {
+        "summary": "Retrieves a list of all users",
+        "operationId": "listUsers",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "HmacAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "email",
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A paginated list of users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "offset": {
+                      "type": "number",
+                      "example": 10
+                    },
+                    "users": {
+                      "items": {
+                        "$ref": "#/components/schemas/User"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user": {
+      "post": {
+        "summary": "Creates a new user",
+        "operationId": "createUser",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "HmacAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "firstName": {
+                    "type": "string",
+                    "description": "The user's first name",
+                    "example": "John"
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "description": "The user's last name",
+                    "example": "Smith"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "The user's email address",
+                    "example": "john@smith.com"
+                  },
+                  "organisationName": {
+                    "type": "string",
+                    "description": "The organisation the user belongs to",
+                    "example": "University of Washington"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "student",
+                      "instructor"
+                    ],
+                    "description": "The role of the user",
+                    "x-enum-descriptions": {
+                      "student": "A user who is currently enrolled a course of study",
+                      "instructor": "A user who teaches or manages a course of study"
+                    }
+                  },
+                  "discipline": {
+                    "type": "string",
+                    "description": "The field of study the user is enrolled in",
+                    "example": "Mathematics"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "Unique identifier for the user in the Perlego system",
+                      "example": "47e61dfd-8bb6-47ea-aafb-6359a7c70012"
+                    },
+                    "firstName": {
+                      "type": "string",
+                      "description": "The user's first name",
+                      "example": "John"
+                    },
+                    "lastName": {
+                      "type": "string",
+                      "description": "The user's last name",
+                      "example": "Smith"
+                    },
+                    "email": {
+                      "type": "string",
+                      "format": "email",
+                      "description": "The user's email address",
+                      "example": "john@smith.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "User with email address already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error409"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/{userId}": {
+      "get": {
+        "summary": "Retrieves a user by their uuid",
+        "operationId": "getUserById",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "HmacAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Updates a user",
+        "operationId": "updateUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "HmacAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "john@smith.com",
+                    "description": "The user's email address"
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "example": "John",
+                    "description": "The user's first name"
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "example": "Smith",
+                    "description": "The user's last name"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "User successfully updated"
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "User with email address already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error409"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/{userId}/entitlements": {
+      "get": {
+        "summary": "Retrieves a list of entitlements for a user",
+        "operationId": "getEntitlementsByUserId",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "HmacAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entitlements retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Entitlement"
+                      },
+                      {
+                        "$ref": "#/components/schemas/SubscriptionEntitlement"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/{userId}/entitlement": {
+      "post": {
+        "summary": "Adds an entitlement to a user",
+        "operationId": "addEntitlementToUser",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "HmacAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "entitlementType"
+                ],
+                "properties": {
+                  "entitlementType": {
+                    "type": "string",
+                    "enum": [
+                      "subscription"
+                    ],
+                    "description": "Type of the entitlement, used to determine the actual schema to use"
+                  },
+                  "trialStartDate": {
+                    "type": "string",
+                    "description": "An ISO datetime complinent string indicating the start of the users entitlement trial period"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "decription": "An ISO datetime complient string indicating the start of the users main entitlement period"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "description": "an ISO datetime complient string indicating the end of the users entitlement period after which they will be automatically revoked"
+                  },
+                  "attributes": {
+                    "type": "object",
+                    "description": "A freeform object used to declare attributes to be stored against the entitlement with optional reserved attributes that may have extra data validation against them.",
+                    "properties": {
+                      "perlegoBookIds": {
+                        "description": "an optional array of Perlego book IDs that can be provided with the attributes object. These will be validated as an array of integers.",
+                        "type": "array",
+                        "items": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "additionalProperties": true
+                  }
+                }
+              },
+              "examples": {
+                "simpleSubscription": {
+                  "value": {
+                    "entitlementType": "subscription"
+                  }
+                },
+                "subscriptionWithEndDate": {
+                  "value": {
+                    "entitlementType": "subscription",
+                    "trialStartDate": "2024-08-01T00:00:00Z",
+                    "startDate": "2024-09-01T00:00:00Z",
+                    "endDate": "2025-01-01T00:00:00Z"
+                  }
+                },
+                "subscriptionWithAttributes": {
+                  "value": {
+                    "entitlementType": "subscription",
+                    "attributes": {
+                      "perlegoBookIds": [
+                        1,
+                        2,
+                        3,
+                        5
+                      ]
+                    }
+                  }
+                },
+                "subscriptionWithAll": {
+                  "value": {
+                    "entitlementType": "subscription",
+                    "trialStartDate": "2024-08-01T00:00:00Z",
+                    "startDate": "2024-09-01T00:00:00Z",
+                    "endDate": "2025-01-01T00:00:00Z",
+                    "attributes": {
+                      "perlegoBookIds": [
+                        1,
+                        2,
+                        3,
+                        5
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Entitlement added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionEntitlement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error400"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/{userId}/entitlement/{entitlementId}": {
+      "delete": {
+        "summary": "Removes an entitlement from a user",
+        "operationId": "removeEntitlementFromUser",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "HmacAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "entitlementId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Entitlement successfully removed"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User or entitlement not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/token": {
+      "post": {
+        "summary": "Retrieves a short-lived authentication token for a user",
+        "operationId": "authenticateUser",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "HmacAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The user ID for which the JWT needs to be generated"
+                  }
+                },
+                "required": [
+                  "userId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful, JWT provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JwtResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
